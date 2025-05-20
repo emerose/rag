@@ -23,11 +23,11 @@ from rich.table import Table
 # Try both relative and absolute imports
 try:
     # Try relative imports first (for module usage)
-    from .rag_engine import RAGConfig, RAGEngine
+    from .rag_engine import RAGConfig, RAGEngine, RuntimeOptions
     from .tui import run_tui
 except ImportError:
     # Fall back to absolute imports (for direct script usage)
-    from rag.rag_engine import RAGConfig, RAGEngine
+    from rag.rag_engine import RAGConfig, RAGEngine, RuntimeOptions
     from rag.tui import run_tui
 
 
@@ -172,8 +172,11 @@ def index(
             cache_dir=CACHE_DIR,
         )
 
+        # Create runtime options
+        runtime_options = RuntimeOptions()
+
         # Run the TUI application
-        run_tui(config)
+        run_tui(config, runtime_options)
 
     except ValueError as e:
         state.logger.error(f"Configuration error: {e!s}")
@@ -239,7 +242,8 @@ def invalidate(
             chat_model="gpt-4",
             temperature=0.0,
         )
-        rag_engine = RAGEngine(config)
+        runtime_options = RuntimeOptions()
+        rag_engine = RAGEngine(config, runtime_options)
 
         if all_caches:
             # Invalidate all caches
@@ -303,7 +307,8 @@ def query(
             temperature=0.0,
             cache_dir=CACHE_DIR,
         )
-        rag_engine = RAGEngine(config)
+        runtime_options = RuntimeOptions()
+        rag_engine = RAGEngine(config, runtime_options)
 
         # Load cache metadata to check if we have any documents
         cache_metadata = rag_engine._load_cache_metadata()
@@ -374,7 +379,8 @@ def summarize(
             temperature=0.0,
             cache_dir=CACHE_DIR,
         )
-        rag_engine = RAGEngine(config)
+        runtime_options = RuntimeOptions()
+        rag_engine = RAGEngine(config, runtime_options)
 
         # Load cache metadata to check if we have any documents
         cache_metadata = rag_engine._load_cache_metadata()
@@ -479,9 +485,10 @@ def list() -> None:
             temperature=0.0,
             cache_dir=CACHE_DIR,
         )
+        runtime_options = RuntimeOptions()
         state.logger.debug(
             f"Initialized RAGConfig with cache_dir: {CACHE_DIR}")
-        rag_engine = RAGEngine(config)
+        rag_engine = RAGEngine(config, runtime_options)
         state.logger.debug("Created RAGEngine instance")
 
         # Load cache metadata
@@ -552,7 +559,8 @@ def _initialize_rag_engine() -> RAGEngine:
         temperature=0.0,
         cache_dir=CACHE_DIR,
     )
-    return RAGEngine(config)
+    runtime_options = RuntimeOptions()
+    return RAGEngine(config, runtime_options)
 
 
 def _load_vectorstores(rag_engine: RAGEngine) -> None:

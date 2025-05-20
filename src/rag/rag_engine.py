@@ -107,10 +107,24 @@ def load_environment():
 load_environment()
 
 
-@dataclass
+@dataclass(frozen=True)
 class RAGConfig:
-    """Configuration for RAG Engine."""
-
+    """Configuration for RAG Engine.
+    
+    This is an immutable configuration class that contains all the static configuration
+    parameters for the RAG engine. Runtime-mutable flags are moved to RuntimeOptions.
+    
+    Attributes:
+        documents_dir: Directory containing documents to index
+        embedding_model: Name of the OpenAI embedding model to use
+        chat_model: Name of the OpenAI chat model to use
+        temperature: Temperature parameter for chat model
+        cache_dir: Directory for caching embeddings and vector stores
+        lock_timeout: Timeout in seconds for file locks
+        chunk_size: Number of tokens per chunk
+        chunk_overlap: Number of tokens to overlap between chunks
+        openai_api_key: OpenAI API key (will be set in __post_init__)
+    """
     documents_dir: str
     embedding_model: str = "text-embedding-3-small"
     chat_model: str = "gpt-4"
@@ -120,22 +134,36 @@ class RAGConfig:
     chunk_size: int = 1000  # tokens
     chunk_overlap: int = 200  # tokens
     openai_api_key: str = ""  # Will be set in __post_init__
-    progress_callback: Any = None  # Callback for progress updates
-    log_callback: Any = None  # Callback for logging
 
     def __post_init__(self):
         """Initialize derived attributes after instance creation."""
         if not self.openai_api_key:
-            self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
+            object.__setattr__(self, 'openai_api_key', os.getenv("OPENAI_API_KEY", ""))
+
+
+@dataclass
+class RuntimeOptions:
+    """Runtime options for RAG Engine.
+    
+    This class contains all the runtime-mutable flags and callbacks that can be
+    modified during the execution of the RAG engine.
+    
+    Attributes:
+        progress_callback: Optional callback for progress updates
+        log_callback: Optional callback for logging
+    """
+    progress_callback: Any = None  # Callback for progress updates
+    log_callback: Any = None  # Callback for logging
 
 
 class RAGEngine:
-    def __init__(self, config: RAGConfig | None = None, **kwargs):
+    def __init__(self, config: RAGConfig | None = None, runtime_options: RuntimeOptions | None = None, **kwargs):
         """
         Initialize RAG Engine with document indexing and retrieval capabilities.
 
         Args:
             config: RAGEngine configuration
+            runtime_options: Runtime options for callbacks and mutable flags
             **kwargs: Deprecated. Use config parameter instead.
 
         Raises:
@@ -159,8 +187,10 @@ class RAGEngine:
                     f"RAGEngine.__init__() got unexpected keyword arguments: {list(kwargs.keys())}"
                 )
 
-        self._initialize_from_config(config)
+        self.config = config
+        self.runtime_options = runtime_options or RuntimeOptions()
         self._validate_environment()
+        self._initialize_from_config()
 
     def _validate_environment(self) -> None:
         """Validate that required environment variables are set."""
@@ -195,17 +225,16 @@ class RAGEngine:
             )
             raise
 
-    def _initialize_from_config(self, config: RAGConfig) -> None:
+    def _initialize_from_config(self) -> None:
         """Initialize engine from configuration."""
-        self.config = config  # Store config as instance variable
-        self._initialize_paths(config.documents_dir, config.cache_dir)
+        self._initialize_paths(self.config.documents_dir, self.config.cache_dir)
         self._initialize_parameters(
-            config.lock_timeout, config.chunk_size, config.chunk_overlap
+            self.config.lock_timeout, self.config.chunk_size, self.config.chunk_overlap
         )
-        self._initialize_tokenizer(config.embedding_model)
+        self._initialize_tokenizer(self.config.embedding_model)
         self._initialize_locks()
         self._initialize_embeddings()
-        self._initialize_chat_model(config.chat_model, config.temperature)
+        self._initialize_chat_model(self.config.chat_model, self.config.temperature)
         self._initialize_vectorstores()
         self._initialize_cache_metadata()
 
@@ -1703,9 +1732,9 @@ class RAGEngine:
 
     def _update_progress(self, name: str, value: int) -> None:
         """Update progress using the callback if available."""
-        if self.config.progress_callback:
+        if self.runtime_options.progress_callback:
             try:
-                self.config.progress_callback(name, value)
+                self.runtime_options.progress_callback(name, value)
             except Exception as e:
                 self._log(
                     "WARNING", f"Failed to update progress: {e!s}", "Progress")

@@ -10,7 +10,7 @@ from textual.containers import Container, Horizontal
 from textual.message import Message
 from textual.widgets import Footer, Header, Label, ProgressBar, RichLog
 
-from .rag_engine import RAGConfig, RAGEngine
+from .rag_engine import RAGConfig, RAGEngine, RuntimeOptions
 
 
 class TUILogHandler(logging.Handler):
@@ -216,13 +216,20 @@ class RAGTUI(App):
     }
     """
 
-    def __init__(self, config: RAGConfig | None = None) -> None:
+    def __init__(self, config: RAGConfig | None = None, runtime_options: RuntimeOptions | None = None) -> None:
         """Initialize the RAG TUI application."""
         super().__init__()
         self.config = config
+        self.runtime_options = runtime_options or RuntimeOptions()
         self.rag_engine: RAGEngine | None = None
         self.log_viewer: RichLog | None = None
         self.progress_section: ProgressSection | None = None
+
+        # Set up progress callback if not already set
+        if not self.runtime_options.progress_callback:
+            self.runtime_options.progress_callback = lambda name, value: self.post_message(
+                ProgressUpdated(name, value)
+            )
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -277,15 +284,8 @@ class RAGTUI(App):
             if self.config:
                 logging.info("Initializing RAG engine...")
                 try:
-                    # Set up callback for progress using our event system
-                    self.config.progress_callback = (
-                        lambda name, value: self.post_message(
-                            ProgressUpdated(name, value)
-                        )
-                    )
-
                     # Initialize RAG engine
-                    self.rag_engine = RAGEngine(self.config)
+                    self.rag_engine = RAGEngine(self.config, self.runtime_options)
                     logging.info("RAG engine initialized successfully")
 
                     # Schedule indexing to start after TUI is ready
@@ -367,7 +367,7 @@ class RAGTUI(App):
             self.indexing_task.cancel()
 
 
-def run_tui(config: RAGConfig | None = None) -> None:
+def run_tui(config: RAGConfig | None = None, runtime_options: RuntimeOptions | None = None) -> None:
     """Run the RAG TUI application."""
-    app = RAGTUI(config)
+    app = RAGTUI(config, runtime_options)
     app.run()
