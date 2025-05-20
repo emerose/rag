@@ -76,3 +76,4 @@
 - If you are directed to make a change to fix a problem, eg from a linter check, also look for other instances of that same problem and fix those too
 - If you are directed to make a change, eg to add or change functionality, try to keep the change focused on that particular functionality
 - when making changes, consider the ruff rules in place for both formatting and checking. Only suggest changes that will pass those checks
+- when running code, remember that we are using uv and activate the virtual environment before running anything

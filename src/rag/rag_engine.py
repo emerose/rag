@@ -632,6 +632,55 @@ class RAGEngine:
         for file_path in files_to_remove:
             self._invalidate_cache(file_path)
 
+    def cleanup_orphaned_chunks(self) -> dict[str, Any]:
+        """
+        Delete cached vector stores whose source files were removed.
+        
+        This helps keep the .cache/ directory from growing unbounded by removing
+        vector stores for files that no longer exist in the file system.
+        
+        Returns:
+            Dictionary with number of orphaned chunks cleaned up and total bytes freed
+        """
+        # Get size information before cleanup
+        pre_cleanup_size = 0
+        if self.vectorstore_cache_dir.exists():
+            for item in self.vectorstore_cache_dir.glob("*"):
+                if item.is_file():
+                    pre_cleanup_size += item.stat().st_size
+                
+        # Track what's being removed
+        num_removed = 0
+        removed_paths = []
+        
+        # Check each file in cache metadata
+        files_to_remove = []
+        for file_path in list(self.cache_metadata):
+            if not os.path.exists(file_path):
+                files_to_remove.append(file_path)
+                removed_paths.append(file_path)
+                num_removed += 1
+                
+        # Process removals
+        for file_path in files_to_remove:
+            self._invalidate_cache(file_path)
+        
+        # Calculate space freed
+        post_cleanup_size = 0
+        if self.vectorstore_cache_dir.exists():
+            for item in self.vectorstore_cache_dir.glob("*"):
+                if item.is_file():
+                    post_cleanup_size += item.stat().st_size
+        
+        bytes_freed = max(0, pre_cleanup_size - post_cleanup_size)
+        
+        # Return statistics about the cleanup
+        return {
+            "removed_count": num_removed,
+            "bytes_freed": bytes_freed,
+            "removed_paths": removed_paths
+        }
+
     def _get_file_type(self, file_path: str) -> str:
         """
         Get the MIME type of a file using python-magic.

@@ -12,7 +12,6 @@ Refactoring
 
 Logic
 
-- Add a cleanup_orphaned_chunks() helper that deletes cached vector stores whose source files were removed, to keep .cache/ from growing unbounded.
 - Introduce semantic-aware chunking (e.g., RecursiveCharacterTextSplitter or MarkdownHeaderTextSplitter) instead of fixed token windows—this improves answer relevance and reduces token usage.
 
 Performance

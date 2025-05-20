@@ -781,6 +781,63 @@ def repl(
         state.is_processing = False
 
 
+@app.command()
+def cleanup() -> None:
+    """
+    Clean up orphaned chunks in the cache.
+    
+    This command removes cached vector stores for files that no longer exist,
+    helping to keep the .cache/ directory from growing unbounded.
+    
+    Usage:
+        rag cleanup
+    """
+    try:
+        state.logger.info("Starting cache cleanup...")
+        console.print("[cyan]Starting cache cleanup...[/cyan]")
+        
+        # Initialize RAG engine using RAGConfig with default cache directory
+        state.logger.info(f"Initializing RAGConfig with cache_dir: {CACHE_DIR}")
+        config = RAGConfig(
+            documents_dir=".",  # Not used for cleanup, but required
+            cache_dir=CACHE_DIR,
+        )
+        
+        # Initialize the RAG engine
+        rag_engine = RAGEngine(config)
+        
+        # Execute the cleanup
+        result = rag_engine.cleanup_orphaned_chunks()
+        
+        # Format size nicely
+        bytes_freed = result["bytes_freed"]
+        if bytes_freed < 1024:
+            size_str = f"{bytes_freed} bytes"
+        elif bytes_freed < 1024 * 1024:
+            size_str = f"{bytes_freed / 1024:.2f} KB"
+        else:
+            size_str = f"{bytes_freed / (1024 * 1024):.2f} MB"
+            
+        # Print results
+        console.print(f"[green]Cleanup complete:[/green]")
+        console.print(f"  • Removed [bold]{result['removed_count']}[/bold] orphaned vector stores")
+        console.print(f"  • Freed [bold]{size_str}[/bold] of disk space")
+        
+        # Log removed paths for debugging
+        if result["removed_paths"]:
+            state.logger.info(f"Removed the following orphaned vector stores:")
+            for path in result["removed_paths"]:
+                state.logger.info(f"  - {path}")
+        else:
+            state.logger.info("No orphaned vector stores found")
+            console.print("[cyan]No orphaned vector stores found[/cyan]")
+            
+    except Exception as e:
+        state.logger.error(f"Error during cache cleanup: {e!s}")
+        console.print(f"[red]Error:[/red] Error during cache cleanup: {e!s}")
+        raise typer.Exit(code=1)
+
+
 def run_cli() -> None:
     app()
 
