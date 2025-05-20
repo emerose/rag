@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import time
+import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
@@ -32,6 +33,14 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_unstructured import UnstructuredLoader
 import asyncio
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    wait_exponential,
+    stop_after_attempt,
+    before_sleep_log
+)
+from openai import RateLimitError, APIError, APIConnectionError
 from .index_meta import IndexMetadata
 
 # Disable telemetry
@@ -927,207 +936,48 @@ class RAGEngine:
 
         return valid_docs
 
-    def _get_merged_vectorstore(self) -> FAISS:
+    @retry(
+        retry=retry_if_exception_type((RateLimitError, APIError, APIConnectionError)),
+        wait=wait_exponential(multiplier=1, min=1, max=60),
+        stop=stop_after_attempt(8),
+        before_sleep=before_sleep_log(logger, logging.WARNING)
+    )
+    def _create_embeddings_batch(
+        self, batch: list[Any], embeddings: OpenAIEmbeddings
+    ) -> list[list[float]]:
         """
-        Get a merged vectorstore from all individual vectorstores.
-        Uses public APIs to safely merge vectorstores for querying.
-        Processes documents in batches to stay within token limits.
-
-        Returns:
-            FAISS: Merged vectorstore
-
-        Raises:
-            ValueError: If no vectorstores are available
-        """
-        if not self.vectorstores:
-            raise ValueError("No vectorstores available for merging")
-
-        # Check if we already have a cached merged vectorstore
-        if hasattr(self, '_cached_merged_vectorstore'):
-            return self._cached_merged_vectorstore
-
-        # For simplicity, if there's only one vectorstore, just use it
-        if len(self.vectorstores) == 1:
-            store = next(iter(self.vectorstores.values()))
-            self._cached_merged_vectorstore = store
-            return store
-            
-        self._log("INFO", "Merging multiple vectorstores for querying", "Indexer")
-            
-        # Track source documents and their chunks
-        source_docs = {}
-        total_chunks = 0
-        all_docs = []
-
-        # Collect documents from all vectorstores using public API
-        for file_path, store in self.vectorstores.items():
-            try:
-                # Get absolute path for consistent tracking
-                abs_path = str(Path(file_path).absolute())
-                
-                # Use the similarity search directly to get all documents
-                docs = []
-                try:
-                    # First method: try direct access to the docstore
-                    if hasattr(store, "docstore") and hasattr(store.docstore, "_dict"):
-                        for doc_id in store.docstore._dict:
-                            if doc_id in store.docstore._dict:
-                                docs.append(store.docstore._dict[doc_id])
-                except Exception:
-                    # Fallback method: use similarity search with a large k
-                    try:
-                        docs = store.similarity_search("", k=10000)
-                    except Exception as e:
-                        self._log(
-                            "WARNING",
-                            f"Failed to retrieve documents using similarity search: {e}",
-                            "Indexer"
-                        )
-                
-                num_chunks = len(docs)
-                if num_chunks == 0:
-                    self._log(
-                        "WARNING",
-                        f"No documents found in vectorstore for {file_path}",
-                        "Indexer"
-                    )
-                    continue
-                    
-                # Track source document and its chunks
-                source_docs[abs_path] = {
-                    "chunks": num_chunks,
-                    "first_chunk_id": total_chunks,
-                    "last_chunk_id": total_chunks + num_chunks - 1,
-                }
-                
-                # Add documents to the overall collection
-                all_docs.extend(docs)
-                
-                total_chunks += num_chunks
-                self._log(
-                    "INFO",
-                    f"Collected {num_chunks} documents from: {abs_path}",
-                    "Indexer",
-                )
-            except Exception as e:
-                self._log(
-                    "WARNING",
-                    f"Failed to process vectorstore from {file_path}: {e}",
-                    "Indexer",
-                )
-                continue
-
-        # Create a new vectorstore with all the collected documents
-        if not all_docs:
-            raise ValueError("No documents found in any vectorstore")
-            
-        try:
-            # Process documents in batches to stay within token limits
-            # OpenAI's limit is 300,000 tokens per request
-            merged_store = None
-            batch_size = 100  # Start with a conservative batch size
-            
-            self._log(
-                "INFO",
-                f"Processing {len(all_docs)} documents in batches of {batch_size}",
-                "Indexer",
-            )
-            
-            # Process in batches
-            for i in range(0, len(all_docs), batch_size):
-                batch_docs = all_docs[i:i+batch_size]
-                batch_texts = [doc.page_content for doc in batch_docs]
-                batch_metadatas = [doc.metadata for doc in batch_docs]
-                
-                self._log(
-                    "INFO",
-                    f"Processing batch {i//batch_size + 1}/{(len(all_docs) + batch_size - 1)//batch_size}",
-                    "Indexer",
-                )
-                
-                try:
-                    # For the first batch, create a new vectorstore
-                    if merged_store is None:
-                        merged_store = FAISS.from_texts(
-                            texts=batch_texts,
-                            embedding=self.embeddings,
-                            metadatas=batch_metadatas
-                        )
-                    else:
-                        # For subsequent batches, add to the existing vectorstore
-                        merged_store.add_texts(
-                            texts=batch_texts,
-                            metadatas=batch_metadatas
-                        )
-                except Exception as e:
-                    # If we hit a token limit, reduce batch size and retry
-                    if "max_tokens_per_request" in str(e) and batch_size > 10:
-                        self._log(
-                            "WARNING",
-                            f"Token limit exceeded with batch size {batch_size}, reducing batch size",
-                            "Indexer",
-                        )
-                        batch_size = batch_size // 2
-                        # Retry this batch with smaller size
-                        i -= batch_size
-                        continue
-                    else:
-                        # Other error, re-raise
-                        raise
-            
-            if merged_store is None:
-                raise ValueError("Failed to create merged vectorstore after batching")
-            
-            # Log merging summary
-            self._log(
-                "INFO",
-                f"Successfully merged {len(self.vectorstores)} vectorstores with "
-                f"{total_chunks} total chunks",
-                "Indexer",
-            )
-            
-            # Cache the merged vectorstore
-            self._cached_merged_vectorstore = merged_store
-            return merged_store
-            
-        except Exception as e:
-            self._log(
-                "ERROR",
-                f"Failed to create merged vectorstore: {e}",
-                "Indexer",
-            )
-            raise ValueError(f"Failed to create merged vectorstore: {e}")
-
-    def _calculate_optimal_batch_size(self, total_chunks: int) -> int:
-        """
-        Calculate optimal batch size for embedding operations.
-        Considers OpenAI's rate limits and token limits.
+        Create embeddings for a batch of documents with retry logic.
 
         Args:
-            total_chunks: Total number of chunks to process
+            batch: List of documents to embed
+            embeddings: Embeddings model to use
 
         Returns:
-            Optimal batch size for embedding operations
+            List of embeddings
         """
-        # OpenAI's API can handle up to 2048 tokens per request
-        # For text-embedding-3-small, that's roughly 100-150 chunks per request
-        # We'll use a conservative estimate of 100 chunks per batch
+        try:
+            # Extract text content from documents
+            texts = [doc.page_content for doc in batch]
+            # Create embeddings
+            return embeddings.embed_documents(texts)
+        except Exception as e:
+            self._log(
+                "WARNING", f"Failed to create embeddings for batch: {e}", "Embeddings"
+            )
+            # Re-raise the exception for the retry decorator
+            raise
 
-        # Calculate batch size based on total chunks
-        if total_chunks <= MIN_BATCH_SIZE:
-            return total_chunks  # Process all at once for small documents
-        elif total_chunks <= MAX_BATCH_SIZE:
-            # Small batches for medium documents
-            return min(total_chunks, MEDIUM_BATCH_SIZE)
-        else:
-            # For larger documents, use maximum batch size
-            return MAX_BATCH_SIZE
-
+    @retry(
+        retry=retry_if_exception_type((RateLimitError, APIError, APIConnectionError)),
+        wait=wait_exponential(multiplier=1, min=1, max=60),
+        stop=stop_after_attempt(8),
+        before_sleep=before_sleep_log(logger, logging.WARNING)
+    )
     async def _create_embeddings_batch_async(
         self, batch: list[Any], semaphore: asyncio.Semaphore
     ) -> list[list[float]]:
         """
-        Create embeddings for a batch of documents asynchronously.
+        Create embeddings for a batch of documents asynchronously with retry logic.
 
         Args:
             batch: List of documents to embed
@@ -1159,31 +1009,8 @@ class RAGEngine:
             self._log(
                 "WARNING", f"Failed to create embeddings for batch: {e}", "Embeddings"
             )
-            return []
-
-    def _create_embeddings_batch(
-        self, batch: list[Any], embeddings: OpenAIEmbeddings
-    ) -> list[list[float]]:
-        """
-        Create embeddings for a batch of documents.
-
-        Args:
-            batch: List of documents to embed
-            embeddings: Embeddings model to use
-
-        Returns:
-            List of embeddings
-        """
-        try:
-            # Extract text content from documents
-            texts = [doc.page_content for doc in batch]
-            # Create embeddings
-            return embeddings.embed_documents(texts)
-        except Exception as e:
-            self._log(
-                "WARNING", f"Failed to create embeddings for batch: {e}", "Embeddings"
-            )
-            return []
+            # Re-raise the exception for the retry decorator
+            raise
 
     async def _create_vectorstore_from_chunks_async(
         self, file_path: str, chunks: list[Any]
@@ -1649,9 +1476,15 @@ class RAGEngine:
             self._log("ERROR", f"Error during indexing: {e!s}", "Indexer")
             raise
 
+    @retry(
+        retry=retry_if_exception_type((RateLimitError, APIError, APIConnectionError)),
+        wait=wait_exponential(multiplier=1, min=1, max=60),
+        stop=stop_after_attempt(8),
+        before_sleep=before_sleep_log(logger, logging.WARNING)
+    )
     def query(self, query: str, k: int = 4) -> str:
         """
-        Perform a RAG query on the indexed documents.
+        Perform a RAG query on the indexed documents with retry logic.
 
         Args:
             query: User's query
@@ -1853,6 +1686,239 @@ class RAGEngine:
             List of dictionaries containing file metadata
         """
         return self.index_meta.list_indexed_files()
+
+    def _calculate_optimal_batch_size(self, total_chunks: int) -> int:
+        """
+        Calculate optimal batch size for embedding operations.
+        Considers OpenAI's rate limits and token limits.
+
+        Args:
+            total_chunks: Total number of chunks to process
+
+        Returns:
+            Optimal batch size for embedding operations
+        """
+        # OpenAI's API can handle up to 2048 tokens per request
+        # For text-embedding-3-small, that's roughly 100-150 chunks per request
+        # We'll use a conservative estimate of 100 chunks per batch
+
+        # Calculate batch size based on total chunks
+        if total_chunks <= MIN_BATCH_SIZE:
+            return total_chunks  # Process all at once for small documents
+        elif total_chunks <= MAX_BATCH_SIZE:
+            # Small batches for medium documents
+            return min(total_chunks, MEDIUM_BATCH_SIZE)
+        else:
+            # For larger documents, use maximum batch size
+            return MAX_BATCH_SIZE
+
+    def _get_merged_vectorstore(self) -> FAISS:
+        """
+        Get a merged vectorstore from all individual vectorstores.
+        Uses public APIs to safely merge vectorstores for querying.
+        Processes documents in batches to stay within token limits.
+
+        Returns:
+            FAISS: Merged vectorstore
+
+        Raises:
+            ValueError: If no vectorstores are available
+        """
+        if not self.vectorstores:
+            raise ValueError("No vectorstores available for merging")
+
+        # Check if we already have a cached merged vectorstore
+        if hasattr(self, '_cached_merged_vectorstore'):
+            return self._cached_merged_vectorstore
+
+        # For simplicity, if there's only one vectorstore, just use it
+        if len(self.vectorstores) == 1:
+            store = next(iter(self.vectorstores.values()))
+            self._cached_merged_vectorstore = store
+            return store
+            
+        self._log("INFO", "Merging multiple vectorstores for querying", "Indexer")
+            
+        # Track source documents and their chunks
+        source_docs = {}
+        total_chunks = 0
+        all_docs = []
+
+        # Collect documents from all vectorstores using public API
+        for file_path, store in self.vectorstores.items():
+            try:
+                # Get absolute path for consistent tracking
+                abs_path = str(Path(file_path).absolute())
+                
+                # Use the similarity search directly to get all documents
+                docs = []
+                try:
+                    # First method: try direct access to the docstore
+                    if hasattr(store, "docstore") and hasattr(store.docstore, "_dict"):
+                        for doc_id in store.docstore._dict:
+                            if doc_id in store.docstore._dict:
+                                docs.append(store.docstore._dict[doc_id])
+                except Exception:
+                    # Fallback method: use similarity search with a large k
+                    try:
+                        docs = store.similarity_search("", k=10000)
+                    except Exception as e:
+                        self._log(
+                            "WARNING",
+                            f"Failed to retrieve documents using similarity search: {e}",
+                            "Indexer"
+                        )
+                
+                num_chunks = len(docs)
+                if num_chunks == 0:
+                    self._log(
+                        "WARNING",
+                        f"No documents found in vectorstore for {file_path}",
+                        "Indexer"
+                    )
+                    continue
+                    
+                # Track source document and its chunks
+                source_docs[abs_path] = {
+                    "chunks": num_chunks,
+                    "first_chunk_id": total_chunks,
+                    "last_chunk_id": total_chunks + num_chunks - 1,
+                }
+                
+                # Add documents to the overall collection
+                all_docs.extend(docs)
+                
+                total_chunks += num_chunks
+                self._log(
+                    "INFO",
+                    f"Collected {num_chunks} documents from: {abs_path}",
+                    "Indexer",
+                )
+            except Exception as e:
+                self._log(
+                    "WARNING",
+                    f"Failed to process vectorstore from {file_path}: {e}",
+                    "Indexer",
+                )
+                continue
+
+        # Create a new vectorstore with all the collected documents
+        if not all_docs:
+            raise ValueError("No documents found in any vectorstore")
+            
+        try:
+            # Process documents in batches to stay within token limits
+            # OpenAI's limit is 300,000 tokens per request
+            merged_store = None
+            batch_size = 100  # Start with a conservative batch size
+            
+            self._log(
+                "INFO",
+                f"Processing {len(all_docs)} documents in batches of {batch_size}",
+                "Indexer",
+            )
+            
+            # Process in batches
+            for i in range(0, len(all_docs), batch_size):
+                batch_docs = all_docs[i:i+batch_size]
+                batch_texts = [doc.page_content for doc in batch_docs]
+                batch_metadatas = [doc.metadata for doc in batch_docs]
+                
+                self._log(
+                    "INFO",
+                    f"Processing batch {i//batch_size + 1}/{(len(all_docs) + batch_size - 1)//batch_size}",
+                    "Indexer",
+                )
+                
+                # Add a small random delay between batches to avoid rate limits
+                if i > 0:
+                    delay = random.uniform(0.5, 2.0)
+                    self._log(
+                        "DEBUG", 
+                        f"Waiting {delay:.2f}s before next batch to avoid rate limits", 
+                        "Indexer"
+                    )
+                    time.sleep(delay)
+                
+                success = False
+                retries = 0
+                max_retries = 5
+                
+                while not success and retries < max_retries:
+                    try:
+                        # For the first batch, create a new vectorstore
+                        if merged_store is None:
+                            merged_store = FAISS.from_texts(
+                                texts=batch_texts,
+                                embedding=self.embeddings,
+                                metadatas=batch_metadatas
+                            )
+                        else:
+                            # For subsequent batches, add to the existing vectorstore
+                            merged_store.add_texts(
+                                texts=batch_texts,
+                                metadatas=batch_metadatas
+                            )
+                        success = True
+                    except RateLimitError as e:
+                        retries += 1
+                        wait_time = min(2 ** retries + random.uniform(0, 1), 60)
+                        self._log(
+                            "WARNING",
+                            f"Rate limit exceeded. Retrying in {wait_time:.2f}s (attempt {retries}/{max_retries})",
+                            "Indexer",
+                        )
+                        time.sleep(wait_time)
+                        
+                        # If we've retried too many times, reduce batch size and try again
+                        if retries >= max_retries and batch_size > 10:
+                            batch_size = batch_size // 2
+                            self._log(
+                                "WARNING",
+                                f"Reducing batch size to {batch_size} after multiple rate limit errors",
+                                "Indexer",
+                            )
+                            # Retry this batch with smaller size
+                            i -= batch_size
+                            break
+                    except Exception as e:
+                        # If we hit a token limit, reduce batch size and retry
+                        if "max_tokens_per_request" in str(e) and batch_size > 10:
+                            self._log(
+                                "WARNING",
+                                f"Token limit exceeded with batch size {batch_size}, reducing batch size",
+                                "Indexer",
+                            )
+                            batch_size = batch_size // 2
+                            # Retry this batch with smaller size
+                            i -= batch_size
+                            break
+                        else:
+                            # Other error, re-raise
+                            raise
+            
+            if merged_store is None:
+                raise ValueError("Failed to create merged vectorstore after batching")
+            
+            # Log merging summary
+            self._log(
+                "INFO",
+                f"Successfully merged {len(self.vectorstores)} vectorstores with "
+                f"{total_chunks} total chunks",
+                "Indexer",
+            )
+            
+            # Cache the merged vectorstore
+            self._cached_merged_vectorstore = merged_store
+            return merged_store
+            
+        except Exception as e:
+            self._log(
+                "ERROR",
+                f"Failed to create merged vectorstore: {e}",
+                "Indexer",
+            )
+            raise ValueError(f"Failed to create merged vectorstore: {e}")
 
 
 def main():

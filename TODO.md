@@ -19,7 +19,6 @@ Logic
 Performance
 
 - Expose a --max-workers option on the CLI/TUI that defaults to min(32, os.cpu_count() + 4); propagate it to both the ThreadPool (if you keep it) and the async-semaphore, giving users control over throughput and API-cost.
-- Guard all OpenAI calls with exponential back-off (tenacity.retry) on RateLimitError and APIError; log retries at DEBUG and surfacing a single WARNING on final failure.
 
 Packaging
 
