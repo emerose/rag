@@ -1,4 +1,3 @@
-- Replace the synchronous OpenAIEmbeddings.embed_documents() calls inside ThreadPoolExecutor with the OpenAI Python client's async interface (await client.embeddings.create) and an asyncio‐bounded semaphore to throttle requests—this removes thread-overhead, respects rate-limits, and lets you reuse the same event loop in the TUI.
 - Move all file-system work (hashing, MIME detection, PDF splitting, etc.) into an isolated ingest.py module and let rag_engine.py focus purely on vector-store + QA—clear separation of concerns will simplify unit-testing and future back-ends (e.g., Chroma, Qdrant).
 - Add an incremental-indexing guard: store each document's SHA-256 + chunking params in a tiny SQLite table (index_meta.db); skip re-embedding if neither the file hash nor the chunking parameters changed.
 - Replace the ad-hoc lock files with filelock's context-manager in a with block (with FileLock(path, timeout): …) so locks are always released, even on SIGINT.
