@@ -3,12 +3,14 @@ import asyncio
 import logging
 from datetime import datetime
 from typing import Any
+import time
 
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
 from textual.message import Message
 from textual.widgets import Footer, Header, Label, ProgressBar, RichLog
+from textual.worker import Worker, get_current_worker
 
 from .rag_engine import RAGConfig, RAGEngine, RuntimeOptions
 
@@ -20,9 +22,11 @@ class TUILogHandler(logging.Handler):
         """Initialize the handler with a reference to the log viewer."""
         super().__init__()
         self.log_viewer = log_viewer
+        self._log_queue = []
+        self._last_flush_time = time.time()
 
     def emit(self, record: logging.LogRecord) -> None:
-        """Emit a log record to the TUI log window."""
+        """Queue a log record for batched rendering."""
         # Map logging levels to Rich colors or styles
         level_styles = {
             logging.ERROR: "bold red",
@@ -46,9 +50,30 @@ class TUILogHandler(logging.Handler):
             f"{msg}"
         )
 
-        # Render and write to the RichLog widget
-        rich_text = Text.from_markup(markup_msg)
-        self.log_viewer.write(rich_text)
+        # Queue the message instead of rendering immediately
+        self._log_queue.append(markup_msg)
+        
+        # If it's been more than 0.1 seconds since the last flush, flush the queue
+        current_time = time.time()
+        if current_time - self._last_flush_time > 0.1:
+            self.flush_queue()
+
+    def flush_queue(self) -> None:
+        """Flush the queued log messages to the log viewer."""
+        if not self._log_queue:
+            return
+            
+        # Get the current queue and clear it
+        messages = self._log_queue
+        self._log_queue = []
+        
+        # Render all messages at once
+        for markup_msg in messages:
+            rich_text = Text.from_markup(markup_msg)
+            self.log_viewer.write(rich_text)
+            
+        # Update the last flush time
+        self._last_flush_time = time.time()
 
 
 class ProgressBarWithLabel(Container):
@@ -71,9 +96,21 @@ class ProgressBarWithLabel(Container):
                 total=self.total, classes="progress-bar")
             yield self.progress_bar
 
-    def update_progress(self, value: int) -> None:
-        """Update the progress bar value."""
+    def update_progress(self, value: int, total: int | None = None) -> None:
+        """Update the progress bar value and optionally its total."""
         if self.progress_bar:
+            if total is not None and total != self.total:
+                self.total = max(1, total)  # Ensure total is at least 1
+                self.progress_bar.total = self.total
+            
+            # Prevent division by zero
+            if self.total <= 0:
+                self.total = 1
+                self.progress_bar.total = 1
+                
+            # Scale the value to 0-100 range if total is not 100
+            if self.total != 100:
+                value = int((value / self.total) * 100)
             self.progress_bar.progress = value
 
 
@@ -101,6 +138,18 @@ class ProgressSection(Container):
         self.progress_bars[name] = progress_container
         self.mount(progress_container)
 
+    def update_progress(self, name: str, value: int, total: int | None = None) -> None:
+        """
+        Update a progress bar's value and optionally its total.
+
+        Args:
+            name: Name of the progress bar to update
+            value: Current progress value
+            total: Optional new total value
+        """
+        if name in self.progress_bars:
+            self.progress_bars[name].update_progress(value, total)
+
     def remove_progress_bar(self, name: str) -> None:
         """
         Remove a progress bar.
@@ -122,10 +171,11 @@ class ProgressSection(Container):
 class ProgressUpdated(Message):
     """Message sent when progress is updated."""
 
-    def __init__(self, name: str, value: int) -> None:
+    def __init__(self, name: str, value: int, total: int | None = None) -> None:
         """Initialize the progress update message."""
         self.name = name
         self.value = value
+        self.total = total
         super().__init__()
 
 
@@ -227,8 +277,8 @@ class RAGTUI(App):
 
         # Set up progress callback if not already set
         if not self.runtime_options.progress_callback:
-            self.runtime_options.progress_callback = lambda name, value: self.post_message(
-                ProgressUpdated(name, value)
+            self.runtime_options.progress_callback = lambda name, value, total=None: self.post_message(
+                ProgressUpdated(name, value, total)
             )
 
     def compose(self) -> ComposeResult:
@@ -253,6 +303,9 @@ class RAGTUI(App):
             tui_handler = TUILogHandler(self.log_viewer)
             tui_handler.setLevel(logging.INFO)
             root_logger.addHandler(tui_handler)
+            
+            # Store a reference to the handler for easy access
+            self.log_viewer._handler = tui_handler
 
             # Configure specific loggers to propagate to root
             loggers_to_configure = [
@@ -305,8 +358,8 @@ class RAGTUI(App):
         """Handle progress update events."""
         if self.progress_section:
             if event.name in self.progress_section.progress_bars:
-                container = self.progress_section.progress_bars[event.name]
-                container.update_progress(event.value)
+                self.progress_section.update_progress(
+                    event.name, event.value, event.total)
 
     def action_help(self) -> None:
         """Show help dialog."""
@@ -342,34 +395,60 @@ class RAGTUI(App):
         try:
             logging.info("Starting indexing process...")
 
-            # Add progress bars with descriptive labels
-            self.progress_section.add_progress_bar("Files", 100)
-            self.progress_section.add_progress_bar("Chunks", 100)
-            self.progress_section.add_progress_bar("Embeddings", 100)
+            # Add progress bars with initial totals
+            self.progress_section.add_progress_bar("Files", 1)  # Will be updated with actual count
+            self.progress_section.add_progress_bar("Chunks", 1)  # Will be updated with actual count
+            self.progress_section.add_progress_bar("Embeddings", 1)  # Will be updated with actual count
 
             logging.info("Starting document indexing...")
-            # Run indexing in a background task
 
-            async def _index_and_exit():
+            async def _index_documents_with_refresh():
+                """Index documents with periodic UI refreshes."""
                 try:
+                    # Start the indexing process
                     await self.rag_engine.index_documents_async()
                     logging.info("Indexing completed successfully")
-                    logging.info("Exiting in 5 seconds...")
-                    await asyncio.sleep(5)
-                    self.exit()
+                    # Schedule exit after a short delay
+                    self.set_timer(5, self.exit)
                 except Exception as e:
                     logging.error(f"Error during indexing: {e!s}")
-                    self.exit()
+                    self.set_timer(5, self.exit)
 
-            self.indexing_task = asyncio.create_task(_index_and_exit())
+            # Run the indexing in a worker
+            self.run_worker(_index_documents_with_refresh, group="indexing")
+
         except Exception as e:
             error_msg = f"Error starting indexing: {e!s}"
             logging.error(error_msg)
 
+    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
+        """Handle worker state changes."""
+        if event.worker.group == "indexing":
+            if event.state == "success":
+                logging.info("Indexing worker completed successfully")
+            elif event.state == "error":
+                logging.error(f"Indexing worker failed: {event.error}")
+                self.set_timer(5, self.exit)
+
+    async def on_idle(self) -> None:
+        """Handle idle time in the event loop."""
+        # This method is called when the event loop is idle
+        
+        # Check if we need to flush log messages
+        if hasattr(self, "log_viewer") and hasattr(self.log_viewer, "_handler"):
+            handler = self.log_viewer._handler
+            if isinstance(handler, TUILogHandler) and handler._log_queue:
+                handler.flush_queue()
+                
+        # Small sleep to yield back to the event loop
+        await asyncio.sleep(0.01)
+        
+        # Force a refresh periodically
+        self.refresh()
+
     def on_unmount(self) -> None:
         """Clean up when the app is unmounted."""
-        if hasattr(self, "indexing_task"):
-            self.indexing_task.cancel()
+        pass  # We're using workers, so no manual cleanup needed
 
 
 def run_tui(config: RAGConfig | None = None, runtime_options: RuntimeOptions | None = None) -> None:

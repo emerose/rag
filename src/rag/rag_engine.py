@@ -737,9 +737,9 @@ class RAGEngine:
                 self._invalidate_cache(file_path)
         return None
 
-    def _save_vectorstore_to_cache(self, file_path: str, vectorstore: FAISS) -> None:
+    async def _save_vectorstore_to_cache_async(self, file_path: str, vectorstore: FAISS) -> None:
         """
-        Save vectorstore to cache and update metadata with file locking.
+        Save vectorstore to cache and update metadata with file locking asynchronously.
 
         Args:
             file_path: Path to the file
@@ -747,11 +747,18 @@ class RAGEngine:
         """
         cache_path = self._get_cache_path(file_path)
         try:
+            # Yield to event loop before acquiring lock
+            await asyncio.sleep(0)
+            
             with self.vectorstore_lock:
                 vectorstore.save_local(str(cache_path))
                 self._update_cache_metadata(file_path)
                 self._log(
                     "INFO", f"Saved vectorstore to cache: {cache_path}", "Cache")
+                    
+            # Yield to event loop after saving
+            await asyncio.sleep(0)
+            
         except Timeout:
             self._log(
                 "ERROR", "Timeout while acquiring vectorstore lock", "Cache")
@@ -893,7 +900,7 @@ class RAGEngine:
         max_tokens = 300000  # OpenAI's limit
         valid_docs = []
 
-        for doc in split_docs:
+        for i, doc in enumerate(split_docs):
             tokens = len(self.tokenizer.encode(doc.page_content))
             if tokens > max_tokens:
                 self._log(
@@ -911,6 +918,12 @@ class RAGEngine:
                         valid_docs.append(new_doc)
             else:
                 valid_docs.append(doc)
+            
+            # Yield to the event loop periodically during CPU-intensive operations
+            # Can't use async/await here since this is a synchronous method,
+            # but we can add hooks for the async wrapper to yield
+            if i % 10 == 0 and hasattr(self, '_split_documents_yield_hook'):
+                self._split_documents_yield_hook()
 
         return valid_docs
 
@@ -1024,6 +1037,9 @@ class RAGEngine:
         try:
             # Extract text content from documents
             texts = [doc.page_content for doc in batch]
+            
+            # Yield to event loop before API call
+            await asyncio.sleep(0)
 
             # Use semaphore to limit concurrent requests
             async with semaphore:
@@ -1032,6 +1048,10 @@ class RAGEngine:
                     input=texts,
                     model=self.config.embedding_model
                 )
+                
+                # Yield to event loop after API call
+                await asyncio.sleep(0)
+                
                 return [item.embedding for item in response.data]
         except Exception as e:
             self._log(
@@ -1088,6 +1108,7 @@ class RAGEngine:
         # Create vector store for this file in manageable batches
         vectorstore: FAISS | None = None
         chunks_processed = 0
+        last_progress_update = 0
 
         # Create semaphore to limit concurrent requests
         semaphore = asyncio.Semaphore(3)  # Limit to 3 concurrent requests
@@ -1097,113 +1118,53 @@ class RAGEngine:
             chunks[i: i + batch_size] for i in range(0, total_chunks, batch_size)
         ]
 
-        # Process batches concurrently
-        tasks = [
-            self._create_embeddings_batch_async(batch, semaphore)
-            for batch in batches
-        ]
-        embeddings_results = await asyncio.gather(*tasks)
-
-        # Process results
-        for batch, embeddings in zip(batches, embeddings_results):
-            if embeddings:
-                vectorstore = self._add_batch_to_vectorstore(
-                    vectorstore, batch, embeddings
-                )
-                chunks_processed += len(batch)
-                self._update_progress(
-                    "Chunks", int(chunks_processed * 100 / total_chunks)
-                )
-                self._update_progress(
-                    "Embeddings", int(chunks_processed * 100 / total_chunks)
-                )
-
-        if vectorstore is None:
-            self._log(
-                "WARNING", f"No vectorstore created for: {file_path}", "Indexer")
-            return None
-
-        # Save to cache immediately
-        self._save_vectorstore_to_cache(file_path, vectorstore)
-        self._log(
-            "INFO",
-            f"Created and saved vectorstore for: {file_path} "
-            f"with total chunks: {total_chunks}",
-            "Indexer",
-        )
-
-        return vectorstore
-
-    def _create_vectorstore_from_chunks(
-        self, file_path: str, chunks: list[Any]
-    ) -> FAISS | None:
-        """
-        Create a vectorstore from document chunks.
-
-        Args:
-            file_path: Path to the file
-            chunks: List of document chunks
-
-        Returns:
-            FAISS vectorstore if successful, None otherwise
-        """
-        # Calculate optimal batch size based on total chunks
-        total_chunks = len(chunks)
-        batch_size = self._calculate_optimal_batch_size(total_chunks)
-        self._log(
-            "INFO",
-            f"Processing {total_chunks} chunks in batches of {batch_size}",
-            "Indexer",
-        )
-
-        # Create vector store for this file in manageable batches
-        vectorstore: FAISS | None = None
-        chunks_processed = 0
-
-        # Process batches in parallel using ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=3) as executor:
-            # Create batches
-            batches = [
-                chunks[i: i + batch_size] for i in range(0, total_chunks, batch_size)
+        # Yield to event loop before processing batches
+        await asyncio.sleep(0)
+        
+        # Process batches in smaller groups to allow more frequent yielding
+        for i in range(0, len(batches), 5):  # Process 5 batches at a time
+            batch_group = batches[i:i+5]
+            
+            # Create embedding tasks for this group
+            tasks = [
+                self._create_embeddings_batch_async(batch, semaphore)
+                for batch in batch_group
             ]
-
-            # Submit embedding creation tasks
-            future_to_batch = {
-                executor.submit(
-                    self._create_embeddings_batch, batch, self.embeddings
-                ): batch
-                for batch in batches
-            }
-
-            # Process completed batches
-            for future in as_completed(future_to_batch):
-                batch = future_to_batch[future]
-                try:
-                    embeddings = future.result()
-                    if embeddings:
-                        vectorstore = self._add_batch_to_vectorstore(
-                            vectorstore, batch, embeddings
-                        )
-                        chunks_processed += len(batch)
+            
+            # Await this group of embeddings
+            embeddings_results = await asyncio.gather(*tasks)
+            
+            # Process results for this group
+            for batch, embeddings in zip(batch_group, embeddings_results):
+                if embeddings:
+                    vectorstore = self._add_batch_to_vectorstore(
+                        vectorstore, batch, embeddings
+                    )
+                    chunks_processed += len(batch)
+                    
+                    # Update progress
+                    current_progress = int(chunks_processed * 100 / total_chunks)
+                    progress_delta = current_progress - last_progress_update
+                    if progress_delta >= 5 or chunks_processed % 10 == 0:
                         self._update_progress(
-                            "Chunks", int(chunks_processed *
-                                          100 / total_chunks)
+                            "Chunks", current_progress, total_chunks
                         )
                         self._update_progress(
-                            "Embeddings", int(
-                                chunks_processed * 100 / total_chunks)
+                            "Embeddings", current_progress, total_chunks
                         )
-                except Exception as e:
-                    self._log(
-                        "WARNING", f"Failed to process batch: {e}", "Indexer")
+                        last_progress_update = current_progress
+            
+            # Yield to event loop after each batch group
+            await asyncio.sleep(0)
 
         if vectorstore is None:
             self._log(
                 "WARNING", f"No vectorstore created for: {file_path}", "Indexer")
             return None
 
-        # Save to cache immediately
-        self._save_vectorstore_to_cache(file_path, vectorstore)
+        # Save to cache
+        await self._save_vectorstore_to_cache_async(file_path, vectorstore)
+        
         self._log(
             "INFO",
             f"Created and saved vectorstore for: {file_path} "
@@ -1329,9 +1290,28 @@ class RAGEngine:
             mime_type = self._get_file_type(file_path)
             self._log(
                 "INFO", f"Processing file with MIME type: {mime_type}", "Indexer")
+                
+            # Yield to event loop before splitting documents
+            await asyncio.sleep(0)
 
-            # Split documents into chunks
-            all_split_docs = self._split_documents(docs, mime_type)
+            # Add a yield hook for the synchronous split_documents method
+            async def async_yield_hook():
+                await asyncio.sleep(0)
+                
+            # Temporarily attach the hook
+            self._split_documents_yield_hook = async_yield_hook
+            
+            try:
+                # Split documents into chunks - this is CPU intensive
+                all_split_docs = self._split_documents(docs, mime_type)
+            finally:
+                # Remove the hook after splitting
+                if hasattr(self, '_split_documents_yield_hook'):
+                    delattr(self, '_split_documents_yield_hook')
+            
+            # Yield to event loop after splitting documents
+            await asyncio.sleep(0)
+            
             if not all_split_docs:
                 self._log(
                     "WARNING", f"No chunks created for: {file_path}", "Indexer")
@@ -1340,6 +1320,9 @@ class RAGEngine:
             # Enhance document metadata
             self._enhance_document_metadata(
                 all_split_docs, file_path, mime_type)
+                
+            # Yield to event loop after enhancing metadata
+            await asyncio.sleep(0)
 
             # Create and save vectorstore
             return await self._create_vectorstore_from_chunks_async(file_path, all_split_docs)
@@ -1404,8 +1387,8 @@ class RAGEngine:
         """
         try:
             # Reset progress bars for new file
-            self._update_progress("Chunks", 0)
-            self._update_progress("Embeddings", 0)
+            self._update_progress("Chunks", 0, total_chunks)
+            self._update_progress("Embeddings", 0, total_chunks)
 
             self._log("INFO", f"Indexing file: {file_path}", "Indexer")
 
@@ -1413,8 +1396,14 @@ class RAGEngine:
             mime_type = self._get_file_type(file_path)
             self._log("INFO", f"File type: {mime_type}", "Indexer")
 
+            # Yield to event loop
+            await asyncio.sleep(0)
+
             file_loader = self._get_document_loader(file_path)
             docs = file_loader.load()
+
+            # Yield to event loop after loading
+            await asyncio.sleep(0)
 
             if not docs:
                 self._log(
@@ -1428,7 +1417,13 @@ class RAGEngine:
                     doc.metadata = {}
                 doc.metadata["source_type"] = mime_type
 
+            # Yield to event loop before vectorstore creation
+            await asyncio.sleep(0)
+
             vectorstore = await self._create_and_save_vectorstore_async(file_path, docs)
+
+            # Yield to event loop after vectorstore creation
+            await asyncio.sleep(0)
 
             if vectorstore is not None:
                 self.vectorstores[file_path] = vectorstore
@@ -1476,6 +1471,9 @@ class RAGEngine:
             self._validate_documents_dir()
             self._cleanup_invalid_caches()
 
+            # Yield to event loop
+            await asyncio.sleep(0)
+
             all_files = self._get_supported_files()
             if not all_files:
                 raise ValueError(
@@ -1504,19 +1502,31 @@ class RAGEngine:
                         files_to_process.append(file_path)
                 else:
                     files_to_process.append(file_path)
+                
+                # Yield to event loop after each file check
+                await asyncio.sleep(0)
 
             # Process files that need updating
             if files_to_process:
                 self._log(
                     "INFO", f"Processing {len(files_to_process)} files...", "Indexer")
                 for i, file_path in enumerate(files_to_process):
+                    # Update Files progress
                     self._update_progress(
-                        "Files", int((i + 1) * 100 / len(files_to_process))
+                        "Files", int((i + 1) * 100 / len(files_to_process)), len(files_to_process)
                     )
+                    
+                    # Process the file
                     await self._process_single_file_async(file_path, total_chunks)
+                    
+                    # Yield to event loop after each file
+                    await asyncio.sleep(0)
 
             if not self.vectorstores:
                 raise ValueError("No documents could be successfully loaded")
+
+            # Yield to event loop before final log message
+            await asyncio.sleep(0)
 
             self._log(
                 "INFO",
@@ -1528,9 +1538,9 @@ class RAGEngine:
             )
 
             # Ensure we reach 100% at the end
-            self._update_progress("Files", 100)
-            self._update_progress("Chunks", 100)
-            self._update_progress("Embeddings", 100)
+            self._update_progress("Files", 100, len(files_to_process))
+            self._update_progress("Chunks", 100, total_chunks)
+            self._update_progress("Embeddings", 100, total_chunks)
 
             self._log("INFO", "Indexing completed successfully", "Indexer")
         except Exception as e:
@@ -1630,11 +1640,11 @@ class RAGEngine:
         log_level = getattr(logging, level.upper(), logging.INFO)
         logger.log(log_level, formatted_message)
 
-    def _update_progress(self, name: str, value: int) -> None:
+    def _update_progress(self, name: str, value: int, total: int | None = None) -> None:
         """Update progress using the callback if available."""
         if self.runtime_options.progress_callback:
             try:
-                self.runtime_options.progress_callback(name, value)
+                self.runtime_options.progress_callback(name, value, total)
             except Exception as e:
                 self._log(
                     "WARNING", f"Failed to update progress: {e!s}", "Progress")
@@ -1663,13 +1673,23 @@ class RAGEngine:
     def _get_supported_files(self) -> list[str]:
         """
         Get a list of supported files in the documents directory.
+        Skips files and directories that begin with a dot (.).
 
         Returns:
             List of file paths that can be processed
         """
         supported_files = []
-        for root, _, files in os.walk(self.documents_dir):
+        for root, dirs, files in os.walk(self.documents_dir):
+            # Skip directories that start with a dot
+            dirs[:] = [d for d in dirs if not d.startswith('.')]
+            
             for file in files:
+                # Skip files that start with a dot
+                if file.startswith('.'):
+                    self._log(
+                        "DEBUG", f"Skipping hidden file: {file}", "Indexer")
+                    continue
+                    
                 file_path = os.path.join(root, file)
                 if self._is_supported_file_type(file_path):
                     supported_files.append(file_path)
