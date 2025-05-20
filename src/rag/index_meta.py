@@ -32,6 +32,7 @@ class IndexMetadata:
     def _init_db(self) -> None:
         """Initialize the SQLite database with required tables."""
         with sqlite3.connect(self.db_path) as conn:
+            # Create document metadata table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS document_meta (
                     file_path TEXT PRIMARY KEY,
@@ -47,6 +48,28 @@ class IndexMetadata:
                     file_size INTEGER NOT NULL
                 )
             """)
+            
+            # Create global settings table for embedding model info
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS global_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+            
+            # Create file metadata table for additional file-specific metadata
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS file_metadata (
+                    file_path TEXT PRIMARY KEY,
+                    size INTEGER NOT NULL,
+                    mtime REAL NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    source_type TEXT,
+                    chunks_total INTEGER,
+                    modified_at REAL NOT NULL
+                )
+            """)
+            
             conn.commit()
             
     def _calculate_file_hash(self, file_path: Path) -> str:
@@ -164,6 +187,145 @@ class IndexMetadata:
             )
             conn.commit()
             
+    def update_file_metadata(
+        self,
+        file_path: str,
+        size: int,
+        mtime: float,
+        content_hash: str,
+        source_type: str = None,
+        chunks_total: int = None
+    ) -> None:
+        """Update the file-specific metadata.
+        
+        Args:
+            file_path: Path to the file
+            size: File size in bytes
+            mtime: File modification time (timestamp)
+            content_hash: SHA-256 hash of file contents
+            source_type: MIME type of the file
+            chunks_total: Total number of chunks in the file
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO file_metadata
+                (file_path, size, mtime, content_hash, source_type, chunks_total, modified_at)
+                VALUES (?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
+                """,
+                (file_path, size, mtime, content_hash, source_type, chunks_total)
+            )
+            conn.commit()
+            
+    def get_file_metadata(self, file_path: str) -> Optional[Dict[str, Any]]:
+        """Get file-specific metadata.
+        
+        Args:
+            file_path: Path to the file
+            
+        Returns:
+            Dictionary containing file metadata if found, None otherwise
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT size, mtime, content_hash, source_type, chunks_total
+                FROM file_metadata
+                WHERE file_path = ?
+                """,
+                (file_path,)
+            )
+            row = cursor.fetchone()
+            
+            if row is None:
+                return None
+                
+            return {
+                "size": row[0],
+                "mtime": row[1],
+                "content_hash": row[2],
+                "source_type": row[3],
+                "chunks": {"total": row[4]} if row[4] is not None else None
+            }
+            
+    def get_all_file_metadata(self) -> Dict[str, Dict[str, Any]]:
+        """Get metadata for all files.
+        
+        Returns:
+            Dictionary mapping file paths to their metadata
+        """
+        result = {}
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT file_path, size, mtime, content_hash, source_type, chunks_total
+                FROM file_metadata
+                """
+            )
+            rows = cursor.fetchall()
+            
+            for row in rows:
+                result[row[0]] = {
+                    "size": row[1],
+                    "mtime": row[2],
+                    "content_hash": row[3],
+                    "source_type": row[4],
+                    "chunks": {"total": row[5]} if row[5] is not None else None
+                }
+                
+        return result
+            
+    def set_global_setting(self, key: str, value: str) -> None:
+        """Set or update a global setting.
+        
+        Args:
+            key: Setting key
+            value: Setting value
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO global_settings (key, value)
+                VALUES (?, ?)
+                """,
+                (key, value)
+            )
+            conn.commit()
+            
+    def get_global_setting(self, key: str) -> Optional[str]:
+        """Get a global setting value.
+        
+        Args:
+            key: Setting key
+            
+        Returns:
+            Setting value if found, None otherwise
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.execute(
+                """
+                SELECT value FROM global_settings WHERE key = ?
+                """,
+                (key,)
+            )
+            row = cursor.fetchone()
+            
+            return row[0] if row else None
+            
+    def get_global_model_info(self) -> Dict[str, str]:
+        """Get global embedding model information.
+        
+        Returns:
+            Dictionary containing model information
+        """
+        model = self.get_global_setting("embedding_model")
+        version = self.get_global_setting("model_version")
+        
+        return {
+            "embedding_model": model,
+            "model_version": version
+        } if model and version else {}
+            
     def remove_metadata(self, file_path: Path) -> None:
         """Remove metadata for a file.
         
@@ -171,10 +333,18 @@ class IndexMetadata:
             file_path: Path to the file whose metadata should be removed
         """
         with sqlite3.connect(self.db_path) as conn:
+            # Remove from document_meta
             conn.execute(
                 "DELETE FROM document_meta WHERE file_path = ?",
                 (str(file_path),)
             )
+            
+            # Remove from file_metadata
+            conn.execute(
+                "DELETE FROM file_metadata WHERE file_path = ?",
+                (str(file_path),)
+            )
+            
             conn.commit()
             
     def get_metadata(self, file_path: Path) -> Optional[dict[str, Any]]:
@@ -224,10 +394,10 @@ class IndexMetadata:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.execute(
                 """
-                SELECT file_path, file_type, num_chunks, file_size, 
-                       embedding_model, embedding_model_version, indexed_at
-                FROM document_meta
-                ORDER BY indexed_at DESC
+                SELECT dm.file_path, dm.file_type, dm.num_chunks, dm.file_size, 
+                       dm.embedding_model, dm.embedding_model_version, dm.indexed_at
+                FROM document_meta dm
+                ORDER BY dm.indexed_at DESC
                 """
             )
             rows = cursor.fetchall()

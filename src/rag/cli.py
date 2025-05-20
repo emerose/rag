@@ -500,47 +500,37 @@ def summarize(
 @app.command()
 def list() -> None:
     """
-    List all indexed documents in the cache.
-
-    This command will:
-    1. Load the cache metadata
-    2. Display a table of all indexed files with their metadata
+    List indexed documents from the cache.
+    
+    This command displays information about all indexed documents in the cache,
+    including their file type, last modified date, size, and number of chunks.
+    
+    Usage:
+        rag list
     """
     try:
-        # Initialize RAG engine using RAGConfig with default cache directory
-        state.logger.debug("Starting list command")
-        state.logger.info("Loading cache metadata...")
-        config = RAGConfig(
-            documents_dir=".",  # Not used for listing
-            embedding_model="text-embedding-3-small",
-            chat_model="gpt-4",
-            temperature=0.0,
-            cache_dir=CACHE_DIR,
-        )
-        runtime_options = RuntimeOptions()
-        state.logger.debug(
-            f"Initialized RAGConfig with cache_dir: {CACHE_DIR}")
-        rag_engine = RAGEngine(config, runtime_options)
-        state.logger.debug("Created RAGEngine instance")
-
-        # Load cache metadata
-        cache_metadata = rag_engine._load_cache_metadata()
-        state.logger.debug(f"Loaded cache metadata: {cache_metadata}")
-        if not cache_metadata:
-            state.logger.info("No indexed documents found in cache.")
-            return
-
-        # Create and display the table
-        state.logger.debug("Creating table for display")
+        # Initialize RAG engine
+        state.logger.debug("Initializing RAG engine")
+        rag_engine = _initialize_rag_engine()
+        
+        # Get metadata directly from SQLite
+        index_metadata = rag_engine.index_meta
+        indexed_files = index_metadata.list_indexed_files()
+        
+        state.logger.debug(f"Found {len(indexed_files)} indexed documents")
+        
+        # Create table
         table = Table(title="Indexed Documents")
-        table.add_column("File", style="cyan")
-        table.add_column("Type", style="yellow")
-        table.add_column("Last Modified", style="green")
-        table.add_column("Size", style="blue")
-        table.add_column("Chunks", style="magenta")
+        table.add_column("File Path", style="cyan", no_wrap=False)
+        table.add_column("Type", style="green")
+        table.add_column("Last Modified", style="yellow")
+        table.add_column("Size", justify="right", style="blue")
+        table.add_column("Chunks", justify="right", style="magenta")
 
-        for file_path, metadata in cache_metadata.items():
+        for file_info in indexed_files:
+            file_path = file_info["file_path"]
             state.logger.debug(f"Processing file: {file_path}")
+            
             # Get file stats
             try:
                 stats = Path(file_path).stat()
@@ -555,15 +545,11 @@ def list() -> None:
                 size = "N/A"
                 modified = "N/A"
 
-            # Get number of chunks if available
-            chunks = metadata.get("chunks", "N/A")
-            if isinstance(chunks, dict):
-                chunks = chunks.get("total", "N/A")
-            state.logger.debug(f"Chunks for {file_path}: {chunks}")
-
-            # Get file type
-            file_type = metadata.get("source_type", "Unknown")
-            state.logger.debug(f"File type for {file_path}: {file_type}")
+            # Get file metadata
+            file_type = file_info["file_type"]
+            chunks = file_info["num_chunks"]
+            
+            state.logger.debug(f"File type: {file_type}, Chunks: {chunks}")
 
             table.add_row(
                 str(file_path),
@@ -575,7 +561,7 @@ def list() -> None:
 
         console.print("\n")
         console.print(table)
-        state.logger.info(f"Found {len(cache_metadata)} indexed documents.")
+        state.logger.info(f"Found {len(indexed_files)} indexed documents.")
 
     except Exception as e:
         state.logger.error(f"Error listing indexed documents: {e!s}")
@@ -597,8 +583,10 @@ def _initialize_rag_engine() -> RAGEngine:
 
 def _load_vectorstores(rag_engine: RAGEngine) -> None:
     """Load cached vectorstores into the RAG engine."""
-    cache_metadata = rag_engine._load_cache_metadata()
-    if not cache_metadata:
+    index_metadata = rag_engine.index_meta
+    indexed_files = index_metadata.list_indexed_files()
+    
+    if not indexed_files:
         state.logger.error(
             "No indexed documents found in cache. Please run 'rag index' first."
         )
@@ -608,7 +596,8 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
         sys.exit(1)
 
     state.logger.info("Loading cached vectorstores from .cache directory...")
-    for file_path in cache_metadata:
+    for file_info in indexed_files:
+        file_path = file_info["file_path"]
         try:
             cached_store = rag_engine._load_cached_vectorstore(file_path)
             if cached_store is not None:

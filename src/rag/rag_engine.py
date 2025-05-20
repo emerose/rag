@@ -251,8 +251,8 @@ class RAGEngine:
         self._initialize_chat_model(
             self.config.chat_model, self.config.temperature)
         self._initialize_vectorstores()
+        self.index_meta = IndexMetadata(self.cache_dir)  # Initialize index metadata first
         self._initialize_cache_metadata()
-        self.index_meta = IndexMetadata(self.cache_dir)  # Initialize index metadata
 
     def _initialize_paths(self, documents_dir: str, cache_dir: str) -> None:
         """Initialize directory paths."""
@@ -334,55 +334,103 @@ class RAGEngine:
 
     def _initialize_cache_metadata(self) -> None:
         """Initialize cache metadata tracking."""
+        # This path is kept for compatibility purposes during migration
         self.cache_metadata_path = self.cache_dir / "cache_metadata.json"
-        self.cache_metadata = {}  # Initialize with empty dict first
-        self.cache_metadata = (
-            self._load_cache_metadata()
-        )  # Then load from file if exists
+        
+        # Initialize the cache metadata dictionary
+        self.cache_metadata = {}
+        
+        # Migrate data from JSON to SQLite if needed
+        self._migrate_json_to_sqlite()
+        
+        # Save current embedding model info to SQLite
+        self.index_meta.set_global_setting("embedding_model", self.config.embedding_model)
+        self.index_meta.set_global_setting("model_version", self.embedding_model_version)
+        
+        # Load metadata from SQLite
+        self._load_cache_metadata()
+
+    def _migrate_json_to_sqlite(self) -> None:
+        """
+        Migrate metadata from JSON file to SQLite database.
+        This is a one-time migration when moving from JSON to SQLite.
+        """
+        if not self.cache_metadata_path.exists():
+            return
+            
+        try:
+            with self.metadata_lock:
+                # Load JSON metadata
+                with open(self.cache_metadata_path) as f:
+                    metadata = json.load(f)
+                
+                # Migrate global model info
+                if "global_model_info" in metadata:
+                    global_info = metadata["global_model_info"]
+                    if "embedding_model" in global_info:
+                        self.index_meta.set_global_setting(
+                            "embedding_model", global_info["embedding_model"])
+                    if "model_version" in global_info:
+                        self.index_meta.set_global_setting(
+                            "model_version", global_info["model_version"])
+                
+                # Migrate file metadata
+                if "files" in metadata:
+                    for file_path, file_meta in metadata["files"].items():
+                        # Only migrate if the file exists
+                        if os.path.exists(file_path):
+                            source_type = file_meta.get("source_type")
+                            chunks = file_meta.get("chunks", {})
+                            chunks_total = chunks.get("total") if isinstance(chunks, dict) else None
+                            
+                            self.index_meta.update_file_metadata(
+                                file_path,
+                                file_meta.get("size", 0),
+                                file_meta.get("mtime", 0),
+                                file_meta.get("content_hash", ""),
+                                source_type,
+                                chunks_total
+                            )
+                
+                # Rename the JSON file to mark it as migrated
+                backup_path = str(self.cache_metadata_path) + ".migrated"
+                os.rename(str(self.cache_metadata_path), backup_path)
+                self._log("INFO", f"Successfully migrated metadata from JSON to SQLite", "Migration")
+                
+        except Exception as e:
+            self._log("WARNING", f"Failed to migrate JSON metadata to SQLite: {e}", "Migration")
+            # Keep going with the SQLite DB even if migration fails
 
     def _load_cache_metadata(self) -> dict[str, dict[str, Any]]:
         """
-        Load cache metadata from file with file locking.
+        Load cache metadata from SQLite database.
 
         Returns:
             Dictionary containing cache metadata
         """
-        if not self.cache_metadata_path.exists():
+        # First validate global model info
+        if not self._validate_global_model_info():
             return {}
+            
+        # Then load file metadata
+        self.cache_metadata = self.index_meta.get_all_file_metadata()
+        return self.cache_metadata
 
-        try:
-            with self.metadata_lock:
-                with open(self.cache_metadata_path) as f:
-                    metadata = json.load(f)
-                    return self._validate_global_model_info(metadata)
-        except Timeout:
-            self._log("ERROR", "Timeout while acquiring metadata lock", "Cache")
-            raise
-        except Exception as e:
-            self._log(
-                "WARNING", f"Failed to load cache metadata: {e}", "Cache")
-            return {}
-
-    def _validate_global_model_info(
-        self, metadata: dict[str, Any]
-    ) -> dict[str, dict[str, Any]]:
+    def _validate_global_model_info(self) -> bool:
         """
         Validate global model information in metadata.
 
-        Args:
-            metadata: Cache metadata dictionary
-
         Returns:
-            Dictionary containing file metadata
+            True if model info is valid, False otherwise
         """
-        if "global_model_info" not in metadata:
-            return metadata.get("files", {})
-
-        global_info = metadata["global_model_info"]
-        if (
-            global_info.get("embedding_model") != self.config.embedding_model
-            or global_info.get("model_version") != self.embedding_model_version
-        ):
+        global_info = self.index_meta.get_global_model_info()
+        
+        if not global_info:
+            return True  # No global info yet, assume it's the first run
+            
+        if (global_info.get("embedding_model") != self.config.embedding_model or
+            global_info.get("model_version") != self.embedding_model_version):
+            
             self._log(
                 "INFO",
                 f"Global model change detected: "
@@ -391,32 +439,147 @@ class RAGEngine:
                 f"current={self.config.embedding_model} v{self.embedding_model_version}",
             )
             self._invalidate_all_caches()
-            return {}
-
-        return metadata.get("files", {})
+            return False
+            
+        return True
 
     def _save_cache_metadata(self) -> None:
         """
-        Save cache metadata to file with file locking.
+        Save cache metadata to SQLite database.
         """
-        try:
-            with self.metadata_lock:
-                # Add global model information to metadata
-                metadata = {
-                    "global_model_info": {
-                        "embedding_model": self.config.embedding_model,
-                        "model_version": self.embedding_model_version,
-                    },
-                    "files": self.cache_metadata,
-                }
-                with open(self.cache_metadata_path, "w") as f:
-                    json.dump(metadata, f, indent=2, sort_keys=True)
-        except Timeout:
-            self._log("ERROR", "Timeout while acquiring metadata lock", "Cache")
-            raise
-        except Exception as e:
-            self._log(
-                "WARNING", f"Failed to save cache metadata: {e}", "Cache")
+        # No need to save anything here as we save individual file metadata 
+        # in the _update_cache_metadata method
+        pass
+
+    def _update_cache_metadata(self, file_path: str) -> None:
+        """
+        Update cache metadata for a file.
+
+        Args:
+            file_path: Path to the file
+        """
+        # Get basic file metadata
+        metadata = self._get_file_metadata(file_path)
+        
+        # Get source type and chunks information if available
+        source_type = None
+        chunks_total = None
+        
+        if file_path in self.vectorstores:
+            vectorstore = self.vectorstores[file_path]
+            
+            # Get source type from first document if available
+            if vectorstore.index_to_docstore_id:
+                first_doc_id = vectorstore.index_to_docstore_id[0]
+                first_doc = vectorstore.docstore.search({"_id": first_doc_id})
+                if first_doc:
+                    source_type = first_doc[0].metadata.get("source_type", "Unknown")
+            
+            # Get number of chunks
+            chunks_total = len(vectorstore.index_to_docstore_id)
+        
+        # Update metadata in SQLite
+        self.index_meta.update_file_metadata(
+            file_path,
+            metadata["size"],
+            metadata["mtime"],
+            metadata["content_hash"],
+            source_type,
+            chunks_total
+        )
+        
+        # Also update in-memory cache
+        metadata.update({
+            "source_type": source_type,
+            "chunks": {"total": chunks_total} if chunks_total is not None else None
+        })
+        self.cache_metadata[file_path] = metadata
+
+    def _invalidate_cache(self, file_path: str) -> None:
+        """Invalidate the cache for a file.
+        
+        Args:
+            file_path: Path to the file
+        """
+        # Remove from index metadata (both document_meta and file_metadata tables)
+        self.index_meta.remove_metadata(Path(file_path))
+        
+        # Remove from in-memory cache metadata
+        if file_path in self.cache_metadata:
+            del self.cache_metadata[file_path]
+        
+        # Remove vectorstore cache file
+        cache_path = self._get_cache_path(file_path)
+        if cache_path.exists():
+            try:
+                cache_path.unlink()
+            except Exception as e:
+                self._log(
+                    "WARNING",
+                    f"Failed to remove cache file {cache_path}: {e}",
+                    "Cache",
+                )
+
+    def _cleanup_invalid_caches(self) -> None:
+        """
+        Clean up invalid caches (files that no longer exist).
+        """
+        files_to_remove = []
+        for file_path in list(self.cache_metadata):
+            if not os.path.exists(file_path):
+                files_to_remove.append(file_path)
+
+        for file_path in files_to_remove:
+            self._invalidate_cache(file_path)
+
+    def cleanup_orphaned_chunks(self) -> dict[str, Any]:
+        """
+        Delete cached vector stores whose source files were removed.
+        
+        This helps keep the .cache/ directory from growing unbounded by removing
+        vector stores for files that no longer exist in the file system.
+        
+        Returns:
+            Dictionary with number of orphaned chunks cleaned up and total bytes freed
+        """
+        # Get size information before cleanup
+        pre_cleanup_size = 0
+        if self.vectorstore_cache_dir.exists():
+            for item in self.vectorstore_cache_dir.glob("*"):
+                if item.is_file():
+                    pre_cleanup_size += item.stat().st_size
+                
+        # Track what's being removed
+        num_removed = 0
+        removed_paths = []
+        
+        # Check each file in cache metadata
+        files_to_remove = []
+        for file_path in list(self.cache_metadata):
+            if not os.path.exists(file_path):
+                files_to_remove.append(file_path)
+                removed_paths.append(file_path)
+                num_removed += 1
+                
+        # Process removals
+        for file_path in files_to_remove:
+            self._invalidate_cache(file_path)
+        
+        # Calculate space freed
+        post_cleanup_size = 0
+        if self.vectorstore_cache_dir.exists():
+            for item in self.vectorstore_cache_dir.glob("*"):
+                if item.is_file():
+                    post_cleanup_size += item.stat().st_size
+        
+        bytes_freed = max(0, pre_cleanup_size - post_cleanup_size)
+        
+        # Return statistics about the cleanup
+        return {
+            "removed_count": num_removed,
+            "bytes_freed": bytes_freed,
+            "removed_paths": removed_paths
+        }
 
     def _invalidate_all_caches(self) -> None:
         """
@@ -450,7 +613,11 @@ class RAGEngine:
 
                 # Clear cache metadata
                 self.cache_metadata.clear()
-                self._save_cache_metadata()
+                
+                # Update global model info in SQLite
+                self.index_meta.set_global_setting("embedding_model", self.config.embedding_model)
+                self.index_meta.set_global_setting("model_version", self.embedding_model_version)
+                
         except Timeout:
             self._log(
                 "ERROR", "Timeout while acquiring vectorstore lock", "Cache")
@@ -564,122 +731,6 @@ class RAGEngine:
         # Then check if the cache file exists
         cache_path = self._get_cache_path(file_path)
         return cache_path.exists()
-
-    def _update_cache_metadata(self, file_path: str) -> None:
-        """
-        Update cache metadata for a file.
-
-        Args:
-            file_path: Path to the file
-        """
-        # Get basic file metadata
-        metadata = self._get_file_metadata(file_path)
-
-        # Add source type and chunks information if available
-        if file_path in self.vectorstores:
-            vectorstore = self.vectorstores[file_path]
-            # Get source type from first document if available
-            if vectorstore.index_to_docstore_id:
-                first_doc_id = vectorstore.index_to_docstore_id[0]
-                first_doc = vectorstore.docstore.search({"_id": first_doc_id})
-                if first_doc:
-                    metadata["source_type"] = first_doc[0].metadata.get(
-                        "source_type", "Unknown"
-                    )
-
-            # Add chunks information
-            metadata["chunks"] = {"total": len(
-                vectorstore.index_to_docstore_id)}
-
-        self.cache_metadata[file_path] = metadata
-        self._save_cache_metadata()
-
-    def _invalidate_cache(self, file_path: str) -> None:
-        """Invalidate the cache for a file.
-        
-        Args:
-            file_path: Path to the file
-        """
-        # Remove from index metadata
-        self.index_meta.remove_metadata(Path(file_path))
-        
-        # Remove from cache metadata
-        if file_path in self.cache_metadata:
-            del self.cache_metadata[file_path]
-            self._save_cache_metadata()
-            
-        # Remove vectorstore cache file
-        cache_path = self._get_cache_path(file_path)
-        if cache_path.exists():
-            try:
-                cache_path.unlink()
-            except Exception as e:
-                self._log(
-                    "WARNING",
-                    f"Failed to remove cache file {cache_path}: {e}",
-                    "Cache",
-                )
-
-    def _cleanup_invalid_caches(self) -> None:
-        """
-        Clean up invalid caches (files that no longer exist).
-        """
-        files_to_remove = []
-        for file_path in list(self.cache_metadata):
-            if not os.path.exists(file_path):
-                files_to_remove.append(file_path)
-
-        for file_path in files_to_remove:
-            self._invalidate_cache(file_path)
-
-    def cleanup_orphaned_chunks(self) -> dict[str, Any]:
-        """
-        Delete cached vector stores whose source files were removed.
-        
-        This helps keep the .cache/ directory from growing unbounded by removing
-        vector stores for files that no longer exist in the file system.
-        
-        Returns:
-            Dictionary with number of orphaned chunks cleaned up and total bytes freed
-        """
-        # Get size information before cleanup
-        pre_cleanup_size = 0
-        if self.vectorstore_cache_dir.exists():
-            for item in self.vectorstore_cache_dir.glob("*"):
-                if item.is_file():
-                    pre_cleanup_size += item.stat().st_size
-                
-        # Track what's being removed
-        num_removed = 0
-        removed_paths = []
-        
-        # Check each file in cache metadata
-        files_to_remove = []
-        for file_path in list(self.cache_metadata):
-            if not os.path.exists(file_path):
-                files_to_remove.append(file_path)
-                removed_paths.append(file_path)
-                num_removed += 1
-                
-        # Process removals
-        for file_path in files_to_remove:
-            self._invalidate_cache(file_path)
-        
-        # Calculate space freed
-        post_cleanup_size = 0
-        if self.vectorstore_cache_dir.exists():
-            for item in self.vectorstore_cache_dir.glob("*"):
-                if item.is_file():
-                    post_cleanup_size += item.stat().st_size
-        
-        bytes_freed = max(0, pre_cleanup_size - post_cleanup_size)
-        
-        # Return statistics about the cleanup
-        return {
-            "removed_count": num_removed,
-            "bytes_freed": bytes_freed,
-            "removed_paths": removed_paths
-        }
 
     def _get_file_type(self, file_path: str) -> str:
         """
