@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# Misc
+.DS_Store
+*.log
+.env
+
+# for convenience
+"Scientific Data"
+
+# Ignore cache directory
+.cache/
+.cache/cache_metadata.json
+Scientific Data
