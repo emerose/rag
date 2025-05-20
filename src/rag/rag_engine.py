@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from datetime import datetime
 
 import magic
 import tiktoken
@@ -30,6 +31,7 @@ from langchain_community.document_loaders import (
 from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_unstructured import UnstructuredLoader
+import asyncio
 
 # Disable telemetry
 os.environ["DO_NOT_TRACK"] = "true"
@@ -110,10 +112,10 @@ load_environment()
 @dataclass(frozen=True)
 class RAGConfig:
     """Configuration for RAG Engine.
-    
+
     This is an immutable configuration class that contains all the static configuration
     parameters for the RAG engine. Runtime-mutable flags are moved to RuntimeOptions.
-    
+
     Attributes:
         documents_dir: Directory containing documents to index
         embedding_model: Name of the OpenAI embedding model to use
@@ -138,16 +140,17 @@ class RAGConfig:
     def __post_init__(self):
         """Initialize derived attributes after instance creation."""
         if not self.openai_api_key:
-            object.__setattr__(self, 'openai_api_key', os.getenv("OPENAI_API_KEY", ""))
+            object.__setattr__(self, 'openai_api_key',
+                               os.getenv("OPENAI_API_KEY", ""))
 
 
 @dataclass
 class RuntimeOptions:
     """Runtime options for RAG Engine.
-    
+
     This class contains all the runtime-mutable flags and callbacks that can be
     modified during the execution of the RAG engine.
-    
+
     Attributes:
         progress_callback: Optional callback for progress updates
         log_callback: Optional callback for logging
@@ -227,14 +230,16 @@ class RAGEngine:
 
     def _initialize_from_config(self) -> None:
         """Initialize engine from configuration."""
-        self._initialize_paths(self.config.documents_dir, self.config.cache_dir)
+        self._initialize_paths(self.config.documents_dir,
+                               self.config.cache_dir)
         self._initialize_parameters(
             self.config.lock_timeout, self.config.chunk_size, self.config.chunk_overlap
         )
         self._initialize_tokenizer(self.config.embedding_model)
         self._initialize_locks()
         self._initialize_embeddings()
-        self._initialize_chat_model(self.config.chat_model, self.config.temperature)
+        self._initialize_chat_model(
+            self.config.chat_model, self.config.temperature)
         self._initialize_vectorstores()
         self._initialize_cache_metadata()
 
@@ -281,6 +286,10 @@ class RAGEngine:
                 openai_api_key=self.config.openai_api_key,
                 show_progress_bar=False,  # Disable tqdm progress bar
             )
+
+            # Initialize async client for direct API calls
+            from openai import AsyncOpenAI
+            self.async_client = AsyncOpenAI(api_key=self.config.openai_api_key)
 
             # Get embedding dimensions by making a test embedding
             test_embedding = self.embeddings.embed_query("test")
@@ -1035,6 +1044,37 @@ class RAGEngine:
             # For larger documents, use maximum batch size
             return MAX_BATCH_SIZE
 
+    async def _create_embeddings_batch_async(
+        self, batch: list[Any], semaphore: asyncio.Semaphore
+    ) -> list[list[float]]:
+        """
+        Create embeddings for a batch of documents asynchronously.
+
+        Args:
+            batch: List of documents to embed
+            semaphore: Semaphore to limit concurrent requests
+
+        Returns:
+            List of embeddings
+        """
+        try:
+            # Extract text content from documents
+            texts = [doc.page_content for doc in batch]
+
+            # Use semaphore to limit concurrent requests
+            async with semaphore:
+                # Create embeddings using async client
+                response = await self.async_client.embeddings.create(
+                    input=texts,
+                    model=self.config.embedding_model
+                )
+                return [item.embedding for item in response.data]
+        except Exception as e:
+            self._log(
+                "WARNING", f"Failed to create embeddings for batch: {e}", "Embeddings"
+            )
+            return []
+
     def _create_embeddings_batch(
         self, batch: list[Any], embeddings: OpenAIEmbeddings
     ) -> list[list[float]]:
@@ -1059,172 +1099,76 @@ class RAGEngine:
             )
             return []
 
-    def _create_and_save_vectorstore(
-        self, file_path: str, docs: list[Any]
+    async def _create_vectorstore_from_chunks_async(
+        self, file_path: str, chunks: list[Any]
     ) -> FAISS | None:
         """
-        Create and save a FAISS vectorstore for a single file.
-        Processes documents in batches to avoid token limits.
-        Enhances document metadata with source information and preserves document-specific metadata.
+        Create a vectorstore from document chunks asynchronously.
 
         Args:
-            file_path: Path to the file being processed
-            docs: List of documents to index
+            file_path: Path to the file
+            chunks: List of document chunks
 
         Returns:
             FAISS vectorstore if successful, None otherwise
         """
-        try:
-            # Get file type for specialized text splitting
-            mime_type = self._get_file_type(file_path)
+        # Calculate optimal batch size based on total chunks
+        total_chunks = len(chunks)
+        batch_size = self._calculate_optimal_batch_size(total_chunks)
+        self._log(
+            "INFO",
+            f"Processing {total_chunks} chunks in batches of {batch_size}",
+            "Indexer",
+        )
+
+        # Create vector store for this file in manageable batches
+        vectorstore: FAISS | None = None
+        chunks_processed = 0
+
+        # Create semaphore to limit concurrent requests
+        semaphore = asyncio.Semaphore(3)  # Limit to 3 concurrent requests
+
+        # Create batches
+        batches = [
+            chunks[i: i + batch_size] for i in range(0, total_chunks, batch_size)
+        ]
+
+        # Process batches concurrently
+        tasks = [
+            self._create_embeddings_batch_async(batch, semaphore)
+            for batch in batches
+        ]
+        embeddings_results = await asyncio.gather(*tasks)
+
+        # Process results
+        for batch, embeddings in zip(batches, embeddings_results):
+            if embeddings:
+                vectorstore = self._add_batch_to_vectorstore(
+                    vectorstore, batch, embeddings
+                )
+                chunks_processed += len(batch)
+                self._update_progress(
+                    "Chunks", int(chunks_processed * 100 / total_chunks)
+                )
+                self._update_progress(
+                    "Embeddings", int(chunks_processed * 100 / total_chunks)
+                )
+
+        if vectorstore is None:
             self._log(
-                "INFO", f"Processing file with MIME type: {mime_type}", "Indexer")
-
-            # Split documents into chunks
-            all_split_docs = self._split_documents_in_batches(docs, mime_type)
-            if not all_split_docs:
-                self._log(
-                    "WARNING", f"No chunks created for: {file_path}", "Indexer")
-                return None
-
-            # Enhance document metadata
-            self._enhance_document_metadata(
-                all_split_docs, file_path, mime_type)
-
-            # Create and save vectorstore
-            return self._create_vectorstore_from_chunks(file_path, all_split_docs)
-
-        except Exception as e:
-            self._log(
-                "WARNING",
-                f"Failed to create vectorstore for {file_path}: {e!s}",
-                "Indexer",
-            )
+                "WARNING", f"No vectorstore created for: {file_path}", "Indexer")
             return None
 
-    def _split_documents_in_batches(self, docs: list[Any], mime_type: str) -> list[Any]:
-        """
-        Split documents into chunks in batches.
+        # Save to cache immediately
+        self._save_vectorstore_to_cache(file_path, vectorstore)
+        self._log(
+            "INFO",
+            f"Created and saved vectorstore for: {file_path} "
+            f"with total chunks: {total_chunks}",
+            "Indexer",
+        )
 
-        Args:
-            docs: List of documents to split
-            mime_type: MIME type of the document
-
-        Returns:
-            List of split documents
-        """
-        batch_size = 10  # Process 10 documents at a time
-        all_split_docs = []
-
-        for i in range(0, len(docs), batch_size):
-            batch = docs[i: i + batch_size]
-            self._log(
-                "INFO",
-                f"Processing batch {i//batch_size + 1} of {(len(docs) + batch_size - 1)//batch_size}",
-                "Indexer",
-            )
-
-            # Split documents into chunks using document-type-specific splitter
-            split_docs = self._split_documents(batch, mime_type)
-            all_split_docs.extend(split_docs)
-
-        return all_split_docs
-
-    def _enhance_document_metadata(
-        self, docs: list[Any], file_path: str, mime_type: str
-    ) -> None:
-        """
-        Enhance document metadata with source information and preserve document-specific metadata.
-
-        Args:
-            docs: List of documents to enhance
-            file_path: Path to the file
-            mime_type: MIME type of the document
-        """
-        abs_path = str(Path(file_path).absolute())
-        for doc in docs:
-            # Ensure metadata exists
-            if not hasattr(doc, "metadata"):
-                doc.metadata = {}
-
-            # Preserve original metadata
-            original_metadata = doc.metadata.copy()
-
-            # Add source information
-            content_hash = hashlib.md5(
-                doc.page_content.encode()).hexdigest()[:8]
-            doc.metadata.update(
-                {
-                    "source": abs_path,
-                    "source_type": mime_type,
-                    "indexed_at": time.time(),
-                    "chunk_id": f"{abs_path}_{content_hash}",
-                }
-            )
-
-            # Preserve document-specific metadata
-            self._preserve_document_specific_metadata(
-                doc, original_metadata, mime_type)
-
-    def _preserve_document_specific_metadata(
-        self, doc: Any, original_metadata: dict[str, Any], mime_type: str
-    ) -> None:
-        """
-        Preserve document-specific metadata based on file type.
-
-        Args:
-            doc: Document to enhance
-            original_metadata: Original document metadata
-            mime_type: MIME type of the document
-        """
-        # Map of MIME types to their specific metadata fields
-        metadata_mapping = {
-            "application/pdf": {
-                "page": "page_number",
-                "page_number": "page_number",
-                "page_label": "page_label",
-            },
-            "application/msword": {
-                "page": "page_number",
-                "section": "section",
-                "heading": "heading",
-            },
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {
-                "page": "page_number",
-                "section": "section",
-                "heading": "heading",
-            },
-            "application/vnd.ms-excel": {
-                "sheet_name": "sheet_name",
-                "row": "row",
-                "column": "column",
-            },
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
-                "sheet_name": "sheet_name",
-                "row": "row",
-                "column": "column",
-            },
-            "text/markdown": {
-                "heading": "heading",
-                "section": "section",
-            },
-            "text/html": {
-                "tag": "html_tag",
-                "heading": "heading",
-                "section": "section",
-            },
-        }
-
-        # Get metadata mapping for this MIME type
-        mapping = metadata_mapping.get(mime_type, {})
-        for src_key, dest_key in mapping.items():
-            if src_key in original_metadata:
-                doc.metadata[dest_key] = original_metadata[src_key]
-
-        # Add any other relevant metadata from the original document
-        for key, value in original_metadata.items():
-            if key not in doc.metadata and value is not None:
-                doc.metadata[key] = value
+        return vectorstore
 
     def _create_vectorstore_from_chunks(
         self, file_path: str, chunks: list[Any]
@@ -1401,188 +1345,95 @@ class RAGEngine:
         )
         return UnstructuredLoader(file_path)
 
-    def index_documents(self) -> None:
+    async def _create_and_save_vectorstore_async(
+        self, file_path: str, docs: list[Any]
+    ) -> FAISS | None:
         """
-        Load and index documents from the specified directory.
-        Supports multiple file types via unstructured loader.
-        Skips unsupported file types with a warning.
-        Uses caching for both embeddings and vectorstore to avoid recomputing them.
-        Automatically handles cache invalidation for modified or deleted files.
-        Preemptively loads valid cached vectorstores to avoid unnecessary reprocessing.
-        Creates and saves individual FAISS indices per file before merging.
-        """
-        try:
-            self._validate_documents_dir()
-            self._cleanup_invalid_caches()
-
-            all_files = self._get_supported_files()
-            if not all_files:
-                raise ValueError(
-                    f"No supported documents found in {self.documents_dir}"
-                )
-
-            self._process_files(all_files)
-
-            # Ensure we reach 100% at the end
-            self._update_progress("Files", 100)
-            self._update_progress("Chunks", 100)
-            self._update_progress("Embeddings", 100)
-
-            self._log("INFO", "Indexing completed successfully", "Indexer")
-        except Exception as e:
-            self._log("ERROR", f"Error during indexing: {e!s}", "Indexer")
-            raise
-
-    def _validate_documents_dir(self) -> None:
-        """Validate documents directory exists and create it if it doesn't."""
-        # Convert to absolute path and resolve any symlinks
-        abs_path = os.path.abspath(os.path.expanduser(self.documents_dir))
-        self._log(
-            "INFO", f"Attempting to access directory: {abs_path}", "Indexer")
-
-        # Check if path exists
-        if not os.path.exists(abs_path):
-            self._log(
-                "ERROR", f"Directory does not exist: {abs_path}", "Indexer")
-            # List contents of parent directory if it exists
-            parent_dir = os.path.dirname(abs_path)
-            if os.path.exists(parent_dir):
-                self._log(
-                    "INFO", f"Contents of parent directory {parent_dir}:", "Indexer"
-                )
-                try:
-                    for item in os.listdir(parent_dir):
-                        self._log("INFO", f"  - {item}", "Indexer")
-                except Exception as e:
-                    self._log(
-                        "ERROR", f"Error listing parent directory: {e!s}", "Indexer"
-                    )
-            else:
-                self._log(
-                    "ERROR", f"Parent directory does not exist: {parent_dir}", "Indexer"
-                )
-
-            try:
-                os.makedirs(abs_path, exist_ok=True)
-                self._log(
-                    "INFO", f"Created documents directory: {abs_path}", "Indexer")
-            except Exception as e:
-                raise ValueError(
-                    f"Failed to create documents directory {abs_path}: {e!s}", "Indexer"
-                ) from e
-        else:
-            self._log("INFO", f"Directory exists: {abs_path}", "Indexer")
-            # List contents of the directory
-            try:
-                contents = os.listdir(abs_path)
-                self._log(
-                    "INFO", f"Contents of directory {abs_path}:", "Indexer")
-                for item in contents:
-                    self._log("INFO", f"  - {item}", "Indexer")
-            except Exception as e:
-                self._log(
-                    "ERROR", f"Error listing directory contents: {e!s}", "Indexer"
-                )
-
-        self.documents_dir = abs_path  # Update to absolute path
-
-    def _get_supported_files(self) -> list[str]:
-        """Get list of supported files in documents directory."""
-        all_files = []
-        try:
-            for root, _, files in os.walk(self.documents_dir):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    if self._is_supported_file_type(file_path):
-                        all_files.append(file_path)
-                    else:
-                        mime_type = self._get_file_type(file_path)
-                        self._log(
-                            "INFO",
-                            f"Skipping unsupported file: {file_path} "
-                            f"(Type: {mime_type})",
-                            "Indexer",
-                        )
-            self._log(
-                "INFO", f"Found {len(all_files)} supported files to process", "Indexer"
-            )
-        except Exception as e:
-            self._log(
-                "ERROR",
-                f"Error scanning directory {self.documents_dir}: {e!s}",
-                "Indexer",
-            )
-            raise
-        return all_files
-
-    def _process_files(self, all_files: list[str]) -> None:
-        """
-        Process files for indexing.
+        Create and save a FAISS vectorstore for a single file asynchronously.
+        Processes documents in batches to avoid token limits.
+        Enhances document metadata with source information and preserves document-specific metadata.
 
         Args:
-            all_files: List of files to process
+            file_path: Path to the file being processed
+            docs: List of documents to index
+
+        Returns:
+            FAISS vectorstore if successful, None otherwise
         """
-        total_chunks = 0
-        files_to_process = []
-
-        # Initialize cache metadata for all files
-        for file_path in all_files:
-            if file_path not in self.cache_metadata:
-                self.cache_metadata[file_path] = self._get_file_metadata(
-                    file_path)
-                # Add initial source type
-                self.cache_metadata[file_path]["source_type"] = self._get_file_type(
-                    file_path
-                )
-                self.cache_metadata[file_path]["chunks"] = {"total": 0}
-        self._save_cache_metadata()
-
-        # Preemptively load all valid cached vectorstores
-        self._log("INFO", "Loading cached vectorstores...", "Indexer")
-        for file_path in all_files:
-            try:
-                cached_store = self._load_cached_vectorstore(file_path)
-                if cached_store is not None:
-                    self.vectorstores[file_path] = cached_store
-                    total_chunks += len(cached_store.index_to_docstore_id)
-                    self._log(
-                        "INFO", f"Using cached vectorstore for: {file_path}", "Indexer"
-                    )
-                else:
-                    files_to_process.append(file_path)
-            except Exception as e:
-                self._log(
-                    "WARNING",
-                    f"Failed to load cached vectorstore for {file_path}: {e}",
-                    "Indexer",
-                )
-                files_to_process.append(file_path)
-
-        # Process files that need updating
-        if files_to_process:
+        try:
+            # Get file type for specialized text splitting
+            mime_type = self._get_file_type(file_path)
             self._log(
-                "INFO", f"Processing {len(files_to_process)} files...", "Indexer")
-            for i, file_path in enumerate(files_to_process):
-                self._update_progress(
-                    "Files", int((i + 1) * 100 / len(files_to_process))
-                )
-                self._process_single_file(file_path, total_chunks)
+                "INFO", f"Processing file with MIME type: {mime_type}", "Indexer")
 
-        if not self.vectorstores:
-            raise ValueError("No documents could be successfully loaded")
+            # Split documents into chunks
+            all_split_docs = self._split_documents(docs, mime_type)
+            if not all_split_docs:
+                self._log(
+                    "WARNING", f"No chunks created for: {file_path}", "Indexer")
+                return None
 
-        self._log(
-            "INFO",
-            f"Successfully indexed {total_chunks} total document chunks "
-            f"from {len(self.vectorstores)} files "
-            f"({len(files_to_process)} files processed, "
-            f"{len(self.vectorstores) - len(files_to_process)} from cache)",
-            "Indexer",
-        )
+            # Enhance document metadata
+            self._enhance_document_metadata(
+                all_split_docs, file_path, mime_type)
 
-    def _process_single_file(self, file_path: str, total_chunks: int) -> None:
+            # Create and save vectorstore
+            return await self._create_vectorstore_from_chunks_async(file_path, all_split_docs)
+
+        except Exception as e:
+            self._log(
+                "WARNING",
+                f"Failed to create vectorstore for {file_path}: {e!s}",
+                "Indexer",
+            )
+            return None
+
+    def _create_and_save_vectorstore(
+        self, file_path: str, docs: list[Any]
+    ) -> FAISS | None:
         """
-        Process a single file for indexing.
+        Create and save a FAISS vectorstore for a single file.
+        Processes documents in batches to avoid token limits.
+        Enhances document metadata with source information and preserves document-specific metadata.
+
+        Args:
+            file_path: Path to the file being processed
+            docs: List of documents to index
+
+        Returns:
+            FAISS vectorstore if successful, None otherwise
+        """
+        try:
+            # Get file type for specialized text splitting
+            mime_type = self._get_file_type(file_path)
+            self._log(
+                "INFO", f"Processing file with MIME type: {mime_type}", "Indexer")
+
+            # Split documents into chunks
+            all_split_docs = self._split_documents(docs, mime_type)
+            if not all_split_docs:
+                self._log(
+                    "WARNING", f"No chunks created for: {file_path}", "Indexer")
+                return None
+
+            # Enhance document metadata
+            self._enhance_document_metadata(
+                all_split_docs, file_path, mime_type)
+
+            # Create and save vectorstore
+            return self._create_vectorstore_from_chunks(file_path, all_split_docs)
+
+        except Exception as e:
+            self._log(
+                "WARNING",
+                f"Failed to create vectorstore for {file_path}: {e!s}",
+                "Indexer",
+            )
+            return None
+
+    async def _process_single_file_async(self, file_path: str, total_chunks: int) -> None:
+        """
+        Process a single file for indexing asynchronously.
 
         Args:
             file_path: Path to the file to process
@@ -1614,7 +1465,7 @@ class RAGEngine:
                     doc.metadata = {}
                 doc.metadata["source_type"] = mime_type
 
-            vectorstore = self._create_and_save_vectorstore(file_path, docs)
+            vectorstore = await self._create_and_save_vectorstore_async(file_path, docs)
 
             if vectorstore is not None:
                 self.vectorstores[file_path] = vectorstore
@@ -1636,6 +1487,81 @@ class RAGEngine:
         except Exception as e:
             self._log(
                 "WARNING", f"Failed to index {file_path}: {e!s}", "Indexer")
+
+    async def index_documents_async(self) -> None:
+        """
+        Load and index documents from the specified directory asynchronously.
+        Supports multiple file types via unstructured loader.
+        Skips unsupported file types with a warning.
+        Uses caching for both embeddings and vectorstore to avoid recomputing them.
+        Automatically handles cache invalidation for modified or deleted files.
+        Preemptively loads valid cached vectorstores to avoid unnecessary reprocessing.
+        Creates and saves individual FAISS indices per file before merging.
+        """
+        try:
+            self._validate_documents_dir()
+            self._cleanup_invalid_caches()
+
+            all_files = self._get_supported_files()
+            if not all_files:
+                raise ValueError(
+                    f"No supported documents found in {self.documents_dir}"
+                )
+
+            # Process files that need updating
+            files_to_process = []
+            total_chunks = 0
+
+            # First, try to load cached vectorstores
+            for file_path in all_files:
+                if self._is_cache_valid(file_path):
+                    vectorstore = self._load_cached_vectorstore(file_path)
+                    if vectorstore is not None:
+                        self.vectorstores[file_path] = vectorstore
+                        num_chunks = len(vectorstore.index_to_docstore_id)
+                        total_chunks += num_chunks
+                        self._log(
+                            "INFO",
+                            f"Loaded cached vectorstore for: {file_path} "
+                            f"({num_chunks} chunks)",
+                            "Cache",
+                        )
+                    else:
+                        files_to_process.append(file_path)
+                else:
+                    files_to_process.append(file_path)
+
+            # Process files that need updating
+            if files_to_process:
+                self._log(
+                    "INFO", f"Processing {len(files_to_process)} files...", "Indexer")
+                for i, file_path in enumerate(files_to_process):
+                    self._update_progress(
+                        "Files", int((i + 1) * 100 / len(files_to_process))
+                    )
+                    await self._process_single_file_async(file_path, total_chunks)
+
+            if not self.vectorstores:
+                raise ValueError("No documents could be successfully loaded")
+
+            self._log(
+                "INFO",
+                f"Successfully indexed {total_chunks} total document chunks "
+                f"from {len(self.vectorstores)} files "
+                f"({len(files_to_process)} files processed, "
+                f"{len(self.vectorstores) - len(files_to_process)} from cache)",
+                "Indexer",
+            )
+
+            # Ensure we reach 100% at the end
+            self._update_progress("Files", 100)
+            self._update_progress("Chunks", 100)
+            self._update_progress("Embeddings", 100)
+
+            self._log("INFO", "Indexing completed successfully", "Indexer")
+        except Exception as e:
+            self._log("ERROR", f"Error during indexing: {e!s}", "Indexer")
+            raise
 
     def query(self, query: str, k: int = 4) -> str:
         """
@@ -1738,6 +1664,87 @@ class RAGEngine:
             except Exception as e:
                 self._log(
                     "WARNING", f"Failed to update progress: {e!s}", "Progress")
+
+    def _validate_documents_dir(self) -> None:
+        """
+        Validate that the documents directory exists and is accessible.
+
+        Raises:
+            ValueError: If the directory doesn't exist or isn't accessible
+        """
+        if not os.path.exists(self.documents_dir):
+            raise ValueError(
+                f"Documents directory not found: {self.documents_dir}")
+
+        if not os.path.isdir(self.documents_dir):
+            raise ValueError(f"Path is not a directory: {self.documents_dir}")
+
+        if not os.access(self.documents_dir, os.R_OK):
+            raise ValueError(
+                f"Documents directory not readable: {self.documents_dir}")
+
+        self._log(
+            "INFO", f"Validated documents directory: {self.documents_dir}", "Indexer")
+
+    def _get_supported_files(self) -> list[str]:
+        """
+        Get a list of supported files in the documents directory.
+
+        Returns:
+            List of file paths that can be processed
+        """
+        supported_files = []
+        for root, _, files in os.walk(self.documents_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                if self._is_supported_file_type(file_path):
+                    supported_files.append(file_path)
+                    self._log(
+                        "DEBUG", f"Found supported file: {file_path}", "Indexer")
+                else:
+                    self._log(
+                        "DEBUG", f"Skipping unsupported file: {file_path}", "Indexer")
+
+        self._log(
+            "INFO", f"Found {len(supported_files)} supported files", "Indexer")
+        return supported_files
+
+    def _enhance_document_metadata(
+        self, docs: list[Any], file_path: str, mime_type: str
+    ) -> None:
+        """
+        Enhance document metadata with source information and processing details.
+
+        Args:
+            docs: List of documents to enhance
+            file_path: Path to the source file
+            mime_type: MIME type of the file
+        """
+        for i, doc in enumerate(docs):
+            if not hasattr(doc, "metadata"):
+                doc.metadata = {}
+
+            # Add source information
+            doc.metadata.update({
+                "source": file_path,
+                "source_type": mime_type,
+                "chunk_id": i,
+                "indexed_at": datetime.now().isoformat(),
+            })
+
+            # Add file-specific metadata
+            try:
+                stat = os.stat(file_path)
+                doc.metadata.update({
+                    "file_size": stat.st_size,
+                    "last_modified": stat.st_mtime,
+                })
+            except Exception as e:
+                self._log(
+                    "WARNING",
+                    f"Failed to get file stats for {file_path}: {e}",
+                    "Indexer"
+                )
 
 
 def main():

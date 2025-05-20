@@ -6,7 +6,7 @@ import traceback
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import typer
 from prompt_toolkit import PromptSession
@@ -18,6 +18,7 @@ from prompt_toolkit.styles import Style
 from rich.box import ROUNDED
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.table import Table
 
 # Try both relative and absolute imports
@@ -122,10 +123,27 @@ def main(
         "-v",
         help="Enable verbose logging (sets level to INFO)",
     ),
-    log_level: LogLevel = LogLevel.WARNING,
+    log_level: LogLevel = typer.Option(
+        LogLevel.WARNING,
+        "--log-level",
+        "-l",
+        help="Set the logging level",
+    ),
 ) -> None:
     """RAG (Retrieval Augmented Generation) CLI."""
     state.logger = configure_logging(verbose, log_level)
+
+
+def create_console_progress_callback(progress: Progress) -> Callable[[str, int], None]:
+    """Create a progress callback that updates the console progress bars."""
+    tasks = {}
+
+    def update_progress(name: str, value: int) -> None:
+        if name not in tasks:
+            tasks[name] = progress.add_task(f"[cyan]{name}", total=100)
+        progress.update(tasks[name], completed=value)
+
+    return update_progress
 
 
 @app.command()
@@ -137,6 +155,12 @@ def index(
         dir_okay=True,
         file_okay=True,
         resolve_path=True,
+    ),
+    use_tui: bool = typer.Option(
+        False,
+        "--tui",
+        "-t",
+        help="Use the TUI interface for indexing",
     ),
 ) -> None:
     """
@@ -175,8 +199,16 @@ def index(
         # Create runtime options
         runtime_options = RuntimeOptions()
 
-        # Run the TUI application
-        run_tui(config, runtime_options)
+        if use_tui:
+            # Run with TUI
+            run_tui(config, runtime_options)
+        else:
+            # Run without TUI
+            rag_engine = RAGEngine(config, runtime_options)
+
+            # Run indexing
+            import asyncio
+            asyncio.run(rag_engine.index_documents_async())
 
     except ValueError as e:
         state.logger.error(f"Configuration error: {e!s}")

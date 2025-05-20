@@ -285,7 +285,8 @@ class RAGTUI(App):
                 logging.info("Initializing RAG engine...")
                 try:
                     # Initialize RAG engine
-                    self.rag_engine = RAGEngine(self.config, self.runtime_options)
+                    self.rag_engine = RAGEngine(
+                        self.config, self.runtime_options)
                     logging.info("RAG engine initialized successfully")
 
                     # Schedule indexing to start after TUI is ready
@@ -347,14 +348,18 @@ class RAGTUI(App):
             self.progress_section.add_progress_bar("Embeddings", 100)
 
             logging.info("Starting document indexing...")
-            # Run indexing in a background thread, then exit when done
+            # Run indexing in a background task
 
             async def _index_and_exit():
-                await asyncio.to_thread(self.rag_engine.index_documents)
-                logging.info("Indexing completed successfully")
-                logging.info("Exiting in 5 seconds...")
-                await asyncio.sleep(5)
-                self.exit()
+                try:
+                    await self.rag_engine.index_documents_async()
+                    logging.info("Indexing completed successfully")
+                    logging.info("Exiting in 5 seconds...")
+                    await asyncio.sleep(5)
+                    self.exit()
+                except Exception as e:
+                    logging.error(f"Error during indexing: {e!s}")
+                    self.exit()
 
             self.indexing_task = asyncio.create_task(_index_and_exit())
         except Exception as e:
