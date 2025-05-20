@@ -274,6 +274,7 @@ class RAGTUI(App):
         self.rag_engine: RAGEngine | None = None
         self.log_viewer: RichLog | None = None
         self.progress_section: ProgressSection | None = None
+        self.pending_tasks: list[asyncio.Task] = []
 
         # Set up progress callback if not already set
         if not self.runtime_options.progress_callback:
@@ -343,7 +344,13 @@ class RAGTUI(App):
                     logging.info("RAG engine initialized successfully")
 
                     # Schedule indexing to start after TUI is ready
-                    self.set_timer(0.1, self.start_indexing)
+                    async def delayed_start():
+                        await asyncio.sleep(0.1)
+                        self.start_indexing()
+                    
+                    task = asyncio.create_task(delayed_start())
+                    self.pending_tasks.append(task)
+                    
                 except Exception as e:
                     error_msg = f"Failed to initialize RAG engine: {e!s}"
                     logging.error(error_msg)
@@ -402,43 +409,46 @@ class RAGTUI(App):
 
             logging.info("Starting document indexing...")
 
-            async def _index_documents_with_refresh():
-                """Index documents with periodic UI refreshes."""
+            async def _index_documents_task():
+                """Index documents and exit when complete."""
                 try:
                     # Start the indexing process
                     await self.rag_engine.index_documents_async()
                     logging.info("Indexing completed successfully")
-                    # Schedule exit after a short delay
-                    self.set_timer(5, self.exit)
+                    # Add a delay before exiting to allow reading logs
+                    logging.info("Exiting in 5 seconds...")
+                    await asyncio.sleep(5)
+                    # Exit directly after delay
+                    self.exit()
                 except Exception as e:
                     logging.error(f"Error during indexing: {e!s}")
-                    self.set_timer(5, self.exit)
+                    logging.info("Exiting in 5 seconds...")
+                    await asyncio.sleep(5)
+                    self.exit()
 
-            # Run the indexing in a worker
-            self.run_worker(_index_documents_with_refresh, group="indexing")
+            # Create and store the task
+            task = asyncio.create_task(_index_documents_task())
+            self.pending_tasks.append(task)
 
         except Exception as e:
             error_msg = f"Error starting indexing: {e!s}"
             logging.error(error_msg)
 
-    def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
-        """Handle worker state changes."""
-        if event.worker.group == "indexing":
-            if event.state == "success":
-                logging.info("Indexing worker completed successfully")
-            elif event.state == "error":
-                logging.error(f"Indexing worker failed: {event.error}")
-                self.set_timer(5, self.exit)
-
     async def on_idle(self) -> None:
         """Handle idle time in the event loop."""
-        # This method is called when the event loop is idle
-        
-        # Check if we need to flush log messages
+        # Flush log messages
         if hasattr(self, "log_viewer") and hasattr(self.log_viewer, "_handler"):
             handler = self.log_viewer._handler
             if isinstance(handler, TUILogHandler) and handler._log_queue:
                 handler.flush_queue()
+                
+        # Check on pending tasks
+        for task in list(self.pending_tasks):
+            if task.done():
+                self.pending_tasks.remove(task)
+                # Handle any exceptions
+                if task.exception():
+                    logging.error(f"Task failed with exception: {task.exception()}")
                 
         # Small sleep to yield back to the event loop
         await asyncio.sleep(0.01)
@@ -448,7 +458,10 @@ class RAGTUI(App):
 
     def on_unmount(self) -> None:
         """Clean up when the app is unmounted."""
-        pass  # We're using workers, so no manual cleanup needed
+        # Cancel any pending tasks
+        for task in self.pending_tasks:
+            if not task.done():
+                task.cancel()
 
 
 def run_tui(config: RAGConfig | None = None, runtime_options: RuntimeOptions | None = None) -> None:
