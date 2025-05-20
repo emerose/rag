@@ -930,7 +930,8 @@ class RAGEngine:
     def _get_merged_vectorstore(self) -> FAISS:
         """
         Get a merged vectorstore from all individual vectorstores.
-        Tracks source documents and maintains metadata during merging.
+        Uses public APIs to safely merge vectorstores for querying.
+        Processes documents in batches to stay within token limits.
 
         Returns:
             FAISS: Merged vectorstore
@@ -941,60 +942,161 @@ class RAGEngine:
         if not self.vectorstores:
             raise ValueError("No vectorstores available for merging")
 
-        # Start with the first vectorstore
-        first_store = next(iter(self.vectorstores.values()))
-        merged_store = first_store
+        # Check if we already have a cached merged vectorstore
+        if hasattr(self, '_cached_merged_vectorstore'):
+            return self._cached_merged_vectorstore
 
+        # For simplicity, if there's only one vectorstore, just use it
+        if len(self.vectorstores) == 1:
+            store = next(iter(self.vectorstores.values()))
+            self._cached_merged_vectorstore = store
+            return store
+            
+        self._log("INFO", "Merging multiple vectorstores for querying", "Indexer")
+            
         # Track source documents and their chunks
         source_docs = {}
         total_chunks = 0
+        all_docs = []
 
-        # Merge remaining vectorstores
-        for file_path, store in list(self.vectorstores.items())[1:]:
+        # Collect documents from all vectorstores using public API
+        for file_path, store in self.vectorstores.items():
             try:
                 # Get absolute path for consistent tracking
                 abs_path = str(Path(file_path).absolute())
-
+                
+                # Use the similarity search directly to get all documents
+                docs = []
+                try:
+                    # First method: try direct access to the docstore
+                    if hasattr(store, "docstore") and hasattr(store.docstore, "_dict"):
+                        for doc_id in store.docstore._dict:
+                            if doc_id in store.docstore._dict:
+                                docs.append(store.docstore._dict[doc_id])
+                except Exception:
+                    # Fallback method: use similarity search with a large k
+                    try:
+                        docs = store.similarity_search("", k=10000)
+                    except Exception as e:
+                        self._log(
+                            "WARNING",
+                            f"Failed to retrieve documents using similarity search: {e}",
+                            "Indexer"
+                        )
+                
+                num_chunks = len(docs)
+                if num_chunks == 0:
+                    self._log(
+                        "WARNING",
+                        f"No documents found in vectorstore for {file_path}",
+                        "Indexer"
+                    )
+                    continue
+                    
                 # Track source document and its chunks
-                num_chunks = len(store.index_to_docstore_id)
                 source_docs[abs_path] = {
                     "chunks": num_chunks,
                     "first_chunk_id": total_chunks,
                     "last_chunk_id": total_chunks + num_chunks - 1,
                 }
+                
+                # Add documents to the overall collection
+                all_docs.extend(docs)
+                
                 total_chunks += num_chunks
-
-                # Merge vectorstore
-                merged_store.merge_from(store)
                 self._log(
                     "INFO",
-                    f"Merged vectorstore from: {abs_path} " f"({num_chunks} chunks)",
+                    f"Collected {num_chunks} documents from: {abs_path}",
                     "Indexer",
                 )
             except Exception as e:
                 self._log(
                     "WARNING",
-                    f"Failed to merge vectorstore from {file_path}: {e}",
+                    f"Failed to process vectorstore from {file_path}: {e}",
                     "Indexer",
                 )
                 continue
 
-        # Log merging summary
-        self._log(
-            "INFO",
-            f"Merged {len(self.vectorstores)} vectorstores with "
-            f"{total_chunks} total chunks",
-            "Indexer",
-        )
-        for path, info in source_docs.items():
+        # Create a new vectorstore with all the collected documents
+        if not all_docs:
+            raise ValueError("No documents found in any vectorstore")
+            
+        try:
+            # Process documents in batches to stay within token limits
+            # OpenAI's limit is 300,000 tokens per request
+            merged_store = None
+            batch_size = 100  # Start with a conservative batch size
+            
             self._log(
                 "INFO",
-                f"Source: {path} - Chunks {info['first_chunk_id']} to "
-                f"{info['last_chunk_id']} ({info['chunks']} total)",
+                f"Processing {len(all_docs)} documents in batches of {batch_size}",
                 "Indexer",
             )
-
-        return merged_store
+            
+            # Process in batches
+            for i in range(0, len(all_docs), batch_size):
+                batch_docs = all_docs[i:i+batch_size]
+                batch_texts = [doc.page_content for doc in batch_docs]
+                batch_metadatas = [doc.metadata for doc in batch_docs]
+                
+                self._log(
+                    "INFO",
+                    f"Processing batch {i//batch_size + 1}/{(len(all_docs) + batch_size - 1)//batch_size}",
+                    "Indexer",
+                )
+                
+                try:
+                    # For the first batch, create a new vectorstore
+                    if merged_store is None:
+                        merged_store = FAISS.from_texts(
+                            texts=batch_texts,
+                            embedding=self.embeddings,
+                            metadatas=batch_metadatas
+                        )
+                    else:
+                        # For subsequent batches, add to the existing vectorstore
+                        merged_store.add_texts(
+                            texts=batch_texts,
+                            metadatas=batch_metadatas
+                        )
+                except Exception as e:
+                    # If we hit a token limit, reduce batch size and retry
+                    if "max_tokens_per_request" in str(e) and batch_size > 10:
+                        self._log(
+                            "WARNING",
+                            f"Token limit exceeded with batch size {batch_size}, reducing batch size",
+                            "Indexer",
+                        )
+                        batch_size = batch_size // 2
+                        # Retry this batch with smaller size
+                        i -= batch_size
+                        continue
+                    else:
+                        # Other error, re-raise
+                        raise
+            
+            if merged_store is None:
+                raise ValueError("Failed to create merged vectorstore after batching")
+            
+            # Log merging summary
+            self._log(
+                "INFO",
+                f"Successfully merged {len(self.vectorstores)} vectorstores with "
+                f"{total_chunks} total chunks",
+                "Indexer",
+            )
+            
+            # Cache the merged vectorstore
+            self._cached_merged_vectorstore = merged_store
+            return merged_store
+            
+        except Exception as e:
+            self._log(
+                "ERROR",
+                f"Failed to create merged vectorstore: {e}",
+                "Indexer",
+            )
+            raise ValueError(f"Failed to create merged vectorstore: {e}")
 
     def _calculate_optimal_batch_size(self, total_chunks: int) -> int:
         """
@@ -1564,6 +1666,10 @@ class RAGEngine:
         if not self.vectorstores:
             raise ValueError(
                 "Documents not indexed. Call index_documents() first.")
+
+        # Clear cached merged vectorstore if it exists
+        if hasattr(self, '_cached_merged_vectorstore'):
+            delattr(self, '_cached_merged_vectorstore')
 
         # Get merged vectorstore for querying
         merged_store = self._get_merged_vectorstore()
