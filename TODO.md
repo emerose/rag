@@ -1,5 +1,4 @@
 - Move all file-system work (hashing, MIME detection, PDF splitting, etc.) into an isolated ingest.py module and let rag_engine.py focus purely on vector-store + QA—clear separation of concerns will simplify unit-testing and future back-ends (e.g., Chroma, Qdrant).
-- Add an incremental-indexing guard: store each document's SHA-256 + chunking params in a tiny SQLite table (index_meta.db); skip re-embedding if neither the file hash nor the chunking parameters changed.
 - Replace the ad-hoc lock files with filelock's context-manager in a with block (with FileLock(path, timeout): …) so locks are always released, even on SIGINT.
 - Swap the hand-rolled log setup for structlog + RichHandler; emit JSON when --json is passed to the CLI so logs can feed directly into logging-agent pipelines.
 - In tui.py, run the long-running index/QA tasks in asyncio.create_task() and call await task inside on_idle(); remove the timer-based shutdown hack and instead call self.exit() from the task when it finishes—this fixes the "doesn't quit after indexing" race.

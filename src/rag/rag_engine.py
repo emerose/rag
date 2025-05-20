@@ -32,6 +32,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_unstructured import UnstructuredLoader
 import asyncio
+from .index_meta import IndexMetadata
 
 # Disable telemetry
 os.environ["DO_NOT_TRACK"] = "true"
@@ -242,6 +243,7 @@ class RAGEngine:
             self.config.chat_model, self.config.temperature)
         self._initialize_vectorstores()
         self._initialize_cache_metadata()
+        self.index_meta = IndexMetadata(self.cache_dir)  # Initialize index metadata
 
     def _initialize_paths(self, documents_dir: str, cache_dir: str) -> None:
         """Initialize directory paths."""
@@ -532,47 +534,27 @@ class RAGEngine:
         )
 
     def _is_cache_valid(self, file_path: str) -> bool:
-        """
-        Check if the cache for a file is still valid.
-        Validates based on file size, modification time, content hash, and model info.
-
+        """Check if the cache for a file is valid.
+        
         Args:
             file_path: Path to the file
-
+            
         Returns:
-            True if cache is valid, False otherwise
+            True if the cache is valid, False otherwise
         """
-        if file_path not in self.cache_metadata:
+        # First check if the file needs reindexing based on metadata
+        if self.index_meta.needs_reindexing(
+            Path(file_path),
+            self.chunk_size,
+            self.chunk_overlap,
+            self.config.embedding_model,
+            self.embedding_model_version
+        ):
             return False
-
-        try:
-            current_metadata = self._get_file_metadata(file_path)
-            cached_metadata = self.cache_metadata[file_path]
-
-            # Check file metadata
-            if not self._compare_file_metadata(current_metadata, cached_metadata):
-                return False
-
-            # Check model info
-            if not self._compare_model_info(
-                current_metadata["model_info"], cached_metadata.get(
-                    "model_info", {})
-            ):
-                self._log(
-                    "INFO",
-                    f"Model mismatch for {file_path}: "
-                    f"cached={cached_metadata.get('model_info', {}).get('embedding_model')} "
-                    f"v{cached_metadata.get('model_info', {}).get('model_version')}, "
-                    f"current={self.config.embedding_model} v{self.embedding_model_version}",
-                )
-                return False
-
-            return True
-        except Exception as e:
-            self._log(
-                "WARNING", f"Failed to validate cache for {file_path}: {e}", "Cache"
-            )
-            return False
+            
+        # Then check if the cache file exists
+        cache_path = self._get_cache_path(file_path)
+        return cache_path.exists()
 
     def _update_cache_metadata(self, file_path: str) -> None:
         """
@@ -604,48 +586,30 @@ class RAGEngine:
         self._save_cache_metadata()
 
     def _invalidate_cache(self, file_path: str) -> None:
-        """
-        Invalidate cache for a file with file locking.
-
+        """Invalidate the cache for a file.
+        
         Args:
             file_path: Path to the file
         """
-        try:
-            with self.vectorstore_lock:
-                # Count files being invalidated
-                num_files = 1
+        # Remove from index metadata
+        self.index_meta.remove_metadata(Path(file_path))
+        
+        # Remove from cache metadata
+        if file_path in self.cache_metadata:
+            del self.cache_metadata[file_path]
+            self._save_cache_metadata()
+            
+        # Remove vectorstore cache file
+        cache_path = self._get_cache_path(file_path)
+        if cache_path.exists():
+            try:
+                cache_path.unlink()
+            except Exception as e:
                 self._log(
-                    "INFO", f"Invalidating {num_files} cached file", "Cache")
-
-                # Remove from cache metadata
-                if file_path in self.cache_metadata:
-                    del self.cache_metadata[file_path]
-                    self._save_cache_metadata()
-
-                # Remove vectorstore cache
-                cache_path = self._get_cache_path(file_path)
-                if cache_path.exists():
-                    try:
-                        import shutil
-
-                        shutil.rmtree(cache_path)
-                        self._log(
-                            "INFO", f"Invalidated cache for: {file_path}", "Cache"
-                        )
-                    except Exception as e:
-                        self._log(
-                            "WARNING",
-                            f"Failed to invalidate cache for {file_path}: {e}",
-                            "Cache",
-                        )
-
-                # Remove from memory
-                if file_path in self.vectorstores:
-                    del self.vectorstores[file_path]
-        except Timeout:
-            self._log(
-                "ERROR", "Timeout while acquiring vectorstore lock", "Cache")
-            raise
+                    "WARNING",
+                    f"Failed to remove cache file {cache_path}: {e}",
+                    "Cache",
+                )
 
     def _cleanup_invalid_caches(self) -> None:
         """
@@ -1432,9 +1396,8 @@ class RAGEngine:
             return None
 
     async def _process_single_file_async(self, file_path: str, total_chunks: int) -> None:
-        """
-        Process a single file for indexing asynchronously.
-
+        """Process a single file for indexing asynchronously.
+        
         Args:
             file_path: Path to the file to process
             total_chunks: Running total of processed chunks
@@ -1471,6 +1434,17 @@ class RAGEngine:
                 self.vectorstores[file_path] = vectorstore
                 num_chunks = len(vectorstore.index_to_docstore_id)
                 total_chunks += num_chunks
+
+                # Update index metadata with enhanced information
+                self.index_meta.update_metadata(
+                    Path(file_path),
+                    self.chunk_size,
+                    self.chunk_overlap,
+                    self.config.embedding_model,
+                    self.embedding_model_version,
+                    mime_type,
+                    num_chunks
+                )
 
                 # Update cache metadata with file type and chunks information
                 if file_path in self.cache_metadata:
@@ -1745,6 +1719,14 @@ class RAGEngine:
                     f"Failed to get file stats for {file_path}: {e}",
                     "Indexer"
                 )
+
+    def list_indexed_files(self) -> list[dict[str, Any]]:
+        """Get a list of all indexed files with their metadata.
+        
+        Returns:
+            List of dictionaries containing file metadata
+        """
+        return self.index_meta.list_indexed_files()
 
 
 def main():
