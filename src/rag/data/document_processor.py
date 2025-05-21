@@ -118,7 +118,7 @@ class DocumentProcessor:
 
         except Exception as e:
             self._log("ERROR", f"Failed to process {file_path}: {e}")
-            raise ValueError(f"Failed to process {file_path}: {e}")
+            raise ValueError(f"Failed to process {file_path}: {e}") from e
 
     def process_directory(self, directory: Path | str) -> dict[str, list[Document]]:
         """Process all supported files in a directory.

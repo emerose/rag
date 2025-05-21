@@ -112,7 +112,7 @@ class DocumentLoader:
             return loader_class(str(file_path))
         except Exception as e:
             self._log("ERROR", f"Failed to initialize loader for {file_path}: {e}")
-            raise ValueError(f"Failed to initialize loader for {file_path}: {e}")
+            raise ValueError(f"Failed to initialize loader for {file_path}: {e}") from e
 
     def load_document(self, file_path: Path | str) -> list[Document]:
         """Load a document from a file.
@@ -155,7 +155,7 @@ class DocumentLoader:
 
         except Exception as e:
             self._log("ERROR", f"Failed to load document {file_path}: {e}")
-            raise ValueError(f"Failed to load document {file_path}: {e}")
+            raise ValueError(f"Failed to load document {file_path}: {e}") from e
 
     def _enhance_document_metadata(
         self,

@@ -83,7 +83,6 @@ ignore = [
     "TRY003", # Allow longer exception messages without separate classes
     "TRY300", # Allow early returns in try blocks for clearer flow
     "BLE001", # Allow broad exception handling where external libraries raise various errors
-    "B904",   # Allow raising caught exception directly without 'from'
     "EM102",  # Allow f-strings in exception messages for clarity
     "PLR2004",# Magic numbers are acceptable in limited heuristic code
     "ARG001", # Allow unused args in nested helper functions

@@ -979,7 +979,7 @@ def cleanup() -> None:
     except Exception as e:
         state.logger.error(f"Error during cache cleanup: {e!s}")
         console.print(f"[red]Error:[/red] Error during cache cleanup: {e!s}")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
 
 def run_cli() -> None:
