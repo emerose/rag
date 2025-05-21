@@ -1,28 +1,61 @@
-### Additional Refactoring Items
+### 🗺️ Roadmap & Priorities  
+*(Priority ‑ **P1** = Do next, … **P5** = Nice-to-have)*
 
-- Move all file-system work (hashing, MIME detection, PDF splitting, etc.) into an isolated ingest.py module and let rag_engine.py focus purely on vector-store + QA—clear separation of concerns will simplify unit-testing and future back-ends (e.g., Chroma, Qdrant).
-- Replace the ad-hoc lock files with filelock's context-manager in a with block (with FileLock(path, timeout): …) so locks are always released, even on SIGINT.
-- De-duplicate identical CSS strings in tui.py by extracting them to a styles.tcss file and loading via StaticCSS, shrinking the source and allowing theme overrides.
-- Give RAGEngine.answer() a pure-function signature (question: str, k: int = 4 -> str) and let the CLI/TUI handle prompt styling—this makes the engine reusable in other contexts (web API, batch mode).
+---
 
-Logic
+#### 1 . Architecture & Core Design
+- **[P1] Extract ingest layer** – Move all filesystem work (hashing, MIME detection, PDF splitting, etc.) into `rag/ingest.py`; keep the engine focused on retrieval + QA.  *Enables unit-testing and alternate back-ends.*
+- **[P2] Vector-store abstraction** – Introduce `VectorStoreProtocol` so FAISS can be swapped for Qdrant/Chroma via a CLI flag.
+- **[P3] Incremental re-indexing** – Hash each chunk and only (re)embed changed chunks to reduce token spend.
+- **[P4] File-locking cleanup** – Replace ad-hoc lockfiles with `filelock.FileLock` context-manager.
 
-- Introduce semantic-aware chunking (e.g., RecursiveCharacterTextSplitter or MarkdownHeaderTextSplitter) instead of fixed token windows—this improves answer relevance and reduces token usage.
+#### 2 . Retrieval & Relevance
+- **[P1] Metadata-aware chunking** – Capture title / headings / page # in `Document.metadata`; enable metadata filtering in queries.
+- **[P1] Semantic text splitter** – Switch to `RecursiveCharacterTextSplitter` (plus heading detection for PDFs).
+- **[P2] Hybrid retrieval** – Combine BM25 (sparse) + dense scores via reciprocal rank fusion.
+- **[P3] Per-document embedding model map** – Lookup table (`embeddings.yaml`) to choose domain-specific embedding models.
+- **[P3] Re-ranking** – Optional Cohere or cross-encoder re-ranker after top-k retrieval.
 
-Performance
+#### 3 . Prompt Engineering & Generation
+- **[P1] Prompt registry** – Central directory `rag/prompts/*.jinja` (or LCEL `PromptTemplate`) + `--prompt <name>` flag.
+- **[P2] System-persona message** – Read `RAG_SYSTEM_PROMPT` env var and prepend to every chat.
+- **[P2] Context window packing** – LCEL `stuff_documents` / token-length trimming for max context utilisation.
 
-- Expose a --max-workers option on the CLI/TUI that defaults to min(32, os.cpu_count() + 4); propagate it to both the ThreadPool (if you keep it) and the async-semaphore, giving users control over throughput and API-cost.
+#### 4 . LangChain Modernisation
+- **[P1] Migrate orchestration to LCEL** – Replace `query_engine.py` with composable runnables: `retriever | reranker | prompt | llm | parser`.
+- **[P2] Enable LangSmith tracing** – Provide `--trace` flag that runs with `langchain.cli trace`.
 
-Packaging
+#### 5 . CLI / REPL UX
+- **[P2] Streaming token output** – `--stream` flag for real-time coloured output.
+- **[P3] Autocomplete in `rag repl`** – Use `prompt_toolkit` for file path & command completion.
+- **[P4] Plain-text fallback** – Detect non-TTY stdout and emit grep-friendly plain text.
 
-- get rid of the TUI stuff. it's more annoying and fragile than it's worth
-- Package the project with pyproject.toml + hatch; add an entry-point group ([project.scripts] rag = "rag.cli:app") so users get a single rag command instead of calling python cli.py.
-- Adopt ruff + mypy --strict in CI; fix the missing return annotations and the untyped Any parameters (progress_callback, log_callback, batch: list[Any], etc.) to catch bugs before runtime.
-- Add a poetry export -f requirements.txt --without-hashes (or pip-tools) generated lockfile to pin versions of LangChain/LlamaIndex/OpenAI that frequently break compatibility.
-- if stdout is not a terminal (eg output is being piped to another command), maybe the output should be plain text in some greppable form
+#### 6 . Performance
+- **[P2] Async embedding workers** – `asyncio` + `aiostream` pipeline instead of ThreadPool; honour OpenAI parallel limits.
+- **[P3] `--max-workers` CLI option** – Default `min(32, os.cpu_count()+4)`; propagates to async semaphore.
 
+#### 7 . Evaluation & Testing
+- **[P2] Golden-set retrieval QA** – `tests/e2e/eval_rag.py` measuring hit-rate + exact-match.
+- **[P3] Synthetic QA generator** – Script to auto-generate QA pairs for regression tests.
 
-Documentation
+#### 8 . Packaging & CI
+- **[P2] PyProject packaging** – Add `pyproject.toml`, `hatch` build and `[project.scripts] rag = "rag.cli:app"`.
+- **[P2] Ruff + mypy --strict** – Enforce via CI; fix Any-typed params.
+- **[P3] Version lockfile** – Generate requirements lock (poetry export / pip-tools) to freeze LangChain/OpenAI versions.
+- **[P4] Remove TUI** – Deprecate rich-based TUI since it is fragile; keep plain CLI.
+- **[P5] Deduplicate CSS** – Only relevant if TUI retained; else drop.
 
-- Document the public API with Sphinx and auto-publish to GitHub Pages on main pushes; include a "How to plug in a different vector store" example to future-proof against FAISS limitations.
-- Write a short CONTRIBUTING.md explaining the coding standards, pre-commit hooks, and how to run the TUI locally; this lowers the barrier for outside contributions and speeds your own future onboarding.
+#### 9 . Documentation & Examples
+- **[P3] CONTRIBUTING.md** – Coding standards, pre-commit, how to run.
+- **[P3] Sphinx docs + GitHub Pages** – Auto-publish API docs & "swap vector store" guide.
+- **[P4] Tutorial notebook** – `examples/rag_basic.ipynb` covering indexing, querying, prompt tweaks.
+- **[P4] Migration guide** – Explain changes when moving to LCEL + hybrid retrieval.
+
+---
+
+**Legend**  
+P1 = Next sprint, high impact  
+P2 = High value, medium effort  
+P3 = Medium value / effort  
+P4 = Low value or blocked by earlier work  
+P5 = Nice-to-have / may drop later
