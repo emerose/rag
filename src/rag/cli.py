@@ -104,7 +104,6 @@ def signal_handler(signum, frame):
     if state.is_processing:
         console.print("\n[yellow]Interrupt received. Cleaning up...[/yellow]")
         sys.exit(1)
-    else:
         console.print("\n[yellow]Interrupt received. Exiting...[/yellow]")
         sys.exit(0)
 
@@ -122,7 +121,7 @@ def validate_path(path: Path) -> Path:
     return path
 
 
-@app.callback()
+@app.callback(rich_help_panel="Global Options")
 def main(
     verbose: bool = typer.Option(
         False,
@@ -204,6 +203,13 @@ def index(
         "--semantic-chunking/--no-semantic-chunking",
         help="Use semantic boundaries for chunking (paragraphs, sentences, etc.)",
     ),
+    # Duplicated from app-level callback for Typer CLI compatibility
+    cache_dir: str = typer.Option(
+        None,  # Default to None to allow app-level value to be used
+        "--cache-dir",
+        "-c",
+        help="Directory for caching embeddings and vector stores",
+    ),
 ) -> None:
     """Index a file or directory for RAG (Retrieval Augmented Generation).
 
@@ -221,6 +227,9 @@ def index(
     """
     state.is_processing = True
     try:
+        # Use the provided cache_dir if specified, otherwise use the global state
+        cache_directory = cache_dir if cache_dir is not None else state.cache_dir
+
         # Convert string path to Path object
         path = Path(path)
 
@@ -228,7 +237,6 @@ def index(
         # If it's a directory, use it directly
         if path.is_file():
             documents_dir = path.parent
-        else:
             documents_dir = path
 
         if str(documents_dir) == ".":
@@ -240,7 +248,7 @@ def index(
             embedding_model="text-embedding-3-small",
             chat_model="gpt-4",
             temperature=0.0,
-            cache_dir=state.cache_dir,
+            cache_dir=cache_directory,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
         )
@@ -254,7 +262,6 @@ def index(
         if use_tui:
             # Run with TUI
             run_tui(config, runtime_options)
-        else:
             # Run without TUI
             rag_engine = RAGEngine(config, runtime_options)
 
@@ -265,9 +272,7 @@ def index(
                 success = rag_engine.index_file(path)
                 if success:
                     console.print(f"[green]Successfully indexed file:[/green] {path}")
-                else:
                     console.print(f"[red]Failed to index file:[/red] {path}")
-            else:
                 # Index the entire directory
                 state.logger.info(f"Indexing directory: {path}")
 
@@ -309,6 +314,13 @@ def invalidate(
         "-a",
         help="Invalidate all caches in the directory (uses current directory if no path specified)",
     ),
+    # Duplicated from app-level callback for Typer CLI compatibility
+    cache_dir: str = typer.Option(
+        None,  # Default to None to allow app-level value to be used
+        "--cache-dir",
+        "-c",
+        help="Directory for caching embeddings and vector stores",
+    ),
 ) -> None:
     """Invalidate the cache for a specific file or all caches.
 
@@ -318,6 +330,9 @@ def invalidate(
     3. Force re-indexing on next run
     """
     try:
+        # Use the provided cache_dir if specified, otherwise use the global state
+        cache_directory = cache_dir if cache_dir is not None else state.cache_dir
+
         if all_caches and path is None:
             # Use current directory when --all is specified without a path
             path = Path.cwd()
@@ -332,11 +347,11 @@ def invalidate(
 
         # If it's a file, use its parent directory
         # If it's a directory, use it directly
+        documents_dir = path.parent if path.is_file() else path
+
         if path.is_file():
-            documents_dir = path.parent
             state.logger.debug(f"Processing single file: {path.name}")
         else:
-            documents_dir = path
             state.logger.debug(f"Processing directory: {path}")
 
         if str(documents_dir) == ".":
@@ -351,6 +366,7 @@ def invalidate(
             embedding_model="text-embedding-3-small",
             chat_model="gpt-4",
             temperature=0.0,
+            cache_dir=cache_directory,
         )
         runtime_options = RuntimeOptions()
         rag_engine = RAGEngine(config, runtime_options)
@@ -394,6 +410,19 @@ def query(
         min=1,
         max=20,
     ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        "-j",
+        help="Output the result as JSON",
+    ),
+    # Duplicated from app-level callback for Typer CLI compatibility
+    cache_dir: str = typer.Option(
+        None,  # Default to None to allow app-level value to be used
+        "--cache-dir",
+        "-c",
+        help="Directory for caching embeddings and vector stores",
+    ),
 ) -> None:
     """Query the indexed documents using RAG (Retrieval Augmented Generation).
 
@@ -404,14 +433,17 @@ def query(
     """
     state.is_processing = True
     try:
-        # Initialize RAG engine using RAGConfig with default cache directory
+        # Use the provided cache_dir if specified, otherwise use the global state
+        cache_directory = cache_dir if cache_dir is not None else state.cache_dir
+
+        # Initialize RAG engine using RAGConfig with specified cache directory
         state.logger.info("Initializing RAG engine...")
         config = RAGConfig(
             documents_dir=".",  # Not used for querying
             embedding_model="text-embedding-3-small",
             chat_model="gpt-4",
             temperature=0.0,
-            cache_dir=state.cache_dir,
+            cache_dir=cache_directory,
         )
         runtime_options = RuntimeOptions()
         rag_engine = RAGEngine(config, runtime_options)
@@ -448,11 +480,20 @@ def query(
         # Perform the query
         state.logger.info(f"Running query: {query_text}")
         state.logger.info(f"Retrieving top {k} most relevant documents...")
-        result = rag_engine.query(query_text, k=k)
+        result = (
+            rag_engine.answer(query_text, k=k)
+            if json_output
+            else rag_engine.query(query_text, k=k)
+        )
 
         # Print the result
-        console.print("\n[bold green]Query Result:[/bold green]")
-        console.print(result)
+        if json_output:
+            import json
+
+            console.print(json.dumps(result, indent=2))
+        else:
+            console.print("\n[bold green]Query Result:[/bold green]")
+            console.print(result)
 
     except ValueError as e:
         state.logger.error(f"Error: {e!s}")
@@ -566,7 +607,15 @@ def summarize(
 
 
 @app.command()
-def list() -> None:
+def list(
+    # Duplicated from app-level callback for Typer CLI compatibility
+    cache_dir: str = typer.Option(
+        None,  # Default to None to allow app-level value to be used
+        "--cache-dir",
+        "-c",
+        help="Directory for caching embeddings and vector stores",
+    ),
+) -> None:
     """List indexed documents from the cache.
 
     This command displays information about all indexed documents in the cache,
@@ -576,9 +625,20 @@ def list() -> None:
         rag list
     """
     try:
+        # Use the provided cache_dir if specified, otherwise use the global state
+        cache_directory = cache_dir if cache_dir is not None else state.cache_dir
+
         # Initialize RAG engine
         state.logger.debug("Initializing RAG engine")
-        rag_engine = _initialize_rag_engine()
+        config = RAGConfig(
+            documents_dir=".",  # Not used for listing
+            embedding_model="text-embedding-3-small",
+            chat_model="gpt-4",
+            temperature=0.0,
+            cache_dir=cache_directory,
+        )
+        runtime_options = RuntimeOptions()
+        rag_engine = RAGEngine(config, runtime_options)
 
         # Get metadata directly from SQLite
         index_metadata = rag_engine.index_meta
@@ -814,10 +874,10 @@ def repl(
                 console.print("\n[bold]Query:[/bold]", user_input)
                 console.print("[bold]Retrieving documents...[/bold]")
 
-                result = rag_engine.query(user_input, k=k)
+                answer_text = rag_engine.query(user_input, k=k)
 
                 console.print("\n[bold green]Response:[/bold green]")
-                console.print(result)
+                console.print(answer_text)
                 console.print("\n" + "─" * 80 + "\n")
 
             except KeyboardInterrupt:
@@ -867,7 +927,6 @@ def cleanup() -> None:
             size_str = f"{bytes_freed} bytes"
         elif bytes_freed < 1024 * 1024:
             size_str = f"{bytes_freed / 1024:.2f} KB"
-        else:
             size_str = f"{bytes_freed / (1024 * 1024):.2f} MB"
 
         # Print results
@@ -882,7 +941,6 @@ def cleanup() -> None:
             state.logger.info("Removed the following orphaned vector stores:")
             for path in result["removed_paths"]:
                 state.logger.info(f"  - {path}")
-        else:
             state.logger.info("No orphaned vector stores found")
             console.print("[cyan]No orphaned vector stores found[/cyan]")
 

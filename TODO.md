@@ -1,10 +1,6 @@
 ## 🚀 Next Up (Implementation Plan)
 
-1. LCEL migration (P1)
-   - Rewrite query_engine with composable LangChain runnables
-   - Create modular pipeline: retriever | reranker | prompt | llm | parser
-
-2. Prompt registry (P1)
+1. Prompt registry (P1)
    - Create central directory of prompt templates (Jinja or LCEL PromptTemplate)
    - Add --prompt flag to select different prompting strategies
 
@@ -31,7 +27,6 @@
 - **[P2] Context window packing** – LCEL `stuff_documents` / token-length trimming for max context utilisation.
 
 #### 4 . LangChain Modernisation
-- **[P1] Migrate orchestration to LCEL** – Replace `query_engine.py` with composable runnables: `retriever | reranker | prompt | llm | parser`.
 - **[P2] Enable LangSmith tracing** – Provide `--trace` flag that runs with `langchain.cli trace`.
 
 #### 5 . CLI / REPL UX

@@ -284,6 +284,16 @@ rag list --help
 pytest
 ```
 
+### LCEL Architecture
+
+The project has been modernized to use LangChain Expression Language (LCEL) for the RAG pipeline:
+
+- **Composable Pipeline**: Using the `retriever | reranker | prompt | llm | parser` pattern for better maintainability
+- **Filter Syntax Support**: Preserved filter capabilities (e.g., `filter:heading_path="Introduction"`)
+- **Debugging & Tracing**: Support for LangSmith tracing (`--trace` flag) for pipeline visualization
+- **Metadata Enrichment**: Preserved metadata enrichment in the results
+- **JSON Output**: Enhanced CLI with `--json` flag for structured output
+
 ### Code Style
 
 The project uses:
@@ -313,9 +323,8 @@ The project is organized into modular components for better maintainability and 
 - `src/rag/embeddings/` - Embedding functionality
   - `embedding_provider.py` - Embedding generation
   - `batching.py` - Optimized batch processing
-- `src/rag/retrieval/` - Query processing
-  - `query_engine.py` - Query execution
-  - `result_processor.py` - Result enhancement
+- `src/rag/chains/` - LangChain Pipelines
+  - `rag_chain.py` - LCEL-based RAG pipeline
 - `src/rag/utils/` - Shared utilities
   - `logging_utils.py` - Centralized logging
   - `progress_tracker.py` - Progress reporting

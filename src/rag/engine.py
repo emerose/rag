@@ -15,6 +15,9 @@ from langchain_community.vectorstores import FAISS
 # Update LangChain imports to use community packages
 from langchain_openai import ChatOpenAI
 
+from rag.chains.rag_chain import build_rag_chain
+from rag.utils.answer_utils import enhance_result
+
 from .config import RAGConfig, RuntimeOptions
 from .data.chunking import SemanticChunkingStrategy
 from .data.document_loader import DocumentLoader
@@ -23,8 +26,6 @@ from .data.text_splitter import TextSplitterFactory
 from .embeddings.batching import EmbeddingBatcher
 from .embeddings.embedding_provider import EmbeddingProvider
 from .ingest import BasicPreprocessor, IngestManager
-from .retrieval.query_engine import QueryEngine
-from .retrieval.result_processor import ResultProcessor
 from .storage.cache_manager import CacheManager
 from .storage.filesystem import FilesystemManager
 from .storage.index_manager import IndexManager
@@ -296,18 +297,8 @@ class RAGEngine:
             temperature=self.config.temperature,
         )
 
-        # Initialize query engine
-        self.query_engine = QueryEngine(
-            embedding_provider=self.embedding_provider,
-            vectorstore_manager=self.vectorstore_manager,
-            log_callback=self.runtime.log_callback,
-        )
-
-        # Initialize result processor
-        self.result_processor = ResultProcessor(
-            chat_model=self.chat_model,
-            log_callback=self.runtime.log_callback,
-        )
+        # Lazy-initialised RAG chain cache
+        self._rag_chain_cache: dict[tuple[int, str], Any] = {}
 
         self._log("DEBUG", f"Using chat model: {self.config.chat_model}")
 
@@ -526,24 +517,24 @@ class RAGEngine:
 
         return results
 
+    def _get_rag_chain(self, k: int = 4, prompt_id: str = "default"):
+        """Return cached or newly-built LCEL RAG chain."""
+        key = (k, prompt_id)
+        if key not in self._rag_chain_cache:
+            self._rag_chain_cache[key] = build_rag_chain(self, k=k, prompt_id=prompt_id)
+        return self._rag_chain_cache[key]
+
     def answer(self, question: str, k: int = 4) -> dict[str, Any]:
-        """Answer a question using RAG.
+        """Answer *question* using the LCEL pipeline.
 
-        Args:
-            question: Question to answer
-            k: Number of relevant documents to retrieve
-
-        Returns:
-            Dictionary with answer and sources
-
+        Returns the same payload format as the legacy implementation so that
+        CLI and downstream callers remain unchanged.
         """
         self._log("INFO", f"Answering question: {question}")
 
-        # Check if we have any vectorstores
         if not self.vectorstores:
             self._log(
-                "ERROR",
-                "No indexed documents found. Please index documents first.",
+                "ERROR", "No indexed documents found. Please index documents first."
             )
             return {
                 "question": question,
@@ -553,19 +544,10 @@ class RAGEngine:
             }
 
         try:
-            # Merge all vectorstores
-            self._log("INFO", "Merging vectorstores for query")
-            merged_vectorstore = self.vectorstore_manager.merge_vectorstores(
-                list(self.vectorstores.values()),
-            )
-
-            # Execute query
-            self._log("INFO", f"Executing query with k={k}")
-            documents = self.query_engine.execute_query(
-                query=question,
-                vectorstore=merged_vectorstore,
-                k=k,
-            )
+            chain = self._get_rag_chain(k=k)
+            chain_output = chain.invoke(question)  # type: ignore[arg-type]
+            answer_text: str = chain_output["answer"]
+            documents = chain_output["documents"]
 
             if not documents:
                 self._log("WARNING", "No relevant documents found")
@@ -576,23 +558,9 @@ class RAGEngine:
                     "num_documents_retrieved": 0,
                 }
 
-            # Construct prompt context
-            prompt_context = self.query_engine.construct_prompt_context(
-                documents=documents,
-                query=question,
-            )
-
-            # Generate answer
-            answer = self.result_processor.generate_answer(prompt_context)
-
-            # Process and enhance result
-            result = self.result_processor.enhance_result(
-                question=question,
-                answer=answer,
-                documents=documents,
-            )
-
-            self._log("INFO", "Successfully generated answer")
+            result = enhance_result(question, answer_text, documents)
+            result["num_documents_retrieved"] = len(documents)
+            self._log("INFO", "Successfully generated answer (LCEL)")
             return result
 
         except Exception as e:
@@ -603,6 +571,68 @@ class RAGEngine:
                 "sources": [],
                 "num_documents_retrieved": 0,
             }
+
+    def query(self, query: str, k: int = 4) -> str:
+        """Return only the answer text for *query* (legacy helper)."""
+        return self.answer(query, k).get("answer", "")
+
+    def get_document_summaries(self, k: int = 5) -> list[dict[str, Any]]:
+        """Generate short summaries of the *k* largest documents."""
+        self._log("INFO", f"Generating summaries for top {k} documents (LCEL path)")
+
+        if not self.vectorstores:
+            self._log("WARNING", "No indexed documents found")
+            return []
+
+        try:
+            indexed_files = self.list_indexed_files()
+            if not indexed_files:
+                return []
+
+            indexed_files.sort(key=lambda x: x.get("num_chunks", 0), reverse=True)
+            indexed_files = indexed_files[:k]
+
+            summaries: list[dict[str, Any]] = []
+
+            for file_info in indexed_files:
+                file_path = file_info["file_path"]
+                file_type = file_info["file_type"]
+                try:
+                    docs = self.document_loader.load_document(file_path)
+                    if not docs:
+                        continue
+
+                    # Simple summarisation prompt
+                    combined_text = "\n\n".join(doc.page_content for doc in docs)[
+                        :10000
+                    ]
+                    sys_prompt = "You are a helpful assistant. Provide a concise summary (max 200 words) of the given document."
+                    from langchain_core.messages import HumanMessage, SystemMessage
+
+                    response = self.chat_model.invoke(
+                        [
+                            SystemMessage(content=sys_prompt),
+                            HumanMessage(content=combined_text),
+                        ]
+                    )
+                    summary = response.content
+
+                    summaries.append(
+                        {
+                            "source": file_path,
+                            "source_type": file_type,
+                            "summary": summary,
+                            "num_chunks": file_info.get("num_chunks", 0),
+                        }
+                    )
+                except Exception as e:
+                    self._log("ERROR", f"Failed to summarize {file_path}: {e}")
+
+            return summaries
+
+        except Exception as e:
+            self._log("ERROR", f"Failed to generate document summaries: {e}")
+            return []
 
     def cleanup_orphaned_chunks(self) -> dict[str, Any]:
         """Delete cached vector stores whose source files were removed.
@@ -698,20 +728,6 @@ class RAGEngine:
         """Backward compatibility: Invalidate all caches."""
         self.invalidate_all_caches()
 
-    def query(self, query: str, k: int = 4) -> str:
-        """Backward compatibility: Answer a question.
-
-        Args:
-            query: Question to answer
-            k: Number of relevant documents to retrieve
-
-        Returns:
-            Answer to the question
-
-        """
-        result = self.answer(query, k)
-        return result.get("answer", "")
-
     async def index_documents_async(self) -> None:
         """Backward compatibility: Index all documents asynchronously.
 
@@ -740,69 +756,3 @@ class RAGEngine:
         self.cache_manager.cleanup_invalid_caches()
 
         self._log("INFO", "Finished document indexing")
-
-    def get_document_summaries(self, k: int = 5) -> list[dict[str, Any]]:
-        """Get summaries of the top k documents.
-
-        Args:
-            k: Number of top documents to summarize
-
-        Returns:
-            List of document summaries
-
-        """
-        self._log("INFO", f"Generating summaries for top {k} documents")
-
-        if not self.vectorstores:
-            self._log("WARNING", "No indexed documents found")
-            return []
-
-        try:
-            # Get indexed files sorted by relevance (using metadata)
-            indexed_files = self.list_indexed_files()
-            if not indexed_files:
-                return []
-
-            # Sort by number of chunks (as a rough proxy for relevance)
-            indexed_files.sort(key=lambda x: x.get("num_chunks", 0), reverse=True)
-
-            # Limit to top k
-            indexed_files = indexed_files[:k]
-
-            # Generate summaries
-            summaries = []
-
-            for file_info in indexed_files:
-                file_path = file_info["file_path"]
-                file_type = file_info["file_type"]
-
-                try:
-                    # Load documents
-                    docs = self.document_loader.load_document(file_path)
-                    if not docs:
-                        continue
-
-                    # Generate summary using ResultProcessor
-                    summary = self.result_processor.generate_summary(
-                        documents=docs,
-                        max_length=200,  # Keep summaries concise
-                    )
-
-                    # Add to results
-                    summaries.append(
-                        {
-                            "source": file_path,
-                            "source_type": file_type,
-                            "summary": summary,
-                            "num_chunks": file_info.get("num_chunks", 0),
-                        },
-                    )
-
-                except Exception as e:
-                    self._log("ERROR", f"Failed to summarize {file_path}: {e}")
-
-            return summaries
-
-        except Exception as e:
-            self._log("ERROR", f"Failed to generate document summaries: {e}")
-            return []

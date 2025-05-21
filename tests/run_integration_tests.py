@@ -10,8 +10,23 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+import argparse
 
 if __name__ == "__main__":
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="Run RAG system tests")
+    parser.add_argument(
+        "--all", 
+        action="store_true", 
+        help="Run all tests, not just those marked as integration tests"
+    )
+    parser.add_argument(
+        "--verbose", 
+        action="store_true", 
+        help="Increase verbosity of test output"
+    )
+    args, unknown_args = parser.parse_known_args()
+
     # Get the root directory of the project
     root_dir = Path(__file__).parent.parent
     os.chdir(root_dir)
@@ -23,17 +38,23 @@ if __name__ == "__main__":
     # Set up the test command
     pytest_args = [
         "pytest",
-        "-xvs",
+        "-xvs" if args.verbose else "-xs",
         "tests/integration/",
-        "-m",
-        "integration",
     ]
+    
+    # Include test summary report
+    pytest_args.append("-v")
+    
+    # Only apply the integration marker if not running all tests
+    if not args.all:
+        pytest_args.extend(["-m", "integration"])
 
     # Add any additional arguments from the command line
-    if len(sys.argv) > 1:
-        pytest_args.extend(sys.argv[1:])
+    if unknown_args:
+        pytest_args.extend(unknown_args)
 
-    print(f"Running integration tests with command: {' '.join(pytest_args)}")
+    print(f"Running tests with command: {' '.join(pytest_args)}")
+    print(f"{'Integration tests only' if not args.all else 'All tests'}")
 
     # Run the tests
     result = subprocess.run(pytest_args, check=False)
