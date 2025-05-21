@@ -1,9 +1,4 @@
-Testing
-
-- add unit tests where appropriate
-- add a --dry-run flag that walks the docs and prints planned actions (chunks, bytes, price estimate) without hitting OpenAI
-
-Refactoring
+### Additional Refactoring Items
 
 - Move all file-system work (hashing, MIME detection, PDF splitting, etc.) into an isolated ingest.py module and let rag_engine.py focus purely on vector-store + QA—clear separation of concerns will simplify unit-testing and future back-ends (e.g., Chroma, Qdrant).
 - Replace the ad-hoc lock files with filelock's context-manager in a with block (with FileLock(path, timeout): …) so locks are always released, even on SIGINT.
@@ -23,6 +18,7 @@ Packaging
 - Package the project with pyproject.toml + hatch; add an entry-point group ([project.scripts] rag = "rag.cli:app") so users get a single rag command instead of calling python cli.py.
 - Adopt ruff + mypy --strict in CI; fix the missing return annotations and the untyped Any parameters (progress_callback, log_callback, batch: list[Any], etc.) to catch bugs before runtime.
 - Add a poetry export -f requirements.txt --without-hashes (or pip-tools) generated lockfile to pin versions of LangChain/LlamaIndex/OpenAI that frequently break compatibility.
+- if stdout is not a terminal (eg output is being piped to another command), maybe the output should be plain text in some greppable form
 
 Documentation
 

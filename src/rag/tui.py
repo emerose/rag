@@ -12,7 +12,8 @@ from textual.message import Message
 from textual.widgets import Footer, Header, Label, ProgressBar, RichLog
 from textual.worker import Worker, get_current_worker
 
-from .rag_engine import RAGConfig, RAGEngine, RuntimeOptions
+from .config import RAGConfig, RuntimeOptions
+from .engine import RAGEngine
 
 
 class TUILogHandler(logging.Handler):

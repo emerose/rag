@@ -260,3 +260,29 @@ The project uses:
 ## License
 
 MIT License - see LICENSE file for details
+
+## Project Structure
+
+The project is organized into modular components for better maintainability and clarity:
+
+- `src/rag/config.py` - Configuration classes
+- `src/rag/engine.py` - Main RAGEngine (core orchestration)
+- `src/rag/data/` - Document processing
+  - `document_loader.py` - MIME-based document loading
+  - `text_splitter.py` - Content-aware text chunking
+  - `document_processor.py` - Document enhancement and metadata enrichment
+- `src/rag/storage/` - Storage and caching
+  - `cache_manager.py` - SQLite and JSON cache operations
+  - `index_manager.py` - Index management
+  - `vectorstore.py` - FAISS operations
+  - `filesystem.py` - File operations and path handling
+- `src/rag/embeddings/` - Embedding functionality
+  - `embedding_provider.py` - Embedding generation
+  - `batching.py` - Optimized batch processing
+- `src/rag/retrieval/` - Query processing
+  - `query_engine.py` - Query execution
+  - `result_processor.py` - Result enhancement
+- `src/rag/utils/` - Shared utilities
+  - `logging_utils.py` - Centralized logging
+  - `progress_tracker.py` - Progress reporting
+  - `async_utils.py` - Async helpers

@@ -24,11 +24,13 @@ from rich.table import Table
 # Try both relative and absolute imports
 try:
     # Try relative imports first (for module usage)
-    from .rag_engine import RAGConfig, RAGEngine, RuntimeOptions
+    from .config import RAGConfig, RuntimeOptions
+    from .engine import RAGEngine
     from .tui import run_tui
 except ImportError:
     # Fall back to absolute imports (for direct script usage)
-    from rag.rag_engine import RAGConfig, RAGEngine, RuntimeOptions
+    from rag.config import RAGConfig, RuntimeOptions
+    from rag.engine import RAGEngine
     from rag.tui import run_tui
 
 
