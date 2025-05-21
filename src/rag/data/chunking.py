@@ -18,6 +18,7 @@ from langchain_text_splitters import (
 
 from ..ingest import ChunkingStrategy
 from ..utils.logging_utils import log_message
+from .text_splitter import TextSplitterFactory
 
 logger = logging.getLogger(__name__)
 
@@ -304,11 +305,11 @@ class DefaultChunkingStrategy(ChunkingStrategy):
         return self._enhance_metadata(chunks)
 
 
-class SemanticChunkingStrategy(DefaultChunkingStrategy):
-    """Semantic-aware document chunking strategy.
+class SemanticChunkingStrategy(ChunkingStrategy):
+    """Semantic chunking strategy using TextSplitterFactory.
 
-    Extends the default strategy with improved handling of semantic boundaries
-    and metadata extraction from document structure.
+    This strategy uses the TextSplitterFactory to create appropriate text splitters
+    based on document MIME type, with support for semantic chunking and heading preservation.
     """
 
     def __init__(
@@ -316,9 +317,9 @@ class SemanticChunkingStrategy(DefaultChunkingStrategy):
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         model_name: str = "text-embedding-3-small",
-        extract_titles: bool = True,
-        extract_headings: bool = True,
         log_callback: Any = None,
+        preserve_headings: bool = True,
+        semantic_chunking: bool = True,
     ) -> None:
         """Initialize the semantic chunking strategy.
 
@@ -326,87 +327,57 @@ class SemanticChunkingStrategy(DefaultChunkingStrategy):
             chunk_size: Maximum chunk size in tokens
             chunk_overlap: Overlap between chunks in tokens
             model_name: Name of the embedding model to use for tokenization
-            extract_titles: Whether to extract document titles
-            extract_headings: Whether to extract document headings
             log_callback: Optional callback for logging
+            preserve_headings: Whether to preserve document heading structure
+            semantic_chunking: Whether to use semantic boundaries for chunking
         """
-        super().__init__(chunk_size, chunk_overlap, model_name, log_callback)
-        self.extract_titles = extract_titles
-        self.extract_headings = extract_headings
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.model_name = model_name
+        self.log_callback = log_callback
+        self.preserve_headings = preserve_headings
+        self.semantic_chunking = semantic_chunking
 
-    def _extract_document_structure(self, doc: Document) -> dict[str, Any]:
-        """Extract document structure like title, headings, etc.
+        # Initialize text splitter factory
+        self.splitter_factory = TextSplitterFactory(
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            model_name=model_name,
+            log_callback=log_callback,
+            preserve_headings=preserve_headings,
+            semantic_chunking=semantic_chunking,
+        )
+
+    def _log(self, level: str, message: str) -> None:
+        """Log a message.
 
         Args:
-            doc: Document to analyze
-
-        Returns:
-            Dictionary of extracted metadata
+            level: Log level (INFO, WARNING, ERROR, etc.)
+            message: The log message
         """
-        metadata = {}
-        text = doc.page_content
-
-        # Extract title (simple heuristic - first non-empty line)
-        if self.extract_titles and text:
-            lines = text.split("\n")
-            for raw_line in lines:
-                cleaned_line = raw_line.strip()
-                if cleaned_line and len(cleaned_line) < 100:  # Reasonable title length
-                    metadata["title"] = cleaned_line
-                    break
-
-        # Extract headings (simplified implementation)
-        if self.extract_headings and text:
-            headings = []
-            lines = text.split("\n")
-            for raw_line in lines:
-                cleaned_line = raw_line.strip()
-                # Check for markdown headings
-                if cleaned_line.startswith("#") and len(cleaned_line) < 100:
-                    headings.append(cleaned_line)
-                # Check for other potential heading formats
-                elif (
-                    cleaned_line
-                    and cleaned_line.upper() == cleaned_line
-                    and len(cleaned_line) < 50
-                ):
-                    headings.append(cleaned_line)
-
-            if headings:
-                metadata["headings"] = headings
-
-        return metadata
+        log_message(level, message, "SemanticChunking", self.log_callback)
 
     def split_documents(
         self, documents: list[Document], mime_type: str
     ) -> list[Document]:
-        """Split documents into chunks with enhanced semantic metadata.
+        """Split documents into chunks using TextSplitterFactory.
 
         Args:
             documents: List of documents to split
             mime_type: MIME type of the document
 
         Returns:
-            List of document chunks with enhanced metadata
+            List of document chunks
         """
-        # First extract document structure
-        for doc in documents:
-            structure_metadata = self._extract_document_structure(doc)
-            doc.metadata.update(structure_metadata)
+        if not documents:
+            return []
 
-        # Then use the standard splitting logic
-        chunks = super().split_documents(documents, mime_type)
+        self._log(
+            "DEBUG", f"Splitting {len(documents)} documents with mime_type: {mime_type}"
+        )
 
-        # Propagate document-level metadata to chunks
-        for doc in documents:
-            doc_metadata = {
-                k: v
-                for k, v in doc.metadata.items()
-                if k in ["title", "headings", "author", "created_date"]
-            }
+        # Use TextSplitterFactory to split documents
+        chunked_docs = self.splitter_factory.split_documents(documents, mime_type)
 
-            for chunk in chunks:
-                if chunk.metadata.get("source") == doc.metadata.get("source"):
-                    chunk.metadata.update(doc_metadata)
-
-        return chunks
+        self._log("INFO", f"Split into {len(chunked_docs)} chunks")
+        return chunked_docs

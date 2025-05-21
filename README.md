@@ -122,12 +122,46 @@ Index a file or directory:
 rag index path/to/file_or_directory
 ```
 
+Advanced options:
+
+```bash
+# Control text chunking with custom settings
+rag index path/to/documents --chunk-size 1500 --chunk-overlap 100
+
+# Disable semantic chunking to use more basic token-based chunking
+rag index path/to/documents --no-semantic-chunking
+
+# Disable document heading structure preservation
+rag index path/to/documents --no-preserve-headings
+
+# Combine options as needed
+rag index path/to/documents --chunk-size 2000 --no-preserve-headings
+```
+
 This will:
 
 1. Process all supported files in the directory
 2. Create embeddings for each document
 3. Build a searchable vector store
 4. Cache results for future use
+
+#### Text Splitting Features
+
+RAG uses advanced text splitting techniques to ensure high-quality chunks:
+
+- **Semantic Chunking**: Preserves semantic boundaries like paragraphs, sentences, and sections for more coherent chunks
+- **Heading Preservation**: Maintains document structure by attaching heading hierarchy to each chunk
+- **Adaptive Chunking**: Applies different chunking strategies based on document type:
+  - Markdown: Preserves heading structure (#, ##, ###)
+  - HTML: Preserves tag structure with heading detection
+  - PDF: Automatically detects headings based on font analysis
+  - Plain text: Uses semantic boundaries like paragraphs and sentences
+
+The chunking behavior can be customized using CLI flags or environment variables:
+- `--chunk-size` / `RAG_CHUNK_SIZE`: Controls the target size of chunks in tokens
+- `--chunk-overlap` / `RAG_CHUNK_OVERLAP`: Controls the overlap between adjacent chunks
+- `--no-semantic-chunking`: Disables semantic chunking and uses pure token-based chunking
+- `--no-preserve-headings`: Disables document heading structure preservation
 
 ### Querying Documents
 

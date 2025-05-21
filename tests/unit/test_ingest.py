@@ -188,22 +188,26 @@ class TestDefaultChunkingStrategy(unittest.TestCase):
 class TestSemanticChunkingStrategy(unittest.TestCase):
     """Tests for SemanticChunkingStrategy class."""
 
-    def test_extract_document_structure(self) -> None:
-        """Test document structure extraction."""
+    def test_init_with_defaults(self) -> None:
+        """Test initialization with default parameters."""
         strategy = SemanticChunkingStrategy()
-
-        # Test title extraction
-        doc = Document(page_content="Title\n\nThis is content.")
-        metadata = strategy._extract_document_structure(doc)
-        self.assertEqual(metadata["title"], "Title")
-
-        # Test heading extraction
-        doc = Document(
-            page_content="# Heading 1\n\nContent\n\n## Heading 2\n\nMore content."
+        self.assertEqual(strategy.chunk_size, 1000)
+        self.assertEqual(strategy.chunk_overlap, 200)
+        self.assertTrue(strategy.preserve_headings)
+        self.assertTrue(strategy.semantic_chunking)
+        
+    def test_init_with_custom_values(self) -> None:
+        """Test initialization with custom parameters."""
+        strategy = SemanticChunkingStrategy(
+            chunk_size=500,
+            chunk_overlap=50,
+            preserve_headings=False,
+            semantic_chunking=False
         )
-        metadata = strategy._extract_document_structure(doc)
-        self.assertEqual(len(metadata["headings"]), 2)
-        self.assertEqual(metadata["headings"][0], "# Heading 1")
+        self.assertEqual(strategy.chunk_size, 500)
+        self.assertEqual(strategy.chunk_overlap, 50)
+        self.assertFalse(strategy.preserve_headings)
+        self.assertFalse(strategy.semantic_chunking)
 
     def test_split_documents(self) -> None:
         """Test splitting documents with semantic awareness."""
@@ -219,11 +223,16 @@ class TestSemanticChunkingStrategy(unittest.TestCase):
         chunks = strategy.split_documents([doc], "text/markdown")
         self.assertTrue(len(chunks) > 1)
 
-        # Test metadata propagation
+        # Test essential metadata propagation
         for chunk in chunks:
-            self.assertIn("token_count", chunk.metadata)
-            if "title" in chunk.metadata:
-                self.assertEqual(chunk.metadata["source"], "test.md")
+            self.assertIn("source", chunk.metadata)
+            self.assertIn("chunk_index", chunk.metadata)
+            self.assertIn("chunk_total", chunk.metadata)
+            
+        # Check for markdown heading metadata in at least some chunks
+        # The TextSplitter may use "Header 1" for the first level header
+        heading_metadata_present = any("Header 1" in chunk.metadata for chunk in chunks)
+        self.assertTrue(heading_metadata_present, "No chunks have heading metadata")
 
 
 class MockChunkingStrategy:

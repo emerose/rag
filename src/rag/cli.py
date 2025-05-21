@@ -194,6 +194,16 @@ def index(
         min=0,
         max=1000,
     ),
+    preserve_headings: bool = typer.Option(
+        True,
+        "--preserve-headings/--no-preserve-headings",
+        help="Preserve document heading structure in chunks",
+    ),
+    semantic_chunking: bool = typer.Option(
+        True,
+        "--semantic-chunking/--no-semantic-chunking",
+        help="Use semantic boundaries for chunking (paragraphs, sentences, etc.)",
+    ),
 ) -> None:
     """Index a file or directory for RAG (Retrieval Augmented Generation).
 
@@ -202,6 +212,12 @@ def index(
     2. Create embeddings for each document
     3. Build a searchable vector store
     4. Cache results for future use
+
+    Text splitting options:
+    * Use --chunk-size to control the size of text chunks (in tokens)
+    * Use --chunk-overlap to control how much chunks overlap (in tokens)
+    * Use --preserve-headings to maintain document structure
+    * Use --semantic-chunking to split on natural boundaries
     """
     state.is_processing = True
     try:
@@ -229,8 +245,11 @@ def index(
             chunk_overlap=chunk_overlap,
         )
 
-        # Create runtime options
-        runtime_options = RuntimeOptions()
+        # Create runtime options with text splitting preferences
+        runtime_options = RuntimeOptions(
+            preserve_headings=preserve_headings,
+            semantic_chunking=semantic_chunking,
+        )
 
         if use_tui:
             # Run with TUI

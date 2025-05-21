@@ -258,6 +258,8 @@ class RAGEngine:
             chunk_overlap=self.config.chunk_overlap,
             model_name=self.config.embedding_model,
             log_callback=self.runtime.log_callback,
+            preserve_headings=self.runtime.preserve_headings,
+            semantic_chunking=self.runtime.semantic_chunking,
         )
 
         # Initialize document processor

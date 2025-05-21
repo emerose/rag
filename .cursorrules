@@ -18,6 +18,19 @@
 - **ruff**: A library for linting and formatting.
 - **openai**: A library for interacting with the OpenAI API.
 
+# Project Management
+ - TODO.md contains a list of features that we are considering adding
+ - The "Next Up" section includes the items that we are going to work on next
+ - In order to complete a task, follow these steps:
+  1. Review all code and come up with a step by step implementation and testing plan
+  2. Put that plan into the TODO file, under the relevant section in Next Up.  We will use that to keep track of where we are in the work
+  3. Confirm with the user that the plan looks good
+  4. If so, begin implementation. Check off the individual steps in TODO.md as you complete them
+  5. Run tests often and make sure to fix errors as they arise
+  6. When the task is complete, run check.sh and make sure there are no errors or linting problems noted. If there are, resolve those problems
+  7. Finally, run the integration tests to verify that things are still working end-to-end.
+  8. Once everything looks good, remove the tasks from TODO.md
+
 # Coding Guidelines
 
 ## 1. Pythonic Practices

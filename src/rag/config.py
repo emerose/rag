@@ -55,9 +55,14 @@ class RuntimeOptions:
     Attributes:
         progress_callback: Optional callback for progress updates
         log_callback: Optional callback for logging
+        preserve_headings: Whether to preserve document heading structure in chunks
+        semantic_chunking: Whether to use semantic boundaries for chunking
 
     """
 
     # Define more specific type hints
     progress_callback: Callable[[str, int, int | None], None] | None = None
     log_callback: Callable[[str, str, str], None] | None = None
+    # Text splitting options
+    preserve_headings: bool = True
+    semantic_chunking: bool = True

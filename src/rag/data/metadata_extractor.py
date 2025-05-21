@@ -5,11 +5,21 @@ from different document types, enhancing the document retrieval capabilities.
 """
 
 import logging
+import os
 import re
+import statistics
 from abc import ABC, abstractmethod
 from typing import Any, Protocol
 
 from langchain_core.documents import Document
+
+try:
+    from pdfminer.high_level import extract_pages
+    from pdfminer.layout import LTChar, LTTextContainer
+
+    PDFMINER_AVAILABLE = True
+except ImportError:
+    PDFMINER_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -184,8 +194,26 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         if "page" in document.metadata:
             metadata["page_num"] = document.metadata["page"]
 
-        # Try to detect section headings in PDF content
-        if document.page_content:
+        # Try to extract PDF headings from the source file
+        source_path = document.metadata.get("source")
+        if source_path and os.path.isfile(source_path) and PDFMINER_AVAILABLE:
+            try:
+                headings = self.extract_pdf_headings(source_path)
+                if headings:
+                    metadata["heading_hierarchy"] = headings
+                    # Also save the first heading as title if no title found
+                    if (
+                        "title" not in metadata
+                        and headings
+                        and headings[0]["level"] == 1
+                    ):
+                        metadata["title"] = headings[0]["text"]
+            except Exception as e:
+                logger.warning(f"Failed to extract PDF headings: {e}")
+                # Fall back to regex-based extraction
+
+        # Try to detect section headings in PDF content using regex as fallback
+        if document.page_content and "heading_hierarchy" not in metadata:
             content = document.page_content
 
             # Look for potential section headings
@@ -222,6 +250,224 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
                 metadata["section_headings"] = section_candidates
 
         return metadata
+
+    def extract_pdf_headings(self, pdf_path: str) -> list[dict[str, Any]]:
+        """Extract heading information from a PDF using font analysis.
+
+        Args:
+            pdf_path: Path to the PDF file
+
+        Returns:
+            List of heading dictionaries with level, text, and position info
+        """
+        if not PDFMINER_AVAILABLE:
+            logger.warning(
+                "PDF heading extraction disabled due to missing dependencies"
+            )
+            return []
+
+        try:
+            # Extract font sizes and text from PDF
+            font_data = self._extract_font_data(pdf_path)
+            if not font_data:
+                return []
+
+            # Find headings based on font size analysis
+            return self._identify_headings(font_data)
+        except Exception as e:
+            logger.error(f"Error extracting headings from PDF: {e}")
+            return []
+
+    def _extract_font_data(self, pdf_path: str) -> list[dict[str, Any]]:
+        """Extract font size and text data from the PDF.
+
+        Args:
+            pdf_path: Path to the PDF file
+
+        Returns:
+            List of dictionaries with font size, text, and position information
+        """
+        if not PDFMINER_AVAILABLE:
+            return []
+
+        font_data = []
+        char_count = 0
+        current_position = 0
+
+        for page_num, page_layout in enumerate(extract_pages(pdf_path)):
+            for element in page_layout:
+                if isinstance(element, LTTextContainer):
+                    text = element.get_text().strip()
+                    if not text:
+                        continue
+
+                    # Try to extract font information
+                    avg_font_size, is_bold = self._analyze_text_element(element)
+
+                    # Skip elements without font information
+                    if avg_font_size <= 0:
+                        continue
+
+                    # Add to font data
+                    font_data.append(
+                        {
+                            "text": text,
+                            "font_size": avg_font_size,
+                            "is_bold": is_bold,
+                            "page": page_num + 1,
+                            "position": current_position,
+                            "length": len(text),
+                        }
+                    )
+
+                    current_position += len(text)
+                    char_count += len(text)
+
+        return font_data
+
+    def _analyze_text_element(self, element: LTTextContainer) -> tuple[float, bool]:
+        """Analyze a text element for font size and weight.
+
+        Args:
+            element: A PDFMiner text container element
+
+        Returns:
+            Tuple of (average font size, is bold)
+        """
+        font_sizes = []
+        bold_count = 0
+        char_count = 0
+
+        # Traverse the element to find character data
+        for obj in element._objs:
+            for char in obj._objs:
+                if isinstance(char, LTChar):
+                    font_sizes.append(char.size)
+                    # Heuristic: Some PDFs mark bold with 'Bold' in font name
+                    if hasattr(char, "fontname") and "Bold" in char.fontname:
+                        bold_count += 1
+                    char_count += 1
+
+        # Calculate average font size
+        if font_sizes:
+            avg_font_size = sum(font_sizes) / len(font_sizes)
+        else:
+            avg_font_size = 0
+
+        # Determine if text is bold (if more than 50% of chars are bold)
+        is_bold = (bold_count / char_count) > 0.5 if char_count > 0 else False
+
+        return avg_font_size, is_bold
+
+    def _identify_headings(
+        self, font_data: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """Identify headings based on font size analysis.
+
+        Args:
+            font_data: List of font data dictionaries
+
+        Returns:
+            List of identified headings with level, text, and position
+        """
+        if not font_data:
+            return []
+
+        # Extract font sizes to analyze distribution
+        font_sizes = [item["font_size"] for item in font_data]
+
+        try:
+            # Calculate statistical measures
+            mean_size = statistics.mean(font_sizes)
+            std_dev = statistics.stdev(font_sizes) if len(font_sizes) > 1 else 0
+
+            # Set thresholds for heading levels
+            # Level 1: > mean + 2*std_dev (largest headings)
+            # Level 2: > mean + 1.5*std_dev
+            # Level 3: > mean + 1*std_dev
+            threshold_level1 = mean_size + (2 * std_dev)
+            threshold_level2 = mean_size + (1.5 * std_dev)
+            threshold_level3 = mean_size + std_dev
+
+            # Identify headings
+            headings = []
+            for item in font_data:
+                font_size = item["font_size"]
+                text = item["text"]
+                position = item["position"]
+
+                # Skip very short texts (likely not headings)
+                if len(text) < 2 or len(text) > 200:
+                    continue
+
+                # Determine heading level based on font size
+                if font_size >= threshold_level1:
+                    level = 1
+                elif font_size >= threshold_level2:
+                    level = 2
+                elif font_size >= threshold_level3:
+                    level = 3
+                else:
+                    # Not a heading
+                    continue
+
+                # Boost level if text is bold
+                if item.get("is_bold", False) and level > 1:
+                    level -= 1
+
+                # Create heading entry
+                heading = {
+                    "level": level,
+                    "text": text,
+                    "position": position,
+                    "page": item.get("page", 1),
+                }
+
+                headings.append(heading)
+
+            # Sort headings by position
+            headings.sort(key=lambda h: h["position"])
+
+            # Build heading paths
+            self._build_heading_paths(headings)
+
+            return headings
+
+        except Exception as e:
+            logger.error(f"Error in heading identification: {e}")
+            return []
+
+    def _build_heading_paths(self, headings: list[dict[str, Any]]) -> None:
+        """Build hierarchical paths for headings.
+
+        Args:
+            headings: List of heading dictionaries to enrich with paths
+        """
+        if not headings:
+            return
+
+        # Initialize arrays to track current heading at each level
+        current_headings = [None] * 10  # Support up to 10 levels
+
+        for heading in headings:
+            level = heading["level"]
+            text = heading["text"]
+
+            # Update current heading at this level
+            current_headings[level - 1] = text
+
+            # Clear all lower levels (a level 2 heading resets level 3+)
+            for i in range(level, len(current_headings)):
+                current_headings[i] = None
+
+            # Build path from present headings
+            path_components = []
+            for i in range(level):
+                if current_headings[i] is not None:
+                    path_components.append(current_headings[i])
+
+            # Store path in heading
+            heading["path"] = " > ".join(path_components)
 
 
 class HTMLMetadataExtractor(BaseMetadataExtractor):
