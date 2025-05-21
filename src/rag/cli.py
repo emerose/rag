@@ -169,6 +169,22 @@ def index(
         "-t",
         help="Use the TUI interface for indexing",
     ),
+    chunk_size: int = typer.Option(
+        1000,
+        "--chunk-size",
+        "-s",
+        help="Number of tokens per chunk",
+        min=100,
+        max=8000,
+    ),
+    chunk_overlap: int = typer.Option(
+        200,
+        "--chunk-overlap",
+        "-o",
+        help="Number of tokens to overlap between chunks",
+        min=0,
+        max=1000,
+    ),
 ) -> None:
     """Index a file or directory for RAG (Retrieval Augmented Generation).
 
@@ -200,6 +216,8 @@ def index(
             chat_model="gpt-4",
             temperature=0.0,
             cache_dir=CACHE_DIR,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
         )
 
         # Create runtime options
@@ -213,9 +231,36 @@ def index(
             rag_engine = RAGEngine(config, runtime_options)
 
             # Run indexing
-            import asyncio
+            if path.is_file():
+                # Index just the file that was specified
+                state.logger.info(f"Indexing file: {path}")
+                success = rag_engine.index_file(path)
+                if success:
+                    console.print(f"[green]Successfully indexed file:[/green] {path}")
+                else:
+                    console.print(f"[red]Failed to index file:[/red] {path}")
+            else:
+                # Index the entire directory
+                state.logger.info(f"Indexing directory: {path}")
 
-            asyncio.run(rag_engine.index_documents_async())
+                # Create a progress bar
+                with Progress() as progress:
+                    # Create progress callback
+                    progress_callback = create_console_progress_callback(progress)
+
+                    # Set the progress callback
+                    rag_engine.runtime.progress_callback = progress_callback
+
+                    # Run indexing on the specified directory
+                    results = rag_engine.index_directory(path)
+
+                    # Count successful results
+                    success_count = sum(1 for success in results.values() if success)
+
+                # Print a summary of indexed files
+                console.print(
+                    f"[green]Successfully indexed {success_count} files[/green]"
+                )
 
     except ValueError as e:
         state.logger.error(f"Configuration error: {e!s}")

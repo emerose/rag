@@ -111,7 +111,8 @@ class ResultProcessor:
                 HumanMessage(content=prompt),
             ]
 
-            response = self.chat_model.predict_messages(messages)
+            # Use invoke() instead of predict_messages() to avoid deprecation warning
+            response = self.chat_model.invoke(messages)
             answer = response.content
 
             self._log("INFO", "Successfully generated answer")
@@ -335,7 +336,8 @@ class ResultProcessor:
                 ),
             ]
 
-            response = self.chat_model.predict_messages(messages)
+            # Use invoke() instead of predict_messages() to avoid deprecation warning
+            response = self.chat_model.invoke(messages)
             summary = response.content
 
             self._log("INFO", "Successfully generated summary")

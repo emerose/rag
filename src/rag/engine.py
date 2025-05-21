@@ -16,11 +16,13 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI
 
 from .config import RAGConfig, RuntimeOptions
+from .data.chunking import SemanticChunkingStrategy
 from .data.document_loader import DocumentLoader
 from .data.document_processor import DocumentProcessor
 from .data.text_splitter import TextSplitterFactory
 from .embeddings.batching import EmbeddingBatcher
 from .embeddings.embedding_provider import EmbeddingProvider
+from .ingest import BasicPreprocessor, IngestManager
 from .retrieval.query_engine import QueryEngine
 from .retrieval.result_processor import ResultProcessor
 from .storage.cache_manager import CacheManager
@@ -245,17 +247,16 @@ class RAGEngine:
 
     def _initialize_document_processing(self) -> None:
         """Initialize document processing components."""
-        # Initialize text splitter factory
+        # Initialize document loader and text splitter
+        self.document_loader = DocumentLoader(
+            filesystem_manager=self.filesystem_manager,
+            log_callback=self.runtime.log_callback,
+        )
+
         self.text_splitter_factory = TextSplitterFactory(
             chunk_size=self.config.chunk_size,
             chunk_overlap=self.config.chunk_overlap,
             model_name=self.config.embedding_model,
-            log_callback=self.runtime.log_callback,
-        )
-
-        # Initialize document loader
-        self.document_loader = DocumentLoader(
-            filesystem_manager=self.filesystem_manager,
             log_callback=self.runtime.log_callback,
         )
 
@@ -264,6 +265,22 @@ class RAGEngine:
             filesystem_manager=self.filesystem_manager,
             document_loader=self.document_loader,
             text_splitter_factory=self.text_splitter_factory,
+            log_callback=self.runtime.log_callback,
+            progress_callback=self.runtime.progress_callback,
+        )
+
+        # Initialize ingest manager (new!)
+        self.chunking_strategy = SemanticChunkingStrategy(
+            chunk_size=self.config.chunk_size,
+            chunk_overlap=self.config.chunk_overlap,
+            model_name=self.config.embedding_model,
+            log_callback=self.runtime.log_callback,
+        )
+
+        self.ingest_manager = IngestManager(
+            filesystem_manager=self.filesystem_manager,
+            chunking_strategy=self.chunking_strategy,
+            preprocessor=BasicPreprocessor(),
             log_callback=self.runtime.log_callback,
             progress_callback=self.runtime.progress_callback,
         )
@@ -339,8 +356,17 @@ class RAGEngine:
                 self._log("INFO", f"File already indexed: {file_path}")
                 return True
 
-            # Process the file
-            documents = self.document_processor.process_file(file_path)
+            # Use the new ingest manager to process the file
+            ingest_result = self.ingest_manager.ingest_file(file_path)
+
+            if not ingest_result.successful:
+                self._log(
+                    "WARNING",
+                    f"Failed to process {file_path}: {ingest_result.error_message}",
+                )
+                return False
+
+            documents = ingest_result.documents
             if not documents:
                 self._log("WARNING", f"No documents extracted from {file_path}")
                 return False
@@ -358,7 +384,10 @@ class RAGEngine:
                 )
 
             # Create or update vectorstore
-            mime_type = self.filesystem_manager.get_file_type(file_path)
+            mime_type = (
+                ingest_result.source.mime_type
+                or self.filesystem_manager.get_file_type(file_path)
+            )
             vectorstore = self.vectorstore_manager.add_documents_to_vectorstore(
                 vectorstore=existing_vectorstore,
                 documents=documents,
@@ -415,18 +444,76 @@ class RAGEngine:
             self._log("ERROR", f"Invalid documents directory: {directory}")
             return {}
 
-        # Get list of files to index
-        files = self.filesystem_manager.scan_directory(directory)
-        self._log("INFO", f"Found {len(files)} files to index")
+        # Use the ingest manager for directory processing
+        ingest_results = self.ingest_manager.ingest_directory(directory)
 
-        # Index each file
+        # Index each file that was successfully processed
         results = {}
-        for file_path in files:
+        for file_path, result in ingest_results.items():
+            if not result.successful:
+                self._log(
+                    "WARNING", f"Failed to process {file_path}: {result.error_message}"
+                )
+                results[file_path] = False
+                continue
+
             try:
-                results[str(file_path)] = self.index_file(file_path)
+                # We've already processed the file, so we just need to embed and store
+                documents = result.documents
+                if not documents:
+                    self._log("WARNING", f"No documents extracted from {file_path}")
+                    results[file_path] = False
+                    continue
+
+                # Get embeddings
+                self._log(
+                    "INFO",
+                    f"Generating embeddings for {len(documents)} documents from {file_path}",
+                )
+                embeddings = self.embedding_batcher.process_embeddings(documents)
+
+                # Get existing vectorstore if available
+                existing_vectorstore = self.vectorstores.get(file_path)
+                if not existing_vectorstore:
+                    existing_vectorstore = self.vectorstore_manager.load_vectorstore(
+                        file_path
+                    )
+
+                # Create or update vectorstore
+                mime_type = result.source.mime_type or "text/plain"
+                vectorstore = self.vectorstore_manager.add_documents_to_vectorstore(
+                    vectorstore=existing_vectorstore,
+                    documents=documents,
+                    embeddings=embeddings,
+                )
+
+                # Save vectorstore
+                self.vectorstore_manager.save_vectorstore(file_path, vectorstore)
+
+                # Update metadata
+                path_obj = Path(file_path)
+                self.index_manager.update_metadata(
+                    file_path=path_obj,
+                    chunk_size=self.config.chunk_size,
+                    chunk_overlap=self.config.chunk_overlap,
+                    embedding_model=self.config.embedding_model,
+                    embedding_model_version=self.embedding_model_version,
+                    file_type=mime_type,
+                    num_chunks=len(documents),
+                )
+
+                # Update cache metadata
+                file_metadata = self.filesystem_manager.get_file_metadata(path_obj)
+                file_metadata["chunks"] = {"total": len(documents)}
+                self.cache_manager.update_cache_metadata(file_path, file_metadata)
+
+                # Add vectorstore to memory cache
+                self.vectorstores[file_path] = vectorstore
+
+                results[file_path] = True
             except Exception as e:
                 self._log("ERROR", f"Error indexing {file_path}: {e}")
-                results[str(file_path)] = False
+                results[file_path] = False
 
         # Clean up invalid caches
         self.cache_manager.cleanup_invalid_caches()

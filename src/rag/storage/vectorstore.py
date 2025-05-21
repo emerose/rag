@@ -5,10 +5,10 @@ including creation, loading, saving, and querying operations.
 """
 
 import logging
+import pickle
 import traceback
 from collections.abc import Callable
 from pathlib import Path
-import pickle
 
 import faiss
 import numpy as np
@@ -55,15 +55,16 @@ class VectorStoreManager:
 
         # Runtime type check for embeddings
         from langchain_core.embeddings import Embeddings as LCEmbeddings
+
         if not isinstance(self.embeddings, LCEmbeddings):
             self._log(
                 "WARNING",
-                f"Embeddings provider is not an Embeddings object: {type(self.embeddings)}. This may cause FAISS warnings or errors."
+                f"Embeddings provider is not an Embeddings object: {type(self.embeddings)}. This may cause FAISS warnings or errors.",
             )
         else:
             self._log(
                 "DEBUG",
-                f"Embeddings provider is a valid Embeddings object: {type(self.embeddings)}"
+                f"Embeddings provider is a valid Embeddings object: {type(self.embeddings)}",
             )
 
     def _log(self, level: str, message: str) -> None:
@@ -144,10 +145,10 @@ class VectorStoreManager:
 
         try:
             self._log("DEBUG", f"Loading vector store for {file_path}")
-            
+
             # Load the FAISS index
             index = faiss.read_index(str(faiss_file))
-            
+
             # Load the pickle file containing docstore and metadata
             with open(pkl_file, "rb") as f:
                 if not self.safe_deserialization:
@@ -158,10 +159,10 @@ class VectorStoreManager:
                     except pickle.UnpicklingError:
                         self._log(
                             "ERROR",
-                            "Failed to unpickle docstore. Consider setting safe_deserialization=False if you trust the source."
+                            "Failed to unpickle docstore. Consider setting safe_deserialization=False if you trust the source.",
                         )
                         return None
-            
+
             # The pickle file structure varies based on how it was saved
             # It might be a tuple with docstore and index_to_docstore_id
             # Or it might just be the docstore with index_to_docstore_id as an attribute
@@ -170,7 +171,7 @@ class VectorStoreManager:
             else:
                 docstore = data
                 index_to_docstore_id = getattr(docstore, "index_to_docstore_id", {})
-            
+
             # Create a FAISS instance with our embeddings object
             vectorstore = FAISS(
                 embedding_function=self.embeddings,
@@ -178,7 +179,7 @@ class VectorStoreManager:
                 docstore=docstore,
                 index_to_docstore_id=index_to_docstore_id,
             )
-            
+
             # Do a minimal check to verify we have a valid vector store
             if (hasattr(docstore, "_dict") and not docstore._dict) or not index:
                 self._log(
@@ -248,20 +249,17 @@ class VectorStoreManager:
         """
         self._log("DEBUG", f"Creating vector store with {len(documents)} documents")
         # Log the type of self.embeddings before using it
-        self._log("DEBUG", f"Type of self.embeddings before FAISS.from_documents: {type(self.embeddings)}")
-        from langchain_core.embeddings import Embeddings as LCEmbeddings
-        if not isinstance(self.embeddings, LCEmbeddings):
-            self._log(
-                "WARNING",
-                f"Embeddings provider is not an Embeddings object: {type(self.embeddings)}. This may cause FAISS warnings or errors."
-            )
+        self._log("DEBUG", f"Embeddings type: {type(self.embeddings)}")
+
         try:
-            if not documents:
-                return self.create_empty_vectorstore()
+            # Create a new FAISS vector store
             return FAISS.from_documents(documents, self.embeddings)
         except Exception as e:
+            # If there's an error, try to log more information
             self._log("ERROR", f"Failed to create vector store: {e}")
-            self._log("ERROR", f"Traceback: {traceback.format_exc()}")
+            self._log("ERROR", f"Embeddings type: {type(self.embeddings)}")
+            if hasattr(e, "__traceback__"):
+                self._log("ERROR", f"Traceback: {traceback.format_exc()}")
             raise
 
     def create_empty_vectorstore(self) -> FAISS:
@@ -272,30 +270,26 @@ class VectorStoreManager:
 
         """
         self._log("DEBUG", "Creating empty vector store")
-        try:
-            # Get embedding dimension
-            dim = self._get_embedding_dimension()
 
-            # Create empty index
-            index = faiss.IndexFlatL2(dim)
+        # Get the embedding dimension
+        embedding_dim = self._get_embedding_dimension()
 
-            # Create empty docstore
-            docstore = InMemoryDocstore({})
+        # Create empty FAISS index
+        index = faiss.IndexFlatL2(embedding_dim)
 
-            # Create FAISS instance with the empty index
-            return FAISS(
-                embedding_function=self.embeddings,
-                index=index,
-                docstore=docstore,
-                index_to_docstore_id={},
-            )
-        except Exception as e:
-            self._log(
-                "ERROR",
-                f"An unexpected error occurred while creating empty vector store: {e}",
-            )
-            self._log("ERROR", f"Traceback: {traceback.format_exc()}")
-            raise
+        # Create empty docstore
+        docstore = InMemoryDocstore({})
+
+        # Create empty index_to_docstore_id mapping
+        index_to_docstore_id = {}
+
+        # Create FAISS vector store
+        return FAISS(
+            embedding_function=self.embeddings,
+            index=index,
+            docstore=docstore,
+            index_to_docstore_id=index_to_docstore_id,
+        )
 
     def _prepare_documents_and_embeddings(
         self,

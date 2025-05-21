@@ -93,6 +93,11 @@ class FilesystemManager:
         supported_files = []
         for root, _, files in os.walk(directory):
             for file in files:
+                # Skip files that begin with a dot (hidden files)
+                if file.startswith("."):
+                    self._log("DEBUG", f"Skipping hidden file: {file}")
+                    continue
+
                 file_path = Path(root) / file
                 if self.is_supported_file(file_path):
                     supported_files.append(file_path)
@@ -112,6 +117,10 @@ class FilesystemManager:
         """
         # Convert to Path if string is provided
         file_path = Path(file_path)
+
+        # Skip files that begin with a dot (hidden files)
+        if file_path.name.startswith("."):
+            return False
 
         # First, check if the file exists
         if not file_path.exists() or not file_path.is_file():

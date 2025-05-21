@@ -1,10 +1,29 @@
+## 🚀 Next Up (Implementation Plan)
+
+1. Metadata-aware chunking (P1)
+   - Capture title, headings, page numbers in Document.metadata
+   - Enable filtering based on metadata in queries
+
+2. Improve text splitting (P1)
+   - Switch to RecursiveCharacterTextSplitter with semantic boundaries
+   - Implement better heading detection for PDFs
+
+3. LCEL migration (P1)
+   - Rewrite query_engine with composable LangChain runnables
+   - Create modular pipeline: retriever | reranker | prompt | llm | parser
+
+4. Prompt registry (P1)
+   - Create central directory of prompt templates (Jinja or LCEL PromptTemplate)
+   - Add --prompt flag to select different prompting strategies
+
+---
+
 ### 🗺️ Roadmap & Priorities  
 *(Priority ‑ **P1** = Do next, … **P5** = Nice-to-have)*
 
 ---
 
 #### 1 . Architecture & Core Design
-- **[P1] Extract ingest layer** – Move all filesystem work (hashing, MIME detection, PDF splitting, etc.) into `rag/ingest.py`; keep the engine focused on retrieval + QA.  *Enables unit-testing and alternate back-ends.*
 - **[P2] Vector-store abstraction** – Introduce `VectorStoreProtocol` so FAISS can be swapped for Qdrant/Chroma via a CLI flag.
 - **[P3] Incremental re-indexing** – Hash each chunk and only (re)embed changed chunks to reduce token spend.
 - **[P4] File-locking cleanup** – Replace ad-hoc lockfiles with `filelock.FileLock` context-manager.
@@ -17,7 +36,7 @@
 - **[P3] Re-ranking** – Optional Cohere or cross-encoder re-ranker after top-k retrieval.
 
 #### 3 . Prompt Engineering & Generation
-- **[P1] Prompt registry** – Central directory `rag/prompts/*.jinja` (or LCEL `PromptTemplate`) + `--prompt <name>` flag.
+- **[P1] Prompt registry** – Central directory `rag/prompts/*.jinja` (or LCEL `PromptTemplate`) + `--prompt <n>` flag.
 - **[P2] System-persona message** – Read `RAG_SYSTEM_PROMPT` env var and prepend to every chat.
 - **[P2] Context window packing** – LCEL `stuff_documents` / token-length trimming for max context utilisation.
 

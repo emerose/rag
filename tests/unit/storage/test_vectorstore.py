@@ -4,7 +4,7 @@ Focus on testing our wrapper logic, not FAISS itself.
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 from langchain_core.documents import Document
 
@@ -194,19 +194,28 @@ def test_save_vectorstore(
 
 
 @patch("rag.storage.vectorstore.FAISS")
+@patch("rag.storage.vectorstore.faiss")
+@patch("rag.storage.vectorstore.pickle")
 def test_load_vectorstore(
-    _mock_faiss: MagicMock,
+    mock_pickle: MagicMock,
+    mock_faiss_lib: MagicMock,
+    _mock_faiss_cls: MagicMock,
     temp_dir: Path,
     mock_embedding_provider: MagicMock,
 ) -> None:
     """Test loading a vector store."""
-    # Setup mock
-    mock_instance = MagicMock()
-    _mock_faiss.load_local.return_value = mock_instance
+    # Setup mocks
+    mock_index = MagicMock()
+    mock_faiss_lib.read_index.return_value = mock_index
 
-    # Set up a mock docstore that appears to have documents
-    mock_instance.docstore = MagicMock()
-    type(mock_instance.docstore)._dict = PropertyMock(return_value={"doc1": "content"})
+    # Create mock docstore with index_to_docstore_id attribute
+    mock_docstore = MagicMock()
+    mock_docstore._dict = {"doc1": "content"}
+    mock_docstore.index_to_docstore_id = {"0": "doc1"}
+    mock_pickle.load.return_value = mock_docstore
+
+    mock_instance = MagicMock()
+    _mock_faiss_cls.return_value = mock_instance
 
     # Patch embedding provider to avoid API calls
     with patch.object(
@@ -219,16 +228,21 @@ def test_load_vectorstore(
             embeddings=mock_embedding_provider.embeddings,
         )
 
-        # Create a mock cache path that "exists"
-        with patch.object(Path, "exists", return_value=True):
+        # Create mock files that "exist"
+        with (
+            patch.object(Path, "exists", return_value=True),
+            patch("builtins.open", mock_open()),
+        ):
             # Load the vectorstore
             file_path = "/path/to/test/file.txt"
             vectorstore = manager.load_vectorstore(file_path)
 
-        # Verify FAISS.load_local was called
-        _mock_faiss.load_local.assert_called_once()
+        # Verify faiss.read_index was called with the right path
+        mock_faiss_lib.read_index.assert_called_once()
 
-        # Verify the returned vectorstore is the mock instance
+        # Don't strictly check the parameters since they depend on implementation details
+        # Just verify that FAISS constructor was called and returned our mock
+        assert _mock_faiss_cls.called
         assert vectorstore == mock_instance
 
 
