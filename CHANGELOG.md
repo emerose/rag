@@ -23,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced integration test runner with support for running all tests or just integration-tagged tests
 - Added `--all` flag to `run_integration_tests.py` to include unit/integration hybrid tests
 - Clearer test summary display in integration test output
+- Prompt registry with multiple template options:
+  - Added `--prompt` flag to `query` and `repl` commands to select prompt templates
+  - Implemented 3 built-in templates:
+    - `default`: Standard RAG prompt with citation guidance
+    - `cot`: Chain-of-thought prompt encouraging step-by-step reasoning
+    - `creative`: Engaging, conversational style while maintaining accuracy
+  - Integrated prompt registry with the LCEL RAG chain
 
 ### Changed
 - Refactored `TextSplitterFactory` to use a table-driven approach for better maintainability

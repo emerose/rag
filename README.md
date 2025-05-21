@@ -13,6 +13,11 @@ A powerful command-line tool for building and querying RAG applications with a b
 - 📊 Generate document summaries
 - 🔍 Interactive REPL for continuous querying
 - 📋 List and manage indexed documents
+- **Document Indexing**: Process and index various document types (PDF, Markdown, Text, etc.)
+- **Vector Search**: Use semantic similarity to find relevant information
+- **Context-Aware Generation**: Generate answers based on retrieved document chunks
+- **Interactive REPL**: Query your documents in an interactive command-line interface
+- **Multiple Prompt Templates**: Choose different prompting strategies with the `--prompt` flag
 
 ## Quick Start
 
@@ -329,3 +334,21 @@ The project is organized into modular components for better maintainability and 
   - `logging_utils.py` - Centralized logging
   - `progress_tracker.py` - Progress reporting
   - `async_utils.py` - Async helpers
+
+## Customizing Prompts
+
+The RAG CLI supports different prompting strategies via the `--prompt` flag:
+
+```bash
+# Use chain-of-thought reasoning
+rag query "What is the key feature of RAG?" --prompt cot
+
+# Use a more conversational style
+rag repl --prompt creative
+```
+
+Available prompt templates:
+
+- `default`: Standard RAG prompt with citation guidance
+- `cot`: Chain-of-thought prompt encouraging step-by-step reasoning
+- `creative`: Engaging, conversational style while maintaining accuracy

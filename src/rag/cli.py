@@ -410,6 +410,12 @@ def query(
         min=1,
         max=20,
     ),
+    prompt: str = typer.Option(
+        "default",
+        "--prompt",
+        "-p",
+        help="Prompt template to use (default, cot, creative)",
+    ),
     json_output: bool = typer.Option(
         False,
         "--json",
@@ -430,6 +436,11 @@ def query(
     1. Load the existing vector store from the global cache
     2. Use the query to find the most relevant document chunks
     3. Generate a response using the retrieved context
+
+    Choose a prompt style with --prompt:
+    - default: Standard RAG prompt with citation guidance
+    - cot: Chain-of-thought prompt encouraging step-by-step reasoning
+    - creative: Engaging, conversational style while maintaining accuracy
     """
     state.is_processing = True
     try:
@@ -447,6 +458,9 @@ def query(
         )
         runtime_options = RuntimeOptions()
         rag_engine = RAGEngine(config, runtime_options)
+
+        # Set the chosen prompt template
+        rag_engine.default_prompt_id = prompt
 
         # Load cache metadata to check if we have any documents
         cache_metadata = rag_engine._load_cache_metadata()
@@ -820,21 +834,39 @@ def repl(
         min=1,
         max=MAX_K_VALUE,
     ),
+    prompt: str = typer.Option(
+        "default",
+        "--prompt",
+        "-p",
+        help="Prompt template to use (default, cot, creative)",
+    ),
 ) -> None:
-    """Start an interactive REPL (Read-Eval-Print Loop) for querying the indexed documents.
+    """Start an interactive REPL (Read-Eval-Print-Loop) for RAG queries.
 
-    Features:
-    - Command history (up/down arrows)
-    - Auto-suggestions from history
-    - Syntax highlighting
-    - Auto-completion
-    - Clear screen command
-    - Exit command
+    This command provides an interactive shell for querying the RAG system.
+    You can ask questions and get answers in real-time without having to
+    run the `query` command repeatedly.
+
+    Available commands in the REPL:
+    - `q` or `quit`: Exit the REPL
+    - `k=<value>`: Change the number of documents to retrieve
+    - `list`: List all indexed documents
+    - `summarize`: Generate summaries of indexed documents
+
+    Choose a prompt style with --prompt:
+    - default: Standard RAG prompt with citation guidance
+    - cot: Chain-of-thought prompt encouraging step-by-step reasoning
+    - creative: Engaging, conversational style while maintaining accuracy
     """
     state.is_processing = True
     try:
         # Initialize RAG engine
         rag_engine = _initialize_rag_engine()
+
+        # Set the chosen prompt template
+        rag_engine.default_prompt_id = prompt
+
+        # Load vectorstores
         _load_vectorstores(rag_engine)
 
         # Set up REPL session

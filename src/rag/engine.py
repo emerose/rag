@@ -76,6 +76,7 @@ class RAGEngine:
         # Set up configuration
         self.config = config or self._create_default_config()
         self.runtime = runtime_options or RuntimeOptions()
+        self.default_prompt_id: str = "default"
 
         # For backward compatibility
         if self.runtime.progress_callback and not callable(
@@ -519,6 +520,10 @@ class RAGEngine:
 
     def _get_rag_chain(self, k: int = 4, prompt_id: str = "default"):
         """Return cached or newly-built LCEL RAG chain."""
+        # Use the engine's default prompt ID if 'default' is passed
+        if prompt_id == "default":
+            prompt_id = self.default_prompt_id
+
         key = (k, prompt_id)
         if key not in self._rag_chain_cache:
             self._rag_chain_cache[key] = build_rag_chain(self, k=k, prompt_id=prompt_id)

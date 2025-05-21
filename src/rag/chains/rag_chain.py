@@ -22,8 +22,10 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_community.vectorstores import FAISS  # type: ignore
 from langchain_core.documents import Document
-from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnableLambda, RunnableParallel
+
+# Import the prompt registry
+from rag.prompts import get_prompt
 
 # Forward reference for type checking
 if TYPE_CHECKING:
@@ -104,8 +106,10 @@ def build_rag_chain(engine: RAGEngine, k: int = 4, prompt_id: str = "default"):
     k
         Number of documents to retrieve.
     prompt_id
-        Identifier of the prompt template. Only ``"default"`` is currently
-        supported.  Future work will hook into the prompt registry.
+        Identifier of the prompt template to use. Available templates are:
+        - "default": Standard RAG prompt with citation guidance
+        - "cot": Chain-of-thought prompt encouraging step-by-step reasoning
+        - "creative": Engaging, conversational style while maintaining accuracy
     """
 
     # ---------------------------------------------------------------------
@@ -121,21 +125,14 @@ def build_rag_chain(engine: RAGEngine, k: int = 4, prompt_id: str = "default"):
     retriever = merged_vs.as_retriever(search_type="similarity", search_kwargs={"k": k})
 
     # ---------------------------------------------------------------------
-    # Prompt template (fallback default)
+    # Get prompt template from registry
     # ---------------------------------------------------------------------
-    default_template = (
-        "You are a helpful assistant. Answer the user's **question** using ONLY "
-        "the provided **context**. If the context is insufficient, respond with "
-        "'I don't know based on the provided context.' Do **not** fabricate "
-        "answers. Cite sources in square brackets (e.g. [1]) when relevant.\n\n"
-        "Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer:"
-    )
-    if prompt_id != "default":
-        logger.warning(
-            "Prompt registry not yet implemented. Falling back to default template.",
-        )
-
-    prompt = PromptTemplate.from_template(default_template)
+    try:
+        prompt = get_prompt(prompt_id)
+    except KeyError as e:
+        logger.warning(f"{e!s}")
+        prompt_id = "default"
+        prompt = get_prompt(prompt_id)
 
     # ---------------------------------------------------------------------
     # Helper functions for LCEL lambdas

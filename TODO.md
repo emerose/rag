@@ -1,9 +1,5 @@
 ## 🚀 Next Up (Implementation Plan)
 
-1. Prompt registry (P1)
-   - Create central directory of prompt templates (Jinja or LCEL PromptTemplate)
-   - Add --prompt flag to select different prompting strategies
-
 ---
 
 ### 🗺️ Roadmap & Priorities  
@@ -22,7 +18,6 @@
 - **[P3] Re-ranking** – Optional Cohere or cross-encoder re-ranker after top-k retrieval.
 
 #### 3 . Prompt Engineering & Generation
-- **[P1] Prompt registry** – Central directory `rag/prompts/*.jinja` (or LCEL `PromptTemplate`) + `--prompt <n>` flag.
 - **[P2] System-persona message** – Read `RAG_SYSTEM_PROMPT` env var and prepend to every chat.
 - **[P2] Context window packing** – LCEL `stuff_documents` / token-length trimming for max context utilisation.
 
