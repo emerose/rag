@@ -70,6 +70,7 @@ class GlobalState:
 
     is_processing: bool = False
     logger: logging.Logger | None = None
+    cache_dir: str = CACHE_DIR  # Initialize with default value
 
 
 state = GlobalState()
@@ -135,10 +136,18 @@ def main(
         "-l",
         help="Set the logging level",
     ),
+    cache_dir: str = typer.Option(
+        CACHE_DIR,
+        "--cache-dir",
+        "-c",
+        help="Directory for caching embeddings and vector stores",
+    ),
 ) -> None:
     """RAG (Retrieval Augmented Generation) CLI."""
     load_dotenv()
     state.logger = configure_logging(verbose, log_level)
+    # Update the cache directory
+    state.cache_dir = cache_dir
 
 
 def create_console_progress_callback(progress: Progress) -> Callable[[str, int], None]:
@@ -215,7 +224,7 @@ def index(
             embedding_model="text-embedding-3-small",
             chat_model="gpt-4",
             temperature=0.0,
-            cache_dir=CACHE_DIR,
+            cache_dir=state.cache_dir,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
         )
@@ -383,7 +392,7 @@ def query(
             embedding_model="text-embedding-3-small",
             chat_model="gpt-4",
             temperature=0.0,
-            cache_dir=CACHE_DIR,
+            cache_dir=state.cache_dir,
         )
         runtime_options = RuntimeOptions()
         rag_engine = RAGEngine(config, runtime_options)
@@ -451,7 +460,7 @@ def summarize(
             embedding_model="text-embedding-3-small",
             chat_model="gpt-4",
             temperature=0.0,
-            cache_dir=CACHE_DIR,
+            cache_dir=state.cache_dir,
         )
         runtime_options = RuntimeOptions()
         rag_engine = RAGEngine(config, runtime_options)
@@ -613,7 +622,7 @@ def _initialize_rag_engine() -> RAGEngine:
         embedding_model="text-embedding-3-small",
         chat_model="gpt-4",
         temperature=0.0,
-        cache_dir=CACHE_DIR,
+        cache_dir=state.cache_dir,
     )
     runtime_options = RuntimeOptions()
     return RAGEngine(config, runtime_options)
@@ -821,10 +830,10 @@ def cleanup() -> None:
         console.print("[cyan]Starting cache cleanup...[/cyan]")
 
         # Initialize RAG engine using RAGConfig with default cache directory
-        state.logger.info(f"Initializing RAGConfig with cache_dir: {CACHE_DIR}")
+        state.logger.info(f"Initializing RAGConfig with cache_dir: {state.cache_dir}")
         config = RAGConfig(
             documents_dir=".",  # Not used for cleanup, but required
-            cache_dir=CACHE_DIR,
+            cache_dir=state.cache_dir,
         )
 
         # Initialize the RAG engine

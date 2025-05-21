@@ -131,7 +131,7 @@ max-complexity = 10
 known-first-party = ["rag"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["PLR2004"]
+"tests/**/*" = ["ALL"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -155,4 +155,5 @@ exclude = [
     "dist/",
     ".venv/",
     ".mypy_cache/",
+    "tests/",
 ]

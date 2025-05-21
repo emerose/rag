@@ -1,0 +1,15 @@
+RAG System Test Document
+
+This is a sample document for testing the RAG system. It contains some facts that we can query:
+
+1. The capital of France is Paris.
+2. The capital of Japan is Tokyo.
+3. The capital of Egypt is Cairo.
+4. The capital of Brazil is Brasília.
+5. The capital of Australia is Canberra.
+
+The RAG system should be able to retrieve this information when queried properly.
+For example, if we ask "What is the capital of Japan?", it should return "Tokyo".
+
+This document will be used in integration testing to verify that the RAG system
+works end-to-end from indexing to querying. 

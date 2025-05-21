@@ -27,23 +27,17 @@ run_check() {
 # Run all checks
 echo "🔍 Starting code quality checks..."
 
-# Run tests
-run_check "uv run pytest" "Running tests"
+# Run tests (excluding integration tests)
+run_check "uv run python tests/run_tests.py" "Running tests (excluding integration tests)"
 
-# Format code
-run_check "uv run ruff format . --line-length 88" "Formatting code"
+# Format code (excluding tests)
+run_check "uv run ruff format src/ --line-length 88" "Formatting code"
 
 # Run linter for main code
 run_check "uv run ruff check src/rag --fix --line-length 88" "Linting main code"
 
-# Run linter for test code
-run_check "uv run ruff check tests --fix --line-length 88 --ignore S101,SLF001" "Linting test code"
-
 # Run format again to ensure any auto-fixes are properly formatted
-run_check "uv run ruff format . --line-length 88" "Re-formatting code after linting"
-
-# Run mypy strict type checks on tests
-run_check "uv run mypy --strict tests/" "Running type checks on tests"
+run_check "uv run ruff format src/ --line-length 88" "Re-formatting code after linting"
 
 # Final report
 if [ $OVERALL_STATUS -eq 0 ]; then

@@ -17,6 +17,14 @@ from rag.config import RAGConfig, RuntimeOptions
 from rag.embeddings.embedding_provider import EmbeddingProvider
 
 
+# Define the integration marker - tests with this marker are not run by default
+def pytest_configure(config: pytest.Config) -> None:
+    """Configure pytest markers."""
+    config.addinivalue_line(
+        "markers", "integration: mark test as integration test (not run by default)"
+    )
+
+
 @pytest.fixture
 def temp_dir() -> Generator[Path, None, None]:
     """Create a temporary directory for test files.
