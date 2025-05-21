@@ -15,6 +15,7 @@ from langchain_community.vectorstores import FAISS
 import numpy as np
 
 from rag.chains.rag_chain import build_rag_chain, _parse_metadata_filters, _doc_matches_filters
+from rag.utils.exceptions import VectorstoreError
 
 
 @pytest.fixture
@@ -151,10 +152,10 @@ def test_chain_execution(mock_runnable_lambda, mock_engine, mock_faiss, mock_doc
 def test_chain_with_error_handling(mock_engine):
     """Test error handling in the RAG chain."""
     # Configure mock engine to raise an exception when merging vectorstores
-    mock_engine.vectorstore_manager.merge_vectorstores.side_effect = ValueError("No vectorstores available")
+    mock_engine.vectorstore_manager.merge_vectorstores.side_effect = VectorstoreError("No vectorstores available")
     
-    # Expect ValueError when no vectorstores are available
-    with pytest.raises(ValueError, match="No vectorstores available"):
+    # Expect VectorstoreError when no vectorstores are available
+    with pytest.raises(VectorstoreError):
         build_rag_chain(mock_engine)
     
     # Remove the side effect
@@ -163,6 +164,6 @@ def test_chain_with_error_handling(mock_engine):
     # Now make vectorstores empty
     mock_engine.vectorstores = {}
     
-    # Expect ValueError when vectorstores is empty
-    with pytest.raises(ValueError, match="No vectorstores available"):
+    # Expect VectorstoreError when vectorstores is empty
+    with pytest.raises(VectorstoreError):
         build_rag_chain(mock_engine) 

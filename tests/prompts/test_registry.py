@@ -6,6 +6,7 @@ from langchain_core.prompts.base import BasePromptTemplate
 
 from rag.prompts import get_prompt
 from rag.prompts.registry import _PROMPTS
+from rag.utils.exceptions import PromptNotFoundError
 
 
 def test_get_prompt_valid_ids():
@@ -19,8 +20,8 @@ def test_get_prompt_valid_ids():
 
 def test_get_prompt_invalid_id():
     """Test retrieving an invalid prompt template ID."""
-    # Should raise KeyError for unknown prompt IDs
-    with pytest.raises(KeyError):
+    # Should raise PromptNotFoundError for unknown prompt IDs
+    with pytest.raises(PromptNotFoundError):
         get_prompt("nonexistent_prompt")
 
 

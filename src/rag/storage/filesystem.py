@@ -12,33 +12,40 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypeAlias
 
-from rag.utils.logging_utils import log_message
+from ..utils.exceptions import FileNotFoundError as RAGFileNotFoundError
+from ..utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
 
-# Define supported file types and their MIME types
+# TypeAlias for log callback function
+LogCallback: TypeAlias = Callable[[str, str, str], None]
+
+# Map of supported MIME types to their file extensions
 SUPPORTED_MIME_TYPES = {
-    "text/plain": [".txt", ".md", ".log", ".csv", ".json", ".yml", ".yaml"],
+    "text/plain": [".txt", ".log", ".json", ".yml", ".yaml", ".xml"],
     "text/markdown": [".md", ".markdown"],
+    "text/csv": [".csv"],
     "text/html": [".html", ".htm"],
     "application/pdf": [".pdf"],
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
-        ".docx",
+        ".docx"
     ],
+    "application/msword": [".doc"],
     "application/vnd.openxmlformats-officedocument.presentationml.presentation": [
         ".pptx",
     ],
-    "application/msword": [".doc"],
     "application/vnd.ms-powerpoint": [".ppt"],
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+    "application/vnd.ms-excel": [".xls"],
+    "application/rtf": [".rtf"],
+    "application/vnd.oasis.opendocument.text": [".odt"],
+    "application/epub+zip": [".epub"],
 }
 
 # Flatten the extensions for quick lookup
 SUPPORTED_EXTENSIONS = {
     ext.lower() for exts in SUPPORTED_MIME_TYPES.values() for ext in exts
 }
-
-# TypeAlias for log callback function
-LogCallback: TypeAlias = Callable[[str, str, str], None]
 
 
 class FilesystemManager:
@@ -128,7 +135,7 @@ class FilesystemManager:
 
         try:
             mime_type = self.get_file_type(file_path)
-        except (FileNotFoundError, PermissionError, ValueError) as e:
+        except (RAGFileNotFoundError, PermissionError, ValueError) as e:
             self._log("WARNING", f"Failed to determine file type for {file_path}: {e}")
             return False
         else:
@@ -154,7 +161,7 @@ class FilesystemManager:
 
         # Check if file exists
         if not file_path.exists():
-            raise FileNotFoundError(f"File {file_path} does not exist")
+            raise RAGFileNotFoundError(file_path)
 
         mime_type, _ = mimetypes.guess_type(str(file_path))
 

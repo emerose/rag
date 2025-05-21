@@ -7,6 +7,8 @@ It exposes a `get_prompt` function that returns a prompt template by ID.
 from langchain_core.prompts import PromptTemplate
 from langchain_core.prompts.base import BasePromptTemplate
 
+from ..utils.exceptions import PromptNotFoundError
+
 # Dictionary of built-in prompt templates
 _PROMPTS: dict[str, BasePromptTemplate] = {
     "default": PromptTemplate.from_template(
@@ -48,11 +50,9 @@ def get_prompt(prompt_id: str) -> BasePromptTemplate:
         The prompt template
 
     Raises:
-        KeyError: If the prompt ID is not found in the registry
+        PromptNotFoundError: If the prompt ID is not found in the registry
     """
     if prompt_id not in _PROMPTS:
-        raise KeyError(
-            f"Prompt template '{prompt_id}' not found. Available prompts: {', '.join(_PROMPTS.keys())}"
-        )
+        raise PromptNotFoundError(prompt_id, list(_PROMPTS.keys()))
 
     return _PROMPTS[prompt_id]
