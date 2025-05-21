@@ -225,6 +225,9 @@ class CacheManager:
             except OSError as e:
                 self._log("ERROR", f"Failed to delete cache file {f}: {e}")
                 
+        # Clear all metadata from the index database
+        self.index_manager.clear_all_file_metadata()
+        
         self._log("INFO", f"Invalidated all caches ({len(file_paths)} files)")
         
     def cleanup_invalid_caches(self) -> None:

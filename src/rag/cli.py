@@ -20,6 +20,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
 from rich.table import Table
+from dotenv import load_dotenv
 
 # Try both relative and absolute imports
 try:
@@ -133,6 +134,7 @@ def main(
     ),
 ) -> None:
     """RAG (Retrieval Augmented Generation) CLI."""
+    load_dotenv()
     state.logger = configure_logging(verbose, log_level)
 
 

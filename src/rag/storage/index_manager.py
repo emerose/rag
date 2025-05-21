@@ -479,4 +479,18 @@ class IndexManager:
                 ]
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to list indexed files: {e}")
-            return [] 
+            return []
+
+    def clear_all_file_metadata(self) -> None:
+        """Remove all file metadata from the database."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                # Remove all entries from document_meta table
+                conn.execute("DELETE FROM document_meta")
+                # Remove all entries from file_metadata table
+                conn.execute("DELETE FROM file_metadata")
+                conn.commit()
+                self._log("INFO", "Cleared all file metadata from the database")
+        except sqlite3.Error as e:
+            self._log("ERROR", f"Failed to clear all file metadata: {e}")
+            raise
