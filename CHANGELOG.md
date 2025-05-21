@@ -25,8 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Refactored `TextSplitterFactory` to use a table-driven approach for better maintainability
 - Enhanced PDF processing with improved font analysis for heading detection
 - Separated metadata extraction into dedicated `DocumentMetadataExtractor` classes
+- Improved code structure by breaking down complex methods into smaller, focused helpers
 
 ### Fixed
 - More reliable heading detection in PDFs by using statistical font analysis
 - Better preservation of document structure in chunks
-- Improved semantic boundaries in text chunking 
+- Improved semantic boundaries in text chunking
+- Fixed complexity and linting issues in text splitting code
