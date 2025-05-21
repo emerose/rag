@@ -21,6 +21,7 @@ from langchain_core.documents import Document
 
 from ..storage.filesystem import FilesystemManager
 from ..utils.logging_utils import log_message
+from .metadata_extractor import DocumentMetadataExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,7 @@ class DocumentLoader:
         """
         self.filesystem_manager = filesystem_manager
         self.log_callback = log_callback
+        self.metadata_extractor = DocumentMetadataExtractor()
 
     def _log(self, level: str, message: str) -> None:
         """Log a message.
@@ -140,6 +142,13 @@ class DocumentLoader:
 
             # Add file metadata to each document
             self._enhance_document_metadata(docs, file_path)
+
+            # Get MIME type of the file
+            mime_type = self.filesystem_manager.get_file_type(file_path)
+
+            # Extract and add document-specific metadata
+            self._log("DEBUG", f"Extracting metadata from document: {file_path}")
+            docs = self.metadata_extractor.enhance_documents(docs, mime_type)
 
             self._log("INFO", f"Loaded {len(docs)} document(s) from {file_path}")
             return docs

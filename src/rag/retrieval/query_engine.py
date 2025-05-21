@@ -5,6 +5,7 @@ and constructing contexts for LLM prompts.
 """
 
 import logging
+import re
 from collections.abc import Callable
 from typing import Any, TypeAlias
 
@@ -76,6 +77,163 @@ class QueryEngine:
         """
         log_message(level, message, "QueryEngine", self.log_callback)
 
+    def _parse_metadata_filters(self, query: str) -> tuple[str, dict[str, Any]]:
+        """Parse metadata filters from a query string.
+
+        Filters are specified in the format `filter:field=value`.
+        Multiple filters can be specified.
+
+        Values can contain spaces if quoted: `filter:field="value with spaces"`
+
+        Args:
+            query: The query string
+
+        Returns:
+            Tuple of (clean query, metadata filters dict)
+        """
+        metadata_filters = {}
+        clean_query = query
+
+        # Match both quoted and unquoted filter values:
+        # 1. filter:field="value with spaces"
+        # 2. filter:field=value_without_spaces
+        filter_pattern = r'filter:(\w+)=(?:"([^"]+)"|([^\s]+))'
+
+        # Find all filter matches
+        matches = re.finditer(filter_pattern, query)
+
+        # Extract the filters and build the metadata_filters dict
+        for match in matches:
+            field = match.group(1)
+            # If group 2 has a value, it's a quoted value, otherwise use group 3
+            value = match.group(2) if match.group(2) else match.group(3)
+            metadata_filters[field] = value
+
+            # Replace the filter in the query with an empty string
+            filter_text = match.group(0)
+            clean_query = clean_query.replace(filter_text, "")
+
+        # Clean up any extra whitespace
+        clean_query = " ".join(clean_query.split())
+
+        self._log("INFO", f"Parsed metadata filters: {metadata_filters}")
+        return clean_query, metadata_filters
+
+    def _apply_metadata_filters(
+        self,
+        documents: list[Document],
+        metadata_filters: dict[str, Any],
+    ) -> list[Document]:
+        """Apply metadata filters to a list of documents.
+
+        Args:
+            documents: List of documents to filter
+            metadata_filters: Dictionary of metadata field to value filters
+
+        Returns:
+            Filtered list of documents
+        """
+        if not metadata_filters:
+            return documents
+
+        self._log("INFO", f"Applying metadata filters to {len(documents)} documents")
+
+        filtered_docs = []
+        for doc in documents:
+            if self._document_matches_filters(doc, metadata_filters):
+                filtered_docs.append(doc)
+
+        self._log("INFO", f"After filtering: {len(filtered_docs)} documents remain")
+        return filtered_docs
+
+    def _document_matches_filters(
+        self, doc: Document, metadata_filters: dict[str, Any]
+    ) -> bool:
+        """Check if a document matches all of the given filters.
+
+        Args:
+            doc: Document to check
+            metadata_filters: Dictionary of metadata field to value filters
+
+        Returns:
+            True if the document matches all filters, False otherwise
+        """
+        for key, value in metadata_filters.items():
+            # Check if document has the metadata field
+            if key not in doc.metadata:
+                return False
+
+            # Handle different metadata types
+            if not self._value_matches_filter(doc.metadata[key], value, key, doc):
+                return False
+
+        return True
+
+    def _value_matches_filter(
+        self, doc_value: Any, filter_value: Any, key: str, doc: Document
+    ) -> bool:
+        """Check if a document metadata value matches a filter value.
+
+        Args:
+            doc_value: Value from the document metadata
+            filter_value: Value from the filter
+            key: Metadata key being checked
+            doc: Original document (for checking related metadata)
+
+        Returns:
+            True if the value matches the filter, False otherwise
+        """
+        # Convert filter value to match document value type if needed
+        if isinstance(doc_value, int | float):
+            try:
+                # Convert to same type as doc_value
+                if isinstance(doc_value, int):
+                    filter_value = int(filter_value)
+                elif isinstance(doc_value, float):
+                    filter_value = float(filter_value)
+            except ValueError:
+                # If conversion fails, they can't match
+                return False
+
+        # String comparison - we'll do partial matching for text fields
+        if isinstance(doc_value, str):
+            if str(filter_value).lower() not in doc_value.lower():
+                return False
+        # Simple equality for all other types
+        elif doc_value != filter_value:
+            return False
+
+        # Special handling for hierarchical fields
+        if key == "heading_path" and "heading_hierarchy" in doc.metadata:
+            return self._heading_path_matches(
+                doc.metadata["heading_hierarchy"], filter_value
+            )
+
+        return True
+
+    def _heading_path_matches(self, hierarchies: Any, filter_value: Any) -> bool:
+        """Check if a heading path filter matches any heading in the hierarchy.
+
+        Args:
+            hierarchies: Heading hierarchy metadata
+            filter_value: Filter value to match against
+
+        Returns:
+            True if the filter matches any heading path, False otherwise
+        """
+        # Try to match against any heading in the hierarchy
+        if not isinstance(hierarchies, list):
+            return False
+
+        for heading in hierarchies:
+            if (
+                "path" in heading
+                and str(filter_value).lower() in heading["path"].lower()
+            ):
+                return True
+
+        return False
+
     @retry(
         retry=retry_if_exception_type((RateLimitError, APIError, APIConnectionError)),
         wait=wait_exponential(multiplier=1, min=1, max=60),
@@ -104,12 +262,29 @@ class QueryEngine:
         """
         self._log("INFO", f"Executing query with k={k}")
 
+        # Parse and remove metadata filters from the query
+        clean_query, metadata_filters = self._parse_metadata_filters(query)
+
+        # If filters exist, we'll need to fetch more results to filter down
+        search_k = k
+        if metadata_filters:
+            # Fetch more results if we have filters (multiply by 3 as a heuristic)
+            search_k = k * 3
+            self._log("INFO", f"Using expanded k={search_k} for filtered search")
+
         try:
             results = self.vectorstore_manager.similarity_search(
                 vectorstore=vectorstore,
-                query=query,
-                k=k,
+                query=clean_query,  # Use the clean query without filter directives
+                k=search_k,
             )
+
+            # Apply metadata filters if any
+            if metadata_filters:
+                results = self._apply_metadata_filters(results, metadata_filters)
+                # Trim to requested k if we have more results than needed
+                if len(results) > k:
+                    results = results[:k]
 
             self._log("INFO", f"Query returned {len(results)} results")
         except (RateLimitError, APIError, APIConnectionError) as e:
@@ -147,10 +322,32 @@ class QueryEngine:
             # Get source information
             source = doc.metadata.get("source", "Unknown source")
 
-            # Format document with source information
-            formatted_doc = (
-                f"Document {i + 1} (Source: {source}):\n{doc.page_content}\n"
-            )
+            # Include additional metadata in context if available
+            metadata_context = ""
+
+            # Title
+            if "title" in doc.metadata:
+                metadata_context += f"Title: {doc.metadata['title']}\n"
+
+            # Section/Heading path
+            if "heading_path" in doc.metadata:
+                metadata_context += f"Section: {doc.metadata['heading_path']}\n"
+            elif "closest_heading" in doc.metadata:
+                metadata_context += f"Section: {doc.metadata['closest_heading']}\n"
+
+            # Page number (for PDFs)
+            if "page_num" in doc.metadata:
+                metadata_context += f"Page: {doc.metadata['page_num']}\n"
+
+            # Add metadata context if we have any
+            if metadata_context:
+                formatted_doc = f"Document {i + 1} (Source: {source}):\n{metadata_context}{doc.page_content}\n"
+            else:
+                # Original format without additional metadata
+                formatted_doc = (
+                    f"Document {i + 1} (Source: {source}):\n{doc.page_content}\n"
+                )
+
             formatted_docs.append(formatted_doc)
 
         # Join documents with separators
@@ -183,14 +380,21 @@ class QueryEngine:
         sources = []
         for doc in documents:
             source = doc.metadata.get("source", "Unknown source")
-            sources.append(
-                {
-                    "path": source,
-                    "excerpt": doc.page_content[:MAX_EXCERPT_LENGTH] + "..."
-                    if len(doc.page_content) > MAX_EXCERPT_LENGTH
-                    else doc.page_content,
-                },
-            )
+
+            # Create source item with basic info
+            source_item = {
+                "path": source,
+                "excerpt": doc.page_content[:MAX_EXCERPT_LENGTH] + "..."
+                if len(doc.page_content) > MAX_EXCERPT_LENGTH
+                else doc.page_content,
+            }
+
+            # Add additional metadata if available
+            for key in ["title", "heading_path", "page_num"]:
+                if key in doc.metadata:
+                    source_item[key] = doc.metadata[key]
+
+            sources.append(source_item)
 
         # Remove duplicates while preserving order
         unique_sources = []

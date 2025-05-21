@@ -259,6 +259,128 @@ class TextSplitterFactory:
         tokens = self.tokenizer.encode(text)
         return len(tokens)
 
+    def _preserve_metadata_hierarchy(self, docs: list[Document]) -> list[Document]:
+        """Preserve metadata hierarchy across chunks.
+
+        Args:
+            docs: List of document chunks
+
+        Returns:
+            List of document chunks with preserved metadata hierarchy
+        """
+        # If no documents or only one document, return as is
+        if not docs or len(docs) == 1:
+            return docs
+
+        # Apply base metadata to all chunks
+        base_metadata = self._extract_base_metadata(docs[0])
+        docs = self._apply_base_metadata(docs, base_metadata)
+
+        # Add position context for heading hierarchies
+        docs = self._add_heading_context(docs)
+
+        return docs
+
+    def _extract_base_metadata(self, doc: Document) -> dict[str, Any]:
+        """Extract base metadata to preserve across all chunks.
+
+        Args:
+            doc: First document to extract base metadata from
+
+        Returns:
+            Dictionary of metadata fields to preserve
+        """
+        # Standard metadata fields to preserve
+        metadata_to_preserve = [
+            "title",
+            "headings",
+            "heading_hierarchy",
+            "section_headings",
+            "page_num",
+            "source",
+            "source_type",
+        ]
+
+        # Extract fields from first document
+        base_metadata = {}
+        for field in metadata_to_preserve:
+            if field in doc.metadata:
+                base_metadata[field] = doc.metadata[field]
+
+        return base_metadata
+
+    def _apply_base_metadata(
+        self, docs: list[Document], base_metadata: dict[str, Any]
+    ) -> list[Document]:
+        """Apply base metadata to all chunks.
+
+        Args:
+            docs: List of document chunks
+            base_metadata: Base metadata to apply
+
+        Returns:
+            Documents with base metadata applied
+        """
+        for doc in docs:
+            for field, value in base_metadata.items():
+                if field not in doc.metadata:
+                    doc.metadata[field] = value
+
+        return docs
+
+    def _add_heading_context(self, docs: list[Document]) -> list[Document]:
+        """Add heading context to each chunk based on position.
+
+        Args:
+            docs: List of document chunks
+
+        Returns:
+            Documents with heading context added
+        """
+        for doc in docs:
+            if (
+                "heading_hierarchy" in doc.metadata
+                and isinstance(doc.metadata["heading_hierarchy"], list)
+                and "chunk_start_char" in doc.metadata
+            ):
+                # Find the closest heading to this chunk
+                chunk_pos = doc.metadata["chunk_start_char"]
+                closest_heading = self._find_closest_heading(
+                    doc.metadata["heading_hierarchy"], chunk_pos
+                )
+
+                if closest_heading:
+                    doc.metadata["closest_heading"] = closest_heading["text"]
+                    doc.metadata["heading_path"] = closest_heading.get(
+                        "path", closest_heading["text"]
+                    )
+
+        return docs
+
+    def _find_closest_heading(
+        self, hierarchies: list[dict[str, Any]], chunk_pos: int
+    ) -> dict[str, Any] | None:
+        """Find the closest heading to a chunk position.
+
+        Args:
+            hierarchies: List of heading hierarchies
+            chunk_pos: Position of the chunk
+
+        Returns:
+            Closest heading or None if not found
+        """
+        closest_heading = None
+        min_distance = float("inf")
+
+        for heading in hierarchies:
+            if "position" in heading:
+                distance = abs(heading["position"] - chunk_pos)
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_heading = heading
+
+        return closest_heading
+
     def split_documents(
         self,
         documents: list[Document],
@@ -308,9 +430,47 @@ class TextSplitterFactory:
                 chunked_docs.extend(sub_chunks)
 
             self._log("INFO", f"Split into {len(chunked_docs)} chunks")
-            return chunked_docs
+
+            # Track chunk positions and context
+            for i, chunk in enumerate(chunked_docs):
+                # Add chunk index information
+                chunk.metadata["chunk_index"] = i
+                chunk.metadata["chunk_total"] = len(chunked_docs)
+
+                # Add character position information if possible
+                original_text = documents[0].page_content
+                if chunk.page_content and chunk.page_content in original_text:
+                    start_pos = original_text.find(chunk.page_content)
+                    if start_pos != -1:
+                        chunk.metadata["chunk_start_char"] = start_pos
+                        chunk.metadata["chunk_end_char"] = start_pos + len(
+                            chunk.page_content
+                        )
+
+            # Preserve hierarchy metadata
+            return self._preserve_metadata_hierarchy(chunked_docs)
 
         # Regular case: use the splitter directly
         chunked_docs = splitter.split_documents(documents)
+
+        # Track chunk positions
+        for i, chunk in enumerate(chunked_docs):
+            # Add chunk index information
+            chunk.metadata["chunk_index"] = i
+            chunk.metadata["chunk_total"] = len(chunked_docs)
+
+            # Add character position information if possible
+            if len(documents) == 1:  # Only track position for single document
+                original_text = documents[0].page_content
+                if chunk.page_content and chunk.page_content in original_text:
+                    start_pos = original_text.find(chunk.page_content)
+                    if start_pos != -1:
+                        chunk.metadata["chunk_start_char"] = start_pos
+                        chunk.metadata["chunk_end_char"] = start_pos + len(
+                            chunk.page_content
+                        )
+
         self._log("INFO", f"Split into {len(chunked_docs)} chunks")
-        return chunked_docs
+
+        # Preserve hierarchy metadata
+        return self._preserve_metadata_hierarchy(chunked_docs)

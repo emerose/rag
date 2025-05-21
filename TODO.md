@@ -1,18 +1,14 @@
 ## 🚀 Next Up (Implementation Plan)
 
-1. Metadata-aware chunking (P1)
-   - Capture title, headings, page numbers in Document.metadata
-   - Enable filtering based on metadata in queries
-
-2. Improve text splitting (P1)
+1. Improve text splitting (P1)
    - Switch to RecursiveCharacterTextSplitter with semantic boundaries
    - Implement better heading detection for PDFs
 
-3. LCEL migration (P1)
+2. LCEL migration (P1)
    - Rewrite query_engine with composable LangChain runnables
    - Create modular pipeline: retriever | reranker | prompt | llm | parser
 
-4. Prompt registry (P1)
+3. Prompt registry (P1)
    - Create central directory of prompt templates (Jinja or LCEL PromptTemplate)
    - Add --prompt flag to select different prompting strategies
 
@@ -29,7 +25,6 @@
 - **[P4] File-locking cleanup** – Replace ad-hoc lockfiles with `filelock.FileLock` context-manager.
 
 #### 2 . Retrieval & Relevance
-- **[P1] Metadata-aware chunking** – Capture title / headings / page # in `Document.metadata`; enable metadata filtering in queries.
 - **[P1] Semantic text splitter** – Switch to `RecursiveCharacterTextSplitter` (plus heading detection for PDFs).
 - **[P2] Hybrid retrieval** – Combine BM25 (sparse) + dense scores via reciprocal rank fusion.
 - **[P3] Per-document embedding model map** – Lookup table (`embeddings.yaml`) to choose domain-specific embedding models.
