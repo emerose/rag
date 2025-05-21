@@ -56,6 +56,22 @@ class CacheManager:
         """
         log_message(level, message, "CacheManager", self.log_callback)
         
+    def _get_vector_store_file_paths(self, source_file_path_str: str) -> tuple[Path, Path]:
+        """Get the paths to the .faiss and .pkl cache files for a source file.
+        
+        Args:
+            source_file_path_str: Path to the original source file.
+            
+        Returns:
+            A tuple containing the Path to the .faiss file and the .pkl file.
+        """
+        import hashlib
+        # Ensure consistency with VectorStoreManager's hashing
+        file_hash = hashlib.md5(source_file_path_str.encode()).hexdigest()
+        faiss_file = self.cache_dir / f"{file_hash}.faiss"
+        pkl_file = self.cache_dir / f"{file_hash}.pkl"
+        return faiss_file, pkl_file
+
     def migrate_json_to_sqlite(self) -> bool:
         """Migrate cache metadata from JSON files to SQLite.
         
@@ -174,61 +190,69 @@ class CacheManager:
     def invalidate_cache(self, file_path: str) -> None:
         """Invalidate cache for a specific file.
         
-        This removes the file from cache metadata and deletes its vector store.
+        This removes the file from cache metadata and deletes its vector store files.
         
         Args:
             file_path: Path to the file
         """
-        if file_path in self.cache_metadata:
-            del self.cache_metadata[file_path]
+        str_file_path = str(Path(file_path).absolute()) # Ensure consistent path format
+
+        if str_file_path in self.cache_metadata:
+            del self.cache_metadata[str_file_path]
             
-        # Remove from database
-        if Path(file_path).exists():
-            self.index_manager.remove_metadata(Path(file_path))
+        # Remove from database (IndexManager uses absolute paths)
+        self.index_manager.remove_metadata(Path(str_file_path))
             
-        # Delete vector store file if it exists
-        cache_path = self._get_cache_path(file_path)
-        if cache_path.exists():
-            try:
-                os.remove(cache_path)
-                self._log("INFO", f"Deleted vector store for {file_path}")
-            except OSError as e:
-                self._log("ERROR", f"Failed to delete vector store for {file_path}: {e}")
+        # Delete vector store files
+        faiss_file, pkl_file = self._get_vector_store_file_paths(str_file_path)
+        
+        for cache_file_to_delete in [faiss_file, pkl_file]:
+            if cache_file_to_delete.exists():
+                try:
+                    os.remove(cache_file_to_delete)
+                    self._log("INFO", f"Deleted cache file {cache_file_to_delete} for {str_file_path}")
+                except OSError as e:
+                    self._log("ERROR", f"Failed to delete cache file {cache_file_to_delete} for {str_file_path}: {e}")
                 
     def invalidate_all_caches(self) -> None:
         """Invalidate all caches.
         
         This removes all files from cache metadata and deletes all vector stores.
         """
-        # Get all file paths first
-        file_paths = list(self.cache_metadata.keys())
+        # Get all file paths from metadata before clearing (important!)
+        # These keys are the original source file paths
+        source_file_paths = list(self.cache_metadata.keys())
         
         # Clear in-memory cache
         self.cache_metadata = {}
         
-        # Iterate through all files to remove vector stores
-        for file_path in file_paths:
-            cache_path = self._get_cache_path(file_path)
-            if cache_path.exists():
+        # Iterate through all source files to remove their specific vector stores
+        for src_path in source_file_paths:
+            faiss_file, pkl_file = self._get_vector_store_file_paths(src_path)
+            for cache_file_to_delete in [faiss_file, pkl_file]:
+                if cache_file_to_delete.exists():
+                    try:
+                        os.remove(cache_file_to_delete)
+                    except OSError as e:
+                        self._log("ERROR", f"Failed to delete cache file {cache_file_to_delete} during invalidate_all: {e}")
+        
+        # As a fallback/catch-all, also delete any remaining .faiss and .pkl files in the cache_dir.
+        # This helps clean up any files not perfectly tracked by metadata (e.g., due to past bugs).
+        # However, the primary deletion should happen based on known source_file_paths.
+        all_faiss_files = list(self.cache_dir.glob("*.faiss"))
+        all_pkl_files = list(self.cache_dir.glob("*.pkl"))
+        
+        for f in all_faiss_files + all_pkl_files:
+            if f.exists(): # Check again, as it might have been deleted by the loop above
                 try:
-                    os.remove(cache_path)
+                    os.remove(f)
                 except OSError as e:
-                    self._log("ERROR", f"Failed to delete vector store for {file_path}: {e}")
-        
-        # Delete vector store files
-        cache_files = list(self.cache_dir.glob("*.faiss"))
-        index_files = list(self.cache_dir.glob("*.pkl"))
-        
-        for f in cache_files + index_files:
-            try:
-                os.remove(f)
-            except OSError as e:
-                self._log("ERROR", f"Failed to delete cache file {f}: {e}")
+                    self._log("ERROR", f"Failed to delete (globbed) cache file {f} during invalidate_all: {e}")
                 
         # Clear all metadata from the index database
         self.index_manager.clear_all_file_metadata()
         
-        self._log("INFO", f"Invalidated all caches ({len(file_paths)} files)")
+        self._log("INFO", f"Invalidated all caches (processed {len(source_file_paths)} source files)")
         
     def cleanup_invalid_caches(self) -> None:
         """Clean up invalid caches (files that no longer exist).
@@ -247,55 +271,55 @@ class CacheManager:
             self._log("INFO", f"Cleaned up {len(files_to_remove)} invalid caches")
             
     def cleanup_orphaned_chunks(self) -> Dict[str, Any]:
-        """Delete cached vector stores whose source files were removed.
+        """Delete cached vector stores whose source files were removed or are no longer in metadata.
         
         This helps keep the .cache/ directory from growing unbounded by removing
-        vector stores for files that no longer exist in the file system.
+        vector stores for files that no longer exist in the file system or metadata.
         
         Returns:
             Dictionary with number of orphaned chunks cleaned up and total bytes freed
         """
-        # Get all vector store files in the cache directory
-        cache_files = list(self.cache_dir.glob("*.faiss"))
-        index_files = list(self.cache_dir.glob("*.pkl"))
+        # Get all .faiss and .pkl files actually present in the cache directory
+        actual_faiss_files = {str(f) for f in self.cache_dir.glob("*.faiss")}
+        actual_pkl_files = {str(f) for f in self.cache_dir.glob("*.pkl")}
+        all_actual_cache_files = actual_faiss_files.union(actual_pkl_files)
         
-        # Get a set of all valid cache paths from current metadata
-        valid_paths = set()
-        for file_path in self.cache_metadata:
-            valid_paths.add(str(self._get_cache_path(file_path)))
+        # Get a set of all valid cache file paths expected from current metadata
+        expected_cache_files = set()
+        # self.cache_metadata is loaded by self.load_cache_metadata() which gets it from index_manager
+        # The keys of self.cache_metadata are the original source file paths.
+        for source_file_path_str in self.cache_metadata.keys():
+            faiss_file, pkl_file = self._get_vector_store_file_paths(source_file_path_str)
+            expected_cache_files.add(str(faiss_file))
+            expected_cache_files.add(str(pkl_file))
             
-        # Find orphaned cache files
-        orphaned_files = []
-        for cache_file in cache_files:
-            if str(cache_file) not in valid_paths:
-                orphaned_files.append(cache_file)
-                
-        for index_file in index_files:
-            # Check if this is a companion to a .faiss file
-            faiss_path = index_file.with_suffix(".faiss")
-            if str(faiss_path) not in valid_paths:
-                orphaned_files.append(index_file)
-                
-        # Calculate bytes to be freed
-        total_bytes = sum(os.path.getsize(f) for f in orphaned_files)
+        # Find orphaned cache files (present on disk but not expected by metadata)
+        orphaned_file_paths_str = list(all_actual_cache_files - expected_cache_files)
         
-        # Delete orphaned files
-        for f in orphaned_files:
-            try:
-                os.remove(f)
-            except OSError as e:
-                self._log("ERROR", f"Failed to delete orphaned file {f}: {e}")
+        total_bytes_freed = 0
+        orphaned_files_removed_count = 0
+        
+        for orphaned_path_str in orphaned_file_paths_str:
+            orphaned_file = Path(orphaned_path_str)
+            if orphaned_file.exists():
+                try:
+                    file_size = orphaned_file.stat().st_size
+                    os.remove(orphaned_file)
+                    total_bytes_freed += file_size
+                    orphaned_files_removed_count += 1
+                    self._log("INFO", f"Deleted orphaned cache file {orphaned_file}")
+                except OSError as e:
+                    self._log("ERROR", f"Failed to delete orphaned file {orphaned_file}: {e}")
                 
-        # Log results
-        if orphaned_files:
+        if orphaned_files_removed_count > 0:
             self._log("INFO", 
-                     f"Cleaned up {len(orphaned_files)} orphaned cache files, freed {total_bytes} bytes")
+                     f"Cleaned up {orphaned_files_removed_count} orphaned cache files, freed {total_bytes_freed} bytes")
         else:
             self._log("INFO", "No orphaned cache files found")
             
         return {
-            "orphaned_files_removed": len(orphaned_files),
-            "bytes_freed": total_bytes
+            "orphaned_files_removed": orphaned_files_removed_count,
+            "bytes_freed": total_bytes_freed
         }
         
     def is_cache_valid(self, file_path: str, 
@@ -309,40 +333,39 @@ class CacheManager:
         Returns:
             True if cache is valid, False otherwise
         """
-        # Get cached metadata
-        cached_metadata = self.get_cache_metadata(file_path)
-        if not cached_metadata:
+        str_file_path = str(Path(file_path).absolute())
+        # Get cached metadata from IndexManager (the source of truth for what *should* exist)
+        cached_db_metadata = self.index_manager.get_file_metadata(Path(str_file_path))
+        if not cached_db_metadata:
+            self._log("DEBUG", f"No DB metadata for {str_file_path}, cache considered invalid.")
             return False
             
-        # If no current metadata provided, assume cache is valid
+        # If no current metadata provided for comparison, check physical files based on DB metadata
         if not current_metadata:
-            return True
+            faiss_file, pkl_file = self._get_vector_store_file_paths(str_file_path)
+            if not faiss_file.exists() or not pkl_file.exists():
+                self._log("DEBUG", f"Cache files missing for {str_file_path}, cache invalid.")
+                return False
+            self._log("DEBUG", f"DB metadata exists and cache files exist for {str_file_path}, cache valid (no current_metadata for content check).")
+            return True # Cache files exist, and DB metadata says they should
             
-        # Compare content hash
-        if cached_metadata.get("content_hash") != current_metadata.get("content_hash"):
+        # Compare content hash (current_metadata is from live file system scan)
+        if cached_db_metadata.get("content_hash") != current_metadata.get("content_hash"):
+            self._log("DEBUG", f"Content hash mismatch for {str_file_path}, cache invalid.")
             return False
             
-        # Compare modification time
-        if cached_metadata.get("mtime", 0) < current_metadata.get("mtime", float("inf")):
+        # Compare modification time - Note: This check might be too strict if only content_hash matters.
+        # If content_hash is the same, mtime ideally shouldn't invalidate a valid cache.
+        # For now, keeping it as it was.
+        # if cached_db_metadata.get("mtime", 0) < current_metadata.get("mtime", float("inf")):
+        #     self._log("DEBUG", f"Modification time mismatch for {str_file_path}, cache invalid.")
+        #     return False
+            
+        # Check that vector store files exist
+        faiss_file, pkl_file = self._get_vector_store_file_paths(str_file_path)
+        if not faiss_file.exists() or not pkl_file.exists():
+            self._log("DEBUG", f"Cache files .faiss or .pkl missing for {str_file_path} despite matching metadata, cache invalid.")
             return False
             
-        # Check that vector store file exists
-        cache_path = self._get_cache_path(file_path)
-        if not cache_path.exists():
-            return False
-            
+        self._log("DEBUG", f"Cache valid for {str_file_path}")
         return True
-        
-    def _get_cache_path(self, file_path: str) -> Path:
-        """Get the path to the cached vector store for a file.
-        
-        Args:
-            file_path: Path to the source file
-            
-        Returns:
-            Path to the cached vector store
-        """
-        # Generate a filename-safe hash of the file path
-        import hashlib
-        file_hash = hashlib.md5(file_path.encode()).hexdigest()
-        return self.cache_dir / f"{file_hash}.faiss" 

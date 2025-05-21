@@ -71,19 +71,18 @@ class VectorStoreManager:
         
         return self._embedding_dimension
         
-    def get_cache_path(self, file_path: str) -> Path:
-        """Get the path to the cached vector store for a file.
+    def _get_cache_base_name(self, file_path: str) -> str:
+        """Get the base name (hash) for caching a vector store for a file.
         
         Args:
             file_path: Path to the source file
             
         Returns:
-            Path to the cached vector store
+            Cache base name (hash string)
         """
-        # Generate a filename-safe hash of the file path
         import hashlib
         file_hash = hashlib.md5(file_path.encode()).hexdigest()
-        return self.cache_dir / f"{file_hash}.faiss"
+        return file_hash
         
     def load_vectorstore(self, file_path: str) -> Optional[FAISS]:
         """Load a vector store from cache.
@@ -94,31 +93,41 @@ class VectorStoreManager:
         Returns:
             Loaded FAISS vector store or None if not found
         """
-        cache_path = self.get_cache_path(file_path)
-        index_path = cache_path.with_suffix(".pkl")
+        base_name = self._get_cache_base_name(file_path)
+        faiss_file_path = self.cache_dir / f"{base_name}.faiss"
+        pkl_file_path = self.cache_dir / f"{base_name}.pkl"
         
-        if not cache_path.exists() or not index_path.exists():
-            self._log("DEBUG", f"Vector store not found for {file_path}")
+        if not faiss_file_path.exists() or not pkl_file_path.exists():
+            self._log("DEBUG", f"Vector store files not found for {file_path} (expected {faiss_file_path}, {pkl_file_path})")
             return None
             
         try:
-            self._log("DEBUG", f"Loading vector store for {file_path}")
+            self._log("DEBUG", f"Loading vector store for {file_path} using base name {base_name}")
+            # FAISS.load_local expects the folder and the base name (without extension).
+            # It internally appends .faiss and .pkl.
             vectorstore = FAISS.load_local(
-                str(cache_path.parent),
-                self.embeddings,
-                str(cache_path.name),
-                str(index_path.name)
+                folder_path=str(self.cache_dir),
+                embeddings=self.embeddings,
+                index_name=base_name,  # Pass the base name (hash)
+                allow_dangerous_deserialization=True
             )
             
             # Verify the vector store has documents
-            if not vectorstore.docstore._dict:
+            if not vectorstore.docstore._dict: # type: ignore
                 self._log("WARNING", f"Loaded empty vector store for {file_path}, discarding")
+                # Optionally, delete these empty files
+                # try:
+                #     if faiss_file_path.exists(): os.remove(faiss_file_path)
+                #     if pkl_file_path.exists(): os.remove(pkl_file_path)
+                # except OSError as e_del:
+                #     self._log("ERROR", f"Failed to delete empty vector store files for {file_path}: {e_del}")
                 return None
                 
             return vectorstore
             
         except Exception as e:
             self._log("ERROR", f"Failed to load vector store for {file_path}: {e}")
+            self._log("ERROR", f"Traceback: {traceback.format_exc()}")
             return None
             
     def save_vectorstore(self, file_path: str, vectorstore: FAISS) -> bool:
@@ -131,19 +140,19 @@ class VectorStoreManager:
         Returns:
             True if successful, False otherwise
         """
-        cache_path = self.get_cache_path(file_path)
+        base_name = self._get_cache_base_name(file_path)
         
         try:
-            self._log("DEBUG", f"Saving vector store for {file_path}")
+            self._log("DEBUG", f"Saving vector store for {file_path} using base name {base_name}")
             
-            # Create directory if it doesn't exist
-            os.makedirs(self.cache_dir, exist_ok=True)
+            # Ensure cache directory exists
+            self.cache_dir.mkdir(parents=True, exist_ok=True) # Changed from os.makedirs
             
-            # Save the vectorstore
-            index_name = cache_path.name
-            vectorstore.save_local(str(self.cache_dir), index_name)
+            # FAISS.save_local expects the folder and the base name (without extension).
+            # It internally appends .faiss and .pkl.
+            vectorstore.save_local(folder_path=str(self.cache_dir), index_name=base_name)
             
-            self._log("DEBUG", f"Saved vector store for {file_path}")
+            self._log("DEBUG", f"Saved vector store for {file_path} (files: {base_name}.faiss, {base_name}.pkl)")
             return True
             
         except Exception as e:
@@ -228,10 +237,15 @@ class VectorStoreManager:
             
             # Log dimensions of embeddings for debugging
             for i, emb in enumerate(embeddings[:5]):  # Only log first 5 for brevity
-                if emb:
-                    self._log("DEBUG", f"Embedding {i} dimension: {len(emb)}")
+                if emb is None:
+                    self._log("DEBUG", f"Embedding {i} is None (during logging)")
                 else:
-                    self._log("DEBUG", f"Embedding {i} is empty")
+                    is_numpy_array_log = isinstance(emb, np.ndarray)
+                    current_emb_length_log = emb.size if is_numpy_array_log else len(emb)
+                    if current_emb_length_log > 0:
+                        self._log("DEBUG", f"Embedding {i} dimension: {current_emb_length_log} (type: {type(emb)})")
+                    else:
+                        self._log("DEBUG", f"Embedding {i} is empty (length/size 0 during logging)")
             
             # Validate that we have embeddings for all documents
             if len(documents) != len(embeddings):
@@ -241,9 +255,20 @@ class VectorStoreManager:
             # Make sure no embeddings are empty
             valid_entries = []
             for i, (doc, emb) in enumerate(zip(documents, embeddings)):
-                if not emb or len(emb) == 0:
-                    self._log("WARNING", f"Empty embedding for document {i}, skipping")
+                # emb can be None if EmbeddingProvider failed, or a np.ndarray from reconstruct,
+                # or a list[float] from EmbeddingBatcher.
+                if emb is None: 
+                    self._log("WARNING", f"Embedding for document {i} is None, skipping")
                     continue
+                
+                # Check if the embedding is empty (either a list or a numpy array)
+                is_numpy_array = isinstance(emb, np.ndarray)
+                current_emb_length = emb.size if is_numpy_array else len(emb)
+
+                if current_emb_length == 0:
+                    self._log("WARNING", f"Empty embedding (length/size 0) for document {i}, skipping")
+                    continue
+                
                 valid_entries.append((doc, emb))
                 
             if not valid_entries:
