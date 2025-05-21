@@ -105,8 +105,8 @@ class VectorStoreManager:
         """
         import hashlib
 
-        # Using MD5 for filename hashing is acceptable as it's not for security purposes
-        return hashlib.md5(file_path.encode()).hexdigest()
+        # Use SHA-256 for secure hash generation
+        return hashlib.sha256(file_path.encode()).hexdigest()
 
     def get_cache_path(self, file_path: str) -> Path:
         """Get the cache file path for a file.

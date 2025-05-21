@@ -78,8 +78,8 @@ class CacheManager:
             A tuple containing the Path to the .faiss file and the .pkl file.
 
         """
-        # Ensure consistency with VectorStoreManager's hashing
-        file_hash = hashlib.md5(source_file_path_str.encode()).hexdigest()
+        # Use SHA-256 for more secure hashing
+        file_hash = hashlib.sha256(source_file_path_str.encode()).hexdigest()
         faiss_file = self.cache_dir / f"{file_hash}.faiss"
         pkl_file = self.cache_dir / f"{file_hash}.pkl"
         return faiss_file, pkl_file

@@ -90,7 +90,6 @@ ignore = [
     "ARG002", # Allow unused args in method signatures for consistency
     "DTZ005", # Allow naive datetime where timezone not critical
     "SLF001", # Allow access to private attributes of 3rd-party objects
-    "S324",   # Use of MD5 is acceptable for non-cryptographic hashes
     "C901",   # Allow higher complexity until future refactor
     "PERF203",# Allow try/except inside loops when clarity outweighs perf
     "RUF012", # Allow mutable class attributes when intentional

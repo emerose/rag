@@ -61,7 +61,7 @@ def test_get_cache_path(
 
         # Verify the filename uses a hash and has the right extension
         assert cache_path.suffix == ".faiss"
-        assert len(cache_path.stem) == 32  # MD5 hash length
+        assert len(cache_path.stem) == 64  # SHA-256 hash length
 
         # Verify different files get different cache paths
         file_path2 = "/path/to/test/different_file.txt"
