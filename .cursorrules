@@ -9,94 +9,124 @@
 
 # Technology Stack
 
-- **Python**: The primary language for this project.
-- **LangChain**: A framework for building RAG applications.
-- **FAISS**: A library for efficient similarity search.
-- **Unstructured**: A library for document processing.
-- **Python-dotenv**: A library for loading environment variables from a .env file.
-- **uv**: A library for package management.
-- **ruff**: A library for linting and formatting.
-- **openai**: A library for interacting with the OpenAI API.
+- **Python 3.10+**: The primary language for this project.
+- **LangChain**: Framework for building RAG applications with LCEL (LangChain Expression Language).
+- **FAISS**: Library for efficient similarity search and vector storage.
+- **OpenAI**: API for embeddings (text-embedding-3-small) and LLM access (GPT-4).
+- **Unstructured**: Library for document processing with support for multiple formats.
+- **Typer**: Library for building CLI applications with rich help documentation.
+- **Rich**: Library for rich text formatting in terminal applications.
+- **Python-dotenv**: Library for loading environment variables from a .env file.
+- **uv**: Modern Python package installer and resolver for dependency management.
+- **ruff**: Fast Python linter and formatter with comprehensive rule sets.
+
+# Project Structure
+
+- **src/rag/**: Main package
+  - **chains/**: LangChain LCEL components and pipelines
+  - **cli.py**: Command-line interface using Typer
+  - **config.py**: Configuration classes and settings
+  - **data/**: Document processing, chunking, and metadata extraction
+  - **embeddings/**: Embedding generation and batching
+  - **engine.py**: Core RAG engine orchestrating the entire system
+  - **ingest.py**: Document ingestion pipeline
+  - **prompts/**: Prompt templates and registry
+  - **retrieval/**: Document retrieval components
+  - **storage/**: Vectorstore, cache, and index management
+  - **utils/**: Shared utilities and helpers
+- **tests/**: Test suite
+  - **unit/**: Unit tests for individual components
+  - **integration/**: End-to-end tests
+  - **prompts/**: Tests for prompt templates and registry
 
 # Project Management
- - TODO.md contains a list of features that we are considering adding
- - The "Next Up" section includes the items that we are going to work on next
- - In order to complete a task, follow these steps:
-  1. Review all code and come up with a step by step implementation and testing plan
-  2. Put that plan into the TODO file, under the relevant section in Next Up.  We will use that to keep track of where we are in the work
-  3. Confirm with the user that the plan looks good
-  4. If so, begin implementation. Check off the individual steps in TODO.md as you complete them
-  5. Run tests often and make sure to fix errors as they arise
-  6. When the task is complete, run check.sh and make sure there are no errors or linting problems noted. If there are, resolve those problems
-  7. Finally, run the integration tests to verify that things are still working end-to-end.
-  8. Once everything looks good, remove the tasks from TODO.md
+ - **TODO.md**: Contains a list of features that we are considering adding
+   - The "Next Up" section includes the items that we are going to work on next
+ - **CHANGELOG.md**: Documents all notable changes to the project
+ - **check.sh**: Script to run tests, formatting, and linting checks
+
+## Task Workflow
+1. Review all code and come up with a step-by-step implementation and testing plan
+2. Put that plan into the TODO file, under the relevant section in Next Up
+3. Confirm with the user that the plan looks good
+4. If approved, begin implementation, checking off individual steps in TODO.md as they're completed
+5. Run tests often and fix errors as they arise
+6. When the task is complete, run check.sh to ensure no errors or linting problems
+7. Run integration tests to verify end-to-end functionality
+8. Remove completed tasks from TODO.md and update CHANGELOG.md with the changes
 
 # Coding Guidelines
 
 ## 1. Pythonic Practices
 
-- **Elegance and Readability:** Strive for elegant and Pythonic code that is easy to understand and maintain.
-- **PEP 8 Compliance:** Adhere to PEP 8 guidelines for code style, with Ruff as the primary linter and formatter.
-- **Explicit over Implicit:** Favor explicit code that clearly communicates its intent over implicit, overly concise code.
-- **Zen of Python:** Keep the Zen of Python in mind when making design decisions.
+- **Elegance and Readability**: Strive for elegant and Pythonic code that is easy to understand and maintain.
+- **PEP 8 Compliance**: Adhere to PEP 8 guidelines for code style, with Ruff as the primary linter and formatter.
+- **Explicit over Implicit**: Favor explicit code that clearly communicates its intent over implicit, overly concise code.
+- **Zen of Python**: Keep the Zen of Python in mind when making design decisions.
+- **Simplicity Over Complexity**: Do not over-engineer solutions. Strive for simplicity and maintainability.
+- **Library Selection**: Use modern libraries when appropriate, but justify their use and ensure they don't add unnecessary complexity.
 
 ## 2. Modular Design
 
-- **Single Responsibility Principle:** Each module/file should have a well-defined, single responsibility.
-- **Reusable Components:** Develop reusable functions and classes, favoring composition over inheritance.
-- **Package Structure:** Organize code into logical packages and modules.
+- **Single Responsibility Principle**: Each module/file should have a well-defined, single responsibility.
+- **Reusable Components**: Develop reusable functions and classes, favoring composition over inheritance.
+- **Package Structure**: Organize code into logical packages and modules.
+- **Balanced Modularity**: Favor modularity for maintainability, but avoid over-modularization that creates unnecessary abstraction.
 
 ## 3. Code Quality
 
-- **Comprehensive Type Annotations:** All functions, methods, and class members must have type annotations, using the most specific types possible.
-- **Detailed Docstrings:** All functions, methods, and classes must have Google-style docstrings, thoroughly explaining their purpose, parameters, return values, and any exceptions raised. Include usage examples where helpful.
-- **Robust Exception Handling:** Use specific exception types, provide informative error messages, and handle exceptions gracefully. Implement custom exception classes when needed. Avoid bare `except` clauses.
-- **Logging:** Employ the `logging` module judiciously to log important events, warnings, and errors.
+- **Comprehensive Type Annotations**: All functions, methods, and class members must have type annotations, using the most specific types possible.
+- **Detailed Docstrings**: All functions, methods, and classes must have Google-style docstrings, thoroughly explaining their purpose, parameters, return values, and any exceptions raised. Include usage examples where helpful.
+- **Robust Exception Handling**: Use specific exception types, provide informative error messages, and handle exceptions gracefully. Implement custom exception classes when needed. Avoid bare `except` clauses.
+- **Logging**: Employ the `logging` module judiciously to log important events, warnings, and errors.
+- **Security Awareness**: Always consider security implications, especially when handling user inputs and external data.
 
 ## 4. ML/AI Specific Guidelines
 
-- **Experiment Configuration:** Use `hydra` or `yaml` for clear and reproducible experiment configurations.
-- **Data Pipeline Management:** Employ scripts or tools like `dvc` to manage data preprocessing and ensure reproducibility.
-- **Model Versioning:** Utilize `git-lfs` or cloud storage to track and manage model checkpoints effectively.
-- **Experiment Logging:** Maintain comprehensive logs of experiments, including parameters, results, and environmental details.
-- **LLM Prompt Engineering:** Dedicate a module or files for managing Prompt templates with version control.
-- **Context Handling:** Implement efficient context management for conversations, using suitable data structures like deques.
+- **Experiment Configuration**: Use `hydra` or `yaml` for clear and reproducible experiment configurations.
+- **Data Pipeline Management**: Employ scripts or tools like `dvc` to manage data preprocessing and ensure reproducibility.
+- **Model Versioning**: Utilize `git-lfs` or cloud storage to track and manage model checkpoints effectively.
+- **Experiment Logging**: Maintain comprehensive logs of experiments, including parameters, results, and environmental details.
+- **LLM Prompt Engineering**: Use the prompt registry (`src/rag/prompts/`) for managing prompt templates with version control.
+- **Context Handling**: Implement efficient context management for conversations, using suitable data structures like deques.
 
-## Testing
+## 5. Testing
 
-- Write unit tests using `pytest`
-- Test both common cases and edge cases
-- Do not test 3rd party code or APIs, and do not bother testing 1st party code that is mostly just wrapping 3rd party code. Focus tests on complex 1st party logic only
-- Do not allow any tests to call remote APIs
-- Tests should be focused and fast. Do not allow any individual unit test to take more than 0.5 seconds to complete
-- For end-to-end testing, include a small number of integration tests that are focused on common end-user use cases
-- Only write tests to cover meaningful 1st party business logic. If a test is mostly just exercising mocks or getters and setters, it probably isn't worth it
+- **Unit Tests**: Write unit tests using `pytest` for individual components.
+- **Integration Tests**: Include a small number of integration tests focused on common end-user use cases.
+- **Test Coverage**: Aim for high test coverage of business logic, but don't test third-party code.
+- **Test Speed**: Keep tests focused and fast; individual unit tests should take less than 0.5 seconds.
+- **Test Independence**: Avoid tests that call remote APIs or have external dependencies.
+- **Test Value**: Only write tests that cover meaningful business logic; avoid tests that just exercise mocks or simple getters/setters.
 
-# Code Example Requirements
+# Development Workflow
 
-- All functions must include type annotations.
-- Must provide clear, Google-style docstrings.
-- Key logic should be annotated with comments.
-- Provide usage examples (e.g., in the `tests/` directory or as a `__main__` section).
-- Include error handling.
-- Use `ruff` for code formatting.
+- **Environment**: Use uv for package management and virtual environment.
+- **Installation**: Run `uv pip install -e .` to install the package in development mode.
+- **Running**: Activate the virtual environment before running any code.
+- **CLI**: The RAG CLI can be run directly when the virtual environment is active.
+- **Dependencies**: Add new dependencies to pyproject.toml, not manually with pip.
+- **Formatting & Linting**: Use ruff for both formatting and linting.
+- **Checks**: Run `./check.sh` before committing changes to ensure code quality.
+- **Python Version**: Target Python 3.10+ for all new features.
+- **Version Control**: Keep .coverage and other generated files out of git.
 
-# Others
+# Code Review and Maintenance
 
-- **Prioritize new features in Python 3.10+.**
-- **When explaining code, provide clear logical explanations and code comments.**
-- **When making suggestions, explain the rationale and potential trade-offs.**
-- **If code examples span multiple files, clearly indicate the file name.**
-- **Do not over-engineer solutions. Strive for simplicity and maintainability while still being efficient.**
-- **Favor modularity, but avoid over-modularization.**
-- **Use the most modern and efficient libraries when appropriate, but justify their use and ensure they don't add unnecessary complexity.**
-- **When providing solutions or examples, ensure they are self-contained and executable without requiring extensive modifications.**
-- **If a request is unclear or lacks sufficient information, ask clarifying questions before proceeding.**
-- **Always consider the security implications of your code, especially when dealing with user inputs and external data.**
-- **Actively use and promote best practices for the specific tasks at hand (LLM app development, data cleaning, demo creation, etc.).**
-- If you are directed to make a change to fix a problem, eg from a linter check, also look for other instances of that same problem and fix those too
-- If you are directed to make a change, eg to add or change functionality, try to keep the change focused on that particular functionality
-- when making changes, consider the ruff rules in place for both formatting and checking. Only suggest changes that will pass those checks
-- when running code, remember that we are using uv and activate the virtual environment before running anything
-- the rag cli can be run directly, as long as the virtual environment is active and uv pip install -e has been run
-- do not install packages manually with pip. instead, add them to pyproject.toml and run uv pip install -e
+- **Holistic Fixes**: When fixing an issue identified by a linter, look for other instances of the same problem.
+- **Focused Changes**: When implementing new functionality, keep changes focused on that particular feature.
+- **Rule Compliance**: Follow established ruff rules for both formatting and linting; changes should pass these checks.
+- **Self-Contained Examples**: Provide examples that can be executed without extensive modification.
+- **Clear Explanations**: When explaining code or suggesting improvements, provide clear reasoning and highlight trade-offs.
+- **File References**: When examples span multiple files, clearly indicate file names.
+- **Best Practices**: Apply relevant best practices specific to the task (RAG, LLM app development, etc.).
+- **Clarifying Questions**: If requirements are unclear, ask specific questions before proceeding.
+
+# Code Requirements
+
+- **Type Annotations**: All functions must include type annotations.
+- **Docstrings**: Use Google-style docstrings for all public APIs.
+- **Comments**: Annotate key logic with comments.
+- **Examples**: Provide usage examples in docstrings or tests.
+- **Error Handling**: Include appropriate error handling.
+- **Formatting**: Follow ruff formatting rules.
