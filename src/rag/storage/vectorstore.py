@@ -5,62 +5,83 @@ including creation, loading, saving, and querying operations.
 """
 
 import logging
-import os
-import pickle
 import traceback
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+import pickle
 
-import numpy as np
 import faiss
-from langchain_core.embeddings import Embeddings
-from langchain_core.documents import Document
-from langchain_community.vectorstores import FAISS
+import numpy as np
 from langchain_community.docstore.in_memory import InMemoryDocstore
+from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 
-from ..utils.logging_utils import log_message
+from rag.utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
 
 
 class VectorStoreManager:
     """Manages vector stores for the RAG system.
-    
+
     This class provides methods for creating, loading, saving, and querying
     vector stores using FAISS.
     """
-    
-    def __init__(self, 
-                 cache_dir: Union[Path, str],
-                 embeddings: Embeddings,
-                 log_callback: Optional[Any] = None) -> None:
+
+    def __init__(
+        self,
+        cache_dir: Path | str,
+        embeddings: Embeddings,
+        log_callback: Callable[[str, str, str], None] | None = None,
+        safe_deserialization: bool = True,
+    ) -> None:
         """Initialize the vector store manager.
-        
+
         Args:
             cache_dir: Directory for storing vector store cache files
             embeddings: Embedding provider
             log_callback: Optional callback for logging
+            safe_deserialization: Whether to use safe deserialization for pickle files.
+                Set to False only if you trust the source of the pickle files.
+
         """
         self.cache_dir = Path(cache_dir)
         self.embeddings = embeddings
         self.log_callback = log_callback
+        self.safe_deserialization = safe_deserialization
         # Get the embedding dimension once at initialization
         self._embedding_dimension = None
-        
+
+        # Runtime type check for embeddings
+        from langchain_core.embeddings import Embeddings as LCEmbeddings
+        if not isinstance(self.embeddings, LCEmbeddings):
+            self._log(
+                "WARNING",
+                f"Embeddings provider is not an Embeddings object: {type(self.embeddings)}. This may cause FAISS warnings or errors."
+            )
+        else:
+            self._log(
+                "DEBUG",
+                f"Embeddings provider is a valid Embeddings object: {type(self.embeddings)}"
+            )
+
     def _log(self, level: str, message: str) -> None:
         """Log a message.
-        
+
         Args:
             level: Log level (INFO, WARNING, ERROR, etc.)
             message: The log message
+
         """
         log_message(level, message, "VectorStore", self.log_callback)
-        
+
     def _get_embedding_dimension(self) -> int:
         """Get the dimension of embeddings.
-        
+
         Returns:
             Dimension of embeddings
+
         """
         if self._embedding_dimension is None:
             # Generate a sample embedding to get the dimension
@@ -68,108 +89,172 @@ class VectorStoreManager:
             sample_embedding = self.embeddings.embed_query("sample text")
             self._embedding_dimension = len(sample_embedding)
             self._log("DEBUG", f"Embedding dimension: {self._embedding_dimension}")
-        
+
         return self._embedding_dimension
-        
+
     def _get_cache_base_name(self, file_path: str) -> str:
         """Get the base name (hash) for caching a vector store for a file.
-        
+
         Args:
             file_path: Path to the source file
-            
+
         Returns:
             Cache base name (hash string)
+
         """
         import hashlib
-        file_hash = hashlib.md5(file_path.encode()).hexdigest()
-        return file_hash
-        
-    def load_vectorstore(self, file_path: str) -> Optional[FAISS]:
-        """Load a vector store from cache.
-        
+
+        # Using MD5 for filename hashing is acceptable as it's not for security purposes
+        return hashlib.md5(file_path.encode()).hexdigest()
+
+    def get_cache_path(self, file_path: str) -> Path:
+        """Get the cache file path for a file.
+
         Args:
             file_path: Path to the source file
-            
+
         Returns:
-            Loaded FAISS vector store or None if not found
+            Path to the FAISS cache file
+
         """
         base_name = self._get_cache_base_name(file_path)
-        faiss_file_path = self.cache_dir / f"{base_name}.faiss"
-        pkl_file_path = self.cache_dir / f"{base_name}.pkl"
-        
-        if not faiss_file_path.exists() or not pkl_file_path.exists():
-            self._log("DEBUG", f"Vector store files not found for {file_path} (expected {faiss_file_path}, {pkl_file_path})")
+        return self.cache_dir / f"{base_name}.faiss"
+
+    def load_vectorstore(self, file_path: str) -> FAISS | None:
+        """Load a vector store from cache.
+
+        Args:
+            file_path: Path to the source file
+
+        Returns:
+            FAISS vector store if found, None otherwise
+
+        """
+        base_name = self._get_cache_base_name(file_path)
+        faiss_file = self.cache_dir / f"{base_name}.faiss"
+        pkl_file = self.cache_dir / f"{base_name}.pkl"
+
+        # Check if vector store files exist
+        if not faiss_file.exists() or not pkl_file.exists():
+            self._log(
+                "DEBUG",
+                f"Vector store files not found for {file_path}",
+            )
             return None
-            
+
         try:
-            self._log("DEBUG", f"Loading vector store for {file_path} using base name {base_name}")
-            # FAISS.load_local expects the folder and the base name (without extension).
-            # It internally appends .faiss and .pkl.
-            vectorstore = FAISS.load_local(
-                folder_path=str(self.cache_dir),
-                embeddings=self.embeddings,
-                index_name=base_name,  # Pass the base name (hash)
-                allow_dangerous_deserialization=True
+            self._log("DEBUG", f"Loading vector store for {file_path}")
+            
+            # Load the FAISS index
+            index = faiss.read_index(str(faiss_file))
+            
+            # Load the pickle file containing docstore and metadata
+            with open(pkl_file, "rb") as f:
+                if not self.safe_deserialization:
+                    data = pickle.load(f)
+                else:
+                    try:
+                        data = pickle.load(f)
+                    except pickle.UnpicklingError:
+                        self._log(
+                            "ERROR",
+                            "Failed to unpickle docstore. Consider setting safe_deserialization=False if you trust the source."
+                        )
+                        return None
+            
+            # The pickle file structure varies based on how it was saved
+            # It might be a tuple with docstore and index_to_docstore_id
+            # Or it might just be the docstore with index_to_docstore_id as an attribute
+            if isinstance(data, tuple) and len(data) == 2:
+                docstore, index_to_docstore_id = data
+            else:
+                docstore = data
+                index_to_docstore_id = getattr(docstore, "index_to_docstore_id", {})
+            
+            # Create a FAISS instance with our embeddings object
+            vectorstore = FAISS(
+                embedding_function=self.embeddings,
+                index=index,
+                docstore=docstore,
+                index_to_docstore_id=index_to_docstore_id,
             )
             
-            # Verify the vector store has documents
-            if not vectorstore.docstore._dict: # type: ignore
-                self._log("WARNING", f"Loaded empty vector store for {file_path}, discarding")
-                # Optionally, delete these empty files
-                # try:
-                #     if faiss_file_path.exists(): os.remove(faiss_file_path)
-                #     if pkl_file_path.exists(): os.remove(pkl_file_path)
-                # except OSError as e_del:
-                #     self._log("ERROR", f"Failed to delete empty vector store files for {file_path}: {e_del}")
+            # Do a minimal check to verify we have a valid vector store
+            if (hasattr(docstore, "_dict") and not docstore._dict) or not index:
+                self._log(
+                    "WARNING",
+                    f"Vector store for {file_path} exists but has no documents",
+                )
                 return None
-                
-            return vectorstore
-            
-        except Exception as e:
+
+        except (OSError, ValueError) as e:
             self._log("ERROR", f"Failed to load vector store for {file_path}: {e}")
+            return None
+        except Exception as e:
+            self._log("ERROR", f"Unexpected error loading vector store: {e}")
             self._log("ERROR", f"Traceback: {traceback.format_exc()}")
             return None
-            
+        else:
+            return vectorstore
+
     def save_vectorstore(self, file_path: str, vectorstore: FAISS) -> bool:
         """Save a vector store to cache.
-        
+
         Args:
             file_path: Path to the source file
             vectorstore: FAISS vector store to save
-            
+
         Returns:
             True if successful, False otherwise
+
         """
         base_name = self._get_cache_base_name(file_path)
-        
+
         try:
-            self._log("DEBUG", f"Saving vector store for {file_path} using base name {base_name}")
-            
+            self._log(
+                "DEBUG",
+                f"Saving vector store for {file_path} using base name {base_name}",
+            )
+
             # Ensure cache directory exists
-            self.cache_dir.mkdir(parents=True, exist_ok=True) # Changed from os.makedirs
-            
-            # FAISS.save_local expects the folder and the base name (without extension).
-            # It internally appends .faiss and .pkl.
-            vectorstore.save_local(folder_path=str(self.cache_dir), index_name=base_name)
-            
-            self._log("DEBUG", f"Saved vector store for {file_path} (files: {base_name}.faiss, {base_name}.pkl)")
-            return True
-            
-        except Exception as e:
+            self.cache_dir.mkdir(
+                parents=True,
+                exist_ok=True,
+            )  # Changed from os.makedirs
+
+            # FAISS.save_local expects the folder and the base name separately
+            vectorstore.save_local(str(self.cache_dir), base_name)
+
+            self._log(
+                "INFO",
+                f"Successfully saved vector store for {file_path} "
+                f"(files: {base_name}.faiss, {base_name}.pkl)",
+            )
+        except (ValueError, OSError) as e:
             self._log("ERROR", f"Failed to save vector store for {file_path}: {e}")
-            self._log("ERROR", f"Traceback: {traceback.format_exc()}")
             return False
-            
-    def create_vectorstore(self, documents: List[Document]) -> FAISS:
+        else:
+            return True
+
+    def create_vectorstore(self, documents: list[Document]) -> FAISS:
         """Create a new vector store from documents.
-        
+
         Args:
             documents: List of documents to add to the vector store
-            
+
         Returns:
             FAISS vector store containing the documents
+
         """
         self._log("DEBUG", f"Creating vector store with {len(documents)} documents")
+        # Log the type of self.embeddings before using it
+        self._log("DEBUG", f"Type of self.embeddings before FAISS.from_documents: {type(self.embeddings)}")
+        from langchain_core.embeddings import Embeddings as LCEmbeddings
+        if not isinstance(self.embeddings, LCEmbeddings):
+            self._log(
+                "WARNING",
+                f"Embeddings provider is not an Embeddings object: {type(self.embeddings)}. This may cause FAISS warnings or errors."
+            )
         try:
             if not documents:
                 return self.create_empty_vectorstore()
@@ -178,186 +263,308 @@ class VectorStoreManager:
             self._log("ERROR", f"Failed to create vector store: {e}")
             self._log("ERROR", f"Traceback: {traceback.format_exc()}")
             raise
-        
+
     def create_empty_vectorstore(self) -> FAISS:
         """Create an empty vector store.
-        
+
         Returns:
             Empty FAISS vector store
+
         """
         self._log("DEBUG", "Creating empty vector store")
         try:
             # Get embedding dimension
             dim = self._get_embedding_dimension()
-            
+
             # Create empty index
             index = faiss.IndexFlatL2(dim)
-            
+
             # Create empty docstore
             docstore = InMemoryDocstore({})
-            
+
             # Create FAISS instance with the empty index
             return FAISS(
                 embedding_function=self.embeddings,
                 index=index,
                 docstore=docstore,
-                index_to_docstore_id={}
+                index_to_docstore_id={},
             )
         except Exception as e:
-            self._log("ERROR", f"Failed to create empty vector store: {e}")
+            self._log(
+                "ERROR",
+                f"An unexpected error occurred while creating empty vector store: {e}",
+            )
             self._log("ERROR", f"Traceback: {traceback.format_exc()}")
             raise
-        
-    def add_documents_to_vectorstore(self, 
-                                    vectorstore: Optional[FAISS], 
-                                    documents: List[Document],
-                                    embeddings: List[List[float]]) -> FAISS:
-        """Add documents to a vector store.
-        
+
+    def _prepare_documents_and_embeddings(
+        self,
+        documents: list[Document],
+        embeddings: list[list[float]],
+    ) -> tuple[list[Document], np.ndarray] | None:
+        """Validate and prepare documents and their embeddings.
+
         Args:
-            vectorstore: Existing vector store or None to create a new one
-            documents: Documents to add
-            embeddings: Pre-computed embeddings for the documents
-            
+            documents: List of documents.
+            embeddings: List of pre-computed embeddings.
+
         Returns:
-            Updated FAISS vector store
+            A tuple of (valid_documents, embedding_matrix) or None if validation fails.
+
+        """
+        if len(documents) != len(embeddings):
+            self._log(
+                "ERROR",
+                f"Mismatched lengths: {len(documents)} documents, "
+                f"{len(embeddings)} embeddings.",
+            )
+            return None
+
+        valid_entries = []
+        for i, (doc, emb) in enumerate(zip(documents, embeddings, strict=False)):
+            if emb is None:
+                self._log("WARNING", f"Doc {i}: Embedding is None, skipping.")
+                continue
+
+            is_numpy = isinstance(emb, np.ndarray)
+            emb_len = emb.size if is_numpy else len(emb)
+
+            if emb_len == 0:
+                self._log("WARNING", f"Doc {i}: Empty embedding, skipping.")
+                continue
+
+            valid_entries.append((doc, emb))
+
+        if not valid_entries:
+            self._log("WARNING", "No valid document-embedding pairs found.")
+            return None
+
+        self._log("DEBUG", f"Prepared {len(valid_entries)} valid entries.")
+        valid_docs, valid_embs = zip(*valid_entries, strict=False)
+
+        try:
+            embedding_matrix = np.array(list(valid_embs), dtype=np.float32)
+            self._log("DEBUG", f"Embedding matrix shape: {embedding_matrix.shape}")
+            if (
+                embedding_matrix.ndim == 1
+                and self._get_embedding_dimension() > 0
+                and embedding_matrix.shape[0] == self._get_embedding_dimension()
+            ):
+                # This happens if only one valid embedding was passed.
+                # np.array([ [0.1,0.2] ]) -> shape (1,2)
+                # np.array(  [0.1,0.2]   ) -> shape (2,)
+                # FAISS expects (N, D)
+                embedding_matrix = embedding_matrix.reshape(1, -1)
+                self._log(
+                    "DEBUG",
+                    f"Reshaped embedding matrix to: {embedding_matrix.shape}",
+                )
+
+        except ValueError as e:
+            self._log("ERROR", f"Could not convert embeddings to NumPy matrix: {e}")
+            return None
+
+        return list(valid_docs), embedding_matrix
+
+    def add_documents_to_vectorstore(
+        self,
+        vectorstore: FAISS | None,
+        documents: list[Document],
+        embeddings: list[list[float]],
+    ) -> FAISS:
+        """Add documents to a vector store.
+
+        Args:
+            vectorstore: Existing vector store or None to create a new one.
+            documents: Documents to add.
+            embeddings: Pre-computed embeddings for the documents.
+
+        Returns:
+            Updated FAISS vector store.
+
         """
         if not documents:
-            self._log("DEBUG", "No documents to add to vector store")
+            self._log("DEBUG", "No documents to add to vector store.")
             return vectorstore if vectorstore else self.create_empty_vectorstore()
-            
-        if not vectorstore:
-            # Create a new vector store if none exists
-            self._log("DEBUG", f"Creating new vector store with {len(documents)} documents")
-            vectorstore = self.create_empty_vectorstore()
-            
-        try:
-            self._log("DEBUG", f"Adding {len(documents)} documents to vector store")
-            self._log("DEBUG", f"Documents length: {len(documents)}, Embeddings length: {len(embeddings)}")
-            
-            # Log dimensions of embeddings for debugging
-            for i, emb in enumerate(embeddings[:5]):  # Only log first 5 for brevity
-                if emb is None:
-                    self._log("DEBUG", f"Embedding {i} is None (during logging)")
-                else:
-                    is_numpy_array_log = isinstance(emb, np.ndarray)
-                    current_emb_length_log = emb.size if is_numpy_array_log else len(emb)
-                    if current_emb_length_log > 0:
-                        self._log("DEBUG", f"Embedding {i} dimension: {current_emb_length_log} (type: {type(emb)})")
-                    else:
-                        self._log("DEBUG", f"Embedding {i} is empty (length/size 0 during logging)")
-            
-            # Validate that we have embeddings for all documents
-            if len(documents) != len(embeddings):
-                self._log("ERROR", f"Number of documents ({len(documents)}) doesn't match number of embeddings ({len(embeddings)})")
-                return vectorstore
-                
-            # Make sure no embeddings are empty
-            valid_entries = []
-            for i, (doc, emb) in enumerate(zip(documents, embeddings)):
-                # emb can be None if EmbeddingProvider failed, or a np.ndarray from reconstruct,
-                # or a list[float] from EmbeddingBatcher.
-                if emb is None: 
-                    self._log("WARNING", f"Embedding for document {i} is None, skipping")
-                    continue
-                
-                # Check if the embedding is empty (either a list or a numpy array)
-                is_numpy_array = isinstance(emb, np.ndarray)
-                current_emb_length = emb.size if is_numpy_array else len(emb)
 
-                if current_emb_length == 0:
-                    self._log("WARNING", f"Empty embedding (length/size 0) for document {i}, skipping")
-                    continue
-                
-                valid_entries.append((doc, emb))
-                
-            if not valid_entries:
-                self._log("WARNING", "No valid embeddings found, returning original vectorstore")
-                return vectorstore
-                
-            self._log("DEBUG", f"Valid entries: {len(valid_entries)}")
-            valid_docs, valid_embs = zip(*valid_entries)
-            
-            # Convert embeddings to numpy array
-            self._log("DEBUG", "Converting embeddings to numpy array")
-            embedding_matrix = np.array(valid_embs, dtype=np.float32)
-            self._log("DEBUG", f"Embedding matrix shape: {embedding_matrix.shape}")
-            
-            # Add documents one by one with their embeddings
-            for doc, embedding in zip(valid_docs, embedding_matrix):
-                doc_id = str(len(vectorstore.docstore._dict))
-                vectorstore.docstore._dict[doc_id] = doc
-                vectorstore.index.add(np.array([embedding]))
-                vectorstore.index_to_docstore_id[len(vectorstore.index_to_docstore_id)] = doc_id
-            
+        if vectorstore is None:
+            self._log(
+                "DEBUG",
+                f"No existing vectorstore, creating new for {len(documents)} docs.",
+            )
+            vectorstore = self.create_empty_vectorstore()
+
+        prepared_data = self._prepare_documents_and_embeddings(documents, embeddings)
+        if prepared_data is None:
+            self._log(
+                "ERROR",
+                "Failed to prepare documents and embeddings. "
+                "Returning original vectorstore.",
+            )
+            return vectorstore  # Return original or empty if preparation failed
+
+        valid_docs, embedding_matrix = prepared_data
+
+        if not valid_docs or embedding_matrix.size == 0:
+            self._log(
+                "WARNING",
+                "No valid documents or embeddings after preparation. "
+                "Returning original vectorstore.",
+            )
             return vectorstore
-            
-        except Exception as e:
-            self._log("ERROR", f"Failed to add documents to vector store: {e}")
+
+        self._log("DEBUG", f"Adding {len(valid_docs)} valid documents to vector store.")
+
+        try:
+            # FAISS expects a list of texts and a list of embeddings for add_embeddings
+            # However, we are adding directly to the index and docstore
+            # to use pre-computed embeddings and manage doc_ids.
+
+            # Ensure docstore is initialized
+            if not hasattr(vectorstore, "docstore") or not isinstance(
+                vectorstore.docstore,
+                InMemoryDocstore,
+            ):
+                vectorstore.docstore = InMemoryDocstore({})  # type: ignore[attr-defined]
+
+            if not hasattr(vectorstore.docstore, "_dict"):
+                vectorstore.docstore._dict = {}  # type: ignore[attr-defined]
+
+            # Ensure index_to_docstore_id is initialized
+            if not hasattr(vectorstore, "index_to_docstore_id") or not isinstance(
+                vectorstore.index_to_docstore_id,
+                dict,
+            ):
+                vectorstore.index_to_docstore_id = {}
+
+            current_docstore_size = len(vectorstore.docstore._dict)  # type: ignore[attr-defined]
+            new_doc_ids = [
+                str(current_docstore_size + i) for i in range(len(valid_docs))
+            ]
+
+            vectorstore.index.add(embedding_matrix)  # Add all embeddings at once
+
+            for i, doc_id in enumerate(new_doc_ids):
+                vectorstore.docstore._dict[doc_id] = valid_docs[i]  # type: ignore[attr-defined]
+                vectorstore.index_to_docstore_id[
+                    vectorstore.index.ntotal - len(new_doc_ids) + i
+                ] = doc_id
+
+            self._log(
+                "DEBUG",
+                f"Successfully added {len(valid_docs)} documents. "
+                f"New total: {vectorstore.index.ntotal}",
+            )
+
+        except faiss.FaissException as e:
+            self._log("ERROR", f"FAISS error adding documents: {e}")
             self._log("ERROR", f"Traceback: {traceback.format_exc()}")
-            if vectorstore:
-                return vectorstore
-            return self.create_empty_vectorstore()
-            
-    def merge_vectorstores(self, vectorstores: List[FAISS]) -> FAISS:
+            # Decide if we should return original vectorstore or raise
+        except (ValueError, TypeError, IndexError) as e:
+            self._log(
+                "ERROR",
+                f"Unexpected error adding documents to vector store: {e}",
+            )
+            self._log("ERROR", f"Traceback: {traceback.format_exc()}")
+            # Decide if we should return original vectorstore or raise
+
+        return vectorstore
+
+    def merge_vectorstores(self, vectorstores: list[FAISS]) -> FAISS:
         """Merge multiple vector stores into one.
-        
+
         Args:
             vectorstores: List of FAISS vector stores to merge
-            
+
         Returns:
             Merged FAISS vector store
+
         """
         if not vectorstores:
             return self.create_empty_vectorstore()
-            
+
         if len(vectorstores) == 1:
             return vectorstores[0]
-            
+
         # Start with the first vector store
         merged = vectorstores[0]
-        
+
         # Merge in the rest
         for vs in vectorstores[1:]:
             try:
                 # Get documents and their embeddings from the current store
                 docs = []
-                embeddings = []
-                for i, (doc_id, doc) in enumerate(vs.docstore._dict.items()):
+                embeddings_list = []  # Renamed to avoid confusion
+                # Use _i for unused loop variable if items() iteration is complex
+                for _i, (_doc_id, doc) in enumerate(vs.docstore._dict.items()):  # type: ignore[attr-defined]
                     docs.append(doc)
                     try:
-                        embeddings.append(vs.index.reconstruct(i))
-                    except Exception as e:
-                        self._log("ERROR", f"Failed to reconstruct embedding at index {i}: {e}")
+                        # Assuming _i (original index) corresponds to the index in vs.index
+                        embeddings_list.append(vs.index.reconstruct(_i))
+                    except IndexError as e:  # More specific exception
+                        self._log(
+                            "ERROR",
+                            f"IndexError reconstructing embedding at index {_i} "
+                            f"for doc_id {_doc_id}: {e}",
+                        )
+                        # Skip this document if its embedding can't be reconstructed
+                        docs.pop()  # Remove the doc for which embedding failed
                         continue
-                    
-                # Add to the merged store
-                self.add_documents_to_vectorstore(merged, docs, embeddings)
-                
-            except Exception as e:
+                    except faiss.FaissException as e:  # Specific FAISS exception
+                        self._log(
+                            "ERROR",
+                            f"FAISS error reconstructing embedding at index {_i} "
+                            f"for doc_id {_doc_id}: {e}",
+                        )
+                        docs.pop()
+                        continue
+
+                # Add to the merged store if we have valid documents and embeddings
+                if docs and embeddings_list:
+                    self.add_documents_to_vectorstore(merged, docs, embeddings_list)
+                else:
+                    self._log(
+                        "DEBUG",
+                        "Skipping merge for a vector store with no "
+                        "reconstructible docs/embeddings.",
+                    )
+
+            except AttributeError as e:  # If _dict or index is not found
+                self._log("ERROR", f"Attribute error while merging vector store: {e}")
+                self._log("ERROR", f"Traceback: {traceback.format_exc()}")
+                # Potentially skip this vectorstore or handle as critical error
+            except (ValueError, TypeError, RuntimeError) as e:
                 self._log("ERROR", f"Failed to merge vector store: {e}")
                 self._log("ERROR", f"Traceback: {traceback.format_exc()}")
-                
+                # Potentially skip this vectorstore or raise
+
         return merged
-        
-    def similarity_search(self, 
-                          vectorstore: FAISS, 
-                          query: str, 
-                          k: int = 4) -> List[Document]:
+
+    def similarity_search(
+        self,
+        vectorstore: FAISS,
+        query: str,
+        k: int = 4,
+    ) -> list[Document]:
         """Perform a similarity search on a vector store.
-        
+
         Args:
             vectorstore: FAISS vector store to search
             query: Query string
             k: Number of results to return
-            
+
         Returns:
             List of documents matching the query
+
         """
         self._log("DEBUG", f"Performing similarity search with k={k}")
         try:
             return vectorstore.similarity_search(query, k=k)
-        except Exception as e:
+        except faiss.FaissException as e:  # Specific FAISS exception
+            self._log("ERROR", f"FAISS error during similarity search: {e}")
+            self._log("ERROR", f"Traceback: {traceback.format_exc()}")
+            return []
+        except (ValueError, TypeError, IndexError) as e:
             self._log("ERROR", f"Failed to perform similarity search: {e}")
             self._log("ERROR", f"Traceback: {traceback.format_exc()}")
-            return [] 
+            return []

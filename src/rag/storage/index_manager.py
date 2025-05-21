@@ -5,46 +5,55 @@ to enable efficient incremental indexing and vector store management.
 """
 
 import hashlib
-import json
 import logging
 import sqlite3
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Optional, Dict, List, Union
+from typing import Any, TypeAlias
 
-from ..utils.logging_utils import log_message
+from rag.utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
+
+# TypeAlias for log callback function
+LogCallback: TypeAlias = Callable[[str, str, str], None]
 
 
 class IndexManager:
     """Manages document index metadata using SQLite.
-    
+
     This class handles storing and retrieving document hashes and metadata
     to enable incremental indexing and vector store management.
     """
-    
-    def __init__(self, cache_dir: Union[Path, str], 
-                log_callback: Optional[Any] = None) -> None:
+
+    def __init__(
+        self,
+        cache_dir: Path | str,
+        log_callback: LogCallback | None = None,
+    ) -> None:
         """Initialize the index metadata manager.
-        
+
         Args:
             cache_dir: Directory where the SQLite database will be stored
             log_callback: Optional callback for logging
+
         """
         self.cache_dir = Path(cache_dir)
-        self.db_path = self.cache_dir / "index_meta.db"
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+        self.db_path = self.cache_dir / "index_metadata.db"
         self.log_callback = log_callback
         self._init_db()
-        
+
     def _log(self, level: str, message: str) -> None:
         """Log a message.
-        
+
         Args:
             level: Log level (INFO, WARNING, ERROR, etc.)
             message: The log message
+
         """
         log_message(level, message, "IndexManager", self.log_callback)
-        
+
     def _init_db(self) -> None:
         """Initialize the SQLite database with required tables."""
         try:
@@ -65,7 +74,7 @@ class IndexManager:
                         file_size INTEGER NOT NULL
                     )
                 """)
-                
+
                 # Create global settings table for embedding model info and other settings
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS global_settings (
@@ -73,7 +82,7 @@ class IndexManager:
                         value TEXT NOT NULL
                     )
                 """)
-                
+
                 # Create file metadata table for additional file-specific metadata
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS file_metadata (
@@ -86,61 +95,63 @@ class IndexManager:
                         modified_at REAL NOT NULL
                     )
                 """)
-                
+
                 conn.commit()
                 self._log("DEBUG", "Index database initialized successfully")
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to initialize index database: {e}")
             raise
-            
-    def calculate_file_hash(self, file_path: Path) -> str:
-        """Calculate SHA-256 hash of a file.
-        
+
+    def compute_file_hash(self, file_path: Path) -> str:
+        """Compute the SHA-256 hash of a file.
+
         Args:
             file_path: Path to the file
-            
+
         Returns:
-            SHA-256 hash of the file contents
+            SHA-256 hash as a hex string
+
         """
         sha256_hash = hashlib.sha256()
-        with open(file_path, "rb") as f:
+        with file_path.open("rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
-    
+
     def needs_reindexing(
-        self, 
-        file_path: Path, 
-        chunk_size: int, 
+        self,
+        file_path: Path,
+        chunk_size: int,
         chunk_overlap: int,
         embedding_model: str,
-        embedding_model_version: str
+        embedding_model_version: str,
     ) -> bool:
         """Check if a file needs to be reindexed.
-        
+
         A file needs reindexing if:
         1. It's not in the metadata database
         2. Its hash has changed
         3. The chunking parameters have changed
         4. The file has been modified since last indexing
         5. The embedding model or version has changed
-        
+
         Args:
             file_path: Path to the file
             chunk_size: Current chunk size setting
             chunk_overlap: Current chunk overlap setting
             embedding_model: Current embedding model name
             embedding_model_version: Current embedding model version
-            
+
         Returns:
             True if the file needs reindexing, False otherwise
+
         """
         if not file_path.exists():
             return False
-            
-        current_hash = self.calculate_file_hash(file_path)
+
+        current_hash = self.compute_file_hash(file_path)
         last_modified = file_path.stat().st_mtime
-        
+
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.execute(
@@ -150,28 +161,34 @@ class IndexManager:
                     FROM document_meta
                     WHERE file_path = ?
                     """,
-                    (str(file_path),)
+                    (str(file_path),),
                 )
                 row = cursor.fetchone()
-                
+
                 if row is None:
                     return True
-                    
-                stored_hash, stored_chunk_size, stored_chunk_overlap, stored_modified, \
-                stored_model, stored_model_version = row
-                
+
+                (
+                    stored_hash,
+                    stored_chunk_size,
+                    stored_chunk_overlap,
+                    stored_modified,
+                    stored_model,
+                    stored_model_version,
+                ) = row
+
                 return (
-                    stored_hash != current_hash or
-                    stored_chunk_size != chunk_size or
-                    stored_chunk_overlap != chunk_overlap or
-                    stored_modified < last_modified or
-                    stored_model != embedding_model or
-                    stored_model_version != embedding_model_version
+                    stored_hash != current_hash
+                    or stored_chunk_size != chunk_size
+                    or stored_chunk_overlap != chunk_overlap
+                    or stored_modified < last_modified
+                    or stored_model != embedding_model
+                    or stored_model_version != embedding_model_version
                 )
         except sqlite3.Error as e:
             self._log("ERROR", f"Error checking if file needs reindexing: {e}")
             return True
-            
+
     def update_metadata(
         self,
         file_path: Path,
@@ -180,10 +197,10 @@ class IndexManager:
         embedding_model: str,
         embedding_model_version: str,
         file_type: str,
-        num_chunks: int
+        num_chunks: int,
     ) -> None:
         """Update the metadata for an indexed file.
-        
+
         Args:
             file_path: Path to the indexed file
             chunk_size: Chunk size used for indexing
@@ -192,42 +209,52 @@ class IndexManager:
             embedding_model_version: Version of the embedding model
             file_type: MIME type of the file
             num_chunks: Number of chunks created from the file
+
         """
-        file_hash = self.calculate_file_hash(file_path)
+        file_hash = self.compute_file_hash(file_path)
         last_modified = file_path.stat().st_mtime
         file_size = file_path.stat().st_size
-        
+
         try:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute(
                     """
                     INSERT OR REPLACE INTO document_meta
-                    (file_path, file_hash, chunk_size, chunk_overlap, last_modified, 
+                    (file_path, file_hash, chunk_size, chunk_overlap, last_modified,
                      indexed_at, embedding_model, embedding_model_version, file_type,
                      num_chunks, file_size)
                     VALUES (?, ?, ?, ?, ?, strftime('%s', 'now'), ?, ?, ?, ?, ?)
                     """,
-                    (str(file_path), file_hash, chunk_size, chunk_overlap, last_modified,
-                     embedding_model, embedding_model_version, file_type, num_chunks,
-                     file_size)
+                    (
+                        str(file_path),
+                        file_hash,
+                        chunk_size,
+                        chunk_overlap,
+                        last_modified,
+                        embedding_model,
+                        embedding_model_version,
+                        file_type,
+                        num_chunks,
+                        file_size,
+                    ),
                 )
                 conn.commit()
                 self._log("DEBUG", f"Updated metadata for {file_path}")
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to update metadata: {e}")
             raise
-            
+
     def update_file_metadata(
         self,
         file_path: str,
         size: int,
         mtime: float,
         content_hash: str,
-        source_type: Optional[str] = None,
-        chunks_total: Optional[int] = None
+        source_type: str | None = None,
+        chunks_total: int | None = None,
     ) -> None:
         """Update the file-specific metadata.
-        
+
         Args:
             file_path: Path to the file
             size: File size in bytes
@@ -235,6 +262,7 @@ class IndexManager:
             content_hash: SHA-256 hash of file contents
             source_type: MIME type of the file
             chunks_total: Total number of chunks in the file
+
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -244,22 +272,23 @@ class IndexManager:
                     (file_path, size, mtime, content_hash, source_type, chunks_total, modified_at)
                     VALUES (?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
                     """,
-                    (file_path, size, mtime, content_hash, source_type, chunks_total)
+                    (file_path, size, mtime, content_hash, source_type, chunks_total),
                 )
                 conn.commit()
                 self._log("DEBUG", f"Updated file metadata for {file_path}")
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to update file metadata: {e}")
             raise
-            
-    def get_file_metadata(self, file_path: str) -> Optional[Dict[str, Any]]:
+
+    def get_file_metadata(self, file_path: str) -> dict[str, Any] | None:
         """Get file-specific metadata.
-        
+
         Args:
             file_path: Path to the file
-            
+
         Returns:
             Dictionary containing file metadata if found, None otherwise
+
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -269,29 +298,30 @@ class IndexManager:
                     FROM file_metadata
                     WHERE file_path = ?
                     """,
-                    (file_path,)
+                    (file_path,),
                 )
                 row = cursor.fetchone()
-                
+
                 if row is None:
                     return None
-                    
+
                 return {
                     "size": row[0],
                     "mtime": row[1],
                     "content_hash": row[2],
                     "source_type": row[3],
-                    "chunks": {"total": row[4]} if row[4] is not None else None
+                    "chunks": {"total": row[4]} if row[4] is not None else None,
                 }
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to get file metadata: {e}")
             return None
-            
-    def get_all_file_metadata(self) -> Dict[str, Dict[str, Any]]:
+
+    def get_all_file_metadata(self) -> dict[str, dict[str, Any]]:
         """Get metadata for all files.
-        
+
         Returns:
             Dictionary mapping file paths to their metadata
+
         """
         result = {}
         try:
@@ -300,29 +330,30 @@ class IndexManager:
                     """
                     SELECT file_path, size, mtime, content_hash, source_type, chunks_total
                     FROM file_metadata
-                    """
+                    """,
                 )
                 rows = cursor.fetchall()
-                
+
                 for row in rows:
                     result[row[0]] = {
                         "size": row[1],
                         "mtime": row[2],
                         "content_hash": row[3],
                         "source_type": row[4],
-                        "chunks": {"total": row[5]} if row[5] is not None else None
+                        "chunks": {"total": row[5]} if row[5] is not None else None,
                     }
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to get all file metadata: {e}")
-            
+
         return result
-            
+
     def set_global_setting(self, key: str, value: str) -> None:
         """Set or update a global setting.
-        
+
         Args:
             key: Setting key
             value: Setting value
+
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -331,22 +362,23 @@ class IndexManager:
                     INSERT OR REPLACE INTO global_settings (key, value)
                     VALUES (?, ?)
                     """,
-                    (key, value)
+                    (key, value),
                 )
                 conn.commit()
                 self._log("DEBUG", f"Set global setting: {key}={value}")
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to set global setting: {e}")
             raise
-            
-    def get_global_setting(self, key: str) -> Optional[str]:
+
+    def get_global_setting(self, key: str) -> str | None:
         """Get a global setting value.
-        
+
         Args:
             key: Setting key
-            
+
         Returns:
             Setting value if found, None otherwise
+
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -354,81 +386,85 @@ class IndexManager:
                     """
                     SELECT value FROM global_settings WHERE key = ?
                     """,
-                    (key,)
+                    (key,),
                 )
                 row = cursor.fetchone()
-                
+
                 return row[0] if row else None
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to get global setting: {e}")
             return None
-            
-    def get_global_model_info(self) -> Dict[str, str]:
+
+    def get_global_model_info(self) -> dict[str, str]:
         """Get global embedding model information.
-        
+
         Returns:
             Dictionary containing model information
+
         """
         model = self.get_global_setting("embedding_model")
         version = self.get_global_setting("model_version")
-        
-        return {
-            "embedding_model": model,
-            "model_version": version
-        } if model and version else {}
-            
+
+        return (
+            {"embedding_model": model, "model_version": version}
+            if model and version
+            else {}
+        )
+
     def remove_metadata(self, file_path: Path) -> None:
         """Remove metadata for a file.
-        
+
         Args:
             file_path: Path to the file whose metadata should be removed
+
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
                 # Remove from document_meta
                 conn.execute(
                     "DELETE FROM document_meta WHERE file_path = ?",
-                    (str(file_path),)
+                    (str(file_path),),
                 )
-                
+
                 # Remove from file_metadata
                 conn.execute(
                     "DELETE FROM file_metadata WHERE file_path = ?",
-                    (str(file_path),)
+                    (str(file_path),),
                 )
-                
+
                 conn.commit()
                 self._log("INFO", f"Removed metadata for {file_path}")
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to remove metadata: {e}")
             raise
-            
-    def get_metadata(self, file_path: Path) -> Optional[Dict[str, Any]]:
+
+    def get_metadata(self, file_path: Path) -> dict[str, Any] | None:
         """Get metadata for a file.
-        
+
         Args:
             file_path: Path to the file
-            
+
         Returns:
             Dictionary containing file metadata if found, None otherwise
+
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.execute(
                     """
-                    SELECT file_hash, chunk_size, chunk_overlap, last_modified, indexed_at,
-                           embedding_model, embedding_model_version, file_type, num_chunks,
-                           file_size
+                    SELECT file_hash, chunk_size, chunk_overlap, last_modified,
+                    indexed_at, embedding_model, embedding_model_version, file_type,
+                    num_chunks, file_size
                     FROM document_meta
                     WHERE file_path = ?
                     """,
-                    (str(file_path),)
+                    (str(file_path),),
                 )
                 row = cursor.fetchone()
-                
+
                 if row is None:
                     return None
-                    
+
                 return {
                     "file_hash": row[0],
                     "chunk_size": row[1],
@@ -439,31 +475,33 @@ class IndexManager:
                     "embedding_model_version": row[6],
                     "file_type": row[7],
                     "num_chunks": row[8],
-                    "file_size": row[9]
+                    "file_size": row[9],
                 }
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to get metadata: {e}")
             return None
-            
-    def list_indexed_files(self) -> List[Dict[str, Any]]:
+
+    def list_indexed_files(self) -> list[dict[str, Any]]:
         """Get a list of all indexed files with their metadata.
-        
+
         Returns:
             List of dictionaries containing file metadata
+
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.execute(
                     """
-                    SELECT dm.file_path, dm.file_type, dm.num_chunks, dm.file_size, 
-                           dm.embedding_model, dm.embedding_model_version, dm.indexed_at,
-                           dm.last_modified
+                    SELECT dm.file_path, dm.file_type, dm.num_chunks, dm.file_size,
+                    dm.embedding_model, dm.embedding_model_version, dm.indexed_at,
+                    dm.last_modified
                     FROM document_meta dm
+                    JOIN file_metadata fm ON dm.file_path = fm.file_path
                     ORDER BY dm.indexed_at DESC
-                    """
+                    """,
                 )
                 rows = cursor.fetchall()
-                
+
                 return [
                     {
                         "file_path": row[0],
@@ -473,7 +511,7 @@ class IndexManager:
                         "embedding_model": row[4],
                         "embedding_model_version": row[5],
                         "indexed_at": row[6],
-                        "last_modified": row[7]
+                        "last_modified": row[7],
                     }
                     for row in rows
                 ]

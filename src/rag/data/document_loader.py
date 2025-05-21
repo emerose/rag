@@ -6,7 +6,7 @@ extracting text and metadata, and preparing them for processing.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from langchain_community.document_loaders import (
     CSVLoader,
@@ -27,47 +27,52 @@ logger = logging.getLogger(__name__)
 
 class DocumentLoader:
     """Loads documents based on their MIME type.
-    
+
     This class provides functionality for loading documents from different file types,
     extracting text and metadata, and preparing them for processing.
     """
-    
-    def __init__(self, 
-                 filesystem_manager: FilesystemManager,
-                 log_callback: Optional[Any] = None) -> None:
+
+    def __init__(
+        self,
+        filesystem_manager: FilesystemManager,
+        log_callback: Any | None = None,
+    ) -> None:
         """Initialize the document loader.
-        
+
         Args:
             filesystem_manager: Filesystem manager for file operations
             log_callback: Optional callback for logging
+
         """
         self.filesystem_manager = filesystem_manager
         self.log_callback = log_callback
-        
+
     def _log(self, level: str, message: str) -> None:
         """Log a message.
-        
+
         Args:
             level: Log level (INFO, WARNING, ERROR, etc.)
             message: The log message
+
         """
         log_message(level, message, "DocumentLoader", self.log_callback)
-        
-    def get_loader_for_file(self, file_path: Union[Path, str]) -> Any:
+
+    def get_loader_for_file(self, file_path: Path | str) -> Any:
         """Get the appropriate loader for a file based on its MIME type.
-        
+
         Args:
             file_path: Path to the file
-            
+
         Returns:
             Langchain document loader instance
-            
+
         Raises:
             ValueError: If the file type is not supported
+
         """
         file_path = Path(file_path)
         mime_type = self.filesystem_manager.get_file_type(file_path)
-        
+
         # Map MIME types to loader classes
         loader_map = {
             "text/plain": TextLoader,
@@ -80,85 +85,92 @@ class DocumentLoader:
             "application/vnd.openxmlformats-officedocument.presentationml.presentation": UnstructuredPowerPointLoader,
             "application/vnd.ms-powerpoint": UnstructuredPowerPointLoader,
         }
-        
+
         # Special handling for text files with different extensions
         if mime_type == "text/plain":
             suffix = file_path.suffix.lower()
             if suffix == ".csv":
                 return CSVLoader(str(file_path))
-            elif suffix in [".md", ".markdown"]:
+            if suffix in [".md", ".markdown"]:
                 return UnstructuredMarkdownLoader(str(file_path))
-            elif suffix in [".json", ".yml", ".yaml"]:
+            if suffix in [".json", ".yml", ".yaml"]:
                 return TextLoader(str(file_path))
-                
+
         # Get loader class for the MIME type
         loader_class = loader_map.get(mime_type)
         if not loader_class:
-            self._log("WARNING", f"Unsupported file type: {mime_type}, attempting TextLoader")
+            self._log(
+                "WARNING",
+                f"Unsupported file type: {mime_type}, attempting TextLoader",
+            )
             loader_class = TextLoader
-            
+
         # Initialize the loader
         try:
             return loader_class(str(file_path))
         except Exception as e:
             self._log("ERROR", f"Failed to initialize loader for {file_path}: {e}")
             raise ValueError(f"Failed to initialize loader for {file_path}: {e}")
-            
-    def load_document(self, file_path: Union[Path, str]) -> List[Document]:
+
+    def load_document(self, file_path: Path | str) -> list[Document]:
         """Load a document from a file.
-        
+
         Args:
             file_path: Path to the file
-            
+
         Returns:
             List of langchain Document objects
-            
+
         Raises:
             ValueError: If the file could not be loaded
+
         """
         file_path = Path(file_path)
-        
+
         # Check if file exists and is supported
         if not self.filesystem_manager.is_supported_file(file_path):
             self._log("ERROR", f"Unsupported or non-existent file: {file_path}")
             raise ValueError(f"Unsupported or non-existent file: {file_path}")
-            
+
         # Get loader for the file
         try:
             loader = self.get_loader_for_file(file_path)
             self._log("DEBUG", f"Loading document: {file_path}")
             docs = loader.load()
-            
+
             # Add file metadata to each document
             self._enhance_document_metadata(docs, file_path)
-            
+
             self._log("INFO", f"Loaded {len(docs)} document(s) from {file_path}")
             return docs
-            
+
         except Exception as e:
             self._log("ERROR", f"Failed to load document {file_path}: {e}")
             raise ValueError(f"Failed to load document {file_path}: {e}")
-            
-    def _enhance_document_metadata(self, 
-                                  docs: List[Document], 
-                                  file_path: Union[Path, str]) -> None:
+
+    def _enhance_document_metadata(
+        self,
+        docs: list[Document],
+        file_path: Path | str,
+    ) -> None:
         """Enhance document metadata with file information.
-        
+
         Args:
             docs: List of documents to enhance
             file_path: Path to the source file
+
         """
         file_path = Path(file_path)
         file_metadata = self.filesystem_manager.get_file_metadata(file_path)
-        
+
         for doc in docs:
             # Ensure metadata dictionary exists
             if not hasattr(doc, "metadata") or doc.metadata is None:
                 doc.metadata = {}
-                
+
             # Add file metadata
             doc.metadata["source"] = str(file_path)
             doc.metadata["source_type"] = file_metadata["source_type"]
             doc.metadata["file_size"] = file_metadata["size"]
             doc.metadata["mtime"] = file_metadata["mtime"]
-            doc.metadata["content_hash"] = file_metadata["content_hash"] 
+            doc.metadata["content_hash"] = file_metadata["content_hash"]

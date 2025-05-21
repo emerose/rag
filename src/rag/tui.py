@@ -1,18 +1,16 @@
-#!/usr/bin/env python3
+"""Textual User Interface (TUI) for the RAG application."""
+
 import asyncio
 import logging
-from datetime import datetime
-from typing import Any
-import time
 import threading
+import time
+from datetime import datetime
 
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal
 from textual.message import Message
 from textual.widgets import Footer, Header, Label, ProgressBar, RichLog
-from textual.worker import Worker, get_current_worker
-from textual import work
 
 from .config import RAGConfig, RuntimeOptions
 from .engine import RAGEngine
@@ -20,6 +18,8 @@ from .engine import RAGEngine
 
 class TUILogHandler(logging.Handler):
     """A custom logging handler that writes to the TUI log window."""
+
+    LOG_FLUSH_INTERVAL = 0.1  # Constant for magic number
 
     def __init__(self, log_viewer: RichLog) -> None:
         """Initialize the handler with a reference to the log viewer."""
@@ -40,41 +40,42 @@ class TUILogHandler(logging.Handler):
         style = level_styles.get(record.levelno, "white")
 
         # Timestamp from record
-        ts = datetime.fromtimestamp(record.created).strftime("%H:%M:%S")
+        # Use local timezone for display
+        ts = datetime.fromtimestamp(
+            record.created,
+            tz=datetime.now().astimezone().tzinfo,
+        ).strftime("%H:%M:%S")
 
         # Properly format the message with any args applied
         msg = record.getMessage()
 
         # Build a markup string: timestamp, level, logger name, message
         markup_msg = (
-            f"[grey]{ts}[/] "
-            f"[{style}]{record.levelname}[/] "
-            f"[cyan]{record.name}[/] "
-            f"{msg}"
+            f"[grey]{ts}[/] [{style}]{record.levelname}[/] [cyan]{record.name}[/] {msg}"
         )
 
         # Queue the message instead of rendering immediately
         self._log_queue.append(markup_msg)
-        
-        # If it's been more than 0.1 seconds since the last flush, flush the queue
+
+        # If it's been more than LOG_FLUSH_INTERVAL seconds since the last flush, flush the queue
         current_time = time.time()
-        if current_time - self._last_flush_time > 0.1:
+        if current_time - self._last_flush_time > self.LOG_FLUSH_INTERVAL:
             self.flush_queue()
 
     def flush_queue(self) -> None:
         """Flush the queued log messages to the log viewer."""
         if not self._log_queue:
             return
-            
+
         # Get the current queue and clear it
         messages = self._log_queue
         self._log_queue = []
-        
+
         # Render all messages at once
         for markup_msg in messages:
             rich_text = Text.from_markup(markup_msg)
             self.log_viewer.write(rich_text)
-            
+
         # Update the last flush time
         self._last_flush_time = time.time()
 
@@ -83,7 +84,11 @@ class ProgressBarWithLabel(Container):
     """A container that combines a label and progress bar."""
 
     def __init__(
-        self, label_text: str, total: int = 100, *args: Any, **kwargs: Any
+        self,
+        label_text: str,
+        total: int = 100,
+        *args: object,
+        **kwargs: object,
     ) -> None:
         """Initialize the progress bar with label."""
         super().__init__(*args, **kwargs)
@@ -95,8 +100,7 @@ class ProgressBarWithLabel(Container):
         """Create child widgets for the progress bar with label."""
         with Horizontal():
             yield Label(self._label_text, classes="progress-label")
-            self.progress_bar = ProgressBar(
-                total=self.total, classes="progress-bar")
+            self.progress_bar = ProgressBar(total=self.total, classes="progress-bar")
             yield self.progress_bar
 
     def update_progress(self, value: int, total: int | None = None) -> None:
@@ -105,10 +109,12 @@ class ProgressBarWithLabel(Container):
             if total is not None and total != self.total:
                 self.total = max(1, total)  # Ensure total is at least 1
                 self.progress_bar.total = self.total
-            
+
             # Ensure total is not zero to prevent division by zero if we were calculating percentage
             if self.progress_bar.total == 0:
-                self.progress_bar.total = 1 # Prevent crash, though this state is unusual
+                self.progress_bar.total = (
+                    1  # Prevent crash, though this state is unusual
+                )
 
             self.progress_bar.progress = value
 
@@ -116,18 +122,18 @@ class ProgressBarWithLabel(Container):
 class ProgressSection(Container):
     """A container for progress bars."""
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: object, **kwargs: object) -> None:
         """Initialize the progress section."""
         super().__init__(*args, **kwargs)
         self.progress_bars: dict[str, ProgressBarWithLabel] = {}
 
     def add_progress_bar(self, name: str, total: int = 100) -> None:
-        """
-        Add a new progress bar with label.
+        """Add a new progress bar with label.
 
         Args:
             name: Name of the progress bar
             total: Total number of steps
+
         """
         progress_container = ProgressBarWithLabel(
             label_text=name,
@@ -138,23 +144,23 @@ class ProgressSection(Container):
         self.mount(progress_container)
 
     def update_progress(self, name: str, value: int, total: int | None = None) -> None:
-        """
-        Update a progress bar's value and optionally its total.
+        """Update a progress bar's value and optionally its total.
 
         Args:
             name: Name of the progress bar to update
             value: Current progress value
             total: Optional new total value
+
         """
         if name in self.progress_bars:
             self.progress_bars[name].update_progress(value, total)
 
     def remove_progress_bar(self, name: str) -> None:
-        """
-        Remove a progress bar.
+        """Remove a progress bar.
 
         Args:
             name: Name of the progress bar to remove
+
         """
         if name in self.progress_bars:
             container = self.progress_bars[name]
@@ -178,10 +184,10 @@ class ProgressUpdated(Message):
         super().__init__()
 
 
-class RAGTUI(App):
+class RAGTUI(App[None]):
     """The main RAG TUI application."""
 
-    BINDINGS = [  # noqa: RUF012
+    BINDINGS: list[tuple[str, str, str]] = [
         ("q", "quit", "Quit"),
         ("r", "refresh", "Refresh"),
         ("h", "help", "Help"),
@@ -265,7 +271,11 @@ class RAGTUI(App):
     }
     """
 
-    def __init__(self, config: RAGConfig | None = None, runtime_options: RuntimeOptions | None = None) -> None:
+    def __init__(
+        self,
+        config: RAGConfig | None = None,
+        runtime_options: RuntimeOptions | None = None,
+    ) -> None:
         """Initialize the RAG TUI application."""
         super().__init__()
         self.config = config
@@ -274,11 +284,14 @@ class RAGTUI(App):
         self.log_viewer: RichLog | None = None
         self.progress_section: ProgressSection | None = None
         self.pending_tasks: list[asyncio.Task] = []
+        self.logger = logging.getLogger(__name__)  # Instance logger
 
         # Set up progress callback if not already set
         if not self.runtime_options.progress_callback:
-            self.runtime_options.progress_callback = lambda name, value, total=None: self.post_message(
-                ProgressUpdated(name, value, total)
+            self.runtime_options.progress_callback = (
+                lambda name, value, total=None: self.post_message(
+                    ProgressUpdated(name, value, total),
+                )
             )
 
     def compose(self) -> ComposeResult:
@@ -292,20 +305,20 @@ class RAGTUI(App):
         """Set up the application when it starts."""
         try:
             self.log_viewer = self.query_one("#log-viewer", RichLog)
-            self.progress_section = self.query_one(
-                "#progress-section", ProgressSection)
+            self.progress_section = self.query_one("#progress-section", ProgressSection)
 
-            # Set up logging to use the TUI log viewer
+            # Get the root logger to add our handler
             root_logger = logging.getLogger()
-            root_logger.setLevel(logging.INFO)
+            # Don't setLevel on root_logger directly if other parts of app use it differently
+            # Instead, ensure our handler has the desired level.
 
             # Add our TUI handler to root logger
             tui_handler = TUILogHandler(self.log_viewer)
-            tui_handler.setLevel(logging.INFO)
+            tui_handler.setLevel(logging.INFO)  # Set level on the handler
             root_logger.addHandler(tui_handler)
-            
+
             # Store a reference to the handler for easy access
-            self.log_viewer._handler = tui_handler
+            self.log_viewer._handler = tui_handler  # type: ignore[attr-defined]
 
             # Configure specific loggers to propagate to root
             loggers_to_configure = [
@@ -331,36 +344,40 @@ class RAGTUI(App):
                 logger.propagate = True
 
             # Add initial log message
-            logging.info("TUI application started")
+            self.logger.info("TUI application started")
 
             # Initialize RAG engine if config is provided
             if self.config:
-                logging.info("Initializing RAG engine...")
+                self.logger.info("Initializing RAG engine...")
                 try:
                     # Initialize RAG engine
-                    self.rag_engine = RAGEngine(
-                        self.config, self.runtime_options)
-                    logging.info("RAG engine initialized successfully")
+                    self.rag_engine = RAGEngine(self.config, self.runtime_options)
+                    self.logger.info("RAG engine initialized successfully")
 
                     # Start indexing immediately after engine initialization
                     self.start_indexing()
-                    
-                except Exception as e:
+
+                except (
+                    Exception
+                ) as e:  # Keep generic here as RAGEngine init can have various errors
                     error_msg = f"Failed to initialize RAG engine: {e!s}"
-                    logging.error(error_msg)
+                    self.logger.exception(error_msg)
             else:
-                logging.warning("No configuration provided")
-        except Exception as e:
+                self.logger.warning("No configuration provided")
+        except Exception as e:  # Keep generic for overall mount errors
             error_msg = f"Error during mount: {e!s}"
-            logging.error(error_msg)
+            # Use root logger for critical errors if self.logger isn't fully set up
+            logging.getLogger().exception(error_msg)
             raise
 
     def on_progress_updated(self, event: ProgressUpdated) -> None:
         """Handle progress update events."""
-        if self.progress_section:
-            if event.name in self.progress_section.progress_bars:
-                self.progress_section.update_progress(
-                    event.name, event.value, event.total)
+        if self.progress_section and event.name in self.progress_section.progress_bars:
+            self.progress_section.update_progress(
+                event.name,
+                event.value,
+                event.total,
+            )
 
     def action_help(self) -> None:
         """Show help dialog."""
@@ -377,7 +394,7 @@ class RAGTUI(App):
         """Clear the log viewer."""
         if self.log_viewer:
             self.log_viewer.clear()
-            logging.info("Logs cleared")
+            self.logger.info("Logs cleared")
 
     def action_quit(self) -> None:
         """Quit the application."""
@@ -388,84 +405,101 @@ class RAGTUI(App):
         self.refresh()
 
     def index_documents_worker_manual_thread(self) -> None:
-        """Synchronous method to be run in a manual thread for indexing documents."""
-        # worker = get_current_worker() # Not applicable for manual threads in this way
-        # if not worker.is_cancelled: # Need a different cancellation mechanism if desired
-
+        """Run synchronous document indexing in a separate thread."""
         if not self.rag_engine:
             # Use call_from_thread for logging if TUI components are involved
-            self.call_from_thread(logging.error, "RAG engine not initialized. Cannot start indexing worker.")
+            self.call_from_thread(
+                self.logger.error,  # Use instance logger
+                "RAG engine not initialized. Cannot start indexing worker.",
+            )
             return
 
         try:
-            self.call_from_thread(logging.info, "Indexing worker started (manual thread)...")
-            
+            self.call_from_thread(
+                self.logger.info,  # Use instance logger
+                "Indexing worker started (manual thread)...",
+            )
+
             # Run the async RAG engine indexing. asyncio.run creates a new event loop.
             asyncio.run(self.rag_engine.index_documents_async())
-            
-            # if not worker.is_cancelled: # Check cancellation differently if needed
-            self.call_from_thread(logging.info, "Indexing completed successfully by worker (manual thread).")
-            self.call_from_thread(logging.info, "TUI will exit in 5 seconds...")
-            time.sleep(5) # This is fine, it's in a separate thread
+
+            self.call_from_thread(
+                self.logger.info,  # Use instance logger
+                "Indexing completed successfully by worker (manual thread).",
+            )
+            self.call_from_thread(self.logger.info, "TUI will exit in 5 seconds...")
+            time.sleep(5)  # This is fine, it's in a separate thread
             self.call_from_thread(self.exit)
 
-        except Exception as e: # Catch generic Exception for now
-            # Consider specific exception handling for asyncio.CancelledError if manual cancellation is implemented
-            self.call_from_thread(logging.error, f"Error during indexing in manual thread: {e!s}")
-            # if not worker.is_cancelled: # Check cancellation differently if needed
-            self.call_from_thread(logging.info, "TUI will exit in 5 seconds due to error...")
-            time.sleep(5)
-            self.call_from_thread(self.exit)
+        except RuntimeError as e:  # More specific for asyncio.run issues
+            self.call_from_thread(
+                self.logger.error,
+                f"Runtime error during indexing in manual thread: {e!s}",
+            )
+        except Exception as e:  # Catch other specific exceptions if known, then generic
+            self.call_from_thread(
+                self.logger.error,
+                f"Error during indexing in manual thread: {e!s}",
+            )
         finally:
-            self.call_from_thread(logging.info, "Indexing worker (manual thread) finished.")
+            # This block will run regardless of whether an exception occurred or not.
+            # Common place for cleanup or final logging.
+            self.call_from_thread(
+                self.logger.info,  # Use instance logger
+                "Indexing worker (manual thread) finished.",
+            )
 
     def start_indexing(self) -> None:
         """Start the document indexing process using a manual thread."""
-        
-        # Restore actual indexing logic, now with manual threading
         if not self.rag_engine:
-            logging.error("Cannot start indexing: RAG engine not initialized")
+            self.logger.error("Cannot start indexing: RAG engine not initialized")
             return
 
         try:
-            logging.info("Starting indexing process via manual thread...")
+            self.logger.info("Starting indexing process via manual thread...")
 
             if self.progress_section:
                 self.progress_section.clear_progress_bars()
                 self.progress_section.add_progress_bar("Files", 1)
                 self.progress_section.add_progress_bar("Chunks", 1)
                 self.progress_section.add_progress_bar("Embeddings", 1)
-            
-            # Create and start a new thread for the indexing worker
-            # The target is the new synchronous worker method
-            thread = threading.Thread(target=self.index_documents_worker_manual_thread, daemon=True)
-            thread.start()
-            # No longer using self.run_worker
 
-        except Exception as e:
+            thread = threading.Thread(
+                target=self.index_documents_worker_manual_thread,
+                daemon=True,
+            )
+            thread.start()
+
+        except Exception as e:  # Keep generic for threading errors
             error_msg = f"Error starting indexing (manual thread): {e!s}"
-            logging.error(error_msg)
+            self.logger.exception(error_msg)
 
     async def on_idle(self) -> None:
         """Handle idle time in the event loop."""
-        # Flush log messages
-        if hasattr(self, "log_viewer") and hasattr(self.log_viewer, "_handler"):
-            handler = self.log_viewer._handler
+        if (
+            hasattr(self, "log_viewer")
+            and self.log_viewer
+            and hasattr(self.log_viewer, "_handler")
+        ):  # type: ignore[attr-defined]
+            handler = self.log_viewer._handler  # type: ignore[attr-defined]
             if isinstance(handler, TUILogHandler) and handler._log_queue:
                 handler.flush_queue()
-                
-        # Small sleep to yield back to the event loop, allowing other coroutines to run
-        await asyncio.sleep(0.05) # Increased sleep time slightly
+
+        await asyncio.sleep(0.05)
 
     def on_unmount(self) -> None:
         """Clean up when the app is unmounted."""
-        # Workers are managed by Textual and should be cancelled automatically
-        # if they are daemonic or via specific cancellation calls if needed.
-        # For @work(exclusive=True, group=...), Textual handles shutdown.
-        pass
+        self.logger.info("RAG TUI unmounting. Cancelling pending tasks.")
+        for task in self.pending_tasks:
+            if not task.done():
+                task.cancel()
+        # Other cleanup if needed
 
 
-def run_tui(config: RAGConfig | None = None, runtime_options: RuntimeOptions | None = None) -> None:
+def run_tui(
+    config: RAGConfig | None = None,
+    runtime_options: RuntimeOptions | None = None,
+) -> None:
     """Run the RAG TUI application."""
-    app = RAGTUI(config, runtime_options)
+    app = RAGTUI(config=config, runtime_options=runtime_options)
     app.run()

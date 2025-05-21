@@ -1,13 +1,12 @@
-"""
-Configuration module for the RAG system.
+"""Configuration module for the RAG system.
 
 This module contains configuration classes that define the static and runtime parameters
 for the RAG engine.
 """
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
 
 
 @dataclass(frozen=True)
@@ -27,7 +26,9 @@ class RAGConfig:
         chunk_size: Number of tokens per chunk
         chunk_overlap: Number of tokens to overlap between chunks
         openai_api_key: OpenAI API key (will be set in __post_init__)
+
     """
+
     documents_dir: str
     embedding_model: str = "text-embedding-3-small"
     chat_model: str = "gpt-4"
@@ -41,8 +42,7 @@ class RAGConfig:
     def __post_init__(self):
         """Initialize derived attributes after instance creation."""
         if not self.openai_api_key:
-            object.__setattr__(self, 'openai_api_key',
-                              os.getenv("OPENAI_API_KEY", ""))
+            object.__setattr__(self, "openai_api_key", os.getenv("OPENAI_API_KEY", ""))
 
 
 @dataclass
@@ -55,7 +55,9 @@ class RuntimeOptions:
     Attributes:
         progress_callback: Optional callback for progress updates
         log_callback: Optional callback for logging
+
     """
+
     # Define more specific type hints
-    progress_callback: Optional[Callable[[str, int, Optional[int]], None]] = None
-    log_callback: Optional[Callable[[str, str, str], None]] = None 
+    progress_callback: Callable[[str, int, int | None], None] | None = None
+    log_callback: Callable[[str, str, str], None] | None = None

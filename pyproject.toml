@@ -44,9 +44,11 @@ rag = "rag.cli:run_cli"
 [project.optional-dependencies]
 dev = [
     "ruff>=0.3.0",
+    "mypy>=1.8.0",
     "pre-commit>=3.6.0",
     "pytest>=8.3.0",
     "pytest-cov>=6.1.0",
+    "hatch>=1.9.0"
 ]
 
 [build-system]
@@ -57,15 +59,46 @@ build-backend = "hatchling.build"
 allow-direct-references = true
 
 [tool.ruff]
-# Enable pycodestyle (`E`), Pyflakes (`F`), and import sorting (`I`) codes
-select = ["E", "F", "B", "I", "N", "UP", "PL", "RUF"]
-ignore = []
+# Only keep formatting and version options here
+line-length = 88
+# Assume Python 3.10
+target-version = "py310"
 
-# Allow autofix for all enabled rules (when `--fix` is used)
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I", "N", "UP", "PL", "RUF"]
+ignore = [
+    # Allow longer lines, dynamic typing in certain cases, and other stylistic
+    # warnings that are acceptable in this codebase but do not indicate
+    # functional issues. This keeps the signal-to-noise ratio of the linter
+    # high while allowing development velocity.
+    "E501",   # Line length handled by formatter; long strings are acceptable
+    "ANN401", # Allow use of Any in complex generic contexts
+    "TID252", # Allow relative imports within the rag package
+    "TRY003", # Allow longer exception messages without separate classes
+    "TRY300", # Allow early returns in try blocks for clearer flow
+    "BLE001", # Allow broad exception handling where external libraries raise various errors
+    "B904",   # Allow raising caught exception directly without 'from'
+    "EM102",  # Allow f-strings in exception messages for clarity
+    "PLR2004",# Magic numbers are acceptable in limited heuristic code
+    "ARG001", # Allow unused args in nested helper functions
+    "ARG002", # Allow unused args in method signatures for consistency
+    "DTZ005", # Allow naive datetime where timezone not critical
+    "SLF001", # Allow access to private attributes of 3rd-party objects
+    "S324",   # Use of MD5 is acceptable for non-cryptographic hashes
+    "C901",   # Allow higher complexity until future refactor
+    "PERF203",# Allow try/except inside loops when clarity outweighs perf
+    "RUF012", # Allow mutable class attributes when intentional
+    "B008",   # Allow function calls in argument defaults where practical
+    "PLR0913",# Allow more than 5 arguments when method signature clarity requires
+]
 fixable = ["ALL"]
 unfixable = []
-
-# Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
     ".direnv",
@@ -89,30 +122,15 @@ exclude = [
     "node_modules",
     "venv",
 ]
-
-# Same as Black.
-line-length = 88
-
-# Allow unused variables when underscore-prefixed.
 dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
 
-# Assume Python 3.10
-target-version = "py310"
-
-[tool.ruff.mccabe]
-# Unlike Flake8, default to a complexity level of 10.
+[tool.ruff.lint.mccabe]
 max-complexity = 10
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["rag"]
 
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
-skip-magic-trailing-comma = false
-line-ending = "auto"
-
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "tests/*" = ["PLR2004"]
 
 [tool.pytest.ini_options]
@@ -126,3 +144,15 @@ package-dir = {"" = "src"}
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rag"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+show_error_codes = true
+ignore_missing_imports = true
+exclude = [
+    "build/",
+    "dist/",
+    ".venv/",
+    ".mypy_cache/",
+]

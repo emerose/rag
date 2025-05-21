@@ -3,12 +3,14 @@ import logging
 import signal
 import sys
 import traceback
+from collections.abc import Callable
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import typer
+from dotenv import load_dotenv
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import WordCompleter
@@ -18,9 +20,10 @@ from prompt_toolkit.styles import Style
 from rich.box import ROUNDED
 from rich.console import Console
 from rich.logging import RichHandler
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.progress import (
+    Progress,
+)
 from rich.table import Table
-from dotenv import load_dotenv
 
 # Try both relative and absolute imports
 try:
@@ -167,8 +170,7 @@ def index(
         help="Use the TUI interface for indexing",
     ),
 ) -> None:
-    """
-    Index a file or directory for RAG (Retrieval Augmented Generation).
+    """Index a file or directory for RAG (Retrieval Augmented Generation).
 
     The indexing process will:
     1. Process all supported files in the directory
@@ -212,6 +214,7 @@ def index(
 
             # Run indexing
             import asyncio
+
             asyncio.run(rag_engine.index_documents_async())
 
     except ValueError as e:
@@ -234,8 +237,7 @@ def invalidate(
         help="Invalidate all caches in the directory (uses current directory if no path specified)",
     ),
 ) -> None:
-    """
-    Invalidate the cache for a specific file or all caches.
+    """Invalidate the cache for a specific file or all caches.
 
     This command will:
     1. Remove cached embeddings and vector stores
@@ -247,8 +249,7 @@ def invalidate(
             # Use current directory when --all is specified without a path
             path = Path.cwd()
         elif path is None:
-            console.print(
-                "[red]Error:[/red] Please specify a path or use --all flag")
+            console.print("[red]Error:[/red] Please specify a path or use --all flag")
             sys.exit(1)
 
         # Validate path exists
@@ -286,18 +287,15 @@ def invalidate(
             state.logger.info("Invalidating all caches...")
             rag_engine._invalidate_all_caches()
             state.logger.info("Successfully invalidated all caches")
-            console.print(
-                "[green]Success:[/green] All caches invalidated successfully")
+            console.print("[green]Success:[/green] All caches invalidated successfully")
         elif path.is_file():
             state.logger.info(f"Invalidating cache for: {path.name}")
             rag_engine._invalidate_cache(str(path))
-            state.logger.info(
-                f"Successfully invalidated cache for {path.name}")
-            console.print(
-                f"[green]Success:[/green] Cache invalidated for {path.name}")
+            state.logger.info(f"Successfully invalidated cache for {path.name}")
+            console.print(f"[green]Success:[/green] Cache invalidated for {path.name}")
         else:
             console.print(
-                "[red]Error:[/red] Please specify a file path when not using --all flag"
+                "[red]Error:[/red] Please specify a file path when not using --all flag",
             )
             sys.exit(1)
 
@@ -305,15 +303,15 @@ def invalidate(
         console.print(f"[red]Error:[/red] Configuration error: {e!s}")
         sys.exit(1)
     except Exception as e:
-        console.print(
-            f"[red]Error:[/red] Error during cache invalidation: {e!s}")
+        console.print(f"[red]Error:[/red] Error during cache invalidation: {e!s}")
         sys.exit(1)
 
 
 @app.command()
 def query(
     query_text: str = typer.Argument(
-        ..., help="The query to run against the indexed documents"
+        ...,
+        help="The query to run against the indexed documents",
     ),
     k: int = typer.Option(
         4,
@@ -324,8 +322,7 @@ def query(
         max=20,
     ),
 ) -> None:
-    """
-    Query the indexed documents using RAG (Retrieval Augmented Generation).
+    """Query the indexed documents using RAG (Retrieval Augmented Generation).
 
     This command will:
     1. Load the existing vector store from the global cache
@@ -350,13 +347,12 @@ def query(
         cache_metadata = rag_engine._load_cache_metadata()
         if not cache_metadata:
             state.logger.error(
-                "No indexed documents found in cache. Please run 'rag index' first."
+                "No indexed documents found in cache. Please run 'rag index' first.",
             )
             sys.exit(1)
 
         # Load cached vectorstores
-        state.logger.info(
-            "Loading cached vectorstores from .cache directory...")
+        state.logger.info("Loading cached vectorstores from .cache directory...")
         for file_path in cache_metadata:
             try:
                 cached_store = rag_engine._load_cached_vectorstore(file_path)
@@ -364,17 +360,16 @@ def query(
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
             except Exception as e:
-                state.logger.warning(
-                    f"Failed to load vectorstore for {file_path}: {e}")
+                state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
             state.logger.error(
-                "No valid vectorstores found in cache. Please run 'rag index' first."
+                "No valid vectorstores found in cache. Please run 'rag index' first.",
             )
             sys.exit(1)
 
         state.logger.info(
-            f"Successfully loaded {len(rag_engine.vectorstores)} vectorstores"
+            f"Successfully loaded {len(rag_engine.vectorstores)} vectorstores",
         )
 
         # Perform the query
@@ -398,11 +393,9 @@ def query(
 
 @app.command()
 def summarize(
-    k: int = typer.Option(
-        5, "--k", "-k", help="Number of documents to summarize"),
+    k: int = typer.Option(5, "--k", "-k", help="Number of documents to summarize"),
 ) -> None:
-    """
-    Generate summaries for the top k most relevant documents.
+    """Generate summaries for the top k most relevant documents.
     Uses the global cache of indexed documents.
     """
     try:
@@ -422,16 +415,15 @@ def summarize(
         cache_metadata = rag_engine._load_cache_metadata()
         if not cache_metadata:
             state.logger.error(
-                "No indexed documents found in cache. Please run 'rag index' first."
+                "No indexed documents found in cache. Please run 'rag index' first.",
             )
             console.print(
-                "[red]No indexed documents found in cache. Please run 'rag index' first.[/red]"
+                "[red]No indexed documents found in cache. Please run 'rag index' first.[/red]",
             )
             sys.exit(1)
 
         # Load cached vectorstores
-        state.logger.info(
-            "Loading cached vectorstores from .cache directory...")
+        state.logger.info("Loading cached vectorstores from .cache directory...")
         for file_path in cache_metadata:
             try:
                 cached_store = rag_engine._load_cached_vectorstore(file_path)
@@ -439,20 +431,19 @@ def summarize(
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
             except Exception as e:
-                state.logger.warning(
-                    f"Failed to load vectorstore for {file_path}: {e}")
+                state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
             state.logger.error(
-                "No valid vectorstores found in cache. Please run 'rag index' first."
+                "No valid vectorstores found in cache. Please run 'rag index' first.",
             )
             console.print(
-                "[red]No valid vectorstores found in cache. Please run 'rag index' first.[/red]"
+                "[red]No valid vectorstores found in cache. Please run 'rag index' first.[/red]",
             )
             sys.exit(1)
 
         state.logger.info(
-            f"Successfully loaded {len(rag_engine.vectorstores)} vectorstores"
+            f"Successfully loaded {len(rag_engine.vectorstores)} vectorstores",
         )
 
         # Get document summaries
@@ -462,7 +453,7 @@ def summarize(
 
         if not summaries:
             console.print(
-                "[yellow]No summaries could be generated. Try indexing more documents or check your data.[/yellow]"
+                "[yellow]No summaries could be generated. Try indexing more documents or check your data.[/yellow]",
             )
             return
 
@@ -503,12 +494,11 @@ def summarize(
 
 @app.command()
 def list() -> None:
-    """
-    List indexed documents from the cache.
-    
+    """List indexed documents from the cache.
+
     This command displays information about all indexed documents in the cache,
     including their file type, last modified date, size, and number of chunks.
-    
+
     Usage:
         rag list
     """
@@ -516,13 +506,13 @@ def list() -> None:
         # Initialize RAG engine
         state.logger.debug("Initializing RAG engine")
         rag_engine = _initialize_rag_engine()
-        
+
         # Get metadata directly from SQLite
         index_metadata = rag_engine.index_meta
         indexed_files = index_metadata.list_indexed_files()
-        
+
         state.logger.debug(f"Found {len(indexed_files)} indexed documents")
-        
+
         # Create table
         table = Table(title="Indexed Documents")
         table.add_column("File Path", style="cyan", no_wrap=False)
@@ -534,16 +524,15 @@ def list() -> None:
         for file_info in indexed_files:
             file_path = file_info["file_path"]
             state.logger.debug(f"Processing file: {file_path}")
-            
+
             # Get file stats
             try:
                 stats = Path(file_path).stat()
                 size = f"{stats.st_size / 1024:.1f} KB"
                 modified = datetime.fromtimestamp(stats.st_mtime).strftime(
-                    "%Y-%m-%d %H:%M:%S"
+                    "%Y-%m-%d %H:%M:%S",
                 )
-                state.logger.debug(
-                    f"File stats - size: {size}, modified: {modified}")
+                state.logger.debug(f"File stats - size: {size}, modified: {modified}")
             except Exception as e:
                 state.logger.debug(f"Failed to get file stats: {e}")
                 size = "N/A"
@@ -552,7 +541,7 @@ def list() -> None:
             # Get file metadata
             file_type = file_info["file_type"]
             chunks = file_info["num_chunks"]
-            
+
             state.logger.debug(f"File type: {file_type}, Chunks: {chunks}")
 
             table.add_row(
@@ -589,13 +578,13 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
     """Load cached vectorstores into the RAG engine."""
     index_metadata = rag_engine.index_meta
     indexed_files = index_metadata.list_indexed_files()
-    
+
     if not indexed_files:
         state.logger.error(
-            "No indexed documents found in cache. Please run 'rag index' first."
+            "No indexed documents found in cache. Please run 'rag index' first.",
         )
         console.print(
-            "[red]No indexed documents found in cache. Please run 'rag index' first.[/red]"
+            "[red]No indexed documents found in cache. Please run 'rag index' first.[/red]",
         )
         sys.exit(1)
 
@@ -608,20 +597,19 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
                 rag_engine.vectorstores[file_path] = cached_store
                 state.logger.info(f"Loaded vectorstore for: {file_path}")
         except Exception as e:
-            state.logger.warning(
-                f"Failed to load vectorstore for {file_path}: {e}")
+            state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
     if not rag_engine.vectorstores:
         state.logger.error(
-            "No valid vectorstores found in cache. Please run 'rag index' first."
+            "No valid vectorstores found in cache. Please run 'rag index' first.",
         )
         console.print(
-            "[red]No valid vectorstores found in cache. Please run 'rag index' first.[/red]"
+            "[red]No valid vectorstores found in cache. Please run 'rag index' first.[/red]",
         )
         sys.exit(1)
 
     state.logger.info(
-        f"Successfully loaded {len(rag_engine.vectorstores)} vectorstores"
+        f"Successfully loaded {len(rag_engine.vectorstores)} vectorstores",
     )
 
 
@@ -643,7 +631,7 @@ def _get_repl_style() -> Style:
         {
             "prompt": "ansicyan bold",
             "input": "ansiwhite",
-        }
+        },
     )
 
 
@@ -658,7 +646,7 @@ def _get_repl_commands() -> dict[str, Any]:
             "  clear - Clear the screen\n"
             "  exit/quit - Exit the REPL\n"
             "  help - Show this help message\n"
-            f"  k <number> - Change number of documents to retrieve (1-{MAX_K_VALUE})\n"
+            f"  k <number> - Change number of documents to retrieve (1-{MAX_K_VALUE})\n",
         ),
     }
 
@@ -671,7 +659,7 @@ def _print_welcome_message() -> None:
     console.print("  [cyan]exit[/cyan] or [cyan]quit[/cyan] - Exit the REPL")
     console.print("  [cyan]help[/cyan] - Show help message")
     console.print(
-        f"  [cyan]k <number>[/cyan] - Change number of documents to retrieve (1-{MAX_K_VALUE})"
+        f"  [cyan]k <number>[/cyan] - Change number of documents to retrieve (1-{MAX_K_VALUE})",
     )
     console.print("\nPress [bold]Ctrl+C[/bold] to exit\n")
 
@@ -700,8 +688,7 @@ def repl(
         max=MAX_K_VALUE,
     ),
 ) -> None:
-    """
-    Start an interactive REPL (Read-Eval-Print Loop) for querying the indexed documents.
+    """Start an interactive REPL (Read-Eval-Print Loop) for querying the indexed documents.
 
     Features:
     - Command history (up/down arrows)
@@ -762,7 +749,7 @@ def repl(
 
             except KeyboardInterrupt:
                 console.print(
-                    "\n[yellow]Use 'exit' or 'quit' to exit the REPL[/yellow]"
+                    "\n[yellow]Use 'exit' or 'quit' to exit the REPL[/yellow]",
                 )
             except Exception as e:
                 console.print(f"\n[red]Error: {e}[/red]")
@@ -776,32 +763,31 @@ def repl(
 
 @app.command()
 def cleanup() -> None:
-    """
-    Clean up orphaned chunks in the cache.
-    
+    """Clean up orphaned chunks in the cache.
+
     This command removes cached vector stores for files that no longer exist,
     helping to keep the .cache/ directory from growing unbounded.
-    
+
     Usage:
         rag cleanup
     """
     try:
         state.logger.info("Starting cache cleanup...")
         console.print("[cyan]Starting cache cleanup...[/cyan]")
-        
+
         # Initialize RAG engine using RAGConfig with default cache directory
         state.logger.info(f"Initializing RAGConfig with cache_dir: {CACHE_DIR}")
         config = RAGConfig(
             documents_dir=".",  # Not used for cleanup, but required
             cache_dir=CACHE_DIR,
         )
-        
+
         # Initialize the RAG engine
         rag_engine = RAGEngine(config)
-        
+
         # Execute the cleanup
         result = rag_engine.cleanup_orphaned_chunks()
-        
+
         # Format size nicely
         bytes_freed = result["bytes_freed"]
         if bytes_freed < 1024:
@@ -810,21 +796,23 @@ def cleanup() -> None:
             size_str = f"{bytes_freed / 1024:.2f} KB"
         else:
             size_str = f"{bytes_freed / (1024 * 1024):.2f} MB"
-            
+
         # Print results
-        console.print(f"[green]Cleanup complete:[/green]")
-        console.print(f"  • Removed [bold]{result['removed_count']}[/bold] orphaned vector stores")
+        console.print("[green]Cleanup complete:[/green]")
+        console.print(
+            f"  • Removed [bold]{result['removed_count']}[/bold] orphaned vector stores",
+        )
         console.print(f"  • Freed [bold]{size_str}[/bold] of disk space")
-        
+
         # Log removed paths for debugging
         if result["removed_paths"]:
-            state.logger.info(f"Removed the following orphaned vector stores:")
+            state.logger.info("Removed the following orphaned vector stores:")
             for path in result["removed_paths"]:
                 state.logger.info(f"  - {path}")
         else:
             state.logger.info("No orphaned vector stores found")
             console.print("[cyan]No orphaned vector stores found[/cyan]")
-            
+
     except Exception as e:
         state.logger.error(f"Error during cache cleanup: {e!s}")
         console.print(f"[red]Error:[/red] Error during cache cleanup: {e!s}")

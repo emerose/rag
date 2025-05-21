@@ -15,10 +15,12 @@ Performance
 
 Packaging
 
+- get rid of the TUI stuff. it's more annoying and fragile than it's worth
 - Package the project with pyproject.toml + hatch; add an entry-point group ([project.scripts] rag = "rag.cli:app") so users get a single rag command instead of calling python cli.py.
 - Adopt ruff + mypy --strict in CI; fix the missing return annotations and the untyped Any parameters (progress_callback, log_callback, batch: list[Any], etc.) to catch bugs before runtime.
 - Add a poetry export -f requirements.txt --without-hashes (or pip-tools) generated lockfile to pin versions of LangChain/LlamaIndex/OpenAI that frequently break compatibility.
 - if stdout is not a terminal (eg output is being piped to another command), maybe the output should be plain text in some greppable form
+
 
 Documentation
 

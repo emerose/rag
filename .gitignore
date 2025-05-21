@@ -31,3 +31,5 @@ build/
 .cache/index_meta.db
 Scientific Data
 Ingest
+
+.coverage/
