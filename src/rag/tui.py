@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from typing import Any
 import time
+import threading
 
 from rich.text import Text
 from textual.app import App, ComposeResult
@@ -11,6 +12,7 @@ from textual.containers import Container, Horizontal
 from textual.message import Message
 from textual.widgets import Footer, Header, Label, ProgressBar, RichLog
 from textual.worker import Worker, get_current_worker
+from textual import work
 
 from .config import RAGConfig, RuntimeOptions
 from .engine import RAGEngine
@@ -104,14 +106,10 @@ class ProgressBarWithLabel(Container):
                 self.total = max(1, total)  # Ensure total is at least 1
                 self.progress_bar.total = self.total
             
-            # Prevent division by zero
-            if self.total <= 0:
-                self.total = 1
-                self.progress_bar.total = 1
-                
-            # Scale the value to 0-100 range if total is not 100
-            if self.total != 100:
-                value = int((value / self.total) * 100)
+            # Ensure total is not zero to prevent division by zero if we were calculating percentage
+            if self.progress_bar.total == 0:
+                self.progress_bar.total = 1 # Prevent crash, though this state is unusual
+
             self.progress_bar.progress = value
 
 
@@ -344,13 +342,8 @@ class RAGTUI(App):
                         self.config, self.runtime_options)
                     logging.info("RAG engine initialized successfully")
 
-                    # Schedule indexing to start after TUI is ready
-                    async def delayed_start():
-                        await asyncio.sleep(0.1)
-                        self.start_indexing()
-                    
-                    task = asyncio.create_task(delayed_start())
-                    self.pending_tasks.append(task)
+                    # Start indexing immediately after engine initialization
+                    self.start_indexing()
                     
                 except Exception as e:
                     error_msg = f"Failed to initialize RAG engine: {e!s}"
@@ -394,45 +387,63 @@ class RAGTUI(App):
         """Refresh the display."""
         self.refresh()
 
+    def index_documents_worker_manual_thread(self) -> None:
+        """Synchronous method to be run in a manual thread for indexing documents."""
+        # worker = get_current_worker() # Not applicable for manual threads in this way
+        # if not worker.is_cancelled: # Need a different cancellation mechanism if desired
+
+        if not self.rag_engine:
+            # Use call_from_thread for logging if TUI components are involved
+            self.call_from_thread(logging.error, "RAG engine not initialized. Cannot start indexing worker.")
+            return
+
+        try:
+            self.call_from_thread(logging.info, "Indexing worker started (manual thread)...")
+            
+            # Run the async RAG engine indexing. asyncio.run creates a new event loop.
+            asyncio.run(self.rag_engine.index_documents_async())
+            
+            # if not worker.is_cancelled: # Check cancellation differently if needed
+            self.call_from_thread(logging.info, "Indexing completed successfully by worker (manual thread).")
+            self.call_from_thread(logging.info, "TUI will exit in 5 seconds...")
+            time.sleep(5) # This is fine, it's in a separate thread
+            self.call_from_thread(self.exit)
+
+        except Exception as e: # Catch generic Exception for now
+            # Consider specific exception handling for asyncio.CancelledError if manual cancellation is implemented
+            self.call_from_thread(logging.error, f"Error during indexing in manual thread: {e!s}")
+            # if not worker.is_cancelled: # Check cancellation differently if needed
+            self.call_from_thread(logging.info, "TUI will exit in 5 seconds due to error...")
+            time.sleep(5)
+            self.call_from_thread(self.exit)
+        finally:
+            self.call_from_thread(logging.info, "Indexing worker (manual thread) finished.")
+
     def start_indexing(self) -> None:
-        """Start the document indexing process."""
+        """Start the document indexing process using a manual thread."""
+        
+        # Restore actual indexing logic, now with manual threading
         if not self.rag_engine:
             logging.error("Cannot start indexing: RAG engine not initialized")
             return
 
         try:
-            logging.info("Starting indexing process...")
+            logging.info("Starting indexing process via manual thread...")
 
-            # Add progress bars with initial totals
-            self.progress_section.add_progress_bar("Files", 1)  # Will be updated with actual count
-            self.progress_section.add_progress_bar("Chunks", 1)  # Will be updated with actual count
-            self.progress_section.add_progress_bar("Embeddings", 1)  # Will be updated with actual count
-
-            logging.info("Starting document indexing...")
-
-            async def _index_documents_task():
-                """Index documents and exit when complete."""
-                try:
-                    # Start the indexing process
-                    await self.rag_engine.index_documents_async()
-                    logging.info("Indexing completed successfully")
-                    # Add a delay before exiting to allow reading logs
-                    logging.info("Exiting in 5 seconds...")
-                    await asyncio.sleep(5)
-                    # Exit directly after delay
-                    self.exit()
-                except Exception as e:
-                    logging.error(f"Error during indexing: {e!s}")
-                    logging.info("Exiting in 5 seconds...")
-                    await asyncio.sleep(5)
-                    self.exit()
-
-            # Create and store the task
-            task = asyncio.create_task(_index_documents_task())
-            self.pending_tasks.append(task)
+            if self.progress_section:
+                self.progress_section.clear_progress_bars()
+                self.progress_section.add_progress_bar("Files", 1)
+                self.progress_section.add_progress_bar("Chunks", 1)
+                self.progress_section.add_progress_bar("Embeddings", 1)
+            
+            # Create and start a new thread for the indexing worker
+            # The target is the new synchronous worker method
+            thread = threading.Thread(target=self.index_documents_worker_manual_thread, daemon=True)
+            thread.start()
+            # No longer using self.run_worker
 
         except Exception as e:
-            error_msg = f"Error starting indexing: {e!s}"
+            error_msg = f"Error starting indexing (manual thread): {e!s}"
             logging.error(error_msg)
 
     async def on_idle(self) -> None:
@@ -443,26 +454,15 @@ class RAGTUI(App):
             if isinstance(handler, TUILogHandler) and handler._log_queue:
                 handler.flush_queue()
                 
-        # Check on pending tasks
-        for task in list(self.pending_tasks):
-            if task.done():
-                self.pending_tasks.remove(task)
-                # Handle any exceptions
-                if task.exception():
-                    logging.error(f"Task failed with exception: {task.exception()}")
-                
-        # Small sleep to yield back to the event loop
-        await asyncio.sleep(0.01)
-        
-        # Force a refresh periodically
-        self.refresh()
+        # Small sleep to yield back to the event loop, allowing other coroutines to run
+        await asyncio.sleep(0.05) # Increased sleep time slightly
 
     def on_unmount(self) -> None:
         """Clean up when the app is unmounted."""
-        # Cancel any pending tasks
-        for task in self.pending_tasks:
-            if not task.done():
-                task.cancel()
+        # Workers are managed by Textual and should be cancelled automatically
+        # if they are daemonic or via specific cancellation calls if needed.
+        # For @work(exclusive=True, group=...), Textual handles shutdown.
+        pass
 
 
 def run_tui(config: RAGConfig | None = None, runtime_options: RuntimeOptions | None = None) -> None:
