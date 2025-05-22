@@ -27,7 +27,7 @@ try:
 except ImportError:
     PDFMINER_AVAILABLE = False
 
-from ..utils.logging_utils import log_message
+from rag.utils.logging_utils import log_message
 from .metadata_extractor import DocumentMetadataExtractor
 
 logger = logging.getLogger(__name__)

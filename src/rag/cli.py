@@ -36,6 +36,7 @@ except ImportError:
     from rag.config import RAGConfig, RuntimeOptions
     from rag.engine import RAGEngine
     from rag.tui import run_tui
+    from rag.utils import exceptions
 
 
 class LogLevel(str, Enum):
@@ -299,7 +300,13 @@ def index(
     except ValueError as e:
         state.logger.error(f"Configuration error: {e!s}")
         sys.exit(1)
-    except Exception as e:
+    except (
+        rag.utils.exceptions.RAGError,
+        rag.utils.exceptions.DocumentProcessingError,
+        rag.utils.exceptions.DocumentLoadingError,
+        IOError,
+        OSError,
+    ) as e:
         state.logger.error(f"Error during indexing: {e!s}")
         sys.exit(1)
     finally:

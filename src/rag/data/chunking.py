@@ -16,8 +16,8 @@ from langchain_text_splitters import (
     TokenTextSplitter,
 )
 
-from ..ingest import ChunkingStrategy
-from ..utils.logging_utils import log_message
+from rag.ingest import ChunkingStrategy
+from rag.utils.logging_utils import log_message
 from .text_splitter import TextSplitterFactory
 
 logger = logging.getLogger(__name__)

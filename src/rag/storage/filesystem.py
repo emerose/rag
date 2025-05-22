@@ -12,8 +12,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypeAlias
 
-from ..utils.exceptions import FileNotFoundError as RAGFileNotFoundError
-from ..utils.logging_utils import log_message
+from rag.utils.exceptions import FileNotFoundError as RAGFileNotFoundError
+from rag.utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
 

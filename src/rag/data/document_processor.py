@@ -10,10 +10,10 @@ from typing import Any
 
 from langchain.schema import Document
 
-from ..storage.filesystem import FilesystemManager
-from ..utils.exceptions import DocumentProcessingError, UnsupportedFileError
-from ..utils.logging_utils import log_message
-from ..utils.progress_tracker import ProgressTracker
+from rag.storage.filesystem import FilesystemManager
+from rag.utils.exceptions import DocumentProcessingError, UnsupportedFileError
+from rag.utils.logging_utils import log_message
+from rag.utils.progress_tracker import ProgressTracker
 from .document_loader import DocumentLoader
 from .text_splitter import TextSplitterFactory
 

@@ -10,9 +10,9 @@ from typing import Any, TypeVar
 
 from langchain.schema import Document
 
-from ..utils.async_utils import AsyncBatchProcessor, get_optimal_concurrency
-from ..utils.logging_utils import log_message
-from ..utils.progress_tracker import ProgressTracker
+from rag.utils.async_utils import AsyncBatchProcessor, get_optimal_concurrency
+from rag.utils.logging_utils import log_message
+from rag.utils.progress_tracker import ProgressTracker
 from .embedding_provider import EmbeddingProvider
 
 logger = logging.getLogger(__name__)

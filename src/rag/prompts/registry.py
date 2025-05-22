@@ -7,7 +7,7 @@ It exposes a `get_prompt` function that returns a prompt template by ID.
 from langchain_core.prompts import PromptTemplate
 from langchain_core.prompts.base import BasePromptTemplate
 
-from ..utils.exceptions import PromptNotFoundError
+from rag.utils.exceptions import PromptNotFoundError
 
 # Dictionary of built-in prompt templates
 _PROMPTS: dict[str, BasePromptTemplate] = {
