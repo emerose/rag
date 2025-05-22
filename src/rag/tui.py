@@ -25,7 +25,7 @@ class TUILogHandler(logging.Handler):
         """Initialize the handler with a reference to the log viewer."""
         super().__init__()
         self.log_viewer = log_viewer
-        self._log_queue = []
+        self.log_queue = []  # Make this a public attribute
         self._last_flush_time = time.time()
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -55,7 +55,7 @@ class TUILogHandler(logging.Handler):
         )
 
         # Queue the message instead of rendering immediately
-        self._log_queue.append(markup_msg)
+        self.log_queue.append(markup_msg)
 
         # If it's been more than LOG_FLUSH_INTERVAL seconds since the last flush, flush the queue
         current_time = time.time()
@@ -64,12 +64,12 @@ class TUILogHandler(logging.Handler):
 
     def flush_queue(self) -> None:
         """Flush the queued log messages to the log viewer."""
-        if not self._log_queue:
+        if not self.log_queue:
             return
 
         # Get the current queue and clear it
-        messages = self._log_queue
-        self._log_queue = []
+        messages = self.log_queue
+        self.log_queue = []
 
         # Render all messages at once
         for markup_msg in messages:
@@ -318,7 +318,7 @@ class RAGTUI(App[None]):
             root_logger.addHandler(tui_handler)
 
             # Store a reference to the handler for easy access
-            self.log_viewer._handler = tui_handler  # type: ignore[attr-defined]
+            self.log_viewer.tui_handler = tui_handler  # Store in a public attribute
 
             # Configure specific loggers to propagate to root
             loggers_to_configure = [
@@ -479,10 +479,10 @@ class RAGTUI(App[None]):
         if (
             hasattr(self, "log_viewer")
             and self.log_viewer
-            and hasattr(self.log_viewer, "_handler")
-        ):  # type: ignore[attr-defined]
-            handler = self.log_viewer._handler  # type: ignore[attr-defined]
-            if isinstance(handler, TUILogHandler) and handler._log_queue:
+            and hasattr(self.log_viewer, "tui_handler")
+        ):
+            handler = self.log_viewer.tui_handler
+            if isinstance(handler, TUILogHandler) and handler.log_queue:
                 handler.flush_queue()
 
         await asyncio.sleep(0.05)

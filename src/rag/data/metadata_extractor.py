@@ -325,7 +325,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         return font_data
 
     def _analyze_text_element(self, element: LTTextContainer) -> tuple[float, bool]:
-        """Analyze a text element for font size and weight.
+        """Analyze a text element to determine font size and if it's bold.
 
         Args:
             element: A PDFMiner text container element
@@ -337,10 +337,13 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         bold_count = 0
         char_count = 0
 
-        # Traverse the element to find character data
-        for obj in element._objs:
-            for char in obj._objs:
-                if isinstance(char, LTChar):
+        # Use the public API to extract character information
+        if hasattr(element, "get_text"):
+            text = element.get_text()
+            
+            # Process each character in the element
+            for char in self._extract_chars_from_element(element):
+                if hasattr(char, "size"):
                     font_sizes.append(char.size)
                     # Heuristic: Some PDFs mark bold with 'Bold' in font name
                     if hasattr(char, "fontname") and "Bold" in char.fontname:
@@ -357,6 +360,40 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         is_bold = (bold_count / char_count) > 0.5 if char_count > 0 else False
 
         return avg_font_size, is_bold
+
+    def _extract_chars_from_element(self, element: Any) -> list:
+        """Extract character objects from a PDF text element using public APIs.
+        
+        This method provides a safe way to access character information without
+        relying on private attributes.
+        
+        Args:
+            element: PDF element to extract characters from
+            
+        Returns:
+            List of character objects
+        """
+        chars = []
+        
+        # Handle different element types from pdfminer
+        if hasattr(element, "get_text"):
+            # For text containers, iterate through children if possible
+            if hasattr(element, "groups"):
+                # LTTextBoxHorizontal has public 'groups' attribute
+                for group in element.groups:
+                    chars.extend(self._extract_chars_from_element(group))
+            elif hasattr(element, "get_text") and hasattr(element, "__iter__"):
+                # Some text elements allow iteration through their lines
+                for line in element:
+                    chars.extend(self._extract_chars_from_element(line))
+            # Try to get individual characters
+            elif hasattr(element, "__iter__"):
+                for item in element:
+                    if hasattr(item, "size") and hasattr(item, "get_text"):
+                        # This is likely an LTChar
+                        chars.append(item)
+        
+        return chars
 
     def _identify_headings(
         self, font_data: list[dict[str, Any]]
