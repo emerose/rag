@@ -402,9 +402,9 @@ def invalidate(
     except (
         exceptions.RAGError,
         IOError, 
-        OSError,
+        OSError, 
         KeyError,
-        TypeError
+        FileNotFoundError
     ) as e:
         console.print(f"[red]Error:[/red] Error during cache invalidation: {e!s}")
         sys.exit(1)
@@ -492,7 +492,14 @@ def query(
                 if cached_store is not None:
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
-            except Exception as e:
+            except (
+                exceptions.RAGError,
+                exceptions.VectorstoreError,
+                IOError,
+                OSError,
+                KeyError,
+                TypeError,
+            ) as e:
                 state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
@@ -579,7 +586,14 @@ def summarize(
                 if cached_store is not None:
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
-            except Exception as e:
+            except (
+                exceptions.RAGError,
+                exceptions.VectorstoreError,
+                IOError,
+                OSError,
+                KeyError,
+                TypeError,
+            ) as e:
                 state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
@@ -701,7 +715,7 @@ def list(
                     "%Y-%m-%d %H:%M:%S",
                 )
                 state.logger.debug(f"File stats - size: {size}, modified: {modified}")
-            except Exception as e:
+            except (FileNotFoundError, PermissionError, OSError) as e:
                 state.logger.debug(f"Failed to get file stats: {e}")
                 size = "N/A"
                 modified = "N/A"
@@ -771,7 +785,14 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
             if cached_store is not None:
                 rag_engine.vectorstores[file_path] = cached_store
                 state.logger.info(f"Loaded vectorstore for: {file_path}")
-        except Exception as e:
+        except (
+            exceptions.RAGError,
+            exceptions.VectorstoreError,
+            IOError,
+            OSError,
+            KeyError,
+            TypeError,
+        ) as e:
             state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
     if not rag_engine.vectorstores:
@@ -944,10 +965,27 @@ def repl(
                 console.print(
                     "\n[yellow]Use 'exit' or 'quit' to exit the REPL[/yellow]",
                 )
-            except Exception as e:
+            except (
+                exceptions.RAGError,
+                exceptions.VectorstoreError,
+                exceptions.PromptNotFoundError,
+                ValueError,
+                KeyError,
+                IOError,
+                OSError,
+                ConnectionError
+            ) as e:
                 console.print(f"\n[red]Error: {e}[/red]")
 
-    except Exception as e:
+    except (
+        exceptions.RAGError,
+        exceptions.VectorstoreError,
+        IOError,
+        OSError,
+        KeyError,
+        ValueError,
+        ImportError
+    ) as e:
         state.logger.error(f"Error during REPL: {e!s}")
         sys.exit(1)
     finally:
@@ -1004,7 +1042,14 @@ def cleanup() -> None:
             state.logger.info("No orphaned vector stores found")
             console.print("[cyan]No orphaned vector stores found[/cyan]")
 
-    except Exception as e:
+    except (
+        exceptions.RAGError, 
+        IOError, 
+        OSError, 
+        ValueError, 
+        KeyError,
+        FileNotFoundError
+    ) as e:
         state.logger.error(f"Error during cache cleanup: {e!s}")
         console.print(f"[red]Error:[/red] Error during cache cleanup: {e!s}")
         raise typer.Exit(code=1) from e
