@@ -46,14 +46,16 @@
  - **check.sh**: Script to run tests, formatting, and linting checks
 
 ## Task Workflow
-1. Review all code and come up with a step-by-step implementation and testing plan
-2. Put that plan into the TODO file, under the relevant section in Next Up
-3. Confirm with the user that the plan looks good
-4. If approved, begin implementation, checking off individual steps in TODO.md as they're completed
-5. Run tests often and fix errors as they arise
-6. When the task is complete, run check.sh to ensure no errors or linting problems
-7. Run integration tests to verify end-to-end functionality
-8. Remove completed tasks from TODO.md and update CHANGELOG.md with the changes
+1. Create a new feature branch with appropriate naming: `git checkout -b feature/descriptive-name`
+2. Review all code and come up with a step-by-step implementation and testing plan
+3. Put that plan into the TODO file, under the relevant section in Next Up
+4. Confirm with the user that the plan looks good
+5. If approved, begin implementation, checking off individual steps in TODO.md as they're completed
+6. Make small, focused commits with conventional commit messages following the format in the Git Best Practices section
+7. Run tests often and fix errors as they arise
+8. When the task is complete, run check.sh to ensure no errors or linting problems
+9. Run integration tests to verify end-to-end functionality
+10. Remove completed tasks from TODO.md and update CHANGELOG.md with the changes
 
 # Coding Guidelines
 
@@ -130,3 +132,47 @@
 - **Examples**: Provide usage examples in docstrings or tests.
 - **Error Handling**: Include appropriate error handling.
 - **Formatting**: Follow ruff formatting rules.
+
+# Git Best Practices
+
+## 1. Commit Messages
+
+- **Atomic Commits**: Each commit should represent a single logical change.
+- **Structured Format**: Use the following format for commit messages:
+  ```
+  <type>(<scope>): <subject>
+
+  <body>
+
+  <footer>
+  ```
+- **Types**: Use one of these types: feat, fix, docs, style, refactor, test, chore.
+- **Scope**: Optional field indicating the section of the codebase (e.g., cli, storage, retrieval).
+- **Subject**: Concise description of the change (50 chars max, no period at end).
+- **Body**: Optional detailed explanation of the change (wrap at 72 chars).
+- **Footer**: Optional, reference issues and PRs (e.g., "Fixes #123").
+- **Clarity**: Write in the imperative mood ("Add feature" not "Added feature").
+- **Completeness**: Explain what and why, not how (code shows how).
+
+## 2. Branching Strategy
+
+- **Main Branch**: Always keep the main branch in a deployable state.
+- **Feature Branches**: Create branches for new features, fixes, or experiments.
+- **Naming Convention**: Use descriptive names with prefixes:
+  - `feature/descriptive-name` for new features
+  - `fix/issue-description` for bug fixes
+  - `refactor/component-name` for code refactoring
+  - `docs/topic-name` for documentation changes
+  - `test/component-name` for test additions or improvements
+- **Short-lived Branches**: Keep feature branches short-lived to minimize merge conflicts.
+- **Regular Rebasing**: Rebase feature branches on main regularly to stay up to date.
+
+## 3. General Version Control
+
+- **Gitignore**: Keep the repository clean by using appropriate .gitignore patterns.
+- **Large Files**: Use Git LFS for large files, especially model weights.
+- **Secrets**: Never commit secrets, API keys, or credentials.
+- **Generated Files**: Don't commit generated files that can be recreated.
+- **History Preservation**: Avoid force pushing to shared branches.
+- **Meaningful History**: Use rebase and interactive rebase to maintain a clean, meaningful history.
+- **Tags**: Use semantic versioning for release tags (vX.Y.Z).
