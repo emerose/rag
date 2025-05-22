@@ -104,7 +104,7 @@
 # Development Workflow
 
 - **Environment**: Use uv for package management and virtual environment.
-- **Installation**: Run `uv pip install -e .` to install the package in development mode.
+ - **Installation**: Run `uv pip install -e ".[dev]"` to install the package in development mode.
 - **Running**: Activate the virtual environment before running any code.
 - **CLI**: The RAG CLI can be run directly when the virtual environment is active.
 - **Dependencies**: Add new dependencies to pyproject.toml, not manually with pip.
