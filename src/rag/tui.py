@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 from datetime import datetime
+from typing import ClassVar
 
 from rich.text import Text
 from textual.app import App, ComposeResult
@@ -187,7 +188,7 @@ class ProgressUpdated(Message):
 class RAGTUI(App[None]):
     """The main RAG TUI application."""
 
-    BINDINGS: list[tuple[str, str, str]] = [
+    BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("q", "quit", "Quit"),
         ("r", "refresh", "Refresh"),
         ("h", "help", "Help"),

@@ -3,7 +3,8 @@
 1. **Reduce ignored lint rules** – Systematically address and eliminate ignored ruff rules in pyproject.toml for stricter code quality.
    - [x] Fixed TID252 (relative imports) issues
    - [x] Fixed BLE001 (blind except) issues (replaced with specific exceptions)
-   - [ ] Fix remaining rules
+   - [ ] Fix remaining rules:
+     - [x] RUF012 - Mutable class attributes should be annotated with `typing.ClassVar`
    - [x] Address new issues identified by ruff:
      - [x] I001 - Import block is un-sorted or un-formatted (fixed with --fix)
      - [x] UP024 - Replace aliased errors with `OSError` (fixed with --fix)

@@ -9,7 +9,7 @@ import os
 import statistics
 import warnings
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, ClassVar
 
 import tiktoken
 from langchain_core.documents import Document
@@ -292,7 +292,7 @@ class SemanticRecursiveCharacterTextSplitter:
     """
 
     # Default semantic boundaries from most to least significant
-    DEFAULT_SEPARATORS = [
+    DEFAULT_SEPARATORS: ClassVar[list[str]] = [
         "\n\n\n",  # Multiple paragraph breaks
         "\n\n",  # Paragraph breaks
         "\n",  # Line breaks
@@ -469,7 +469,7 @@ class TextSplitterFactory:
     """
 
     # Define splitter configurations by mime type
-    SPLITTER_CONFIGS = {
+    SPLITTER_CONFIGS: ClassVar[dict[str, dict[str, Any]]] = {
         "text/markdown": {
             "name": "markdown_header_splitter",
             "description": "Markdown header text splitter",
@@ -576,7 +576,7 @@ class TextSplitterFactory:
     }
 
     # Define token splitter config
-    TOKEN_SPLITTER_CONFIG = {
+    TOKEN_SPLITTER_CONFIG: ClassVar[dict[str, str]] = {
         "name": "token_splitter",
         "description": "Token-based text splitter",
     }
