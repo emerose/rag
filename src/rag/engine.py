@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
 
 # Update LangChain imports to use community packages
 from langchain_openai import ChatOpenAI
@@ -346,15 +347,17 @@ class RAGEngine:
         self._log("INFO", f"Indexing file: {file_path}")
 
         try:
-            # Debug: Check if file exists
+            # Check if file exists
             if not file_path.exists():
                 self._log("ERROR", f"File does not exist: {file_path}")
                 return False
-                
+
             self._log("DEBUG", f"Starting document ingestion for: {file_path}")
             # Ingest the file
             ingest_result = self.ingest_manager.ingest_file(file_path)
-            self._log("DEBUG", f"Ingestion result successful: {ingest_result.successful}")
+            self._log(
+                "DEBUG", f"Ingestion result successful: {ingest_result.successful}"
+            )
             if not ingest_result.successful:
                 self._log(
                     "ERROR",
@@ -372,79 +375,20 @@ class RAGEngine:
             # Debug: Check first document content
             if documents:
                 first_doc = documents[0]
-                content_preview = first_doc.page_content[:100] + "..." if len(first_doc.page_content) > 100 else first_doc.page_content
+                content_preview = (
+                    first_doc.page_content[:100] + "..."
+                    if len(first_doc.page_content) > 100
+                    else first_doc.page_content
+                )
                 self._log("DEBUG", f"First document content preview: {content_preview}")
                 self._log("DEBUG", f"First document metadata: {first_doc.metadata}")
 
-            # Generate embeddings
-            self._log(
-                "INFO",
-                f"Generating embeddings for {len(documents)} documents from {file_path}",
-            )
-            embeddings = self.embedding_batcher.process_embeddings(documents)
-            self._log("DEBUG", f"Generated {len(embeddings)} embeddings")
-            
-            # Debug: Check first embedding
-            if embeddings:
-                first_emb = embeddings[0]
-                emb_shape = f"length={len(first_emb)}, type={type(first_emb)}"
-                self._log("DEBUG", f"First embedding shape: {emb_shape}")
-
-            # Get existing vectorstore if available
-            existing_vectorstore = self.vectorstores.get(str(file_path))
-            if not existing_vectorstore:
-                self._log("DEBUG", f"No existing vectorstore for {file_path}, loading from cache if available")
-                existing_vectorstore = self.vectorstore_manager.load_vectorstore(
-                    str(file_path)
-                )
-                if existing_vectorstore:
-                    self._log("DEBUG", f"Loaded existing vectorstore from cache")
-                else:
-                    self._log("DEBUG", f"No existing vectorstore found in cache")
-
-            # Create or update vectorstore
-            self._log("DEBUG", f"Adding documents to vectorstore")
-            vectorstore = self.vectorstore_manager.add_documents_to_vectorstore(
-                vectorstore=existing_vectorstore,
-                documents=documents,
-                embeddings=embeddings,
-            )
-            self._log("DEBUG", f"Added documents to vectorstore, store type: {type(vectorstore)}")
-
-            # Save vectorstore
-            self._log("DEBUG", f"Saving vectorstore to cache")
-            save_result = self.vectorstore_manager.save_vectorstore(str(file_path), vectorstore)
-            self._log("DEBUG", f"Vectorstore save result: {save_result}")
-
-            # Update metadata
-            self._log("DEBUG", f"Updating index metadata")
-            self.index_manager.update_metadata(
+            # Generate embeddings and create vectorstore
+            return self._create_vectorstore_from_documents(
                 file_path=file_path,
-                chunk_size=self.config.chunk_size,
-                chunk_overlap=self.config.chunk_overlap,
-                embedding_model=self.config.embedding_model,
-                embedding_model_version=self.embedding_model_version,
+                documents=documents,
                 file_type=ingest_result.source.mime_type or "text/plain",
-                num_chunks=len(documents),
             )
-
-            # Update cache metadata
-            self._log("DEBUG", f"Getting file metadata")
-            file_metadata = self.filesystem_manager.get_file_metadata(file_path)
-            file_metadata["chunks"] = {"total": len(documents)}
-            self._log("DEBUG", f"Updating cache metadata")
-            self.cache_manager.update_cache_metadata(str(file_path), file_metadata)
-
-            # Add vectorstore to memory cache
-            self._log("DEBUG", f"Adding vectorstore to memory cache")
-            self.vectorstores[str(file_path)] = vectorstore
-
-            self._log(
-                "INFO",
-                f"Successfully indexed {file_path} with {len(documents)} chunks",
-            )
-            
-            return True
         except (
             OSError,
             ValueError,
@@ -456,6 +400,110 @@ class RAGEngine:
             FileNotFoundError,
         ) as e:
             self._log("ERROR", f"Failed to index {file_path}: {e}")
+            return False
+
+    def _create_vectorstore_from_documents(
+        self, file_path: Path, documents: list[Document], file_type: str
+    ) -> bool:
+        """Create or update a vectorstore from documents.
+
+        Args:
+            file_path: Path to the file
+            documents: List of documents to add to the vectorstore
+            file_type: MIME type of the file
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Generate embeddings
+            self._log(
+                "INFO",
+                f"Generating embeddings for {len(documents)} documents from {file_path}",
+            )
+            embeddings = self.embedding_batcher.process_embeddings(documents)
+            self._log("DEBUG", f"Generated {len(embeddings)} embeddings")
+
+            # Debug: Check first embedding
+            if embeddings:
+                first_emb = embeddings[0]
+                emb_shape = f"length={len(first_emb)}, type={type(first_emb)}"
+                self._log("DEBUG", f"First embedding shape: {emb_shape}")
+
+            # Get existing vectorstore if available
+            existing_vectorstore = self.vectorstores.get(str(file_path))
+            if not existing_vectorstore:
+                self._log(
+                    "DEBUG",
+                    f"No existing vectorstore for {file_path}, loading from cache if available",
+                )
+                existing_vectorstore = self.vectorstore_manager.load_vectorstore(
+                    str(file_path)
+                )
+                if existing_vectorstore:
+                    self._log("DEBUG", "Loaded existing vectorstore from cache")
+                else:
+                    self._log("DEBUG", "No existing vectorstore found in cache")
+
+            # Create or update vectorstore
+            self._log("DEBUG", "Adding documents to vectorstore")
+            vectorstore = self.vectorstore_manager.add_documents_to_vectorstore(
+                vectorstore=existing_vectorstore,
+                documents=documents,
+                embeddings=embeddings,
+            )
+            self._log(
+                "DEBUG",
+                f"Added documents to vectorstore, store type: {type(vectorstore)}",
+            )
+
+            # Save vectorstore
+            self._log("DEBUG", "Saving vectorstore to cache")
+            save_result = self.vectorstore_manager.save_vectorstore(
+                str(file_path), vectorstore
+            )
+            self._log("DEBUG", f"Vectorstore save result: {save_result}")
+
+            # Update metadata
+            self._log("DEBUG", "Updating index metadata")
+            self.index_manager.update_metadata(
+                file_path=file_path,
+                chunk_size=self.config.chunk_size,
+                chunk_overlap=self.config.chunk_overlap,
+                embedding_model=self.config.embedding_model,
+                embedding_model_version=self.embedding_model_version,
+                file_type=file_type,
+                num_chunks=len(documents),
+            )
+
+            # Update cache metadata
+            self._log("DEBUG", "Getting file metadata")
+            file_metadata = self.filesystem_manager.get_file_metadata(file_path)
+            file_metadata["chunks"] = {"total": len(documents)}
+            self._log("DEBUG", "Updating cache metadata")
+            self.cache_manager.update_cache_metadata(str(file_path), file_metadata)
+
+            # Add vectorstore to memory cache
+            self._log("DEBUG", "Adding vectorstore to memory cache")
+            self.vectorstores[str(file_path)] = vectorstore
+
+            self._log(
+                "INFO",
+                f"Successfully indexed {file_path} with {len(documents)} chunks",
+            )
+
+            return True
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            ConnectionError,
+            TimeoutError,
+            ImportError,
+            AttributeError,
+            FileNotFoundError,
+        ) as e:
+            self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
             return False
 
     def index_directory(self, directory: Path | str | None = None) -> dict[str, bool]:
