@@ -80,7 +80,15 @@ class PDFHeadingExtractor:
 
             # Find headings based on font size analysis
             return self._identify_headings(font_data)
-        except Exception as e:
+        except (
+            IOError,
+            OSError,
+            ValueError,
+            KeyError,
+            IndexError,
+            AttributeError,
+            TypeError
+        ) as e:
             logger.error(f"Error extracting headings from PDF: {e}")
             return []
 
@@ -236,7 +244,15 @@ class PDFHeadingExtractor:
 
             # Build heading paths
             self._build_heading_paths(headings)
-        except Exception as e:
+        except (
+            KeyError,
+            IndexError,
+            ValueError,
+            TypeError,
+            AttributeError,
+            ZeroDivisionError,
+            statistics.StatisticsError
+        ) as e:
             logger.error(f"Error in heading identification: {e}")
             return []
         else:
@@ -825,7 +841,15 @@ class TextSplitterFactory:
                         )
                         # Store heading hierarchy in document metadata
                         documents[0].metadata["heading_hierarchy"] = headings
-                except Exception as e:
+                except (
+                    IOError,
+                    OSError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    AttributeError,
+                    TypeError
+                ) as e:
                     self._log("WARNING", f"Failed to extract PDF headings: {e}")
 
         return documents

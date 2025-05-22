@@ -207,7 +207,15 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
                         and headings[0]["level"] == 1
                     ):
                         metadata["title"] = headings[0]["text"]
-            except Exception as e:
+            except (
+                IOError,
+                OSError,
+                ValueError,
+                KeyError,
+                IndexError,
+                AttributeError,
+                TypeError
+            ) as e:
                 logger.warning(f"Failed to extract PDF headings: {e}")
                 # Fall back to regex-based extraction
 
@@ -273,7 +281,15 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
 
             # Find headings based on font size analysis
             return self._identify_headings(font_data)
-        except Exception as e:
+        except (
+            IOError,
+            OSError,
+            ValueError,
+            KeyError,
+            IndexError,
+            AttributeError,
+            TypeError
+        ) as e:
             logger.error(f"Error extracting headings from PDF: {e}")
             return []
 
@@ -406,7 +422,13 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
 
             # Build heading paths
             self._build_heading_paths(headings)
-        except Exception as e:
+        except (
+            KeyError,
+            IndexError,
+            ValueError,
+            TypeError,
+            AttributeError
+        ) as e:
             logger.error(f"Error in heading identification: {e}")
             return []
         else:

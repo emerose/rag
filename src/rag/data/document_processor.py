@@ -152,7 +152,14 @@ class DocumentProcessor:
                 documents = self.process_file(file_path)
                 results[str(file_path)] = documents
 
-            except Exception as e:
+            except (
+                UnsupportedFileError,
+                DocumentProcessingError,
+                IOError,
+                OSError,
+                ValueError,
+                KeyError,
+            ) as e:
                 self._log("ERROR", f"Failed to process {file_path}: {e}")
 
             # Update progress
