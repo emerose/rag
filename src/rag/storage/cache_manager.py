@@ -11,6 +11,7 @@ import shutil
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypeAlias
+import sqlite3
 
 from rag.utils.logging_utils import log_message
 
@@ -153,7 +154,18 @@ class CacheManager:
             shutil.move(self.cache_metadata_path, self.migrated_marker)
 
             self._log("INFO", "Successfully migrated metadata from JSON to SQLite")
-        except Exception as e:
+        except (
+            IOError,
+            OSError,
+            ValueError,
+            KeyError,
+            ImportError,
+            AttributeError,
+            TypeError,
+            FileNotFoundError,
+            sqlite3.Error,
+            json.JSONDecodeError
+        ) as e:
             self._log("ERROR", f"Failed to migrate cache metadata: {e}")
             return False
         else:

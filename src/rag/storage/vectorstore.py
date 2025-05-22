@@ -191,7 +191,15 @@ class VectorStoreManager:
         except (OSError, ValueError) as e:
             self._log("ERROR", f"Failed to load vector store for {file_path}: {e}")
             return None
-        except Exception as e:
+        except (
+            ImportError,
+            AttributeError,
+            TypeError,
+            KeyError,
+            IndexError,
+            faiss.FaissException,
+            pickle.PickleError
+        ) as e:
             self._log("ERROR", f"Unexpected error loading vector store: {e}")
             self._log("ERROR", f"Traceback: {traceback.format_exc()}")
             return None

@@ -281,7 +281,16 @@ class IngestManager:
                     error_message=f"No content loaded from {source.file_path}",
                     processing_time=datetime.now().timestamp() - start_time,
                 )
-        except Exception as e:
+        except (
+            IOError,
+            OSError,
+            ValueError,
+            KeyError,
+            ImportError,
+            AttributeError,
+            TypeError,
+            FileNotFoundError
+        ) as e:
             self._log("ERROR", f"Failed to load document {source.file_path}: {e}")
             return IngestResult(
                 source=source,
@@ -324,7 +333,16 @@ class IngestManager:
                 "INFO",
                 f"Processed {source.file_path}: {len(documents)} document(s) -> {result.chunk_count} chunks",
             )
-        except Exception as e:
+        except (
+            IOError,
+            OSError,
+            ValueError,
+            KeyError,
+            ImportError,
+            AttributeError,
+            TypeError,
+            IndexError
+        ) as e:
             self._log("ERROR", f"Failed to process {source.file_path}: {e}")
             return IngestResult(
                 source=source,
@@ -370,7 +388,16 @@ class IngestManager:
                 self._log("INFO", f"Processing file {i + 1}/{len(files)}: {file_path}")
                 result = self.ingest_file(file_path)
                 results[str(file_path)] = result
-            except Exception as e:
+            except (
+                IOError,
+                OSError,
+                ValueError,
+                KeyError,
+                ImportError,
+                AttributeError,
+                TypeError,
+                FileNotFoundError
+            ) as e:
                 self._log("ERROR", f"Failed to process {file_path}: {e}")
                 source = self.load_document_source(file_path)
                 results[str(file_path)] = IngestResult(
