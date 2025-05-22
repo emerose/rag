@@ -10,6 +10,9 @@
        - `extract_metadata` in PDFMetadataExtractor
        - `_add_heading_context` in TextSplitterFactory
        - `add_documents_to_vectorstore` in VectorStoreManager
+     - [ ] PERF203 - Try-except inside loops in file loading and processing, maintained for error resilience:
+       - In engine.py and cli.py for vectorstore loading
+       - In engine.py for async file indexing
    - [x] Address new issues identified by ruff:
      - [x] I001 - Import block is un-sorted or un-formatted (fixed with --fix)
      - [x] UP024 - Replace aliased errors with `OSError` (fixed with --fix)

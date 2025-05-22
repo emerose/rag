@@ -87,7 +87,7 @@ ignore = [
     "DTZ005", # Allow naive datetime where timezone not critical
     "SLF001", # Allow access to private attributes of 3rd-party objects
     "C901",   # Complex functions identified for future refactoring (see TODO.md)
-    "PERF203",# Allow try/except inside loops when clarity outweighs perf
+    "PERF203",# Try-except inside loops needed for error resilience in file operations
     # "RUF012", # FIXED: Added ClassVar annotation to mutable class attributes
     "B008",   # Required for Typer CLI - function calls in parameter defaults are part of Typer's design pattern
     "PLR0913",# Allow more than 5 arguments when method signature clarity requires
