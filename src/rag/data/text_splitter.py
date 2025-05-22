@@ -19,6 +19,42 @@ from langchain_text_splitters import (
     TokenTextSplitter,
 )
 
+from rag.utils.logging_utils import log_message
+
+from .metadata_extractor import DocumentMetadataExtractor
+
+
+class _DummyEncoding:
+    """Fallback tokenizer used when ``tiktoken`` data is unavailable."""
+
+    name = "dummy"
+
+    def encode(self, text: str, **_: Any) -> list[str]:
+        return text.split()
+
+
+def _safe_get_encoding(name: str) -> Any:
+    """Return a ``tiktoken`` encoding, falling back to a dummy encoding."""
+
+    try:
+        return tiktoken.get_encoding(name)
+    except Exception as exc:  # pragma: no cover - network failure
+        logger.warning("Falling back to dummy encoding for %s: %s", name, exc)
+        return _DummyEncoding()
+
+
+def _safe_encoding_for_model(model_name: str) -> Any:
+    """Return the encoding for a model, using a dummy one if needed."""
+
+    try:
+        return tiktoken.encoding_for_model(model_name)
+    except Exception as exc:  # pragma: no cover - network failure
+        logger.warning(
+            "Falling back to dummy encoding for model %s: %s", model_name, exc
+        )
+        return _DummyEncoding()
+
+
 try:
     from pdfminer.high_level import extract_pages
     from pdfminer.layout import LTTextContainer
@@ -26,10 +62,6 @@ try:
     PDFMINER_AVAILABLE = True
 except ImportError:
     PDFMINER_AVAILABLE = False
-
-from rag.utils.logging_utils import log_message
-
-from .metadata_extractor import DocumentMetadataExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -441,13 +473,7 @@ class SemanticRecursiveCharacterTextSplitter:
         Returns:
             A SemanticRecursiveCharacterTextSplitter instance
         """
-        try:
-            enc = tiktoken.get_encoding(encoding_name)
-        except KeyError:
-            logger.warning(
-                f"Encoding {encoding_name} not found, falling back to cl100k_base"
-            )
-            enc = tiktoken.get_encoding("cl100k_base")
+        enc = _safe_get_encoding(encoding_name)
 
         if disallowed_special is None:
             disallowed_special = []
@@ -485,15 +511,8 @@ class SemanticRecursiveCharacterTextSplitter:
         chunk_size = int(os.environ.get("RAG_CHUNK_SIZE", "1000"))
         chunk_overlap = int(os.environ.get("RAG_CHUNK_OVERLAP", "200"))
 
-        # Create the instance with tiktoken encoding
-        try:
-            enc = tiktoken.encoding_for_model(model_name)
-            encoding_name = enc.name
-        except KeyError:
-            logger.warning(
-                f"Model {model_name} not found, falling back to cl100k_base encoding"
-            )
-            encoding_name = "cl100k_base"
+        enc = _safe_encoding_for_model(model_name)
+        encoding_name = getattr(enc, "name", "dummy")
 
         return cls.from_tiktoken_encoder(
             encoding_name=encoding_name,
@@ -655,13 +674,7 @@ class TextSplitterFactory:
         self.metadata_extractor = DocumentMetadataExtractor()
 
         # Initialize tokenizer
-        try:
-            self.tokenizer = tiktoken.encoding_for_model(model_name)
-        except KeyError:
-            logger.warning(
-                f"Model {model_name} not found, falling back to cl100k_base encoding",
-            )
-            self.tokenizer = tiktoken.get_encoding("cl100k_base")
+        self.tokenizer = _safe_encoding_for_model(model_name)
 
         # Initialize default semantic splitter
         self.semantic_splitter = (
@@ -784,6 +797,13 @@ class TextSplitterFactory:
             Token-based text splitter
 
         """
+        if isinstance(self.tokenizer, _DummyEncoding):
+            return SemanticRecursiveCharacterTextSplitter(
+                chunk_size=self.chunk_size,
+                chunk_overlap=self.chunk_overlap,
+                length_function=lambda text: len(self.tokenizer.encode(text)),
+            )
+
         return TokenTextSplitter(
             encoding_name=self.tokenizer.name,
             chunk_size=self.chunk_size,
