@@ -37,6 +37,13 @@ _PROMPTS: dict[str, BasePromptTemplate] = {
         "Context:\n{context}\n\nQuestion:\n{question}\n\n"
         "Engaging answer:"
     ),
+    "summary": PromptTemplate.from_template(
+        "You are a concise summarizer. Create a brief summary of the provided context. "
+        "Focus on the main points and key information. Be clear and direct. "
+        "If the context contains multiple topics, organize them logically.\n\n"
+        "Context:\n{context}\n\nQuestion:\n{question}\n\n"
+        "Summary:"
+    ),
 }
 
 

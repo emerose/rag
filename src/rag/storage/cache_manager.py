@@ -310,22 +310,40 @@ class CacheManager:
             f"Invalidated all caches (processed {len(source_file_paths)} source files)",
         )
 
-    def cleanup_invalid_caches(self) -> None:
+    def cleanup_invalid_caches(self) -> list[str]:
         """Clean up invalid caches (files that no longer exist).
 
         This removes files from cache metadata if they no longer exist on disk.
-        """
-        files_to_remove = [
-            file_path
-            for file_path in list(self.cache_metadata)
-            if not Path(file_path).exists()
-        ]
 
+        Returns:
+            List of file paths that were removed from the cache
+        """
+        # Make sure we have the latest cache metadata
+        self.load_cache_metadata()
+
+        self._log(
+            "DEBUG", f"Checking {len(self.cache_metadata)} files in cache metadata"
+        )
+
+        # Convert all paths to absolute paths for consistent checking
+        files_to_remove = []
+        for file_path in list(self.cache_metadata):
+            path_obj = Path(file_path).resolve()
+            if not path_obj.exists():
+                self._log(
+                    "INFO",
+                    f"File no longer exists and will be removed from cache: {file_path}",
+                )
+                files_to_remove.append(file_path)
+
+        # Remove files from cache
         for file_path in files_to_remove:
             self.invalidate_cache(file_path)
 
         if files_to_remove:
             self._log("INFO", f"Cleaned up {len(files_to_remove)} invalid caches")
+
+        return files_to_remove
 
     def cleanup_orphaned_chunks(self) -> dict[str, Any]:
         """Delete cached vector stores whose source files were removed or are no longer in metadata.
@@ -337,15 +355,24 @@ class CacheManager:
             Dictionary with number of orphaned chunks cleaned up and total bytes freed
 
         """
-        # Get all .faiss and .pkl files actually present in the cache directory
+        # First, find files in metadata that no longer exist
+        files_to_remove = [
+            file_path
+            for file_path in list(self.cache_metadata)
+            if not Path(file_path).exists()
+        ]
+
+        # Remove these files from metadata and their vector stores
+        for file_path in files_to_remove:
+            self.invalidate_cache(file_path)
+
+        # Now check for orphaned vector store files
         actual_faiss_files = {str(f) for f in self.cache_dir.glob("*.faiss")}
         actual_pkl_files = {str(f) for f in self.cache_dir.glob("*.pkl")}
         all_actual_cache_files = actual_faiss_files.union(actual_pkl_files)
 
         # Get a set of all valid cache file paths expected from current metadata
         expected_cache_files = set()
-        # self.cache_metadata is loaded by self.load_cache_metadata() which gets it from index_manager
-        # The keys of self.cache_metadata are the original source file paths.
         for source_file_path_str in self.cache_metadata:
             faiss_file, pkl_file = self._get_vector_store_file_paths(
                 source_file_path_str,
@@ -357,8 +384,12 @@ class CacheManager:
         orphaned_file_paths_str = list(all_actual_cache_files - expected_cache_files)
 
         total_bytes_freed = 0
-        orphaned_files_removed_count = 0
+        orphaned_files_removed_count = len(
+            files_to_remove
+        )  # Count files removed from metadata
+        removed_paths = []
 
+        # Delete orphaned vector store files
         for orphaned_path_str in orphaned_file_paths_str:
             orphaned_file = Path(orphaned_path_str)
             if orphaned_file.exists():
@@ -367,6 +398,7 @@ class CacheManager:
                     orphaned_file.unlink()
                     total_bytes_freed += file_size
                     orphaned_files_removed_count += 1
+                    removed_paths.append(str(orphaned_file))
                     self._log("INFO", f"Deleted orphaned cache file {orphaned_file}")
                 except OSError as e:
                     self._log(
@@ -385,6 +417,7 @@ class CacheManager:
         return {
             "orphaned_files_removed": orphaned_files_removed_count,
             "bytes_freed": total_bytes_freed,
+            "removed_paths": removed_paths,
         }
 
     def is_cache_valid(

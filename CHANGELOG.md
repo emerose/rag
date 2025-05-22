@@ -8,6 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Machine-readable JSON output for all CLI commands:
+  - Added `--json` flag to enable JSON output
+  - Auto-detect non-TTY stdout for automatic JSON mode
+  - Structured JSON output for each command type:
+    - `index`: Summary and per-file results
+    - `list`: Table of indexed documents
+    - `query`: Answer, sources, and metadata
+    - `summarize`: Table of document summaries
+    - `cleanup`: Summary of removed files
+    - `invalidate`: Success/error messages
+  - Consistent error output format across all commands
+  - Integration with tools like `jq` for output processing
+  - Comprehensive test suite for JSON output functionality
+  - Refactored output handling into dedicated `cli.output` module with:
+    - `Message` type for simple text output
+    - `TableData` type for structured table data
+    - `Error` type for consistent error reporting
+    - Support for nested tables and arbitrary data structures
 - Advanced text splitting with semantic chunking for better context preservation
 - Automated heading detection for Markdown, HTML, and PDF documents
 - Improved metadata extraction and preservation during chunking

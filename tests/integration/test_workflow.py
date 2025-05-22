@@ -22,8 +22,8 @@ from unittest.mock import patch, MagicMock
 import pytest
 from typer.testing import CliRunner
 
-import rag.cli
-from rag.cli import app
+import rag
+from rag.cli.cli import app, state
 from rag.engine import RAGEngine
 
 
@@ -55,10 +55,10 @@ class TestRAGWorkflow:
     def run_rag_command(self, runner, cmd_args, temp_cache_dir):
         """Run a RAG command with the given arguments using the CliRunner."""
         # Patch the cache_dir in state
-        original_cache_dir = rag.cli.state.cache_dir
+        original_cache_dir = state.cache_dir
         try:
             # Set the cache directory for this test
-            rag.cli.state.cache_dir = temp_cache_dir
+            state.cache_dir = temp_cache_dir
             
             # Always add --cache-dir explicitly to each command
             if cmd_args and cmd_args[0] in ["index", "query", "list", "invalidate"]:
@@ -73,7 +73,7 @@ class TestRAGWorkflow:
             return result
         finally:
             # Restore the original cache directory
-            rag.cli.state.cache_dir = original_cache_dir
+            state.cache_dir = original_cache_dir
 
     def test_cli_option_consistency(self, runner, test_cache_dir):
         """Test that all major commands support the --cache-dir option."""
@@ -193,7 +193,7 @@ class TestRAGWorkflow:
             # Mock both cache loading and chain building
             with patch('rag.engine.RAGEngine._load_cache_metadata') as mock_cache_metadata, \
                  patch('rag.engine.RAGEngine._load_cached_vectorstore') as mock_load_vs, \
-                 patch('rag.engine.RAGEngine._get_rag_chain') as mock_get_chain:
+                 patch('rag.engine.RAGEngine.answer') as mock_answer:
                 
                 # Mock cache metadata to include our file
                 mock_cache_metadata.return_value = {str(sample_file_path): {"chunks": {"total": 3}}}
@@ -202,14 +202,13 @@ class TestRAGWorkflow:
                 mock_vs = MagicMock()
                 mock_load_vs.return_value = mock_vs
                 
-                # Create a mock chain that returns a predetermined result with Tokyo in it
-                mock_chain = MagicMock()
-                mock_chain.invoke.return_value = {
+                # Create a mock answer result with Tokyo in it
+                mock_answer.return_value = {
+                    "question": "What is the capital of Japan?",
                     "answer": "The capital of Japan is Tokyo.",
-                    "documents": [MagicMock()]
+                    "sources": [{"source": str(sample_file_path), "page": 1}],
+                    "num_documents_retrieved": 1
                 }
-                # Return our mock chain when _get_rag_chain is called
-                mock_get_chain.return_value = mock_chain
                 
                 # Run the query
                 result = self.run_rag_command(runner, ["query", query], test_cache_dir)

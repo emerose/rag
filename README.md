@@ -13,6 +13,7 @@ A powerful command-line tool for building and querying RAG applications with a b
 - 📊 Generate document summaries
 - 🔍 Interactive REPL for continuous querying
 - 📋 List and manage indexed documents
+- 🤖 Machine-readable JSON output for automation
 - **Document Indexing**: Process and index various document types (PDF, Markdown, Text, etc.)
 - **Vector Search**: Use semantic similarity to find relevant information
 - **Context-Aware Generation**: Generate answers based on retrieved document chunks
@@ -178,20 +179,24 @@ rag query "What are the main findings?"
 
 # Adjust the number of retrieved documents (default: 4)
 rag query "What are the main findings?" -k 6
+
+# Get machine-readable output
+rag query "What are the main findings?" --json | jq .answer
+
+# Get both answer and sources in JSON format
+rag query "What are the main findings?" --json | jq '{answer: .answer, files: [.sources[].file]}'
 ```
-
-The query command will:
-
-1. Load the existing vector store
-2. Use the query to find the most relevant document chunks
-3. Generate a response using the retrieved context
 
 ### Listing Indexed Documents
 
 View all indexed documents and their metadata:
 
 ```bash
+# Human-readable output
 rag list
+
+# JSON output for scripting
+rag list --json | jq '.table.rows[] | select(.[1] == "PDF")'
 ```
 
 This will show:
@@ -200,7 +205,6 @@ This will show:
 - Document types
 - Last modified dates
 - File sizes
-- Number of chunks
 
 ### Generating Document Summaries
 
@@ -352,3 +356,89 @@ Available prompt templates:
 - `default`: Standard RAG prompt with citation guidance
 - `cot`: Chain-of-thought prompt encouraging step-by-step reasoning
 - `creative`: Engaging, conversational style while maintaining accuracy
+
+### Machine-Readable Output
+
+All commands support machine-readable JSON output through the `--json` flag. JSON output is also automatically enabled when the output is not a terminal (e.g., when piping to another command).
+
+```bash
+# Enable JSON output explicitly
+rag query "What are the main findings?" --json
+
+# JSON output is automatic when piping
+rag query "What are the main findings?" | jq .answer
+
+# List documents in JSON format
+rag list --json | jq '.table.rows[] | select(.[0] | contains(".pdf"))'
+
+# Get indexing results in JSON
+rag index docs/ --json | jq '.summary.total_files'
+```
+
+#### JSON Output Format
+
+Each command produces structured JSON output:
+
+1. Simple messages:
+   ```json
+   {
+     "message": "Successfully processed file.txt"
+   }
+   ```
+
+2. Error messages:
+   ```json
+   {
+     "error": "File not found: missing.txt"
+   }
+   ```
+
+3. Tables (e.g., from `rag list`):
+   ```json
+   {
+     "table": {
+       "title": "Indexed Documents",
+       "columns": ["File", "Type", "Modified", "Size"],
+       "rows": [
+         ["doc1.pdf", "PDF", "2024-03-20", "1.2MB"],
+         ["doc2.txt", "Text", "2024-03-19", "50KB"]
+       ]
+     }
+   }
+   ```
+
+4. Multiple tables:
+   ```json
+   {
+     "tables": [
+       {
+         "title": "Summary",
+         "columns": ["Metric", "Value"],
+         "rows": [["Total Files", "10"], ["Processed", "8"]]
+       },
+       {
+         "title": "Details",
+         "columns": ["File", "Status"],
+         "rows": [["file1.txt", "Success"], ["file2.pdf", "Error"]]
+       }
+     ]
+   }
+   ```
+
+5. Command-specific data (e.g., from `rag query`):
+   ```json
+   {
+     "answer": "The main findings are...",
+     "sources": [
+       {
+         "file": "paper.pdf",
+         "page": 12,
+         "text": "..."
+       }
+     ],
+     "metadata": {
+       "tokens_used": 150,
+       "model": "gpt-4"
+     }
+   }
+   ```

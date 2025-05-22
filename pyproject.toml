@@ -39,7 +39,7 @@ readme = "README.md"
 license = { text = "MIT" }
 
 [project.scripts]
-rag = "rag.cli:run_cli"
+rag = "rag.cli.cli:run_cli"
 
 [project.optional-dependencies]
 dev = [

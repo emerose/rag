@@ -769,11 +769,31 @@ class RAGEngine:
         """
         self._log("INFO", "Cleaning up orphaned chunks")
 
-        # Clean up invalid caches first
-        self.cache_manager.cleanup_invalid_caches()
+        # Make sure cache metadata is loaded
+        self.cache_manager.load_cache_metadata()
 
-        # Clean up orphaned chunks
-        result = self.cache_manager.cleanup_orphaned_chunks()
+        # Clean up invalid caches first (files that no longer exist)
+        removed_files = self.cache_manager.cleanup_invalid_caches()
+        self._log(
+            "INFO",
+            f"Removed {len(removed_files)} invalid cache entries for non-existent files",
+        )
+
+        # Clean up orphaned chunks (vector store files without metadata)
+        orphaned_result = self.cache_manager.cleanup_orphaned_chunks()
+
+        # Combine results
+        total_removed = len(removed_files) + orphaned_result.get(
+            "orphaned_files_removed", 0
+        )
+        removed_paths = orphaned_result.get("removed_paths", []) + removed_files
+
+        # Create the combined result
+        result = {
+            "orphaned_files_removed": total_removed,
+            "bytes_freed": orphaned_result.get("bytes_freed", 0),
+            "removed_paths": removed_paths,
+        }
 
         # Reload vectorstores to ensure consistency
         self._initialize_vectorstores()

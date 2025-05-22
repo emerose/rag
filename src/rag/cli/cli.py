@@ -17,23 +17,24 @@ from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
-from rich.box import ROUNDED
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.panel import Panel
 from rich.progress import (
     Progress,
 )
-from rich.table import Table
 
 # Try both relative and absolute imports
 try:
     # Try relative imports first (for module usage)
+    from .cli.output import Error, TableData, set_json_mode, write
     from .config import RAGConfig, RuntimeOptions
     from .engine import RAGEngine
     from .tui import run_tui
     from .utils import exceptions
 except ImportError:
     # Fall back to absolute imports (for direct script usage)
+    from rag.cli.output import Error, TableData, set_json_mode, write
     from rag.config import RAGConfig, RuntimeOptions
     from rag.engine import RAGEngine
     from rag.tui import run_tui
@@ -58,24 +59,58 @@ app = typer.Typer(
     name="rag",
     help="RAG (Retrieval Augmented Generation) CLI",
     add_completion=False,
+    context_settings={"help_option_names": ["--help", "-h"]},
 )
 
 # Global constants
 CACHE_DIR = ".cache"
 MAX_K_VALUE = 20
 
+
 # Global state
-
-
 class GlobalState:
     """Global state for the CLI."""
 
     is_processing: bool = False
     logger: logging.Logger | None = None
     cache_dir: str = CACHE_DIR  # Initialize with default value
+    json_mode: bool = False  # Track JSON mode
+    console: Console = console  # Store console instance
 
 
 state = GlobalState()
+
+# Define options at module level
+LOG_LEVEL_OPTION = typer.Option(
+    LogLevel.INFO,
+    "--log-level",
+    "-l",
+    help="Set the logging level",
+)
+
+JSON_OUTPUT_OPTION = typer.Option(
+    None,
+    "--json/--no-json",
+    help="Output in JSON format",
+)
+
+# Define argument defaults outside functions
+INVALIDATE_PATH_ARG = typer.Argument(
+    None,
+    help="Path to the file or directory to invalidate",
+    exists=True,
+    dir_okay=True,
+    file_okay=True,
+    resolve_path=True,
+)
+
+
+def update_console_for_json_mode(json_mode: bool) -> None:
+    """Update the global console based on JSON mode."""
+    # Don't use global statement
+    new_console = Console(stderr=True) if json_mode else Console()
+    state.console = new_console
+    state.json_mode = json_mode
 
 
 def configure_logging(verbose: bool, log_level: LogLevel) -> logging.Logger:
@@ -91,7 +126,10 @@ def configure_logging(verbose: bool, log_level: LogLevel) -> logging.Logger:
     logger.handlers = []
 
     # Create and configure the RichHandler
-    rich_handler = RichHandler(console=console, rich_tracebacks=True)
+    rich_handler = RichHandler(
+        console=Console(stderr=True),  # Use stderr for logging
+        rich_tracebacks=True,
+    )
     rich_handler.setLevel(level)
 
     # Add the handler to our logger
@@ -104,10 +142,10 @@ def configure_logging(verbose: bool, log_level: LogLevel) -> logging.Logger:
 def signal_handler(_signum, _frame):
     """Handle interrupt signals gracefully."""
     if state.is_processing:
-        console.print("\n[yellow]Interrupt received. Cleaning up...[/yellow]")
+        write(Error("Interrupt received. Cleaning up..."))
         sys.exit(1)
     else:
-        console.print("\n[yellow]Interrupt received. Exiting...[/yellow]")
+        write(Error("Interrupt received. Exiting..."))
         sys.exit(0)
 
 
@@ -129,26 +167,39 @@ def main(
         False,
         "--verbose",
         "-v",
-        help="Enable verbose logging (sets level to INFO)",
+        help="Enable verbose output",
     ),
-    log_level: LogLevel = typer.Option(  # noqa: B008
-        LogLevel.WARNING,
-        "--log-level",
-        "-l",
-        help="Set the logging level",
-    ),
+    log_level: LogLevel = LOG_LEVEL_OPTION,
     cache_dir: str = typer.Option(
         CACHE_DIR,
         "--cache-dir",
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
+    json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
-    """RAG (Retrieval Augmented Generation) CLI."""
+    """RAG (Retrieval Augmented Generation) CLI.
+
+    This tool provides a command-line interface for indexing documents,
+    querying them using RAG, and managing the document cache.
+    """
+    # Load environment variables
     load_dotenv()
+
+    # Configure logging
     state.logger = configure_logging(verbose, log_level)
-    # Update the cache directory
+
+    # Set cache directory
     state.cache_dir = cache_dir
+
+    # Set up signal handlers
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+    # Configure output mode
+    json_mode = json_output if json_output is not None else not sys.stdout.isatty()
+    set_json_mode(json_mode)
+    update_console_for_json_mode(json_mode)
 
 
 def create_console_progress_callback(progress: Progress) -> Callable[[str, int], None]:
@@ -212,51 +263,27 @@ def index(  # noqa: PLR0913
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
+    json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
     """Index a file or directory for RAG (Retrieval Augmented Generation).
 
-    The indexing process will:
-    1. Process all supported files in the directory
-    2. Create embeddings for each document
-    3. Build a searchable vector store
-    4. Cache results for future use
-
-    Text splitting options:
-    * Use --chunk-size to control the size of text chunks (in tokens)
-    * Use --chunk-overlap to control how much chunks overlap (in tokens)
-    * Use --preserve-headings to maintain document structure
-    * Use --semantic-chunking to split on natural boundaries
+    This command processes documents and creates vector stores for efficient retrieval.
+    It supports various document formats including PDF, Markdown, and text files.
     """
-    state.is_processing = True
     try:
-        # Use the provided cache_dir if specified, otherwise use the global state
-        cache_directory = cache_dir if cache_dir is not None else state.cache_dir
+        state.is_processing = True
 
-        # Convert string path to Path object
-        path = Path(path)
-
-        # If it's a file, use its parent directory
-        # If it's a directory, use it directly
-        if path.is_file():
-            documents_dir = path.parent
-        else:
-            documents_dir = path
-
-        if str(documents_dir) == ".":
-            documents_dir = Path.cwd()
-
-        # Initialize RAG engine using RAGConfig
+        # Initialize RAG engine
+        state.logger.info("Initializing RAG engine...")
         config = RAGConfig(
-            documents_dir=str(documents_dir),
+            documents_dir=str(path),
             embedding_model="text-embedding-3-small",
             chat_model="gpt-4",
             temperature=0.0,
-            cache_dir=cache_directory,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
+            cache_dir=cache_dir or state.cache_dir,
         )
-
-        # Create runtime options with text splitting preferences
         runtime_options = RuntimeOptions(
             preserve_headings=preserve_headings,
             semantic_chunking=semantic_chunking,
@@ -265,19 +292,41 @@ def index(  # noqa: PLR0913
         if use_tui:
             # Run with TUI
             run_tui(config, runtime_options)
+        else:
             # Run without TUI
             rag_engine = RAGEngine(config, runtime_options)
 
             # Run indexing
-            if path.is_file():
+            path_obj = Path(path)
+            if path_obj.is_file():
                 # Index just the file that was specified
-                state.logger.info(f"Indexing file: {path}")
-                success = rag_engine.index_file(path)
+                state.logger.info(f"Indexing file: {path_obj}")
+                success = rag_engine.index_file(path_obj)
                 if success:
-                    console.print(f"[green]Successfully indexed file:[/green] {path}")
-                    console.print(f"[red]Failed to index file:[/red] {path}")
+                    write(
+                        {
+                            "summary": {
+                                "total": 1,
+                                "successful": 1,
+                                "failed": 0,
+                            },
+                            "results": {str(path_obj): success},
+                        }
+                    )
+                else:
+                    write(
+                        {
+                            "summary": {
+                                "total": 1,
+                                "successful": 0,
+                                "failed": 1,
+                            },
+                            "results": {str(path_obj): success},
+                        }
+                    )
+            else:
                 # Index the entire directory
-                state.logger.info(f"Indexing directory: {path}")
+                state.logger.info(f"Indexing directory: {path_obj}")
 
                 # Create a progress bar
                 with Progress() as progress:
@@ -288,18 +337,30 @@ def index(  # noqa: PLR0913
                     rag_engine.runtime.progress_callback = progress_callback
 
                     # Run indexing on the specified directory
-                    results = rag_engine.index_directory(path)
+                    results = rag_engine.index_directory(path_obj)
 
                     # Count successful results
                     success_count = sum(1 for success in results.values() if success)
+                    failed_count = len(results) - success_count
 
-                # Print a summary of indexed files
-                console.print(
-                    f"[green]Successfully indexed {success_count} files[/green]"
-                )
+                    # Create output data
+                    output_data = {
+                        "summary": {
+                            "total": len(results),
+                            "successful": success_count,
+                            "failed": failed_count,
+                        },
+                        "results": {
+                            str(file_path): success
+                            for file_path, success in results.items()
+                        },
+                    }
+
+                    # Write output
+                    write(output_data)
 
     except ValueError as e:
-        state.logger.error(f"Configuration error: {e!s}")
+        write(Error(f"Configuration error: {e}"))
         sys.exit(1)
     except (
         exceptions.RAGError,
@@ -307,7 +368,7 @@ def index(  # noqa: PLR0913
         exceptions.DocumentLoadingError,
         OSError,
     ) as e:
-        state.logger.error(f"Error during indexing: {e!s}")
+        write(Error(f"Error during indexing: {e}"))
         sys.exit(1)
     finally:
         state.is_processing = False
@@ -315,7 +376,7 @@ def index(  # noqa: PLR0913
 
 @app.command()
 def invalidate(
-    path: Path | None = None,
+    path: Path = INVALIDATE_PATH_ARG,
     all_caches: bool = typer.Option(
         False,
         "--all",
@@ -329,6 +390,7 @@ def invalidate(
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
+    json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
     """Invalidate the cache for a specific file or all caches.
 
@@ -345,11 +407,14 @@ def invalidate(
             # Use current directory when --all is specified without a path
             path = Path.cwd()
         elif path is None:
-            console.print("[red]Error:[/red] Please specify a path or use --all flag")
+            write(Error("Please specify a path or use --all flag"))
             sys.exit(1)
 
         # Validate path exists
-        path = validate_path(path)
+        if not path.exists():
+            write(Error(f"Path does not exist: {path}"))
+            sys.exit(1)
+
         state.logger.info(f"Starting cache invalidation for: {path.name}")
         state.logger.debug(f"Full path: {path}")
 
@@ -383,24 +448,38 @@ def invalidate(
             # Invalidate all caches
             state.logger.info("Invalidating all caches...")
             rag_engine.invalidate_all_caches()
-            state.logger.info("Successfully invalidated all caches")
-            console.print("[green]Success:[/green] All caches invalidated successfully")
+            write(
+                {
+                    "message": "All caches invalidated successfully",
+                    "summary": {
+                        "total": 1,
+                        "successful": 1,
+                        "failed": 0,
+                    },
+                }
+            )
         elif path.is_file():
             state.logger.info(f"Invalidating cache for: {path.name}")
             rag_engine.invalidate_cache(str(path))
-            state.logger.info(f"Successfully invalidated cache for {path.name}")
-            console.print(f"[green]Success:[/green] Cache invalidated for {path.name}")
-        else:
-            console.print(
-                "[red]Error:[/red] Please specify a file path when not using --all flag",
+            write(
+                {
+                    "message": f"Cache invalidated for {path.name}",
+                    "summary": {
+                        "total": 1,
+                        "successful": 1,
+                        "failed": 0,
+                    },
+                }
             )
+        else:
+            write(Error("Please specify a file path when not using --all flag"))
             sys.exit(1)
 
     except ValueError as e:
-        console.print(f"[red]Error:[/red] Configuration error: {e!s}")
+        write(Error(f"Configuration error: {e}"))
         sys.exit(1)
     except (exceptions.RAGError, OSError, KeyError, FileNotFoundError) as e:
-        console.print(f"[red]Error:[/red] Error during cache invalidation: {e!s}")
+        write(Error(f"Error during cache invalidation: {e}"))
         sys.exit(1)
 
 
@@ -424,12 +503,6 @@ def query(
         "-p",
         help="Prompt template to use (default, cot, creative)",
     ),
-    json_output: bool = typer.Option(
-        False,
-        "--json",
-        "-j",
-        help="Output the result as JSON",
-    ),
     # Duplicated from app-level callback for Typer CLI compatibility
     cache_dir: str = typer.Option(
         None,  # Default to None to allow app-level value to be used
@@ -437,18 +510,12 @@ def query(
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
+    json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
-    """Query the indexed documents using RAG (Retrieval Augmented Generation).
+    """Run a query against the indexed documents.
 
-    This command will:
-    1. Load the existing vector store from the global cache
-    2. Use the query to find the most relevant document chunks
-    3. Generate a response using the retrieved context
-
-    Choose a prompt style with --prompt:
-    - default: Standard RAG prompt with citation guidance
-    - cot: Chain-of-thought prompt encouraging step-by-step reasoning
-    - creative: Engaging, conversational style while maintaining accuracy
+    This command uses RAG to find relevant documents and generate an answer
+    based on their content.
     """
     state.is_processing = True
     try:
@@ -473,8 +540,10 @@ def query(
         # Load cache metadata to check if we have any documents
         cache_metadata = rag_engine.load_cache_metadata()
         if not cache_metadata:
-            state.logger.error(
-                "No indexed documents found in cache. Please run 'rag index' first.",
+            write(
+                Error(
+                    "No indexed documents found in cache. Please run 'rag index' first."
+                )
             )
             sys.exit(1)
 
@@ -496,8 +565,10 @@ def query(
                 state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
-            state.logger.error(
-                "No valid vectorstores found in cache. Please run 'rag index' first.",
+            write(
+                Error(
+                    "No valid vectorstores found in cache. Please run 'rag index' first."
+                )
             )
             sys.exit(1)
 
@@ -508,23 +579,24 @@ def query(
         # Perform the query
         state.logger.info(f"Running query: {query_text}")
         state.logger.info(f"Retrieving top {k} most relevant documents...")
-        result = (
-            rag_engine.answer(query_text, k=k)
-            if json_output
-            else rag_engine.query(query_text, k=k)
+        result = rag_engine.answer(query_text, k=k)
+
+        # Write output
+        write(
+            {
+                "query": query_text,
+                "answer": result["answer"],
+                "sources": result["sources"],
+                "metadata": {
+                    "k": k,
+                    "prompt_template": prompt,
+                    "num_vectorstores": len(rag_engine.vectorstores),
+                },
+            }
         )
 
-        # Print the result
-        if json_output:
-            import json
-
-            console.print(json.dumps(result, indent=2))
-        else:
-            console.print("\n[bold green]Query Result:[/bold green]")
-            console.print(result)
-
     except ValueError as e:
-        state.logger.error(f"Error: {e!s}")
+        write(Error(f"Error: {e}"))
         sys.exit(1)
     except (
         exceptions.RAGError,
@@ -533,7 +605,7 @@ def query(
         KeyError,
         ConnectionError,
     ) as e:
-        state.logger.error(f"Error during query: {e!s}")
+        write(Error(f"Error during query: {e}"))
         sys.exit(1)
     finally:
         state.is_processing = False
@@ -542,9 +614,19 @@ def query(
 @app.command()
 def summarize(
     k: int = typer.Option(5, "--k", "-k", help="Number of documents to summarize"),
+    # Duplicated from app-level callback for Typer CLI compatibility
+    cache_dir: str = typer.Option(
+        None,  # Default to None to allow app-level value to be used
+        "--cache-dir",
+        "-c",
+        help="Directory for caching embeddings and vector stores",
+    ),
+    json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
-    """Generate summaries for the top k most relevant documents.
-    Uses the global cache of indexed documents.
+    """Generate summaries for indexed documents.
+
+    This command retrieves the most recently indexed documents and generates
+    concise summaries of their content.
     """
     try:
         # Initialize RAG engine using RAGConfig with default cache directory
@@ -554,7 +636,7 @@ def summarize(
             embedding_model="text-embedding-3-small",
             chat_model="gpt-4",
             temperature=0.0,
-            cache_dir=state.cache_dir,
+            cache_dir=cache_dir or state.cache_dir,
         )
         runtime_options = RuntimeOptions()
         rag_engine = RAGEngine(config, runtime_options)
@@ -562,11 +644,10 @@ def summarize(
         # Load cache metadata to check if we have any documents
         cache_metadata = rag_engine.load_cache_metadata()
         if not cache_metadata:
-            state.logger.error(
-                "No indexed documents found in cache. Please run 'rag index' first.",
-            )
-            console.print(
-                "[red]No indexed documents found in cache. Please run 'rag index' first.[/red]",
+            write(
+                Error(
+                    "No indexed documents found in cache. Please run 'rag index' first."
+                )
             )
             sys.exit(1)
 
@@ -588,11 +669,10 @@ def summarize(
                 state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
-            state.logger.error(
-                "No valid vectorstores found in cache. Please run 'rag index' first.",
-            )
-            console.print(
-                "[red]No valid vectorstores found in cache. Please run 'rag index' first.[/red]",
+            write(
+                Error(
+                    "No valid vectorstores found in cache. Please run 'rag index' first."
+                )
             )
             sys.exit(1)
 
@@ -606,43 +686,34 @@ def summarize(
         state.logger.debug(f"Number of summaries generated: {len(summaries)}")
 
         if not summaries:
-            console.print(
-                "[yellow]No summaries could be generated. Try indexing more documents or check your data.[/yellow]",
+            write(
+                Error(
+                    "No summaries could be generated. Try indexing more documents or check your data."
+                )
             )
             return
 
-        # Create table
-        table = Table(
+        # Create table data
+        table_data = TableData(
             title="Document Summaries",
-            show_header=True,
-            header_style="bold magenta",
-            box=ROUNDED,
-            padding=(0, 1),
-            show_lines=True,
+            columns=["Source", "Type", "Summary"],
+            rows=[
+                [
+                    str(Path(summary.get("source", "unknown")).name),
+                    summary.get("source_type", "unknown"),
+                    summary.get("summary", "No summary available"),
+                ]
+                for summary in summaries
+            ],
         )
 
-        # Add columns
-        table.add_column("Source", style="cyan", no_wrap=True)
-        table.add_column("Type", style="green")
-        table.add_column("Summary", style="white")
-
-        # Add rows with blank lines between them
-        for summary in summaries:
-            table.add_row(
-                str(Path(summary["source"]).name),
-                summary.get("source_type", "unknown"),
-                summary.get("summary", "No summary available"),
-            )
-            # Add a blank row after each summary
-            table.add_row("", "", "", style="dim")
-
-        # Print table
-        console.print(table)
+        # Write output
+        write(table_data)
 
     except Exception as e:
-        state.logger.error(f"Error during summarization: {e}")
-        console.print(f"[red]Error during summarization: {e}[/red]")
-        console.print(traceback.format_exc())
+        write(Error(f"Error during summarization: {e}"))
+        if state.logger.isEnabledFor(logging.DEBUG):
+            state.logger.debug(traceback.format_exc())
         raise typer.Exit(1) from e
 
 
@@ -655,14 +726,12 @@ def list(
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
+    json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
-    """List indexed documents from the cache.
+    """List all indexed documents.
 
-    This command displays information about all indexed documents in the cache,
-    including their file type, last modified date, size, and number of chunks.
-
-    Usage:
-        rag list
+    This command shows information about all documents that have been indexed,
+    including their paths and types.
     """
     try:
         # Use the provided cache_dir if specified, otherwise use the global state
@@ -686,13 +755,12 @@ def list(
 
         state.logger.debug(f"Found {len(indexed_files)} indexed documents")
 
-        # Create table
-        table = Table(title="Indexed Documents")
-        table.add_column("File Path", style="cyan", no_wrap=False)
-        table.add_column("Type", style="green")
-        table.add_column("Last Modified", style="yellow")
-        table.add_column("Size", justify="right", style="blue")
-        table.add_column("Chunks", justify="right", style="magenta")
+        # Prepare table data
+        table_data = TableData(
+            title="Indexed Documents",
+            columns=["File Path", "Type", "Last Modified", "Size", "Chunks"],
+            rows=[],
+        )
 
         for file_info in indexed_files:
             file_path = file_info["file_path"]
@@ -717,20 +785,23 @@ def list(
 
             state.logger.debug(f"File type: {file_type}, Chunks: {chunks}")
 
-            table.add_row(
-                str(file_path),
-                file_type,
-                modified,
-                size,
-                str(chunks),
+            # Add row to table
+            table_data["rows"].append(
+                [
+                    str(file_path),
+                    file_type,
+                    modified,
+                    size,
+                    str(chunks),
+                ]
             )
 
-        console.print("\n")
-        console.print(table)
+        # Write output
+        write(table_data)
         state.logger.info(f"Found {len(indexed_files)} indexed documents.")
 
     except (exceptions.RAGError, OSError, KeyError, ValueError, TypeError) as e:
-        state.logger.error(f"Error listing indexed documents: {e!s}")
+        write(Error(f"Error listing indexed documents: {e}"))
         sys.exit(1)
 
 
@@ -756,7 +827,7 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
         state.logger.error(
             "No indexed documents found in cache. Please run 'rag index' first.",
         )
-        console.print(
+        state.console.print(
             "[red]No indexed documents found in cache. Please run 'rag index' first.[/red]",
         )
         sys.exit(1)
@@ -782,7 +853,7 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
         state.logger.error(
             "No valid vectorstores found in cache. Please run 'rag index' first.",
         )
-        console.print(
+        state.console.print(
             "[red]No valid vectorstores found in cache. Please run 'rag index' first.[/red]",
         )
         sys.exit(1)
@@ -817,30 +888,33 @@ def _get_repl_style() -> Style:
 def _get_repl_commands() -> dict[str, Any]:
     """Get the available REPL commands."""
     return {
-        "clear": lambda: console.clear(),
+        "clear": lambda: state.console.clear(),
         "exit": lambda: sys.exit(0),
         "quit": lambda: sys.exit(0),
-        "help": lambda: console.print(
-            "\n[bold]Available Commands:[/bold]\n"
-            "  clear - Clear the screen\n"
-            "  exit/quit - Exit the REPL\n"
-            "  help - Show this help message\n"
-            f"  k <number> - Change number of documents to retrieve (1-{MAX_K_VALUE})\n",
+        "help": lambda: write(
+            "\n".join(
+                [
+                    "Available Commands:",
+                    "  clear - Clear the screen",
+                    "  exit/quit - Exit the REPL",
+                    "  help - Show this help message",
+                    f"  k <number> - Change number of documents to retrieve (1-{MAX_K_VALUE})",
+                ]
+            )
         ),
     }
 
 
-def _print_welcome_message() -> None:
-    """Print the REPL welcome message."""
-    console.print("\n[bold green]RAG REPL[/bold green]")
-    console.print("Type your query or use one of the following commands:")
-    console.print("  [cyan]clear[/cyan] - Clear the screen")
-    console.print("  [cyan]exit[/cyan] or [cyan]quit[/cyan] - Exit the REPL")
-    console.print("  [cyan]help[/cyan] - Show help message")
-    console.print(
-        f"  [cyan]k <number>[/cyan] - Change number of documents to retrieve (1-{MAX_K_VALUE})",
+def print_welcome_message() -> None:
+    """Print welcome message for the CLI."""
+    state.console.print(
+        Panel(
+            "[bold blue]RAG[/bold blue] [dim](Retrieval Augmented Generation)[/dim] [bold blue]CLI[/bold blue]\n"
+            "[dim]v0.1.0[/dim]",
+            title="Welcome",
+            border_style="blue",
+        )
     )
-    console.print("\nPress [bold]Ctrl+C[/bold] to exit\n")
 
 
 def _handle_k_command(user_input: str, k: int) -> tuple[int, bool]:
@@ -848,11 +922,11 @@ def _handle_k_command(user_input: str, k: int) -> tuple[int, bool]:
     try:
         new_k = int(user_input.split()[1])
         if 1 <= new_k <= MAX_K_VALUE:
-            console.print(f"[green]Set k to {new_k}[/green]")
+            write(f"Set k to {new_k}")
             return new_k, True
-        console.print(f"[red]k must be between 1 and {MAX_K_VALUE}[/red]")
+        write(Error(f"k must be between 1 and {MAX_K_VALUE}"))
     except (ValueError, IndexError):
-        console.print("[red]Invalid k value. Usage: k <number>[/red]")
+        write(Error("Invalid k value. Usage: k <number>"))
     return k, False
 
 
@@ -872,23 +946,19 @@ def repl(
         "-p",
         help="Prompt template to use (default, cot, creative)",
     ),
+    # Duplicated from app-level callback for Typer CLI compatibility
+    cache_dir: str = typer.Option(
+        None,  # Default to None to allow app-level value to be used
+        "--cache-dir",
+        "-c",
+        help="Directory for caching embeddings and vector stores",
+    ),
+    json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
-    """Start an interactive REPL (Read-Eval-Print-Loop) for RAG queries.
+    """Start an interactive REPL session.
 
-    This command provides an interactive shell for querying the RAG system.
-    You can ask questions and get answers in real-time without having to
-    run the `query` command repeatedly.
-
-    Available commands in the REPL:
-    - `q` or `quit`: Exit the REPL
-    - `k=<value>`: Change the number of documents to retrieve
-    - `list`: List all indexed documents
-    - `summarize`: Generate summaries of indexed documents
-
-    Choose a prompt style with --prompt:
-    - default: Standard RAG prompt with citation guidance
-    - cot: Chain-of-thought prompt encouraging step-by-step reasoning
-    - creative: Engaging, conversational style while maintaining accuracy
+    This command starts a Read-Eval-Print Loop where you can enter queries
+    and get responses using RAG.
     """
     state.is_processing = True
     try:
@@ -908,7 +978,7 @@ def repl(
         command_completer = WordCompleter(commands.keys())
 
         # Print welcome message
-        _print_welcome_message()
+        print_welcome_message()
 
         while True:
             try:
@@ -935,19 +1005,29 @@ def repl(
                     continue
 
                 # Process query
-                console.print("\n[bold]Query:[/bold]", user_input)
-                console.print("[bold]Retrieving documents...[/bold]")
+                write("\nQuery: " + user_input)
+                write("Retrieving documents...")
 
-                answer_text = rag_engine.query(user_input, k=k)
+                result = rag_engine.answer(user_input, k=k)
 
-                console.print("\n[bold green]Response:[/bold green]")
-                console.print(answer_text)
-                console.print("\n" + "─" * 80 + "\n")
+                # Write output
+                write(
+                    {
+                        "query": user_input,
+                        "answer": result["answer"],
+                        "sources": result["sources"],
+                        "metadata": {
+                            "k": k,
+                            "prompt_template": prompt,
+                            "num_vectorstores": len(rag_engine.vectorstores),
+                        },
+                    }
+                )
+
+                write("\n" + "─" * 80 + "\n")
 
             except KeyboardInterrupt:
-                console.print(
-                    "\n[yellow]Use 'exit' or 'quit' to exit the REPL[/yellow]",
-                )
+                write("Use 'exit' or 'quit' to exit the REPL")
             except (
                 exceptions.RAGError,
                 exceptions.VectorstoreError,
@@ -957,7 +1037,7 @@ def repl(
                 OSError,
                 ConnectionError,
             ) as e:
-                console.print(f"\n[red]Error: {e}[/red]")
+                write(Error(str(e)))
 
     except (
         exceptions.RAGError,
@@ -967,31 +1047,39 @@ def repl(
         ValueError,
         ImportError,
     ) as e:
-        state.logger.error(f"Error during REPL: {e!s}")
+        write(Error(f"Error during REPL: {e}"))
         sys.exit(1)
     finally:
         state.is_processing = False
 
 
 @app.command()
-def cleanup() -> None:
-    """Clean up orphaned chunks in the cache.
+def cleanup(
+    # Duplicated from app-level callback for Typer CLI compatibility
+    cache_dir: str = typer.Option(
+        None,  # Default to None to allow app-level value to be used
+        "--cache-dir",
+        "-c",
+        help="Directory for caching embeddings and vector stores",
+    ),
+    json_output: bool = JSON_OUTPUT_OPTION,
+) -> None:
+    """Clean up the cache by removing entries for non-existent files.
 
-    This command removes cached vector stores for files that no longer exist,
-    helping to keep the .cache/ directory from growing unbounded.
-
-    Usage:
-        rag cleanup
+    This command:
+    1. Scans the cache for all indexed documents
+    2. Checks if each document still exists
+    3. Removes cache entries for missing documents
+    4. Reports space freed and files removed
     """
     try:
         state.logger.info("Starting cache cleanup...")
-        console.print("[cyan]Starting cache cleanup...[/cyan]")
 
         # Initialize RAG engine using RAGConfig with default cache directory
         state.logger.info(f"Initializing RAGConfig with cache_dir: {state.cache_dir}")
         config = RAGConfig(
             documents_dir=".",  # Not used for cleanup, but required
-            cache_dir=state.cache_dir,
+            cache_dir=cache_dir or state.cache_dir,
         )
 
         # Initialize the RAG engine
@@ -1001,31 +1089,37 @@ def cleanup() -> None:
         result = rag_engine.cleanup_orphaned_chunks()
 
         # Format size nicely
-        bytes_freed = result["bytes_freed"]
+        bytes_freed = result.get("bytes_freed", 0)
         if bytes_freed < 1024:
             size_str = f"{bytes_freed} bytes"
         elif bytes_freed < 1024 * 1024:
             size_str = f"{bytes_freed / 1024:.2f} KB"
+        else:
             size_str = f"{bytes_freed / (1024 * 1024):.2f} MB"
 
-        # Print results
-        console.print("[green]Cleanup complete:[/green]")
-        console.print(
-            f"  • Removed [bold]{result['removed_count']}[/bold] orphaned vector stores",
-        )
-        console.print(f"  • Freed [bold]{size_str}[/bold] of disk space")
+        # Create output data
+        output_data = {
+            "summary": {
+                "removed_count": result.get("orphaned_files_removed", 0),
+                "bytes_freed": bytes_freed,
+                "size_human": size_str,
+            },
+            "removed_paths": result.get("removed_paths", []),
+        }
+
+        # Write output
+        write(output_data)
 
         # Log removed paths for debugging
-        if result["removed_paths"]:
+        if result.get("orphaned_files_removed", 0) > 0:
             state.logger.info("Removed the following orphaned vector stores:")
-            for path in result["removed_paths"]:
+            for path in result.get("removed_paths", []):
                 state.logger.info(f"  - {path}")
+        else:
             state.logger.info("No orphaned vector stores found")
-            console.print("[cyan]No orphaned vector stores found[/cyan]")
 
     except (exceptions.RAGError, OSError, ValueError, KeyError, FileNotFoundError) as e:
-        state.logger.error(f"Error during cache cleanup: {e!s}")
-        console.print(f"[red]Error:[/red] Error during cache cleanup: {e!s}")
+        write(Error(f"Error during cache cleanup: {e}"))
         raise typer.Exit(code=1) from e
 
 
