@@ -81,7 +81,6 @@ ignore = [
     "ANN401", # Allow use of Any in complex generic contexts
     "TID252", # Allow relative imports within the rag package
     "BLE001", # Allow broad exception handling where external libraries raise various errors
-    "EM102",  # Allow f-strings in exception messages for clarity
     "PLR2004",# Magic numbers are acceptable in limited heuristic code
     "DTZ005", # Allow naive datetime where timezone not critical
     "SLF001", # Allow access to private attributes of 3rd-party objects
