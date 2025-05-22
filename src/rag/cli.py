@@ -479,7 +479,7 @@ def query(
                 if cached_store is not None:
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
-            except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:  # noqa: PERF203
+            except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:
                 state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
@@ -559,7 +559,7 @@ def summarize(
                 if cached_store is not None:
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
-            except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:  # noqa: PERF203
+            except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:
                 state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
@@ -744,7 +744,7 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
             if cached_store is not None:
                 rag_engine.vectorstores[file_path] = cached_store
                 state.logger.info(f"Loaded vectorstore for: {file_path}")
-        except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:  # noqa: PERF203
+        except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:
             state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
     if not rag_engine.vectorstores:

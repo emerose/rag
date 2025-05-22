@@ -79,18 +79,10 @@ ignore = [
     # high while allowing development velocity.
     "E501",   # Line length handled by formatter; long strings are acceptable
     "ANN401", # Allow use of Any in complex generic contexts
-    # "TID252", # FIXED: Replaced relative imports with absolute imports
-    # "BLE001", # FIXED: Replaced generic exception handling with specific exceptions
-    # "I001",   # FIXED: Sorted and formatted import blocks
-    # "UP024",  # FIXED: Replaced aliased errors with OSError
-    # "PLR2004",# FIXED: Added # noqa: PLR2004 tags to specific magic value comparisons
-    # "DTZ005", # FIXED: Added timezone-aware datetime utility functions
     "SLF001", # Allow access to private attributes (~190 occurrences, many in 3rd-party objects like _dict)
-    "C901",   # Complex functions identified for future refactoring (see TODO.md)
-    # "PERF203",# FIXED: Added # noqa: PERF203 tags to specific try-except blocks in loops
-    # "RUF012", # FIXED: Added ClassVar annotation to mutable class attributes
+    "C901",   # Complex functions identified for future refactoring (3 occurrences, see TODO.md)
     "B008",   # Required for Typer CLI - function calls in parameter defaults are part of Typer's design pattern
-    "PLR0913",# Allow more than 5 arguments (~70 occurrences, refactoring would be a significant effort)
+    "PLR0913",# Allow more than 5 arguments (~7 occurrences, refactoring would be a significant effort)
 ]
 fixable = ["ALL"]
 unfixable = []

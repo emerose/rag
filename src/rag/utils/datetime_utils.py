@@ -5,10 +5,9 @@ particularly for ensuring timezone awareness.
 """
 
 import datetime
-from typing import Optional
 
 
-def now(tz: Optional[datetime.tzinfo] = None) -> datetime.datetime:
+def now(tz: datetime.tzinfo | None = None) -> datetime.datetime:
     """Get a timezone-aware current datetime.
 
     Args:
@@ -24,7 +23,7 @@ def now(tz: Optional[datetime.tzinfo] = None) -> datetime.datetime:
     return datetime.datetime.now(tz=tz)
 
 
-def timestamp_now(tz: Optional[datetime.tzinfo] = None) -> float:
+def timestamp_now(tz: datetime.tzinfo | None = None) -> float:
     """Get the current timestamp with timezone awareness.
 
     Args:
