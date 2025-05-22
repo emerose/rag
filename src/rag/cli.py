@@ -724,7 +724,14 @@ def list(
         console.print(table)
         state.logger.info(f"Found {len(indexed_files)} indexed documents.")
 
-    except Exception as e:
+    except (
+        exceptions.RAGError,
+        IOError,
+        OSError,
+        KeyError,
+        ValueError,
+        TypeError,
+    ) as e:
         state.logger.error(f"Error listing indexed documents: {e!s}")
         sys.exit(1)
 
