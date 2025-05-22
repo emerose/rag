@@ -13,6 +13,8 @@
      - [x] PERF203 - Added `# noqa: PERF203` tags to specific try-except blocks inside loops
      - [x] PLR2004 - Added `# noqa: PLR2004` tags to specific magic values in comparisons
      - [x] DTZ005 - Created timezone-aware datetime utility functions for all timestamp operations
+     - [ ] SLF001 - This rule should remain disabled as the codebase has ~190 private member accesses, many in 3rd-party code
+     - [ ] PLR0913 - This rule should remain disabled as the codebase has ~70 functions with many arguments
    - [x] Address new issues identified by ruff:
      - [x] I001 - Import block is un-sorted or un-formatted (fixed with --fix)
      - [x] UP024 - Replace aliased errors with `OSError` (fixed with --fix)
