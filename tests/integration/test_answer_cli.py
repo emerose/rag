@@ -69,8 +69,8 @@ def check_cache_directory(cache_dir):
         print(f"No FAISS vectorstore files found in {cache_dir}")
         return False
     
-    # Check for metadata
-    metadata_files = list(cache_path.glob("metadata.sqlite")) 
+    # Check for metadata stored in index_metadata.db
+    metadata_files = list(cache_path.glob("index_metadata.db"))
     if not metadata_files:
         print(f"No metadata files found in {cache_dir}")
         return False
