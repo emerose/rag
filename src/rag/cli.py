@@ -301,9 +301,9 @@ def index(
         state.logger.error(f"Configuration error: {e!s}")
         sys.exit(1)
     except (
-        rag.utils.exceptions.RAGError,
-        rag.utils.exceptions.DocumentProcessingError,
-        rag.utils.exceptions.DocumentLoadingError,
+        exceptions.RAGError,
+        exceptions.DocumentProcessingError,
+        exceptions.DocumentLoadingError,
         IOError,
         OSError,
     ) as e:
@@ -399,7 +399,13 @@ def invalidate(
     except ValueError as e:
         console.print(f"[red]Error:[/red] Configuration error: {e!s}")
         sys.exit(1)
-    except Exception as e:
+    except (
+        exceptions.RAGError,
+        IOError, 
+        OSError,
+        KeyError,
+        TypeError
+    ) as e:
         console.print(f"[red]Error:[/red] Error during cache invalidation: {e!s}")
         sys.exit(1)
 
@@ -520,7 +526,14 @@ def query(
     except ValueError as e:
         state.logger.error(f"Error: {e!s}")
         sys.exit(1)
-    except Exception as e:
+    except (
+        exceptions.RAGError,
+        exceptions.VectorstoreError,
+        IOError,
+        OSError,
+        KeyError,
+        ConnectionError,
+    ) as e:
         state.logger.error(f"Error during query: {e!s}")
         sys.exit(1)
     finally:

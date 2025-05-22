@@ -1,11 +1,19 @@
 ## 🚀 Next Up (Implementation Plan)
 
+1. **Reduce ignored lint rules** – Systematically address and eliminate ignored ruff rules in pyproject.toml for stricter code quality.
+   - [x] Fixed TID252 (relative imports) issues
+   - [ ] Address BLE001 (blind except) issues
+   - [ ] Fix remaining rules
+   - Note: E501 (line length) will remain disabled permanently as it's handled by the formatter and long strings are acceptable
+
+
 ---
 
 ### 🗺️ Roadmap & Priorities  
 *(Priority ‑ **P1** = Do next, … **P5** = Nice-to-have)*
 
 ---
+
 
 #### 1 . Architecture & Core Design
 - **[P2] Vector-store abstraction** – Introduce `VectorStoreProtocol` so FAISS can be swapped for Qdrant/Chroma via a CLI flag.
@@ -39,7 +47,7 @@
 
 #### 8 . Packaging & CI
 - **[P2] PyProject packaging** – Add `pyproject.toml`, `hatch` build and `[project.scripts] rag = "rag.cli:app"`.
-- **[P2] Ruff + mypy --strict** – [IN PROGRESS] Improving linting with ruff by steadily reducing ignored rules.
+- **[P2] Reduce ignored lint rules** – Systematically address and eliminate ignored ruff rules in pyproject.toml for stricter code quality.
 - **[P3] Version lockfile** – Generate requirements lock (poetry export / pip-tools) to freeze LangChain/OpenAI versions.
 - **[P4] Remove TUI** – Deprecate rich-based TUI since it is fragile; keep plain CLI.
 - **[P5] Deduplicate CSS** – Only relevant if TUI retained; else drop.
