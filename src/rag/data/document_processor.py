@@ -197,10 +197,10 @@ class DocumentProcessor:
             doc.metadata["chunk_total"] = len(documents)
             doc.metadata["mime_type"] = mime_type
 
-            # Add enhancement timestamp
-            from datetime import datetime
-
-            doc.metadata["processed_at"] = datetime.now().timestamp()
+            # Add timestamp for when the document was processed
+            from rag.utils import timestamp_now
+            
+            doc.metadata["processed_at"] = timestamp_now()
 
             # Add token count
             token_count = self.text_splitter_factory._token_length(doc.page_content)

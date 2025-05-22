@@ -12,6 +12,7 @@
        - `add_documents_to_vectorstore` in VectorStoreManager
      - [x] PERF203 - Added `# noqa: PERF203` tags to specific try-except blocks inside loops
      - [x] PLR2004 - Added `# noqa: PLR2004` tags to specific magic values in comparisons
+     - [x] DTZ005 - Created timezone-aware datetime utility functions for all timestamp operations
    - [x] Address new issues identified by ruff:
      - [x] I001 - Import block is un-sorted or un-formatted (fixed with --fix)
      - [x] UP024 - Replace aliased errors with `OSError` (fixed with --fix)

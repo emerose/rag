@@ -84,7 +84,7 @@ ignore = [
     # "I001",   # FIXED: Sorted and formatted import blocks
     # "UP024",  # FIXED: Replaced aliased errors with OSError
     # "PLR2004",# FIXED: Added # noqa: PLR2004 tags to specific magic value comparisons
-    "DTZ005", # Allow naive datetime where timezone not critical
+    # "DTZ005", # FIXED: Added timezone-aware datetime utility functions
     "SLF001", # Allow access to private attributes of 3rd-party objects
     "C901",   # Complex functions identified for future refactoring (see TODO.md)
     # "PERF203",# FIXED: Added # noqa: PERF203 tags to specific try-except blocks in loops

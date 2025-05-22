@@ -11,13 +11,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum, auto
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, ClassVar, Generic, Optional, TypeVar
 
 from langchain_core.documents import Document
 
 from .storage.filesystem import FilesystemManager
 from .utils.logging_utils import log_message
 from .utils.progress_tracker import ProgressTracker
+from rag.utils import timestamp_now
 
 logger = logging.getLogger(__name__)
 
@@ -246,7 +247,7 @@ class IngestManager:
         Returns:
             Result of ingestion process
         """
-        start_time = datetime.now().timestamp()
+        start_time = timestamp_now()
         source = self.load_document_source(file_path)
 
         # Check if file exists and is supported
@@ -255,7 +256,7 @@ class IngestManager:
                 source=source,
                 status=IngestStatus.FILE_NOT_FOUND,
                 error_message=f"File not found: {source.file_path}",
-                processing_time=datetime.now().timestamp() - start_time,
+                processing_time=timestamp_now() - start_time,
             )
 
         if not self.filesystem_manager.is_supported_file(source.file_path):
@@ -263,7 +264,7 @@ class IngestManager:
                 source=source,
                 status=IngestStatus.UNSUPPORTED_FILE_TYPE,
                 error_message=f"Unsupported file type: {source.mime_type}",
-                processing_time=datetime.now().timestamp() - start_time,
+                processing_time=timestamp_now() - start_time,
             )
 
         # Load document - separated try block for loading errors
@@ -279,7 +280,7 @@ class IngestManager:
                     source=source,
                     status=IngestStatus.LOADING_ERROR,
                     error_message=f"No content loaded from {source.file_path}",
-                    processing_time=datetime.now().timestamp() - start_time,
+                    processing_time=timestamp_now() - start_time,
                 )
         except (OSError, ValueError, KeyError, ImportError, AttributeError, TypeError, FileNotFoundError) as e:
             self._log("ERROR", f"Failed to load document {source.file_path}: {e}")
@@ -287,7 +288,7 @@ class IngestManager:
                 source=source,
                 status=IngestStatus.LOADING_ERROR,
                 error_message=str(e),
-                processing_time=datetime.now().timestamp() - start_time,
+                processing_time=timestamp_now() - start_time,
             )
 
         # Process document - separate try block for processing errors
@@ -304,7 +305,7 @@ class IngestManager:
                 # Add chunk metadata
                 doc.metadata["chunk_index"] = i
                 doc.metadata["chunk_total"] = len(chunked_docs)
-                doc.metadata["processed_at"] = datetime.now().timestamp()
+                doc.metadata["processed_at"] = timestamp_now()
 
                 # Apply text preprocessor if content exists
                 if hasattr(doc, "page_content") and doc.page_content:
@@ -317,7 +318,7 @@ class IngestManager:
                 source=source,
                 status=IngestStatus.SUCCESS,
                 documents=chunked_docs,
-                processing_time=datetime.now().timestamp() - start_time,
+                processing_time=timestamp_now() - start_time,
             )
 
             self._log(
@@ -330,7 +331,7 @@ class IngestManager:
                 source=source,
                 status=IngestStatus.PROCESSING_ERROR,
                 error_message=str(e),
-                processing_time=datetime.now().timestamp() - start_time,
+                processing_time=timestamp_now() - start_time,
             )
         else:
             return result
