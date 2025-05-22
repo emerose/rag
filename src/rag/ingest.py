@@ -137,12 +137,12 @@ class BasicPreprocessor(Preprocessor):
     newline standardization, etc.
     """
 
-    def process(self, text: str, metadata: dict[str, Any]) -> str:
+    def process(self, text: str, _metadata: dict[str, Any]) -> str:
         """Process document text.
 
         Args:
             text: Document text
-            metadata: Document metadata
+            _metadata: Document metadata (unused)
 
         Returns:
             Processed text
@@ -324,8 +324,6 @@ class IngestManager:
                 "INFO",
                 f"Processed {source.file_path}: {len(documents)} document(s) -> {result.chunk_count} chunks",
             )
-            return result
-
         except Exception as e:
             self._log("ERROR", f"Failed to process {source.file_path}: {e}")
             return IngestResult(
@@ -334,6 +332,8 @@ class IngestManager:
                 error_message=str(e),
                 processing_time=datetime.now().timestamp() - start_time,
             )
+        else:
+            return result
 
     def ingest_directory(self, directory: Path | str) -> dict[str, IngestResult]:
         """Ingest all files in a directory.

@@ -324,7 +324,7 @@ class RAGEngine:
         self._log("INFO", f"Loaded {len(self.vectorstores)} vectorstores")
 
     def index_file(self, file_path: Path | str) -> bool:
-        """Index a single file.
+        """Index a file.
 
         Args:
             file_path: Path to the file to index
@@ -337,51 +337,36 @@ class RAGEngine:
         self._log("INFO", f"Indexing file: {file_path}")
 
         try:
-            # Check if file needs reindexing
-            needs_reindexing = self.index_manager.needs_reindexing(
-                file_path=file_path,
-                chunk_size=self.config.chunk_size,
-                chunk_overlap=self.config.chunk_overlap,
-                embedding_model=self.config.embedding_model,
-                embedding_model_version=self.embedding_model_version,
-            )
-
-            if not needs_reindexing:
-                self._log("INFO", f"File already indexed: {file_path}")
-                return True
-
-            # Use the new ingest manager to process the file
+            # Ingest the file
             ingest_result = self.ingest_manager.ingest_file(file_path)
-
             if not ingest_result.successful:
                 self._log(
-                    "WARNING",
+                    "ERROR",
                     f"Failed to process {file_path}: {ingest_result.error_message}",
                 )
                 return False
 
+            # Get documents from ingestion result
             documents = ingest_result.documents
             if not documents:
                 self._log("WARNING", f"No documents extracted from {file_path}")
                 return False
 
-            # Get embeddings
-            self._log("INFO", f"Generating embeddings for {len(documents)} documents")
+            # Generate embeddings
+            self._log(
+                "INFO",
+                f"Generating embeddings for {len(documents)} documents from {file_path}",
+            )
             embeddings = self.embedding_batcher.process_embeddings(documents)
 
             # Get existing vectorstore if available
-            str_file_path = str(file_path)
-            existing_vectorstore = self.vectorstores.get(str_file_path)
+            existing_vectorstore = self.vectorstores.get(str(file_path))
             if not existing_vectorstore:
                 existing_vectorstore = self.vectorstore_manager.load_vectorstore(
-                    str_file_path,
+                    file_path
                 )
 
             # Create or update vectorstore
-            mime_type = (
-                ingest_result.source.mime_type
-                or self.filesystem_manager.get_file_type(file_path)
-            )
             vectorstore = self.vectorstore_manager.add_documents_to_vectorstore(
                 vectorstore=existing_vectorstore,
                 documents=documents,
@@ -389,7 +374,7 @@ class RAGEngine:
             )
 
             # Save vectorstore
-            self.vectorstore_manager.save_vectorstore(str(file_path), vectorstore)
+            self.vectorstore_manager.save_vectorstore(file_path, vectorstore)
 
             # Update metadata
             self.index_manager.update_metadata(
@@ -398,14 +383,14 @@ class RAGEngine:
                 chunk_overlap=self.config.chunk_overlap,
                 embedding_model=self.config.embedding_model,
                 embedding_model_version=self.embedding_model_version,
-                file_type=mime_type,
+                file_type=ingest_result.source.mime_type or "text/plain",
                 num_chunks=len(documents),
             )
 
             # Update cache metadata
             file_metadata = self.filesystem_manager.get_file_metadata(file_path)
             file_metadata["chunks"] = {"total": len(documents)}
-            self.cache_manager.update_cache_metadata(str(file_path), file_metadata)
+            self.cache_manager.update_cache_metadata(file_path, file_metadata)
 
             # Add vectorstore to memory cache
             self.vectorstores[str(file_path)] = vectorstore
@@ -414,11 +399,11 @@ class RAGEngine:
                 "INFO",
                 f"Successfully indexed {file_path} with {len(documents)} chunks",
             )
-            return True
-
         except Exception as e:
             self._log("ERROR", f"Failed to index {file_path}: {e}")
             return False
+        else:
+            return True
 
     def index_directory(self, directory: Path | str | None = None) -> dict[str, bool]:
         """Index all files in a directory.
@@ -566,8 +551,6 @@ class RAGEngine:
             result = enhance_result(question, answer_text, documents)
             result["num_documents_retrieved"] = len(documents)
             self._log("INFO", "Successfully generated answer (LCEL)")
-            return result
-
         except Exception as e:
             self._log("ERROR", f"Failed to answer question: {e}")
             return {
@@ -576,6 +559,8 @@ class RAGEngine:
                 "sources": [],
                 "num_documents_retrieved": 0,
             }
+        else:
+            return result
 
     def query(self, query: str, k: int = 4) -> str:
         """Return only the answer text for *query* (legacy helper)."""
@@ -607,37 +592,30 @@ class RAGEngine:
                     if not docs:
                         continue
 
-                    # Simple summarisation prompt
-                    combined_text = "\n\n".join(doc.page_content for doc in docs)[
-                        :10000
-                    ]
-                    sys_prompt = "You are a helpful assistant. Provide a concise summary (max 200 words) of the given document."
-                    from langchain_core.messages import HumanMessage, SystemMessage
+                    first_paragraphs = docs[0].page_content.split("\n\n", 3)[:3]
+                    doc_content = "\n\n".join(first_paragraphs)
 
-                    response = self.chat_model.invoke(
-                        [
-                            SystemMessage(content=sys_prompt),
-                            HumanMessage(content=combined_text),
-                        ]
+                    # Use the LCEL RAG chain to summarize it
+                    chain = self._get_rag_chain(k=1, prompt_id="summary")
+                    chain_output = chain.invoke(
+                        f"Generate a 1-2 sentence summary of this document: {doc_content[:5000]}"
                     )
-                    summary = response.content
 
                     summaries.append(
                         {
-                            "source": file_path,
-                            "source_type": file_type,
-                            "summary": summary,
+                            "file_path": file_path,
+                            "file_type": file_type,
+                            "summary": chain_output["answer"],
                             "num_chunks": file_info.get("num_chunks", 0),
                         }
                     )
                 except Exception as e:
                     self._log("ERROR", f"Failed to summarize {file_path}: {e}")
-
-            return summaries
-
         except Exception as e:
             self._log("ERROR", f"Failed to generate document summaries: {e}")
             return []
+        else:
+            return summaries
 
     def cleanup_orphaned_chunks(self) -> dict[str, Any]:
         """Delete cached vector stores whose source files were removed.

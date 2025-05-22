@@ -99,11 +99,12 @@ def configure_logging(verbose: bool, log_level: LogLevel) -> logging.Logger:
     return logger
 
 
-def signal_handler(signum, frame):
+def signal_handler(_signum, _frame):
     """Handle interrupt signals gracefully."""
     if state.is_processing:
         console.print("\n[yellow]Interrupt received. Cleaning up...[/yellow]")
         sys.exit(1)
+    else:
         console.print("\n[yellow]Interrupt received. Exiting...[/yellow]")
         sys.exit(0)
 

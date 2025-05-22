@@ -7,7 +7,6 @@ from different document types, enhancing the document retrieval capabilities.
 import logging
 import os
 import re
-import statistics
 from abc import ABC, abstractmethod
 from typing import Any, Protocol
 
@@ -362,80 +361,56 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
     def _identify_headings(
         self, font_data: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
-        """Identify headings based on font size analysis.
+        """Identify headings from font data.
 
         Args:
             font_data: List of font data dictionaries
 
         Returns:
-            List of identified headings with level, text, and position
+            List of identified headings
         """
-        if not font_data:
-            return []
-
-        # Extract font sizes to analyze distribution
-        font_sizes = [item["font_size"] for item in font_data]
-
         try:
-            # Calculate statistical measures
-            mean_size = statistics.mean(font_sizes)
-            std_dev = statistics.stdev(font_sizes) if len(font_sizes) > 1 else 0
-
-            # Set thresholds for heading levels
-            # Level 1: > mean + 2*std_dev (largest headings)
-            # Level 2: > mean + 1.5*std_dev
-            # Level 3: > mean + 1*std_dev
-            threshold_level1 = mean_size + (2 * std_dev)
-            threshold_level2 = mean_size + (1.5 * std_dev)
-            threshold_level3 = mean_size + std_dev
-
-            # Identify headings
-            headings = []
+            # Group text elements by font size
+            fonts_by_size: dict[float, list[dict[str, Any]]] = {}
             for item in font_data:
-                font_size = item["font_size"]
-                text = item["text"]
-                position = item["position"]
+                size = item["font_size"]
+                if size not in fonts_by_size:
+                    fonts_by_size[size] = []
+                fonts_by_size[size].append(item)
 
-                # Skip very short texts (likely not headings)
-                if len(text) < 2 or len(text) > 200:
-                    continue
+            # Sort font sizes in descending order (larger = higher heading)
+            sorted_sizes = sorted(fonts_by_size.keys(), reverse=True)
 
-                # Determine heading level based on font size
-                if font_size >= threshold_level1:
-                    level = 1
-                elif font_size >= threshold_level2:
-                    level = 2
-                elif font_size >= threshold_level3:
-                    level = 3
-                else:
-                    # Not a heading
-                    continue
+            # Identify up to 5 heading levels (approx. h1-h5)
+            heading_sizes = sorted_sizes[:5] if len(sorted_sizes) > 5 else sorted_sizes
 
-                # Boost level if text is bold
-                if item.get("is_bold", False) and level > 1:
-                    level -= 1
+            # Create heading entries for each identified heading
+            headings = []
+            for level, size in enumerate(heading_sizes, 1):
+                for item in fonts_by_size[size]:
+                    # Skip items that don't seem to be headings (too long)
+                    if len(item["text"]) > 200:
+                        continue
 
-                # Create heading entry
-                heading = {
-                    "level": level,
-                    "text": text,
-                    "position": position,
-                    "page": item.get("page", 1),
-                }
-
-                headings.append(heading)
+                    # Create heading entry
+                    heading = {
+                        "level": level,
+                        "text": item["text"].strip(),
+                        "position": item["position"],
+                        "size": item["font_size"],
+                    }
+                    headings.append(heading)
 
             # Sort headings by position
             headings.sort(key=lambda h: h["position"])
 
             # Build heading paths
             self._build_heading_paths(headings)
-
-            return headings
-
         except Exception as e:
             logger.error(f"Error in heading identification: {e}")
             return []
+        else:
+            return headings
 
     def _build_heading_paths(self, headings: list[dict[str, Any]]) -> None:
         """Build hierarchical paths for headings.

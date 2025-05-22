@@ -115,12 +115,11 @@ class DocumentProcessor:
                 "INFO",
                 f"Processed {file_path}: {len(documents)} document(s) -> {len(enhanced_docs)} chunks",
             )
-
-            return enhanced_docs
-
         except Exception as e:
             self._log("ERROR", f"Failed to process {file_path}: {e}")
             raise DocumentProcessingError(file_path, str(e)) from e
+        else:
+            return enhanced_docs
 
     def process_directory(self, directory: Path | str) -> dict[str, list[Document]]:
         """Process all supported files in a directory.
@@ -175,14 +174,14 @@ class DocumentProcessor:
     def enhance_documents(
         self,
         documents: list[Document],
-        file_path: Path | str,
+        _file_path: Path | str,
         mime_type: str,
     ) -> list[Document]:
         """Enhance document metadata.
 
         Args:
             documents: List of documents to enhance
-            file_path: Path to the source file
+            _file_path: Path to the source file (unused)
             mime_type: MIME type of the source file
 
         Returns:

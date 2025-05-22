@@ -236,12 +236,11 @@ class PDFHeadingExtractor:
 
             # Build heading paths
             self._build_heading_paths(headings)
-
-            return headings
-
         except Exception as e:
             logger.error(f"Error in heading identification: {e}")
             return []
+        else:
+            return headings
 
     def _build_heading_paths(self, headings: list[dict[str, Any]]) -> None:
         """Build hierarchical paths for headings.

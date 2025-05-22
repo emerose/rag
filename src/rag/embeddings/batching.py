@@ -115,13 +115,13 @@ class EmbeddingBatcher:
         # Set up batch processor
         async def process_batch(
             batch: list[str],
-            semaphore: asyncio.Semaphore,
+            _semaphore: asyncio.Semaphore,
         ) -> list[list[float]]:
             """Process a batch of texts.
 
             Args:
                 batch: Batch of texts to embed
-                semaphore: Semaphore for controlling concurrency
+                _semaphore: Semaphore for controlling concurrency (unused)
 
             Returns:
                 List of embeddings
@@ -136,13 +136,12 @@ class EmbeddingBatcher:
                     self.progress_tracker.tasks["embedding"]["current"] + len(batch),
                     len(texts),
                 )
-
-                return embeddings
-
             except Exception as e:
                 self._log("ERROR", f"Error processing batch: {e}")
                 # Return empty embeddings on error
                 return [[] for _ in batch]
+            else:
+                return embeddings
 
         # Create batch processor
         batch_processor = AsyncBatchProcessor(

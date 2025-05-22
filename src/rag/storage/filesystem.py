@@ -168,12 +168,13 @@ class FilesystemManager:
         # If mimetypes can't determine the type, try other methods
         if not mime_type:
             # Check if it's a text file
+            mime_type = "application/octet-stream"  # Default if can't determine
             try:
                 with file_path.open(encoding="utf-8") as f:
                     f.read(1024)  # Try to read as text
-                return "text/plain"
+                mime_type = "text/plain"
             except UnicodeDecodeError:
-                return "application/octet-stream"
+                pass  # Keep the default mime_type
 
         return mime_type
 
