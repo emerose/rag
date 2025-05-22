@@ -24,20 +24,32 @@ run_check() {
   fi
 }
 
+# Make sure we're using the right Python
+if [[ -d ".venv" ]]; then
+  echo "📦 Using Python from .venv environment"
+  source .venv/bin/activate
+else
+  echo "⚠️ No virtual environment found at .venv/"
+  exit 1
+fi
+
+# Show Python version for debugging
+python --version
+
 # Run all checks
 echo "🔍 Starting code quality checks..."
 
 # Run tests (excluding integration tests)
-run_check "uv run python tests/run_tests.py" "Running tests (excluding integration tests)"
+run_check "python tests/run_tests.py" "Running tests (excluding integration tests)"
 
 # Format code (excluding tests)
-run_check "uv run ruff format src/ --line-length 88" "Formatting code"
+run_check "ruff format src/ --line-length 88" "Formatting code"
 
 # Run linter for main code
-run_check "uv run ruff check src/rag --fix --line-length 88" "Linting main code"
+run_check "ruff check src/rag --fix --line-length 88" "Linting main code"
 
 # Run format again to ensure any auto-fixes are properly formatted
-run_check "uv run ruff format src/ --line-length 88" "Re-formatting code after linting"
+run_check "ruff format src/ --line-length 88" "Re-formatting code after linting"
 
 # Final report
 if [ $OVERALL_STATUS -eq 0 ]; then
