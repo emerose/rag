@@ -4,6 +4,9 @@
    - [x] Fixed TID252 (relative imports) issues
    - [x] Fixed BLE001 (blind except) issues (replaced with specific exceptions)
    - [ ] Fix remaining rules
+   - [ ] Address new issues identified by ruff:
+     - [ ] I001 - Import block is un-sorted or un-formatted (fixable with --fix)
+     - [ ] UP024 - Replace aliased errors with `OSError` (fixable with --fix)
    - Note: E501 (line length) will remain disabled permanently as it's handled by the formatter and long strings are acceptable
 
 
