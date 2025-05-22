@@ -448,3 +448,23 @@ class CacheManager:
 
         self._log("DEBUG", f"Cache valid for {str_file_path}")
         return True
+        
+    def list_cached_files(self) -> dict[str, dict[str, Any]]:
+        """List all cached files.
+        
+        This method returns a dictionary of all cached files with their metadata.
+        It uses the index_manager to get the list of indexed files.
+        
+        Returns:
+            Dictionary mapping file paths to their metadata
+        """
+        self._log("DEBUG", "Getting list of cached files from index_manager")
+        indexed_files = self.index_manager.list_indexed_files()
+        
+        result = {}
+        for file_info in indexed_files:
+            file_path = file_info["file_path"]
+            result[file_path] = file_info
+            
+        self._log("DEBUG", f"Found {len(result)} cached files")
+        return result

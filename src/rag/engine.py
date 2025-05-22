@@ -346,8 +346,15 @@ class RAGEngine:
         self._log("INFO", f"Indexing file: {file_path}")
 
         try:
+            # Debug: Check if file exists
+            if not file_path.exists():
+                self._log("ERROR", f"File does not exist: {file_path}")
+                return False
+                
+            self._log("DEBUG", f"Starting document ingestion for: {file_path}")
             # Ingest the file
             ingest_result = self.ingest_manager.ingest_file(file_path)
+            self._log("DEBUG", f"Ingestion result successful: {ingest_result.successful}")
             if not ingest_result.successful:
                 self._log(
                     "ERROR",
@@ -357,9 +364,17 @@ class RAGEngine:
 
             # Get documents from ingestion result
             documents = ingest_result.documents
+            self._log("DEBUG", f"Extracted {len(documents)} documents from {file_path}")
             if not documents:
                 self._log("WARNING", f"No documents extracted from {file_path}")
                 return False
+
+            # Debug: Check first document content
+            if documents:
+                first_doc = documents[0]
+                content_preview = first_doc.page_content[:100] + "..." if len(first_doc.page_content) > 100 else first_doc.page_content
+                self._log("DEBUG", f"First document content preview: {content_preview}")
+                self._log("DEBUG", f"First document metadata: {first_doc.metadata}")
 
             # Generate embeddings
             self._log(
@@ -367,25 +382,42 @@ class RAGEngine:
                 f"Generating embeddings for {len(documents)} documents from {file_path}",
             )
             embeddings = self.embedding_batcher.process_embeddings(documents)
+            self._log("DEBUG", f"Generated {len(embeddings)} embeddings")
+            
+            # Debug: Check first embedding
+            if embeddings:
+                first_emb = embeddings[0]
+                emb_shape = f"length={len(first_emb)}, type={type(first_emb)}"
+                self._log("DEBUG", f"First embedding shape: {emb_shape}")
 
             # Get existing vectorstore if available
             existing_vectorstore = self.vectorstores.get(str(file_path))
             if not existing_vectorstore:
+                self._log("DEBUG", f"No existing vectorstore for {file_path}, loading from cache if available")
                 existing_vectorstore = self.vectorstore_manager.load_vectorstore(
-                    file_path
+                    str(file_path)
                 )
+                if existing_vectorstore:
+                    self._log("DEBUG", f"Loaded existing vectorstore from cache")
+                else:
+                    self._log("DEBUG", f"No existing vectorstore found in cache")
 
             # Create or update vectorstore
+            self._log("DEBUG", f"Adding documents to vectorstore")
             vectorstore = self.vectorstore_manager.add_documents_to_vectorstore(
                 vectorstore=existing_vectorstore,
                 documents=documents,
                 embeddings=embeddings,
             )
+            self._log("DEBUG", f"Added documents to vectorstore, store type: {type(vectorstore)}")
 
             # Save vectorstore
-            self.vectorstore_manager.save_vectorstore(str(file_path), vectorstore)
+            self._log("DEBUG", f"Saving vectorstore to cache")
+            save_result = self.vectorstore_manager.save_vectorstore(str(file_path), vectorstore)
+            self._log("DEBUG", f"Vectorstore save result: {save_result}")
 
             # Update metadata
+            self._log("DEBUG", f"Updating index metadata")
             self.index_manager.update_metadata(
                 file_path=file_path,
                 chunk_size=self.config.chunk_size,
@@ -397,17 +429,22 @@ class RAGEngine:
             )
 
             # Update cache metadata
+            self._log("DEBUG", f"Getting file metadata")
             file_metadata = self.filesystem_manager.get_file_metadata(file_path)
             file_metadata["chunks"] = {"total": len(documents)}
+            self._log("DEBUG", f"Updating cache metadata")
             self.cache_manager.update_cache_metadata(str(file_path), file_metadata)
 
             # Add vectorstore to memory cache
+            self._log("DEBUG", f"Adding vectorstore to memory cache")
             self.vectorstores[str(file_path)] = vectorstore
 
             self._log(
                 "INFO",
                 f"Successfully indexed {file_path} with {len(documents)} chunks",
             )
+            
+            return True
         except (
             OSError,
             ValueError,
@@ -420,8 +457,6 @@ class RAGEngine:
         ) as e:
             self._log("ERROR", f"Failed to index {file_path}: {e}")
             return False
-        else:
-            return True
 
     def index_directory(self, directory: Path | str | None = None) -> dict[str, bool]:
         """Index all files in a directory.
