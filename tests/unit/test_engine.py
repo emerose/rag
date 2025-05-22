@@ -150,3 +150,20 @@ def test_initialize_paths(_mock_mkdir: MagicMock) -> None:
 
         # Verify cache directory was created
         _mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
+
+
+@patch.object(RAGEngine, "_initialize_from_config", autospec=True)
+def test_load_cached_vectorstore_none(_mock_initialize: MagicMock) -> None:
+    """Return ``None`` when no cached vectorstore is found."""
+
+    with (
+        patch.object(RAGEngine, "vectorstore_manager", create=True) as mock_vs,
+        patch.object(RAGEngine, "index_manager", create=True, new=MagicMock()),
+    ):
+        mock_vs.load_vectorstore.return_value = None
+
+        engine = RAGEngine()
+        result = engine.load_cached_vectorstore("missing.txt")
+
+        assert result is None
+        mock_vs.load_vectorstore.assert_called_once_with("missing.txt")

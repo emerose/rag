@@ -742,14 +742,14 @@ class RAGEngine:
         """
         return self._load_cache_metadata()
 
-    def load_cached_vectorstore(self, file_path: str) -> FAISS:
+    def load_cached_vectorstore(self, file_path: str) -> FAISS | None:
         """Load a cached vectorstore.
 
         Args:
             file_path: Path to the source file
 
         Returns:
-            FAISS vectorstore
+            Loaded FAISS vectorstore or ``None`` if not found
 
         """
         return self._load_cached_vectorstore(file_path)
@@ -763,14 +763,14 @@ class RAGEngine:
         """
         return self.cache_manager.load_cache_metadata()
 
-    def _load_cached_vectorstore(self, file_path: str) -> FAISS:
+    def _load_cached_vectorstore(self, file_path: str) -> FAISS | None:
         """Backward compatibility: Load vectorstore from cache.
 
         Args:
             file_path: Path to the file
 
         Returns:
-            FAISS vectorstore
+            Loaded FAISS vectorstore or ``None`` if not found
 
         """
         return self.vectorstore_manager.load_vectorstore(file_path)
