@@ -89,7 +89,7 @@ ignore = [
     "C901",   # Allow higher complexity until future refactor
     "PERF203",# Allow try/except inside loops when clarity outweighs perf
     # "RUF012", # FIXED: Added ClassVar annotation to mutable class attributes
-    "B008",   # Allow function calls in argument defaults where practical
+    "B008",   # Required for Typer CLI - function calls in parameter defaults are part of Typer's design pattern
     "PLR0913",# Allow more than 5 arguments when method signature clarity requires
 ]
 fixable = ["ALL"]
