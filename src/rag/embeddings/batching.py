@@ -136,7 +136,14 @@ class EmbeddingBatcher:
                     self.progress_tracker.tasks["embedding"]["current"] + len(batch),
                     len(texts),
                 )
-            except Exception as e:
+            except (
+                ValueError,
+                KeyError,
+                IOError,
+                ConnectionError,
+                TimeoutError,
+                OSError
+            ) as e:
                 self._log("ERROR", f"Error processing batch: {e}")
                 # Return empty embeddings on error
                 return [[] for _ in batch]
@@ -197,7 +204,14 @@ class EmbeddingBatcher:
                 # Update progress
                 self.progress_tracker.update("embedding", i + len(batch), len(texts))
 
-            except Exception as e:
+            except (
+                ValueError,
+                KeyError,
+                IOError,
+                ConnectionError,
+                TimeoutError,
+                OSError
+            ) as e:
                 self._log("ERROR", f"Error processing batch: {e}")
                 # Add empty embeddings on error
                 embeddings.extend([[] for _ in batch])
