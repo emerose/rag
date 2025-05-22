@@ -6,6 +6,10 @@
    - [ ] Fix remaining rules:
      - [x] RUF012 - Mutable class attributes should be annotated with `typing.ClassVar`
      - [ ] B008 - This rule must remain disabled as it conflicts with Typer's design pattern for CLI parameters
+     - [ ] C901 - Complex functions need significant refactoring; will require separate effort to break down:
+       - `extract_metadata` in PDFMetadataExtractor
+       - `_add_heading_context` in TextSplitterFactory
+       - `add_documents_to_vectorstore` in VectorStoreManager
    - [x] Address new issues identified by ruff:
      - [x] I001 - Import block is un-sorted or un-formatted (fixed with --fix)
      - [x] UP024 - Replace aliased errors with `OSError` (fixed with --fix)
