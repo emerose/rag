@@ -14,11 +14,22 @@ from rag.cli.output import Error, TableData, set_json_mode, write
 
 @pytest.fixture
 def mock_consoles():
-    """Mock Rich consoles for testing."""
+    """Mock Rich consoles for testing.
+
+    The tests expect Rich output to be used when JSON mode is disabled.
+    In CI environments ``sys.stdout.isatty()`` often returns ``False``, which
+    would force JSON output regardless of the ``set_json_mode`` value. To
+    ensure stable behaviour across environments we patch ``isatty`` to return
+    ``True`` for the duration of the tests.
+    """
+
     stdout_console = MagicMock(spec=Console)
     stderr_console = MagicMock(spec=Console)
-    with patch("rag.cli.output.stdout_console", stdout_console), \
-         patch("rag.cli.output.stderr_console", stderr_console):
+    with (
+        patch("rag.cli.output.stdout_console", stdout_console),
+        patch("rag.cli.output.stderr_console", stderr_console),
+        patch("sys.stdout.isatty", return_value=True),
+    ):
         yield stdout_console, stderr_console
 
 
