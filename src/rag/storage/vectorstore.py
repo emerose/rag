@@ -108,7 +108,7 @@ class VectorStoreManager:
 
         # Convert Path to string if needed
         file_path_str = str(file_path)
-        
+
         # Use SHA-256 for secure hash generation
         return hashlib.sha256(file_path_str.encode()).hexdigest()
 
