@@ -31,6 +31,7 @@ try:
     from .config import RAGConfig, RuntimeOptions
     from .engine import RAGEngine
     from .tui import run_tui
+    from .utils import exceptions
 except ImportError:
     # Fall back to absolute imports (for direct script usage)
     from rag.config import RAGConfig, RuntimeOptions
@@ -238,6 +239,7 @@ def index(  # noqa: PLR0913
         # If it's a directory, use it directly
         if path.is_file():
             documents_dir = path.parent
+        else:
             documents_dir = path
 
         if str(documents_dir) == ".":
