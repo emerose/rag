@@ -188,8 +188,11 @@ class CacheManager:
             metadata: Updated metadata dictionary
 
         """
+        # Ensure file_path is a string
+        file_path_str = str(file_path)
+        
         # Update the in-memory cache
-        self.cache_metadata[file_path] = metadata
+        self.cache_metadata[file_path_str] = metadata
 
         # Update the database
         if "size" in metadata and "mtime" in metadata and "content_hash" in metadata:
@@ -197,7 +200,7 @@ class CacheManager:
             source_type = metadata.get("source_type")
 
             self.index_manager.update_file_metadata(
-                file_path=file_path,
+                file_path=file_path_str,
                 size=metadata["size"],
                 mtime=metadata["mtime"],
                 content_hash=metadata["content_hash"],

@@ -383,7 +383,7 @@ class RAGEngine:
             )
 
             # Save vectorstore
-            self.vectorstore_manager.save_vectorstore(file_path, vectorstore)
+            self.vectorstore_manager.save_vectorstore(str(file_path), vectorstore)
 
             # Update metadata
             self.index_manager.update_metadata(
@@ -399,7 +399,7 @@ class RAGEngine:
             # Update cache metadata
             file_metadata = self.filesystem_manager.get_file_metadata(file_path)
             file_metadata["chunks"] = {"total": len(documents)}
-            self.cache_manager.update_cache_metadata(file_path, file_metadata)
+            self.cache_manager.update_cache_metadata(str(file_path), file_metadata)
 
             # Add vectorstore to memory cache
             self.vectorstores[str(file_path)] = vectorstore
@@ -485,7 +485,7 @@ class RAGEngine:
                 )
 
                 # Save vectorstore
-                self.vectorstore_manager.save_vectorstore(file_path, vectorstore)
+                self.vectorstore_manager.save_vectorstore(str(file_path), vectorstore)
 
                 # Update metadata
                 path_obj = Path(file_path)
@@ -502,10 +502,10 @@ class RAGEngine:
                 # Update cache metadata
                 file_metadata = self.filesystem_manager.get_file_metadata(path_obj)
                 file_metadata["chunks"] = {"total": len(documents)}
-                self.cache_manager.update_cache_metadata(file_path, file_metadata)
+                self.cache_manager.update_cache_metadata(str(file_path), file_metadata)
 
                 # Add vectorstore to memory cache
-                self.vectorstores[file_path] = vectorstore
+                self.vectorstores[str(file_path)] = vectorstore
 
                 results[file_path] = True
             except (

@@ -106,8 +106,11 @@ class VectorStoreManager:
         """
         import hashlib
 
+        # Convert Path to string if needed
+        file_path_str = str(file_path)
+        
         # Use SHA-256 for secure hash generation
-        return hashlib.sha256(file_path.encode()).hexdigest()
+        return hashlib.sha256(file_path_str.encode()).hexdigest()
 
     def get_cache_path(self, file_path: str) -> Path:
         """Get the cache file path for a file.
