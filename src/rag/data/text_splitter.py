@@ -162,7 +162,7 @@ class PDFHeadingExtractor:
             avg_font_size = 0
 
         # Determine if text is bold (if more than 50% of chars are bold)
-        is_bold = (bold_count / char_count) > 0.5 if char_count > 0 else False
+        is_bold = (bold_count / char_count) > 0.5 if char_count > 0 else False  # noqa: PLR2004
 
         return avg_font_size, is_bold
 
@@ -204,7 +204,7 @@ class PDFHeadingExtractor:
                 position = item["position"]
 
                 # Skip very short texts (likely not headings)
-                if len(text) < 2 or len(text) > 200:
+                if len(text) < 2 or len(text) > 200:  # noqa: PLR2004
                     continue
 
                 # Determine heading level based on font size

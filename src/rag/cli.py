@@ -116,10 +116,9 @@ signal.signal(signal.SIGTERM, signal_handler)
 
 
 def validate_path(path: Path) -> Path:
-    """Validate that a path exists."""
+    """Validate a path is a file."""
     if not path.exists():
-        console.print(f"[red]Error:[/red] Path not found: {path}")
-        sys.exit(1)
+        raise typer.BadParameter(f"Path does not exist: {path}")
     return path
 
 
@@ -480,7 +479,7 @@ def query(
                 if cached_store is not None:
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
-            except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:
+            except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:  # noqa: PERF203
                 state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
@@ -560,7 +559,7 @@ def summarize(
                 if cached_store is not None:
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
-            except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:
+            except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:  # noqa: PERF203
                 state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
@@ -745,7 +744,7 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
             if cached_store is not None:
                 rag_engine.vectorstores[file_path] = cached_store
                 state.logger.info(f"Loaded vectorstore for: {file_path}")
-        except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:
+        except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:  # noqa: PERF203
             state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
     if not rag_engine.vectorstores:
@@ -957,7 +956,7 @@ def cleanup() -> None:
 
         # Format size nicely
         bytes_freed = result["bytes_freed"]
-        if bytes_freed < 1024:
+        if bytes_freed < 1024:  # noqa: PLR2004
             size_str = f"{bytes_freed} bytes"
         elif bytes_freed < 1024 * 1024:
             size_str = f"{bytes_freed / 1024:.2f} KB"

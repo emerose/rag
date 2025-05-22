@@ -318,7 +318,7 @@ class RAGEngine:
                 if vectorstore:
                     self.vectorstores[file_path] = vectorstore
 
-            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError, ImportError, AttributeError, FileNotFoundError) as e:
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError, ImportError, AttributeError, FileNotFoundError) as e:  # noqa: PERF203
                 self._log("ERROR", f"Failed to load vectorstore for {file_path}: {e}")
 
         self._log("INFO", f"Loaded {len(self.vectorstores)} vectorstores")
@@ -732,7 +732,7 @@ class RAGEngine:
             try:
                 await asyncio.sleep(0)  # Yield control back to event loop
                 self.index_file(file_path)
-            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError, ImportError, AttributeError, FileNotFoundError) as e:
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError, ImportError, AttributeError, FileNotFoundError) as e:  # noqa: PERF203
                 self._log("ERROR", f"Error indexing {file_path}: {e}")
 
         # Clean up invalid caches

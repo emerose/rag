@@ -69,7 +69,7 @@ class BaseMetadataExtractor(ABC):
         lines = content.split("\n")
         for line in lines:
             cleaned = line.strip()
-            if cleaned and len(cleaned) < 100:  # Reasonable title length
+            if cleaned and len(cleaned) < 100:  # noqa: PLR2004 # Reasonable title length
                 return cleaned
 
         return None
@@ -240,7 +240,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
 
             for match in caps_matches:
                 text = match.group(1).strip()
-                if len(text) < 100:  # Reasonable heading length
+                if len(text) < 100:  # noqa: PLR2004 # Reasonable heading length
                     section_candidates.append({"text": text, "position": match.start()})
 
             if section_candidates:
@@ -354,7 +354,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
             avg_font_size = 0
 
         # Determine if text is bold (if more than 50% of chars are bold)
-        is_bold = (bold_count / char_count) > 0.5 if char_count > 0 else False
+        is_bold = (bold_count / char_count) > 0.5 if char_count > 0 else False  # noqa: PLR2004
 
         return avg_font_size, is_bold
 
@@ -382,14 +382,19 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
             sorted_sizes = sorted(fonts_by_size.keys(), reverse=True)
 
             # Identify up to 5 heading levels (approx. h1-h5)
-            heading_sizes = sorted_sizes[:5] if len(sorted_sizes) > 5 else sorted_sizes
+            heading_sizes = sorted_sizes[:5] if len(sorted_sizes) > 5 else sorted_sizes  # noqa: PLR2004
 
             # Create heading entries for each identified heading
             headings = []
-            for level, size in enumerate(heading_sizes, 1):
+            level = 1
+            for size in heading_sizes:
+                # Skip if no text items with this font size
+                if size not in fonts_by_size:
+                    continue
+
                 for item in fonts_by_size[size]:
                     # Skip items that don't seem to be headings (too long)
-                    if len(item["text"]) > 200:
+                    if len(item["text"]) > 200:  # noqa: PLR2004
                         continue
 
                     # Create heading entry
@@ -400,6 +405,8 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
                         "size": item["font_size"],
                     }
                     headings.append(heading)
+
+                    level += 1
 
             # Sort headings by position
             headings.sort(key=lambda h: h["position"])
@@ -552,7 +559,7 @@ class HTMLMetadataExtractor(BaseMetadataExtractor):
             current_path[level - 1] = heading["text"]
 
             # Clear lower levels
-            if level < 6:
+            if level < 6:  # noqa: PLR2004
                 for i in range(level, 6):
                     current_path[i] = None
 

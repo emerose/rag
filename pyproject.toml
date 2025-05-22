@@ -83,11 +83,11 @@ ignore = [
     # "BLE001", # FIXED: Replaced generic exception handling with specific exceptions
     # "I001",   # FIXED: Sorted and formatted import blocks
     # "UP024",  # FIXED: Replaced aliased errors with OSError
-    # "PLR2004",# PLAN: Use # noqa: PLR2004 tags for specific instances
+    # "PLR2004",# FIXED: Added # noqa: PLR2004 tags to specific magic value comparisons
     "DTZ005", # Allow naive datetime where timezone not critical
     "SLF001", # Allow access to private attributes of 3rd-party objects
     "C901",   # Complex functions identified for future refactoring (see TODO.md)
-    # "PERF203",# PLAN: Use # noqa: PERF203 tags for specific instances 
+    # "PERF203",# FIXED: Added # noqa: PERF203 tags to specific try-except blocks in loops
     # "RUF012", # FIXED: Added ClassVar annotation to mutable class attributes
     "B008",   # Required for Typer CLI - function calls in parameter defaults are part of Typer's design pattern
     "PLR0913",# Allow more than 5 arguments when method signature clarity requires

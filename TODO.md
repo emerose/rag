@@ -10,14 +10,8 @@
        - `extract_metadata` in PDFMetadataExtractor
        - `_add_heading_context` in TextSplitterFactory
        - `add_documents_to_vectorstore` in VectorStoreManager
-     - [ ] PERF203 - Add `# noqa: PERF203` tags to specific try-except blocks inside loops:
-       - In engine.py and cli.py for vectorstore loading
-       - In engine.py for async file indexing
-     - [ ] PLR2004 - Add `# noqa: PLR2004` tags to specific magic values in comparisons:
-       - Text length thresholds for title and heading detection (100, 200 chars)
-       - Font/style thresholds for heading detection (0.5 for bold ratio)
-       - Batch size determination based on document count
-       - File size formatting thresholds (1024 bytes)
+     - [x] PERF203 - Added `# noqa: PERF203` tags to specific try-except blocks inside loops
+     - [x] PLR2004 - Added `# noqa: PLR2004` tags to specific magic values in comparisons
    - [x] Address new issues identified by ruff:
      - [x] I001 - Import block is un-sorted or un-formatted (fixed with --fix)
      - [x] UP024 - Replace aliased errors with `OSError` (fixed with --fix)

@@ -166,7 +166,7 @@ class VectorStoreManager:
             # The pickle file structure varies based on how it was saved
             # It might be a tuple with docstore and index_to_docstore_id
             # Or it might just be the docstore with index_to_docstore_id as an attribute
-            if isinstance(data, tuple) and len(data) == 2:
+            if isinstance(data, tuple) and len(data) == 2:  # noqa: PLR2004
                 docstore, index_to_docstore_id = data
             else:
                 docstore = data
