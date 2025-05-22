@@ -39,7 +39,7 @@
 
 #### 8 . Packaging & CI
 - **[P2] PyProject packaging** – Add `pyproject.toml`, `hatch` build and `[project.scripts] rag = "rag.cli:app"`.
-- **[P2] Ruff + mypy --strict** – Enforce via CI; fix Any-typed params.
+- **[P2] Ruff + mypy --strict** – [IN PROGRESS] Improving linting with ruff by steadily reducing ignored rules.
 - **[P3] Version lockfile** – Generate requirements lock (poetry export / pip-tools) to freeze LangChain/OpenAI versions.
 - **[P4] Remove TUI** – Deprecate rich-based TUI since it is fragile; keep plain CLI.
 - **[P5] Deduplicate CSS** – Only relevant if TUI retained; else drop.

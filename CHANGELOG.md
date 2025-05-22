@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `cot`: Chain-of-thought prompt encouraging step-by-step reasoning
     - `creative`: Engaging, conversational style while maintaining accuracy
   - Integrated prompt registry with the LCEL RAG chain
+- Custom exception hierarchy with specific exception classes for better error handling
 
 ### Changed
 - Refactored `TextSplitterFactory` to use a table-driven approach for better maintainability
@@ -43,6 +44,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added comprehensive filter parsing tests to ensure reliable metadata filtering
 - Consolidated test directories by moving e2e tests to integration tests directory
 - Restructured testing approach to use pytest markers more effectively
+- Improved code quality:
+  - Replaced insecure MD5 hash functions with more secure SHA-256
+  - Fixed exception handling by properly chaining exceptions with `from e`
+  - Fixed code structure by moving return statements outside of try blocks
+  - Added underscore prefixes to unused function parameters
+  - Reduced the number of ignored ruff linting rules
 
 ### Fixed
 - More reliable heading detection in PDFs by using statistical font analysis
