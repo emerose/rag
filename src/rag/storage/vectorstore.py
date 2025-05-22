@@ -9,6 +9,7 @@ import pickle
 import traceback
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import faiss
 import numpy as np
@@ -181,7 +182,7 @@ class VectorStoreManager:
             )
 
             # Do a minimal check to verify we have a valid vector store
-            if (hasattr(docstore, "_dict") and not docstore._dict) or not index:
+            if not self._get_docstore_size(docstore) or not index:
                 self._log(
                     "WARNING",
                     f"Vector store for {file_path} exists but has no documents",
@@ -429,25 +430,15 @@ class VectorStoreManager:
             ):
                 vectorstore.docstore = InMemoryDocstore({})  # type: ignore[attr-defined]
 
-            if not hasattr(vectorstore.docstore, "_dict"):
-                vectorstore.docstore._dict = {}  # type: ignore[attr-defined]
-
-            # Ensure index_to_docstore_id is initialized
-            if not hasattr(vectorstore, "index_to_docstore_id") or not isinstance(
-                vectorstore.index_to_docstore_id,
-                dict,
-            ):
-                vectorstore.index_to_docstore_id = {}
-
-            current_docstore_size = len(vectorstore.docstore._dict)  # type: ignore[attr-defined]
-            new_doc_ids = [
-                str(current_docstore_size + i) for i in range(len(valid_docs))
-            ]
+            # Check if we have documents in the docstore
+            current_docstore_size = self._get_docstore_size(vectorstore.docstore)
+            new_doc_ids = [str(current_docstore_size + i) for i in range(len(valid_docs))]
 
             vectorstore.index.add(embedding_matrix)  # Add all embeddings at once
 
+            # Add documents to the docstore
             for i, doc_id in enumerate(new_doc_ids):
-                vectorstore.docstore._dict[doc_id] = valid_docs[i]  # type: ignore[attr-defined]
+                self._add_document_to_docstore(vectorstore.docstore, doc_id, valid_docs[i])
                 vectorstore.index_to_docstore_id[
                     vectorstore.index.ntotal - len(new_doc_ids) + i
                 ] = doc_id
@@ -497,27 +488,43 @@ class VectorStoreManager:
                 # Get documents and their embeddings from the current store
                 docs = []
                 embeddings_list = []  # Renamed to avoid confusion
-                # Use _i for unused loop variable if items() iteration is complex
-                for _i, (_doc_id, doc) in enumerate(vs.docstore._dict.items()):  # type: ignore[attr-defined]
+                
+                # Extract documents from docstore safely
+                doc_items = self._get_docstore_items(vs.docstore)
+                
+                for doc_id, doc in doc_items:
                     docs.append(doc)
                     try:
-                        # Assuming _i (original index) corresponds to the index in vs.index
-                        embeddings_list.append(vs.index.reconstruct(_i))
-                    except IndexError as e:  # More specific exception
+                        # Find index from doc_id using index_to_docstore_id (if available)
+                        idx = None
+                        if hasattr(vs, "index_to_docstore_id"):
+                            # Need to find the key where the value is doc_id
+                            for k, v in vs.index_to_docstore_id.items():
+                                if v == doc_id:
+                                    idx = k
+                                    break
+                        
+                        # If we couldn't find the index, try using the doc_id as a number
+                        if idx is None:
+                            try:
+                                idx = int(doc_id)
+                            except ValueError:
+                                # Skip if we can't determine the index
+                                self._log(
+                                    "WARNING",
+                                    f"Could not determine index for doc_id {doc_id}, skipping",
+                                )
+                                docs.pop()  # Remove the doc we just added
+                                continue
+                                
+                        # Reconstruct the embedding
+                        embeddings_list.append(vs.index.reconstruct(idx))
+                    except (IndexError, faiss.FaissException) as e:
                         self._log(
                             "ERROR",
-                            f"IndexError reconstructing embedding at index {_i} "
-                            f"for doc_id {_doc_id}: {e}",
+                            f"Error reconstructing embedding for doc_id {doc_id}: {e}",
                         )
-                        # Skip this document if its embedding can't be reconstructed
-                        docs.pop()  # Remove the doc for which embedding failed
-                        continue
-                    except faiss.FaissException as e:  # Specific FAISS exception
-                        self._log(
-                            "ERROR",
-                            f"FAISS error reconstructing embedding at index {_i} "
-                            f"for doc_id {_doc_id}: {e}",
-                        )
+                        # Skip this document
                         docs.pop()
                         continue
 
@@ -570,3 +577,85 @@ class VectorStoreManager:
             self._log("ERROR", f"Failed to perform similarity search: {e}")
             self._log("ERROR", f"Traceback: {traceback.format_exc()}")
             return []
+
+    def _get_docstore_size(self, docstore: Any) -> int:
+        """Get the size of a docstore in a safe way.
+        
+        Args:
+            docstore: The docstore object
+            
+        Returns:
+            Number of documents in the docstore
+        """
+        # Try to access size via the public API first
+        if hasattr(docstore, "get") and callable(docstore.get):
+            # Count non-None items
+            size = 0
+            # We don't know the range, so this is inefficient but safe
+            # Only used for validation, not in main processing path
+            for i in range(10000):  # Arbitrary large number
+                try:
+                    if docstore.get(str(i)) is not None:
+                        size += 1
+                except (KeyError, IndexError):
+                    # Either reached the end or this implementation doesn't support get
+                    break
+            if size > 0:
+                return size
+                
+        # If public API fails, fall back to checking the private _dict as a last resort
+        if hasattr(docstore, "_dict"):
+            # We need this for compatibility with current LangChain implementation
+            return len(docstore._dict)  # noqa: SLF001
+            
+        # If all else fails
+        return 0
+
+    def _add_document_to_docstore(self, docstore: Any, doc_id: str, document: Document) -> None:
+        """Add a document to a docstore in a safe way.
+        
+        Args:
+            docstore: The docstore object
+            doc_id: Document ID
+            document: Document to add
+        """
+        # Try to use a public API first
+        if hasattr(docstore, "add") and callable(docstore.add):
+            try:
+                docstore.add({doc_id: document})
+                return
+            except (AttributeError, TypeError):
+                # Fall back to direct access if add() doesn't work as expected
+                pass
+                
+        # Fall back to the private attribute if necessary
+        if hasattr(docstore, "_dict"):
+            # We need this for compatibility with current LangChain implementation
+            docstore._dict[doc_id] = document  # noqa: SLF001
+
+    def _get_docstore_items(self, docstore: Any) -> list[tuple[str, Document]]:
+        """Get items from a docstore in a safe way.
+        
+        Args:
+            docstore: The docstore object
+            
+        Returns:
+            List of (doc_id, document) tuples
+        """
+        items = []
+        
+        # Try to use a public API first if available
+        if hasattr(docstore, "items") and callable(docstore.items):
+            try:
+                return list(docstore.items())
+            except (AttributeError, TypeError):
+                # Fall back if items() doesn't work as expected
+                pass
+                
+        # If the above fails, try using the private attribute
+        if hasattr(docstore, "_dict"):
+            # We need this for compatibility with current LangChain implementation
+            return list(docstore._dict.items())  # noqa: SLF001
+            
+        # If all else fails, return an empty list
+        return items

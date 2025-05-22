@@ -668,15 +668,48 @@ class RAGEngine:
         self.cache_manager.invalidate_all_caches()
 
     def list_indexed_files(self) -> list[dict[str, Any]]:
-        """Get a list of all indexed files with their metadata.
+        """List all indexed files.
 
         Returns:
-            List of dictionaries containing file metadata
+            List of dictionaries with file metadata
 
         """
-        return self.index_manager.list_indexed_files()
+        return list(self.cache_manager.list_cached_files().values())
 
-    # Backward compatibility methods
+    def load_cache_metadata(self) -> dict[str, dict[str, Any]]:
+        """Load cache metadata.
+
+        Returns:
+            Dictionary mapping file paths to metadata
+
+        """
+        return self._load_cache_metadata()
+
+    def load_cached_vectorstore(self, file_path: str) -> FAISS:
+        """Load a cached vectorstore.
+
+        Args:
+            file_path: Path to the source file
+
+        Returns:
+            FAISS vectorstore
+
+        """
+        return self._load_cached_vectorstore(file_path)
+
+    def invalidate_cache(self, file_path: str) -> None:
+        """Invalidate the cache for a file.
+
+        Args:
+            file_path: Path to the source file
+
+        """
+        self._invalidate_cache(file_path)
+
+    def invalidate_all_caches(self) -> None:
+        """Invalidate all caches."""
+        self._invalidate_all_caches()
+
     def _load_cache_metadata(self) -> dict[str, dict[str, Any]]:
         """Backward compatibility: Load cache metadata.
 

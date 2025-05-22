@@ -375,12 +375,12 @@ def invalidate(
         if all_caches:
             # Invalidate all caches
             state.logger.info("Invalidating all caches...")
-            rag_engine._invalidate_all_caches()
+            rag_engine.invalidate_all_caches()
             state.logger.info("Successfully invalidated all caches")
             console.print("[green]Success:[/green] All caches invalidated successfully")
         elif path.is_file():
             state.logger.info(f"Invalidating cache for: {path.name}")
-            rag_engine._invalidate_cache(str(path))
+            rag_engine.invalidate_cache(str(path))
             state.logger.info(f"Successfully invalidated cache for {path.name}")
             console.print(f"[green]Success:[/green] Cache invalidated for {path.name}")
         else:
@@ -464,7 +464,7 @@ def query(
         rag_engine.default_prompt_id = prompt
 
         # Load cache metadata to check if we have any documents
-        cache_metadata = rag_engine._load_cache_metadata()
+        cache_metadata = rag_engine.load_cache_metadata()
         if not cache_metadata:
             state.logger.error(
                 "No indexed documents found in cache. Please run 'rag index' first.",
@@ -475,7 +475,7 @@ def query(
         state.logger.info("Loading cached vectorstores from .cache directory...")
         for file_path in cache_metadata:
             try:
-                cached_store = rag_engine._load_cached_vectorstore(file_path)
+                cached_store = rag_engine.load_cached_vectorstore(file_path)
                 if cached_store is not None:
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
@@ -541,7 +541,7 @@ def summarize(
         rag_engine = RAGEngine(config, runtime_options)
 
         # Load cache metadata to check if we have any documents
-        cache_metadata = rag_engine._load_cache_metadata()
+        cache_metadata = rag_engine.load_cache_metadata()
         if not cache_metadata:
             state.logger.error(
                 "No indexed documents found in cache. Please run 'rag index' first.",
@@ -555,7 +555,7 @@ def summarize(
         state.logger.info("Loading cached vectorstores from .cache directory...")
         for file_path in cache_metadata:
             try:
-                cached_store = rag_engine._load_cached_vectorstore(file_path)
+                cached_store = rag_engine.load_cached_vectorstore(file_path)
                 if cached_store is not None:
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
@@ -740,7 +740,7 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
     for file_info in indexed_files:
         file_path = file_info["file_path"]
         try:
-            cached_store = rag_engine._load_cached_vectorstore(file_path)
+            cached_store = rag_engine.load_cached_vectorstore(file_path)
             if cached_store is not None:
                 rag_engine.vectorstores[file_path] = cached_store
                 state.logger.info(f"Loaded vectorstore for: {file_path}")

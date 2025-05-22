@@ -17,6 +17,7 @@ from rag.utils.progress_tracker import ProgressTracker
 
 from .document_loader import DocumentLoader
 from .text_splitter import TextSplitterFactory
+from rag.utils import timestamp_now
 
 logger = logging.getLogger(__name__)
 
@@ -198,12 +199,10 @@ class DocumentProcessor:
             doc.metadata["mime_type"] = mime_type
 
             # Add timestamp for when the document was processed
-            from rag.utils import timestamp_now
-            
             doc.metadata["processed_at"] = timestamp_now()
 
             # Add token count
-            token_count = self.text_splitter_factory._token_length(doc.page_content)
+            token_count = self.text_splitter_factory.get_token_length(doc.page_content)
             doc.metadata["token_count"] = token_count
 
             enhanced_docs.append(doc)
