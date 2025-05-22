@@ -10,10 +10,10 @@
        - `extract_metadata` in PDFMetadataExtractor
        - `_add_heading_context` in TextSplitterFactory
        - `add_documents_to_vectorstore` in VectorStoreManager
-     - [ ] PERF203 - Try-except inside loops in file loading and processing, maintained for error resilience:
+     - [ ] PERF203 - Add `# noqa: PERF203` tags to specific try-except blocks inside loops:
        - In engine.py and cli.py for vectorstore loading
        - In engine.py for async file indexing
-     - [ ] PLR2004 - Magic values in comparisons, used for heuristic-based decisions in text processing:
+     - [ ] PLR2004 - Add `# noqa: PLR2004` tags to specific magic values in comparisons:
        - Text length thresholds for title and heading detection (100, 200 chars)
        - Font/style thresholds for heading detection (0.5 for bold ratio)
        - Batch size determination based on document count
