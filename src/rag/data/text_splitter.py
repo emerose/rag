@@ -21,7 +21,7 @@ from langchain_text_splitters import (
 
 try:
     from pdfminer.high_level import extract_pages
-    from pdfminer.layout import LTChar, LTTextContainer
+    from pdfminer.layout import LTTextContainer
 
     PDFMINER_AVAILABLE = True
 except ImportError:
@@ -81,7 +81,14 @@ class PDFHeadingExtractor:
 
             # Find headings based on font size analysis
             return self._identify_headings(font_data)
-        except (OSError, ValueError, KeyError, IndexError, AttributeError, TypeError) as e:
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            IndexError,
+            AttributeError,
+            TypeError,
+        ) as e:
             logger.error(f"Error extracting headings from PDF: {e}")
             return []
 
@@ -147,8 +154,6 @@ class PDFHeadingExtractor:
 
         # Use the public API to get character information
         if hasattr(element, "get_text"):
-            text = element.get_text()
-            
             # Process each character in the element
             for char in self._extract_chars_from_element(element):
                 if hasattr(char, "size"):
@@ -165,42 +170,42 @@ class PDFHeadingExtractor:
             avg_font_size = 0
 
         # Determine if text is bold (if more than 50% of chars are bold)
-        is_bold = (bold_count / char_count) > 0.5 if char_count > 0 else False  # noqa: PLR2004
+        is_bold = (bold_count / char_count) > 0.5 if char_count > 0 else False
 
         return avg_font_size, is_bold
 
     def _extract_chars_from_element(self, element: Any) -> list:
-        """Extract character objects from a PDF text element using public APIs.
-        
-        This method provides a safe way to access character information without
-        relying on private attributes.
-        
+        """Extract characters from a text element.
+
         Args:
-            element: PDF element to extract characters from
-            
+            element: Text element to extract characters from
+
         Returns:
-            List of character objects
+            List of character information dictionaries
         """
         chars = []
-        
-        # Handle different element types from pdfminer
+
+        # Use the public API to get character information
         if hasattr(element, "get_text"):
-            # For text containers, iterate through children if possible
-            if hasattr(element, "groups"):
-                # LTTextBoxHorizontal has public 'groups' attribute
-                for group in element.groups:
-                    chars.extend(self._extract_chars_from_element(group))
-            elif hasattr(element, "get_text") and hasattr(element, "__iter__"):
-                # Some text elements allow iteration through their lines
-                for line in element:
-                    chars.extend(self._extract_chars_from_element(line))
-            # Try to get individual characters
-            elif hasattr(element, "__iter__"):
-                for item in element:
-                    if hasattr(item, "size") and hasattr(item, "get_text"):
-                        # This is likely an LTChar
-                        chars.append(item)
-        
+            # Process each character in the element
+            if hasattr(element, "_objs"):
+                for obj in element._objs:
+                    if hasattr(obj, "_objs"):  # LTTextLine
+                        for char_obj in obj._objs:
+                            if hasattr(char_obj, "fontname") and hasattr(
+                                char_obj, "size"
+                            ):
+                                # LTChar or similar
+                                chars.append(
+                                    {
+                                        "text": char_obj.get_text()
+                                        if hasattr(char_obj, "get_text")
+                                        else "",
+                                        "fontname": char_obj.fontname,
+                                        "size": char_obj.size,
+                                    }
+                                )
+
         return chars
 
     def _identify_headings(
@@ -241,7 +246,7 @@ class PDFHeadingExtractor:
                 position = item["position"]
 
                 # Skip very short texts (likely not headings)
-                if len(text) < 2 or len(text) > 200:  # noqa: PLR2004
+                if len(text) < 2 or len(text) > 200:
                     continue
 
                 # Determine heading level based on font size
@@ -281,7 +286,7 @@ class PDFHeadingExtractor:
             TypeError,
             AttributeError,
             ZeroDivisionError,
-            statistics.StatisticsError
+            statistics.StatisticsError,
         ) as e:
             logger.error(f"Error in heading identification: {e}")
             return []
@@ -343,7 +348,7 @@ class SemanticRecursiveCharacterTextSplitter:
         "",  # Characters
     ]
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
@@ -618,7 +623,7 @@ class TextSplitterFactory:
         "description": "Token-based text splitter",
     }
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
@@ -885,7 +890,14 @@ class TextSplitterFactory:
                         )
                         # Store heading hierarchy in document metadata
                         documents[0].metadata["heading_hierarchy"] = headings
-                except (OSError, ValueError, KeyError, IndexError, AttributeError, TypeError) as e:
+                except (
+                    OSError,
+                    ValueError,
+                    KeyError,
+                    IndexError,
+                    AttributeError,
+                    TypeError,
+                ) as e:
                     self._log("WARNING", f"Failed to extract PDF headings: {e}")
 
         return documents
@@ -1171,56 +1183,104 @@ class TextSplitterFactory:
         Returns:
             Documents with heading context added
         """
-        for _, doc in enumerate(docs):
+        for doc in docs:
             # Skip document if it already has closest_heading
             if "closest_heading" in doc.metadata:
                 continue
 
-            # Try to find the closest heading using heading_hierarchy
-            if (
-                "heading_hierarchy" in doc.metadata
-                and isinstance(doc.metadata["heading_hierarchy"], list)
-                and "chunk_start_char" in doc.metadata
-            ):
-                # Find the closest heading to this chunk
-                chunk_pos = doc.metadata["chunk_start_char"]
-                closest_heading = self._find_closest_heading(
-                    doc.metadata["heading_hierarchy"], chunk_pos
-                )
-
-                if closest_heading:
-                    doc.metadata["closest_heading"] = closest_heading["text"]
-                    doc.metadata["heading_path"] = closest_heading.get(
-                        "path", closest_heading["text"]
-                    )
-
-            # Alternative method using Header metadata for Markdown documents
-            elif "Header 1" in doc.metadata or "Header 2" in doc.metadata:
-                # Find highest header level for ordering
-                max_level = 0
-                header_text = None
-
-                for header_level in range(1, 7):  # Header levels 1-6
-                    key = f"Header {header_level}"
-                    if doc.metadata.get(key):
-                        max_level = header_level
-                        header_text = doc.metadata[key]
-
-                if header_text:
-                    doc.metadata["closest_heading"] = header_text
-
-                    # Build path if not already present
-                    if "heading_path" not in doc.metadata:
-                        path_components = []
-                        for header_idx in range(1, max_level + 1):
-                            key = f"Header {header_idx}"
-                            if doc.metadata.get(key):
-                                path_components.append(doc.metadata[key])
-
-                        if path_components:
-                            doc.metadata["heading_path"] = " > ".join(path_components)
+            # Process either using heading hierarchy or header metadata
+            if self._has_heading_hierarchy(doc):
+                self._add_context_from_hierarchy(doc)
+            elif self._has_header_metadata(doc):
+                self._add_context_from_headers(doc)
 
         return docs
+
+    def _has_heading_hierarchy(self, doc: Document) -> bool:
+        """Check if document has valid heading hierarchy metadata.
+
+        Args:
+            doc: Document to check
+
+        Returns:
+            True if the document has valid heading hierarchy metadata
+        """
+        return (
+            "heading_hierarchy" in doc.metadata
+            and isinstance(doc.metadata["heading_hierarchy"], list)
+            and "chunk_start_char" in doc.metadata
+        )
+
+    def _add_context_from_hierarchy(self, doc: Document) -> None:
+        """Add heading context using heading hierarchy metadata.
+
+        Args:
+            doc: Document to enhance with heading context
+        """
+        # Find the closest heading to this chunk
+        chunk_pos = doc.metadata["chunk_start_char"]
+        closest_heading = self._find_closest_heading(
+            doc.metadata["heading_hierarchy"], chunk_pos
+        )
+
+        if closest_heading:
+            doc.metadata["closest_heading"] = closest_heading["text"]
+            doc.metadata["heading_path"] = closest_heading.get(
+                "path", closest_heading["text"]
+            )
+
+    def _has_header_metadata(self, doc: Document) -> bool:
+        """Check if document has header metadata.
+
+        Args:
+            doc: Document to check
+
+        Returns:
+            True if the document has header metadata
+        """
+        return "Header 1" in doc.metadata or "Header 2" in doc.metadata
+
+    def _add_context_from_headers(self, doc: Document) -> None:
+        """Add heading context using Header metadata (for Markdown documents).
+
+        Args:
+            doc: Document to enhance with heading context
+        """
+        # Find highest header level for ordering
+        max_level = 0
+        header_text = None
+
+        for header_level in range(1, 7):  # Header levels 1-6
+            key = f"Header {header_level}"
+            if doc.metadata.get(key):
+                max_level = header_level
+                header_text = doc.metadata[key]
+
+        if header_text:
+            doc.metadata["closest_heading"] = header_text
+
+            # Build path if not already present
+            if "heading_path" not in doc.metadata:
+                path_components = self._build_heading_path(doc, max_level)
+                if path_components:
+                    doc.metadata["heading_path"] = " > ".join(path_components)
+
+    def _build_heading_path(self, doc: Document, max_level: int) -> list[str]:
+        """Build a hierarchical heading path from header metadata.
+
+        Args:
+            doc: Document containing header metadata
+            max_level: Maximum header level found
+
+        Returns:
+            List of path components for the heading path
+        """
+        path_components = []
+        for header_idx in range(1, max_level + 1):
+            key = f"Header {header_idx}"
+            if doc.metadata.get(key):
+                path_components.append(doc.metadata[key])
+        return path_components
 
     def _find_closest_heading(
         self, hierarchies: list[dict[str, Any]], chunk_pos: int

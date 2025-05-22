@@ -318,7 +318,16 @@ class RAGEngine:
                 if vectorstore:
                     self.vectorstores[file_path] = vectorstore
 
-            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError, ImportError, AttributeError, FileNotFoundError) as e:
+            except (
+                OSError,
+                ValueError,
+                KeyError,
+                ConnectionError,
+                TimeoutError,
+                ImportError,
+                AttributeError,
+                FileNotFoundError,
+            ) as e:
                 self._log("ERROR", f"Failed to load vectorstore for {file_path}: {e}")
 
         self._log("INFO", f"Loaded {len(self.vectorstores)} vectorstores")
@@ -399,7 +408,16 @@ class RAGEngine:
                 "INFO",
                 f"Successfully indexed {file_path} with {len(documents)} chunks",
             )
-        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError, ImportError, AttributeError, FileNotFoundError) as e:
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            ConnectionError,
+            TimeoutError,
+            ImportError,
+            AttributeError,
+            FileNotFoundError,
+        ) as e:
             self._log("ERROR", f"Failed to index {file_path}: {e}")
             return False
         else:
@@ -490,7 +508,17 @@ class RAGEngine:
                 self.vectorstores[file_path] = vectorstore
 
                 results[file_path] = True
-            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError, ImportError, AttributeError, FileNotFoundError, TypeError) as e:
+            except (
+                OSError,
+                ValueError,
+                KeyError,
+                ConnectionError,
+                TimeoutError,
+                ImportError,
+                AttributeError,
+                FileNotFoundError,
+                TypeError,
+            ) as e:
                 self._log("ERROR", f"Error indexing {file_path}: {e}")
                 results[file_path] = False
 
@@ -551,7 +579,17 @@ class RAGEngine:
             result = enhance_result(question, answer_text, documents)
             result["num_documents_retrieved"] = len(documents)
             self._log("INFO", "Successfully generated answer (LCEL)")
-        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError, ImportError, AttributeError, IndexError, TypeError) as e:
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            ConnectionError,
+            TimeoutError,
+            ImportError,
+            AttributeError,
+            IndexError,
+            TypeError,
+        ) as e:
             self._log("ERROR", f"Failed to answer question: {e}")
             return {
                 "question": question,
@@ -609,9 +647,28 @@ class RAGEngine:
                             "num_chunks": file_info.get("num_chunks", 0),
                         }
                     )
-                except (OSError, ValueError, KeyError, ConnectionError, ImportError, AttributeError, IndexError, TypeError) as e:
+                except (
+                    OSError,
+                    ValueError,
+                    KeyError,
+                    ConnectionError,
+                    ImportError,
+                    AttributeError,
+                    IndexError,
+                    TypeError,
+                ) as e:
                     self._log("ERROR", f"Failed to summarize {file_path}: {e}")
-        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError, ImportError, AttributeError, IndexError, TypeError) as e:
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            ConnectionError,
+            TimeoutError,
+            ImportError,
+            AttributeError,
+            IndexError,
+            TypeError,
+        ) as e:
             self._log("ERROR", f"Failed to generate document summaries: {e}")
             return []
         else:
@@ -697,19 +754,6 @@ class RAGEngine:
         """
         return self._load_cached_vectorstore(file_path)
 
-    def invalidate_cache(self, file_path: str) -> None:
-        """Invalidate the cache for a file.
-
-        Args:
-            file_path: Path to the source file
-
-        """
-        self._invalidate_cache(file_path)
-
-    def invalidate_all_caches(self) -> None:
-        """Invalidate all caches."""
-        self._invalidate_all_caches()
-
     def _load_cache_metadata(self) -> dict[str, dict[str, Any]]:
         """Backward compatibility: Load cache metadata.
 
@@ -765,7 +809,16 @@ class RAGEngine:
             try:
                 await asyncio.sleep(0)  # Yield control back to event loop
                 self.index_file(file_path)
-            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError, ImportError, AttributeError, FileNotFoundError) as e:
+            except (
+                OSError,
+                ValueError,
+                KeyError,
+                ConnectionError,
+                TimeoutError,
+                ImportError,
+                AttributeError,
+                FileNotFoundError,
+            ) as e:
                 self._log("ERROR", f"Error indexing {file_path}: {e}")
 
         # Clean up invalid caches

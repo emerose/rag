@@ -1,25 +1,6 @@
 ## 🚀 Next Up (Implementation Plan)
 
-1. **Reduce ignored lint rules** – Systematically address and eliminate ignored ruff rules in pyproject.toml for stricter code quality.
-   - [x] Fixed TID252 (relative imports) issues
-   - [x] Fixed BLE001 (blind except) issues (replaced with specific exceptions)
-   - [x] Fixed remaining rules:
-     - [x] RUF012 - Mutable class attributes should be annotated with `typing.ClassVar`
-     - [x] PERF203 - Added `# noqa: PERF203` tags to specific try-except blocks inside loops
-     - [x] PLR2004 - Added `# noqa: PLR2004` tags to specific magic value comparisons
-     - [x] DTZ005 - Created timezone-aware datetime utility functions for all timestamp operations
-   - [x] Rules that remain disabled with justification:
-     - [x] B008 - Required for Typer's design pattern for CLI parameters (1 occurrence)
-     - [x] C901 - Complex functions need significant refactoring (3 occurrences):
-       - `extract_metadata` in PDFMetadataExtractor
-       - `_add_heading_context` in TextSplitterFactory
-       - `add_documents_to_vectorstore` in VectorStoreManager
-     - [x] SLF001 - Private member access (20 occurrences, many in 3rd-party code like _dict attributes)
-     - [x] PLR0913 - Too many arguments (7 occurrences, would require significant refactoring effort)
-   - [x] Address new issues identified by ruff:
-     - [x] I001 - Import block is un-sorted or un-formatted (fixed with --fix)
-     - [x] UP024 - Replace aliased errors with `OSError` (fixed with --fix)
-   - Note: E501 (line length) will remain disabled permanently as it's handled by the formatter and long strings are acceptable
+
 
 
 ---
@@ -62,16 +43,6 @@
 
 #### 8 . Packaging & CI
 - **[P2] PyProject packaging** – Add `pyproject.toml`, `hatch` build and `[project.scripts] rag = "rag.cli:app"`.
-- **[P2] Ruff + mypy --strict** – [IN PROGRESS] Improving linting with ruff by steadily reducing ignored rules:
-  - ✅ Fixed SLF001 (private member access) by implementing proper public APIs for PDFMiner, FAISS, and TUI components
-  - ✅ Fixed PERF203 (try-except in loops) with #noqa tags
-  - ✅ Fixed PLR2004 (magic value comparisons) with #noqa tags
-  - ✅ Fixed DTZ005 (naive datetime) with timezone-aware utility functions
-  - ✅ Fixed I001 (import ordering)
-  - ✅ Fixed RUF012 (mutable class attributes) with ClassVar annotations
-  - ✅ Fixed BLE001 (broad exception handling) with specific exceptions
-  - ✅ Fixed UP024 (aliased errors) with OSError
-  - ✅ Fixed TID252 (relative imports) with absolute imports
 - **[P3] Version lockfile** – Generate requirements lock (poetry export / pip-tools) to freeze LangChain/OpenAI versions.
 - **[P4] Remove TUI** – Deprecate rich-based TUI since it is fragile; keep plain CLI.
 - **[P5] Deduplicate CSS** – Only relevant if TUI retained; else drop.

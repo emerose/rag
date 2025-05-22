@@ -437,7 +437,17 @@ class RAGTUI(App[None]):
                 self.logger.error,
                 f"Runtime error during indexing in manual thread: {e!s}",
             )
-        except (OSError, ValueError, KeyError, ImportError, AttributeError, TypeError, FileNotFoundError, ConnectionError, PermissionError) as e:  # Catch other specific exceptions
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            ImportError,
+            AttributeError,
+            TypeError,
+            FileNotFoundError,
+            ConnectionError,
+            PermissionError,
+        ) as e:  # Catch other specific exceptions
             self.call_from_thread(
                 self.logger.error,
                 f"Error during indexing in manual thread: {e!s}",

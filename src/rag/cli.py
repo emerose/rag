@@ -130,7 +130,7 @@ def main(
         "-v",
         help="Enable verbose logging (sets level to INFO)",
     ),
-    log_level: LogLevel = typer.Option(
+    log_level: LogLevel = typer.Option(  # noqa: B008
         LogLevel.WARNING,
         "--log-level",
         "-l",
@@ -163,7 +163,7 @@ def create_console_progress_callback(progress: Progress) -> Callable[[str, int],
 
 
 @app.command()
-def index(
+def index(  # noqa: PLR0913
     path: str = typer.Argument(
         ...,
         help="Path to the file or directory to index",
@@ -299,7 +299,12 @@ def index(
     except ValueError as e:
         state.logger.error(f"Configuration error: {e!s}")
         sys.exit(1)
-    except (exceptions.RAGError, exceptions.DocumentProcessingError, exceptions.DocumentLoadingError, OSError) as e:
+    except (
+        exceptions.RAGError,
+        exceptions.DocumentProcessingError,
+        exceptions.DocumentLoadingError,
+        OSError,
+    ) as e:
         state.logger.error(f"Error during indexing: {e!s}")
         sys.exit(1)
     finally:
@@ -479,7 +484,13 @@ def query(
                 if cached_store is not None:
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
-            except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:
+            except (
+                exceptions.RAGError,
+                exceptions.VectorstoreError,
+                OSError,
+                KeyError,
+                TypeError,
+            ) as e:
                 state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
@@ -513,7 +524,13 @@ def query(
     except ValueError as e:
         state.logger.error(f"Error: {e!s}")
         sys.exit(1)
-    except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, ConnectionError) as e:
+    except (
+        exceptions.RAGError,
+        exceptions.VectorstoreError,
+        OSError,
+        KeyError,
+        ConnectionError,
+    ) as e:
         state.logger.error(f"Error during query: {e!s}")
         sys.exit(1)
     finally:
@@ -559,7 +576,13 @@ def summarize(
                 if cached_store is not None:
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
-            except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:
+            except (
+                exceptions.RAGError,
+                exceptions.VectorstoreError,
+                OSError,
+                KeyError,
+                TypeError,
+            ) as e:
                 state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
@@ -744,7 +767,13 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
             if cached_store is not None:
                 rag_engine.vectorstores[file_path] = cached_store
                 state.logger.info(f"Loaded vectorstore for: {file_path}")
-        except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:
+        except (
+            exceptions.RAGError,
+            exceptions.VectorstoreError,
+            OSError,
+            KeyError,
+            TypeError,
+        ) as e:
             state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
     if not rag_engine.vectorstores:
@@ -917,10 +946,25 @@ def repl(
                 console.print(
                     "\n[yellow]Use 'exit' or 'quit' to exit the REPL[/yellow]",
                 )
-            except (exceptions.RAGError, exceptions.VectorstoreError, exceptions.PromptNotFoundError, ValueError, KeyError, OSError, ConnectionError) as e:
+            except (
+                exceptions.RAGError,
+                exceptions.VectorstoreError,
+                exceptions.PromptNotFoundError,
+                ValueError,
+                KeyError,
+                OSError,
+                ConnectionError,
+            ) as e:
                 console.print(f"\n[red]Error: {e}[/red]")
 
-    except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, ValueError, ImportError) as e:
+    except (
+        exceptions.RAGError,
+        exceptions.VectorstoreError,
+        OSError,
+        KeyError,
+        ValueError,
+        ImportError,
+    ) as e:
         state.logger.error(f"Error during REPL: {e!s}")
         sys.exit(1)
     finally:
@@ -956,7 +1000,7 @@ def cleanup() -> None:
 
         # Format size nicely
         bytes_freed = result["bytes_freed"]
-        if bytes_freed < 1024:  # noqa: PLR2004
+        if bytes_freed < 1024:
             size_str = f"{bytes_freed} bytes"
         elif bytes_freed < 1024 * 1024:
             size_str = f"{bytes_freed / 1024:.2f} KB"

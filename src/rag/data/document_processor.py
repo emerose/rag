@@ -11,13 +11,13 @@ from typing import Any
 from langchain.schema import Document
 
 from rag.storage.filesystem import FilesystemManager
+from rag.utils import timestamp_now
 from rag.utils.exceptions import DocumentProcessingError, UnsupportedFileError
 from rag.utils.logging_utils import log_message
 from rag.utils.progress_tracker import ProgressTracker
 
 from .document_loader import DocumentLoader
 from .text_splitter import TextSplitterFactory
-from rag.utils import timestamp_now
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +154,13 @@ class DocumentProcessor:
                 documents = self.process_file(file_path)
                 results[str(file_path)] = documents
 
-            except (UnsupportedFileError, DocumentProcessingError, OSError, ValueError, KeyError) as e:
+            except (
+                UnsupportedFileError,
+                DocumentProcessingError,
+                OSError,
+                ValueError,
+                KeyError,
+            ) as e:
                 self._log("ERROR", f"Failed to process {file_path}: {e}")
 
             # Update progress
@@ -202,7 +208,7 @@ class DocumentProcessor:
             doc.metadata["processed_at"] = timestamp_now()
 
             # Add token count
-            token_count = self.text_splitter_factory.get_token_length(doc.page_content)
+            token_count = self.text_splitter_factory._token_length(doc.page_content)
             doc.metadata["token_count"] = token_count
 
             enhanced_docs.append(doc)

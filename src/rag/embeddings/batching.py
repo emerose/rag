@@ -74,13 +74,13 @@ class EmbeddingBatcher:
             Optimal batch size
 
         """
-        if total_chunks <= 10:  # noqa: PLR2004
+        if total_chunks <= 10:
             return 1  # Single item per batch for very small sets
-        if total_chunks <= 50:  # noqa: PLR2004
+        if total_chunks <= 50:
             return 5  # Small batches for small sets
-        if total_chunks <= 200:  # noqa: PLR2004
+        if total_chunks <= 200:
             return 10  # Medium batches for medium sets
-        if total_chunks <= 1000:  # noqa: PLR2004
+        if total_chunks <= 1000:
             return 20  # Larger batches for larger sets
         return 50  # Very large batches for very large sets
 

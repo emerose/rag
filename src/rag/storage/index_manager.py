@@ -189,7 +189,7 @@ class IndexManager:
             self._log("ERROR", f"Error checking if file needs reindexing: {e}")
             return True
 
-    def update_metadata(
+    def update_metadata(  # noqa: PLR0913
         self,
         file_path: Path,
         chunk_size: int,
@@ -244,7 +244,7 @@ class IndexManager:
             self._log("ERROR", f"Failed to update metadata: {e}")
             raise
 
-    def update_file_metadata(
+    def update_file_metadata(  # noqa: PLR0913
         self,
         file_path: str,
         size: int,

@@ -154,7 +154,17 @@ class CacheManager:
             shutil.move(self.cache_metadata_path, self.migrated_marker)
 
             self._log("INFO", "Successfully migrated metadata from JSON to SQLite")
-        except (OSError, ValueError, KeyError, ImportError, AttributeError, TypeError, FileNotFoundError, sqlite3.Error, json.JSONDecodeError) as e:
+        except (
+            OSError,
+            ValueError,
+            KeyError,
+            ImportError,
+            AttributeError,
+            TypeError,
+            FileNotFoundError,
+            sqlite3.Error,
+            json.JSONDecodeError,
+        ) as e:
             self._log("ERROR", f"Failed to migrate cache metadata: {e}")
             return False
         else:

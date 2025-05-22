@@ -73,21 +73,9 @@ line-ending = "auto"
 [tool.ruff.lint]
 select = ["E", "F", "B", "I", "N", "UP", "PL", "RUF"]
 ignore = [
-    # Allow longer lines, dynamic typing in certain cases, and other stylistic
-    # warnings that are acceptable in this codebase but do not indicate
-    # functional issues. This keeps the signal-to-noise ratio of the linter
-    # high while allowing development velocity.
+    # Allow longer lines, which are handled by the formatter
     "E501",   # Line length handled by formatter; long strings are acceptable
-    "ANN401", # Allow use of Any in complex generic contexts
-    "TID252", # Allow relative imports within the rag package
-    "BLE001", # Allow broad exception handling where external libraries raise various errors
-    "PLR2004",# Magic numbers are acceptable in limited heuristic code
-    "DTZ005", # Allow naive datetime where timezone not critical
-    "C901",   # Allow higher complexity until future refactor
-    "PERF203",# Allow try/except inside loops when clarity outweighs perf
-    "RUF012", # Allow mutable class attributes when intentional
-    "B008",   # Allow function calls in argument defaults where practical
-    "PLR0913",# Allow more than 5 arguments when method signature clarity requires
+    "PLR2004" # Magic numbers are often more readable inline than as named constants
 ]
 fixable = ["ALL"]
 unfixable = []

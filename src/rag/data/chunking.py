@@ -313,7 +313,7 @@ class SemanticChunkingStrategy(ChunkingStrategy):
     based on document MIME type, with support for semantic chunking and heading preservation.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,

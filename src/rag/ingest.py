@@ -5,6 +5,7 @@ file loading, text extraction, chunking, and metadata enhancement.
 """
 
 import logging
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -14,10 +15,10 @@ from typing import Any, Protocol
 
 from langchain_core.documents import Document
 
-from rag.utils import timestamp_now
+from rag.data.document_loader import DocumentLoader
+from rag.storage.filesystem import FilesystemManager
+from rag.utils.logging_utils import log_message
 
-from .storage.filesystem import FilesystemManager
-from .utils.logging_utils import log_message
 from .utils.progress_tracker import ProgressTracker
 
 logger = logging.getLogger(__name__)
@@ -168,7 +169,7 @@ class IngestManager:
     including loading, preprocessing, chunking, and metadata enhancement.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         filesystem_manager: FilesystemManager,
         chunking_strategy: ChunkingStrategy,
@@ -202,6 +203,28 @@ class IngestManager:
             message: The log message
         """
         log_message(level, message, "IngestManager", self.log_callback)
+
+    def _apply_preprocessor(self, documents: list[Document]) -> list[Document]:
+        """Apply preprocessor to all documents.
+
+        Args:
+            documents: List of documents to process
+
+        Returns:
+            Processed documents
+        """
+        processed_docs = []
+        for doc in documents:
+            # Create a copy with processed content
+            processed_content = self.preprocessor.process(
+                doc.page_content, doc.metadata
+            )
+            processed_doc = Document(
+                page_content=processed_content,
+                metadata=doc.metadata.copy(),
+            )
+            processed_docs.append(processed_doc)
+        return processed_docs
 
     def load_document_source(self, file_path: Path | str) -> DocumentSource:
         """Load document source metadata.
@@ -242,99 +265,102 @@ class IngestManager:
         """Ingest a single file.
 
         Args:
-            file_path: Path to the file
+            file_path: Path to the file to ingest
 
         Returns:
-            Result of ingestion process
+            IngestResult with ingestion status and documents
         """
-        start_time = timestamp_now()
-        source = self.load_document_source(file_path)
+        file_path = Path(file_path)
+        start_time = time.time()
+        result = None
 
-        # Check if file exists and is supported
-        if not source.file_path.exists():
-            return IngestResult(
-                source=source,
-                status=IngestStatus.FILE_NOT_FOUND,
-                error_message=f"File not found: {source.file_path}",
-                processing_time=timestamp_now() - start_time,
+        # Check if file exists first
+        if not file_path.exists():
+            result = IngestResult(
+                DocumentSource(file_path),
+                IngestStatus.FILE_NOT_FOUND,
+                error_message=f"File not found: {file_path}",
             )
+            return result
 
-        if not self.filesystem_manager.is_supported_file(source.file_path):
-            return IngestResult(
-                source=source,
-                status=IngestStatus.UNSUPPORTED_FILE_TYPE,
-                error_message=f"Unsupported file type: {source.mime_type}",
-                processing_time=timestamp_now() - start_time,
-            )
-
-        # Load document - separated try block for loading errors
+        # Create document source
         try:
-            self._log("INFO", f"Loading document: {source.file_path}")
-            from .data.document_loader import DocumentLoader
+            source = self.load_document_source(file_path)
+        except FileNotFoundError:
+            result = IngestResult(
+                DocumentSource(file_path),
+                IngestStatus.FILE_NOT_FOUND,
+                error_message=f"File not found: {file_path}",
+            )
+            return result
 
-            loader = DocumentLoader(self.filesystem_manager, self.log_callback)
-            documents = loader.load_document(source.file_path)
+        # Check if the file is supported
+        if not self.filesystem_manager.is_supported_file(file_path):
+            result = IngestResult(
+                source,
+                IngestStatus.UNSUPPORTED_FILE_TYPE,
+                error_message=f"Unsupported file type: {file_path}",
+            )
+            return result
 
-            if not documents:
-                return IngestResult(
-                    source=source,
-                    status=IngestStatus.LOADING_ERROR,
-                    error_message=f"No content loaded from {source.file_path}",
-                    processing_time=timestamp_now() - start_time,
+        # Get document type for appropriate loading and chunking
+        mime_type = source.mime_type or "text/plain"
+
+        try:
+            # 1. Load document
+            self._log("INFO", f"Loading document: {file_path}")
+            doc_loader = DocumentLoader(self.filesystem_manager, self.log_callback)
+            docs = doc_loader.load_document(file_path)
+
+            if not docs:
+                result = IngestResult(
+                    source,
+                    IngestStatus.LOADING_ERROR,
+                    error_message=f"No content loaded from file: {file_path}",
                 )
-        except (OSError, ValueError, KeyError, ImportError, AttributeError, TypeError, FileNotFoundError) as e:
-            self._log("ERROR", f"Failed to load document {source.file_path}: {e}")
-            return IngestResult(
-                source=source,
-                status=IngestStatus.LOADING_ERROR,
-                error_message=str(e),
-                processing_time=timestamp_now() - start_time,
-            )
+            else:
+                # Apply preprocessor if one is provided
+                if self.preprocessor:
+                    docs = self._apply_preprocessor(docs)
 
-        # Process document - separate try block for processing errors
-        try:
-            # Chunk document
-            self._log("DEBUG", f"Chunking document: {source.file_path}")
-            chunked_docs = self.chunking_strategy.split_documents(
-                documents, source.mime_type or "text/plain"
-            )
-
-            # Enhance chunks with metadata
-            self._log("DEBUG", f"Enhancing chunks: {source.file_path}")
-            for i, doc in enumerate(chunked_docs):
-                # Add chunk metadata
-                doc.metadata["chunk_index"] = i
-                doc.metadata["chunk_total"] = len(chunked_docs)
-                doc.metadata["processed_at"] = timestamp_now()
-
-                # Apply text preprocessor if content exists
-                if hasattr(doc, "page_content") and doc.page_content:
-                    doc.page_content = self.preprocessor.process(
-                        doc.page_content, doc.metadata
+                # 2. Split into chunks
+                self._log("INFO", f"Splitting document into chunks: {file_path}")
+                try:
+                    chunked_docs = self.chunking_strategy.split_documents(
+                        docs, mime_type
                     )
 
-            # Create result
+                    # 3. Process results
+                    result = IngestResult(source, IngestStatus.SUCCESS)
+                    result.documents = chunked_docs
+                    result.processing_time = time.time() - start_time
+                    self._log(
+                        "INFO",
+                        f"Successfully processed {file_path}: {len(chunked_docs)} chunks",
+                    )
+                except Exception as e:
+                    self._log("ERROR", f"Error during document chunking: {e}")
+                    result = IngestResult(
+                        source,
+                        IngestStatus.PROCESSING_ERROR,
+                        error_message=f"Error during document chunking: {e}",
+                    )
+        except ValueError as e:
+            self._log("ERROR", f"Error loading document: {e}")
             result = IngestResult(
-                source=source,
-                status=IngestStatus.SUCCESS,
-                documents=chunked_docs,
-                processing_time=timestamp_now() - start_time,
+                source,
+                IngestStatus.LOADING_ERROR,
+                error_message=f"Error loading document: {e}",
+            )
+        except Exception as e:
+            self._log("ERROR", f"Unexpected error processing document: {e}")
+            result = IngestResult(
+                source,
+                IngestStatus.PROCESSING_ERROR,
+                error_message=f"Unexpected error: {e}",
             )
 
-            self._log(
-                "INFO",
-                f"Processed {source.file_path}: {len(documents)} document(s) -> {result.chunk_count} chunks",
-            )
-        except (OSError, ValueError, KeyError, ImportError, AttributeError, TypeError, IndexError) as e:
-            self._log("ERROR", f"Failed to process {source.file_path}: {e}")
-            return IngestResult(
-                source=source,
-                status=IngestStatus.PROCESSING_ERROR,
-                error_message=str(e),
-                processing_time=timestamp_now() - start_time,
-            )
-        else:
-            return result
+        return result
 
     def ingest_directory(self, directory: Path | str) -> dict[str, IngestResult]:
         """Ingest all files in a directory.
@@ -371,7 +397,15 @@ class IngestManager:
                 self._log("INFO", f"Processing file {i + 1}/{len(files)}: {file_path}")
                 result = self.ingest_file(file_path)
                 results[str(file_path)] = result
-            except (OSError, ValueError, KeyError, ImportError, AttributeError, TypeError, FileNotFoundError) as e:
+            except (
+                OSError,
+                ValueError,
+                KeyError,
+                ImportError,
+                AttributeError,
+                TypeError,
+                FileNotFoundError,
+            ) as e:
                 self._log("ERROR", f"Failed to process {file_path}: {e}")
                 source = self.load_document_source(file_path)
                 results[str(file_path)] = IngestResult(

@@ -167,7 +167,7 @@ class VectorStoreManager:
             # The pickle file structure varies based on how it was saved
             # It might be a tuple with docstore and index_to_docstore_id
             # Or it might just be the docstore with index_to_docstore_id as an attribute
-            if isinstance(data, tuple) and len(data) == 2:  # noqa: PLR2004
+            if isinstance(data, tuple) and len(data) == 2:
                 docstore, index_to_docstore_id = data
             else:
                 docstore = data
@@ -199,7 +199,7 @@ class VectorStoreManager:
             KeyError,
             IndexError,
             faiss.FaissException,
-            pickle.PickleError
+            pickle.PickleError,
         ) as e:
             self._log("ERROR", f"Unexpected error loading vector store: {e}")
             self._log("ERROR", f"Traceback: {traceback.format_exc()}")
@@ -432,13 +432,17 @@ class VectorStoreManager:
 
             # Check if we have documents in the docstore
             current_docstore_size = self._get_docstore_size(vectorstore.docstore)
-            new_doc_ids = [str(current_docstore_size + i) for i in range(len(valid_docs))]
+            new_doc_ids = [
+                str(current_docstore_size + i) for i in range(len(valid_docs))
+            ]
 
             vectorstore.index.add(embedding_matrix)  # Add all embeddings at once
 
             # Add documents to the docstore
             for i, doc_id in enumerate(new_doc_ids):
-                self._add_document_to_docstore(vectorstore.docstore, doc_id, valid_docs[i])
+                self._add_document_to_docstore(
+                    vectorstore.docstore, doc_id, valid_docs[i]
+                )
                 vectorstore.index_to_docstore_id[
                     vectorstore.index.ntotal - len(new_doc_ids) + i
                 ] = doc_id
@@ -463,6 +467,83 @@ class VectorStoreManager:
 
         return vectorstore
 
+    def _merge_single_vectorstore(self, merged: FAISS, vs: FAISS) -> None:
+        """Merge a single vector store into the target vector store.
+
+        Args:
+            merged: Target FAISS vector store to merge into
+            vs: Source FAISS vector store to merge from
+        """
+        try:
+            # Get documents and their embeddings from the current store
+            docs = []
+            embeddings_list = []  # Renamed to avoid confusion
+
+            # Extract documents from docstore safely
+            doc_items = self._get_docstore_items(vs.docstore)
+
+            for doc_id, doc in doc_items:
+                try:
+                    # Find the index for this document
+                    idx = self._find_index_for_doc(vs, doc_id)
+                    if idx is None:
+                        continue  # Skip if we can't determine the index
+
+                    # Add the document and its embedding
+                    docs.append(doc)
+                    embeddings_list.append(vs.index.reconstruct(idx))
+                except (IndexError, faiss.FaissException) as e:
+                    self._log(
+                        "ERROR",
+                        f"Error reconstructing embedding for doc_id {doc_id}: {e}",
+                    )
+                    continue
+
+            # Add to the merged store if we have valid documents and embeddings
+            if docs and embeddings_list:
+                self.add_documents_to_vectorstore(merged, docs, embeddings_list)
+            else:
+                self._log(
+                    "DEBUG",
+                    "Skipping merge for a vector store with no "
+                    "reconstructible docs/embeddings.",
+                )
+
+        except AttributeError as e:  # If _dict or index is not found
+            self._log("ERROR", f"Attribute error while merging vector store: {e}")
+            self._log("ERROR", f"Traceback: {traceback.format_exc()}")
+        except (ValueError, TypeError, RuntimeError) as e:
+            self._log("ERROR", f"Failed to merge vector store: {e}")
+            self._log("ERROR", f"Traceback: {traceback.format_exc()}")
+
+    def _find_index_for_doc(self, vs: FAISS, doc_id: str) -> int | None:
+        """Find the index for a document in a FAISS vector store.
+
+        Args:
+            vs: FAISS vector store
+            doc_id: Document ID
+
+        Returns:
+            Index of the document, or None if not found
+        """
+        # Find index from doc_id using index_to_docstore_id (if available)
+        if hasattr(vs, "index_to_docstore_id"):
+            # Need to find the key where the value is doc_id
+            for k, v in vs.index_to_docstore_id.items():
+                if v == doc_id:
+                    return k
+
+        # If we couldn't find the index, try using the doc_id as a number
+        try:
+            return int(doc_id)
+        except ValueError:
+            # Skip if we can't determine the index
+            self._log(
+                "WARNING",
+                f"Could not determine index for doc_id {doc_id}, skipping",
+            )
+            return None
+
     def merge_vectorstores(self, vectorstores: list[FAISS]) -> FAISS:
         """Merge multiple vector stores into one.
 
@@ -471,7 +552,6 @@ class VectorStoreManager:
 
         Returns:
             Merged FAISS vector store
-
         """
         if not vectorstores:
             return self.create_empty_vectorstore()
@@ -484,68 +564,7 @@ class VectorStoreManager:
 
         # Merge in the rest
         for vs in vectorstores[1:]:
-            try:
-                # Get documents and their embeddings from the current store
-                docs = []
-                embeddings_list = []  # Renamed to avoid confusion
-                
-                # Extract documents from docstore safely
-                doc_items = self._get_docstore_items(vs.docstore)
-                
-                for doc_id, doc in doc_items:
-                    docs.append(doc)
-                    try:
-                        # Find index from doc_id using index_to_docstore_id (if available)
-                        idx = None
-                        if hasattr(vs, "index_to_docstore_id"):
-                            # Need to find the key where the value is doc_id
-                            for k, v in vs.index_to_docstore_id.items():
-                                if v == doc_id:
-                                    idx = k
-                                    break
-                        
-                        # If we couldn't find the index, try using the doc_id as a number
-                        if idx is None:
-                            try:
-                                idx = int(doc_id)
-                            except ValueError:
-                                # Skip if we can't determine the index
-                                self._log(
-                                    "WARNING",
-                                    f"Could not determine index for doc_id {doc_id}, skipping",
-                                )
-                                docs.pop()  # Remove the doc we just added
-                                continue
-                                
-                        # Reconstruct the embedding
-                        embeddings_list.append(vs.index.reconstruct(idx))
-                    except (IndexError, faiss.FaissException) as e:
-                        self._log(
-                            "ERROR",
-                            f"Error reconstructing embedding for doc_id {doc_id}: {e}",
-                        )
-                        # Skip this document
-                        docs.pop()
-                        continue
-
-                # Add to the merged store if we have valid documents and embeddings
-                if docs and embeddings_list:
-                    self.add_documents_to_vectorstore(merged, docs, embeddings_list)
-                else:
-                    self._log(
-                        "DEBUG",
-                        "Skipping merge for a vector store with no "
-                        "reconstructible docs/embeddings.",
-                    )
-
-            except AttributeError as e:  # If _dict or index is not found
-                self._log("ERROR", f"Attribute error while merging vector store: {e}")
-                self._log("ERROR", f"Traceback: {traceback.format_exc()}")
-                # Potentially skip this vectorstore or handle as critical error
-            except (ValueError, TypeError, RuntimeError) as e:
-                self._log("ERROR", f"Failed to merge vector store: {e}")
-                self._log("ERROR", f"Traceback: {traceback.format_exc()}")
-                # Potentially skip this vectorstore or raise
+            self._merge_single_vectorstore(merged, vs)
 
         return merged
 
@@ -580,10 +599,10 @@ class VectorStoreManager:
 
     def _get_docstore_size(self, docstore: Any) -> int:
         """Get the size of a docstore in a safe way.
-        
+
         Args:
             docstore: The docstore object
-            
+
         Returns:
             Number of documents in the docstore
         """
@@ -602,18 +621,20 @@ class VectorStoreManager:
                     break
             if size > 0:
                 return size
-                
+
         # If public API fails, fall back to checking the private _dict as a last resort
         if hasattr(docstore, "_dict"):
             # We need this for compatibility with current LangChain implementation
-            return len(docstore._dict)  # noqa: SLF001
-            
+            return len(docstore._dict)
+
         # If all else fails
         return 0
 
-    def _add_document_to_docstore(self, docstore: Any, doc_id: str, document: Document) -> None:
+    def _add_document_to_docstore(
+        self, docstore: Any, doc_id: str, document: Document
+    ) -> None:
         """Add a document to a docstore in a safe way.
-        
+
         Args:
             docstore: The docstore object
             doc_id: Document ID
@@ -627,23 +648,23 @@ class VectorStoreManager:
             except (AttributeError, TypeError):
                 # Fall back to direct access if add() doesn't work as expected
                 pass
-                
+
         # Fall back to the private attribute if necessary
         if hasattr(docstore, "_dict"):
             # We need this for compatibility with current LangChain implementation
-            docstore._dict[doc_id] = document  # noqa: SLF001
+            docstore._dict[doc_id] = document
 
     def _get_docstore_items(self, docstore: Any) -> list[tuple[str, Document]]:
         """Get items from a docstore in a safe way.
-        
+
         Args:
             docstore: The docstore object
-            
+
         Returns:
             List of (doc_id, document) tuples
         """
         items = []
-        
+
         # Try to use a public API first if available
         if hasattr(docstore, "items") and callable(docstore.items):
             try:
@@ -651,11 +672,11 @@ class VectorStoreManager:
             except (AttributeError, TypeError):
                 # Fall back if items() doesn't work as expected
                 pass
-                
+
         # If the above fails, try using the private attribute
         if hasattr(docstore, "_dict"):
             # We need this for compatibility with current LangChain implementation
-            return list(docstore._dict.items())  # noqa: SLF001
-            
+            return list(docstore._dict.items())
+
         # If all else fails, return an empty list
         return items
