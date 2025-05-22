@@ -2,7 +2,7 @@
 
 1. **Reduce ignored lint rules** – Systematically address and eliminate ignored ruff rules in pyproject.toml for stricter code quality.
    - [x] Fixed TID252 (relative imports) issues
-   - [🔄] Working on BLE001 (blind except) issues - 9 of 32 fixed (focused on CLI)
+   - [🔄] Working on BLE001 (blind except) issues - 10 of 32 fixed (focused on CLI)
    - [ ] Fix remaining rules
    - Note: E501 (line length) will remain disabled permanently as it's handled by the formatter and long strings are acceptable
 

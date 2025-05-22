@@ -79,7 +79,7 @@ ignore = [
     # high while allowing development velocity.
     "E501",   # Line length handled by formatter; long strings are acceptable
     "ANN401", # Allow use of Any in complex generic contexts
-    "BLE001", # Allow broad exception handling where external libraries raise various errors
+    "BLE001", # IN PROGRESS: Systematically replacing generic exception handling with specific exceptions
     "PLR2004",# Magic numbers are acceptable in limited heuristic code
     "DTZ005", # Allow naive datetime where timezone not critical
     "SLF001", # Allow access to private attributes of 3rd-party objects
