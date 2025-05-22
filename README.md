@@ -70,7 +70,7 @@ A powerful command-line tool for building and querying RAG applications with a b
 
    ```bash
    # For development
-   pip install -e .
+   uv pip install -e ".[dev]"
 
    # For production
    pip install .
@@ -272,72 +272,6 @@ rag list --help
 - ODT (`.odt`)
 - EPUB (`.epub`)
 
-## Development
-
-### Setup Development Environment
-
-1. Install development dependencies:
-
-   ```bash
-   pip install -e ".[dev]"
-   ```
-
-2. Install pre-commit hooks:
-   ```bash
-   pre-commit install
-   ```
-
-### Running Tests
-
-```bash
-pytest
-```
-
-### LCEL Architecture
-
-The project has been modernized to use LangChain Expression Language (LCEL) for the RAG pipeline:
-
-- **Composable Pipeline**: Using the `retriever | reranker | prompt | llm | parser` pattern for better maintainability
-- **Filter Syntax Support**: Preserved filter capabilities (e.g., `filter:heading_path="Introduction"`)
-- **Debugging & Tracing**: Support for LangSmith tracing (`--trace` flag) for pipeline visualization
-- **Metadata Enrichment**: Preserved metadata enrichment in the results
-- **JSON Output**: Enhanced CLI with `--json` flag for structured output
-
-### Code Style
-
-The project uses:
-
-- Ruff for linting and formatting
-- Pre-commit hooks for code quality checks
-
-## License
-
-MIT License - see LICENSE file for details
-
-## Project Structure
-
-The project is organized into modular components for better maintainability and clarity:
-
-- `src/rag/config.py` - Configuration classes
-- `src/rag/engine.py` - Main RAGEngine (core orchestration)
-- `src/rag/data/` - Document processing
-  - `document_loader.py` - MIME-based document loading
-  - `text_splitter.py` - Content-aware text chunking
-  - `document_processor.py` - Document enhancement and metadata enrichment
-- `src/rag/storage/` - Storage and caching
-  - `cache_manager.py` - SQLite and JSON cache operations
-  - `index_manager.py` - Index management
-  - `vectorstore.py` - FAISS operations
-  - `filesystem.py` - File operations and path handling
-- `src/rag/embeddings/` - Embedding functionality
-  - `embedding_provider.py` - Embedding generation
-  - `batching.py` - Optimized batch processing
-- `src/rag/chains/` - LangChain Pipelines
-  - `rag_chain.py` - LCEL-based RAG pipeline
-- `src/rag/utils/` - Shared utilities
-  - `logging_utils.py` - Centralized logging
-  - `progress_tracker.py` - Progress reporting
-  - `async_utils.py` - Async helpers
 
 ## Customizing Prompts
 
@@ -442,3 +376,8 @@ Each command produces structured JSON output:
      }
    }
    ```
+
+## License
+
+MIT License - see [LICENSE](LICENSE)
+
