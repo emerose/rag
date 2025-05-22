@@ -20,8 +20,13 @@ from langchain_community.document_loaders import (
 from langchain_core.documents import Document
 
 from rag.storage.filesystem import FilesystemManager
-from rag.utils.exceptions import DocumentLoadingError, LoaderInitializationError, UnsupportedFileError
+from rag.utils.exceptions import (
+    DocumentLoadingError,
+    LoaderInitializationError,
+    UnsupportedFileError,
+)
 from rag.utils.logging_utils import log_message
+
 from .metadata_extractor import DocumentMetadataExtractor
 
 logger = logging.getLogger(__name__)

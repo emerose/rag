@@ -14,6 +14,7 @@ from rag.storage.filesystem import FilesystemManager
 from rag.utils.exceptions import DocumentProcessingError, UnsupportedFileError
 from rag.utils.logging_utils import log_message
 from rag.utils.progress_tracker import ProgressTracker
+
 from .document_loader import DocumentLoader
 from .text_splitter import TextSplitterFactory
 
@@ -152,14 +153,7 @@ class DocumentProcessor:
                 documents = self.process_file(file_path)
                 results[str(file_path)] = documents
 
-            except (
-                UnsupportedFileError,
-                DocumentProcessingError,
-                IOError,
-                OSError,
-                ValueError,
-                KeyError,
-            ) as e:
+            except (UnsupportedFileError, DocumentProcessingError, OSError, ValueError, KeyError) as e:
                 self._log("ERROR", f"Failed to process {file_path}: {e}")
 
             # Update progress

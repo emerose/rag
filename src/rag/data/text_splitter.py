@@ -28,6 +28,7 @@ except ImportError:
     PDFMINER_AVAILABLE = False
 
 from rag.utils.logging_utils import log_message
+
 from .metadata_extractor import DocumentMetadataExtractor
 
 logger = logging.getLogger(__name__)
@@ -80,15 +81,7 @@ class PDFHeadingExtractor:
 
             # Find headings based on font size analysis
             return self._identify_headings(font_data)
-        except (
-            IOError,
-            OSError,
-            ValueError,
-            KeyError,
-            IndexError,
-            AttributeError,
-            TypeError
-        ) as e:
+        except (OSError, ValueError, KeyError, IndexError, AttributeError, TypeError) as e:
             logger.error(f"Error extracting headings from PDF: {e}")
             return []
 
@@ -841,15 +834,7 @@ class TextSplitterFactory:
                         )
                         # Store heading hierarchy in document metadata
                         documents[0].metadata["heading_hierarchy"] = headings
-                except (
-                    IOError,
-                    OSError,
-                    ValueError,
-                    KeyError,
-                    IndexError,
-                    AttributeError,
-                    TypeError
-                ) as e:
+                except (OSError, ValueError, KeyError, IndexError, AttributeError, TypeError) as e:
                     self._log("WARNING", f"Failed to extract PDF headings: {e}")
 
         return documents

@@ -300,13 +300,7 @@ def index(
     except ValueError as e:
         state.logger.error(f"Configuration error: {e!s}")
         sys.exit(1)
-    except (
-        exceptions.RAGError,
-        exceptions.DocumentProcessingError,
-        exceptions.DocumentLoadingError,
-        IOError,
-        OSError,
-    ) as e:
+    except (exceptions.RAGError, exceptions.DocumentProcessingError, exceptions.DocumentLoadingError, OSError) as e:
         state.logger.error(f"Error during indexing: {e!s}")
         sys.exit(1)
     finally:
@@ -399,13 +393,7 @@ def invalidate(
     except ValueError as e:
         console.print(f"[red]Error:[/red] Configuration error: {e!s}")
         sys.exit(1)
-    except (
-        exceptions.RAGError,
-        IOError, 
-        OSError, 
-        KeyError,
-        FileNotFoundError
-    ) as e:
+    except (exceptions.RAGError, OSError, KeyError, FileNotFoundError) as e:
         console.print(f"[red]Error:[/red] Error during cache invalidation: {e!s}")
         sys.exit(1)
 
@@ -492,14 +480,7 @@ def query(
                 if cached_store is not None:
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
-            except (
-                exceptions.RAGError,
-                exceptions.VectorstoreError,
-                IOError,
-                OSError,
-                KeyError,
-                TypeError,
-            ) as e:
+            except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:
                 state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
@@ -533,14 +514,7 @@ def query(
     except ValueError as e:
         state.logger.error(f"Error: {e!s}")
         sys.exit(1)
-    except (
-        exceptions.RAGError,
-        exceptions.VectorstoreError,
-        IOError,
-        OSError,
-        KeyError,
-        ConnectionError,
-    ) as e:
+    except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, ConnectionError) as e:
         state.logger.error(f"Error during query: {e!s}")
         sys.exit(1)
     finally:
@@ -586,14 +560,7 @@ def summarize(
                 if cached_store is not None:
                     rag_engine.vectorstores[file_path] = cached_store
                     state.logger.info(f"Loaded vectorstore for: {file_path}")
-            except (
-                exceptions.RAGError,
-                exceptions.VectorstoreError,
-                IOError,
-                OSError,
-                KeyError,
-                TypeError,
-            ) as e:
+            except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:
                 state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
         if not rag_engine.vectorstores:
@@ -738,14 +705,7 @@ def list(
         console.print(table)
         state.logger.info(f"Found {len(indexed_files)} indexed documents.")
 
-    except (
-        exceptions.RAGError,
-        IOError,
-        OSError,
-        KeyError,
-        ValueError,
-        TypeError,
-    ) as e:
+    except (exceptions.RAGError, OSError, KeyError, ValueError, TypeError) as e:
         state.logger.error(f"Error listing indexed documents: {e!s}")
         sys.exit(1)
 
@@ -785,14 +745,7 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
             if cached_store is not None:
                 rag_engine.vectorstores[file_path] = cached_store
                 state.logger.info(f"Loaded vectorstore for: {file_path}")
-        except (
-            exceptions.RAGError,
-            exceptions.VectorstoreError,
-            IOError,
-            OSError,
-            KeyError,
-            TypeError,
-        ) as e:
+        except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, TypeError) as e:
             state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
     if not rag_engine.vectorstores:
@@ -965,27 +918,10 @@ def repl(
                 console.print(
                     "\n[yellow]Use 'exit' or 'quit' to exit the REPL[/yellow]",
                 )
-            except (
-                exceptions.RAGError,
-                exceptions.VectorstoreError,
-                exceptions.PromptNotFoundError,
-                ValueError,
-                KeyError,
-                IOError,
-                OSError,
-                ConnectionError
-            ) as e:
+            except (exceptions.RAGError, exceptions.VectorstoreError, exceptions.PromptNotFoundError, ValueError, KeyError, OSError, ConnectionError) as e:
                 console.print(f"\n[red]Error: {e}[/red]")
 
-    except (
-        exceptions.RAGError,
-        exceptions.VectorstoreError,
-        IOError,
-        OSError,
-        KeyError,
-        ValueError,
-        ImportError
-    ) as e:
+    except (exceptions.RAGError, exceptions.VectorstoreError, OSError, KeyError, ValueError, ImportError) as e:
         state.logger.error(f"Error during REPL: {e!s}")
         sys.exit(1)
     finally:
@@ -1042,14 +978,7 @@ def cleanup() -> None:
             state.logger.info("No orphaned vector stores found")
             console.print("[cyan]No orphaned vector stores found[/cyan]")
 
-    except (
-        exceptions.RAGError, 
-        IOError, 
-        OSError, 
-        ValueError, 
-        KeyError,
-        FileNotFoundError
-    ) as e:
+    except (exceptions.RAGError, OSError, ValueError, KeyError, FileNotFoundError) as e:
         state.logger.error(f"Error during cache cleanup: {e!s}")
         console.print(f"[red]Error:[/red] Error during cache cleanup: {e!s}")
         raise typer.Exit(code=1) from e

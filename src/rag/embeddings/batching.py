@@ -13,6 +13,7 @@ from langchain.schema import Document
 from rag.utils.async_utils import AsyncBatchProcessor, get_optimal_concurrency
 from rag.utils.logging_utils import log_message
 from rag.utils.progress_tracker import ProgressTracker
+
 from .embedding_provider import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
@@ -136,14 +137,7 @@ class EmbeddingBatcher:
                     self.progress_tracker.tasks["embedding"]["current"] + len(batch),
                     len(texts),
                 )
-            except (
-                ValueError,
-                KeyError,
-                IOError,
-                ConnectionError,
-                TimeoutError,
-                OSError
-            ) as e:
+            except (ValueError, KeyError, ConnectionError, TimeoutError, OSError) as e:
                 self._log("ERROR", f"Error processing batch: {e}")
                 # Return empty embeddings on error
                 return [[] for _ in batch]
@@ -204,14 +198,7 @@ class EmbeddingBatcher:
                 # Update progress
                 self.progress_tracker.update("embedding", i + len(batch), len(texts))
 
-            except (
-                ValueError,
-                KeyError,
-                IOError,
-                ConnectionError,
-                TimeoutError,
-                OSError
-            ) as e:
+            except (ValueError, KeyError, ConnectionError, TimeoutError, OSError) as e:
                 self._log("ERROR", f"Error processing batch: {e}")
                 # Add empty embeddings on error
                 embeddings.extend([[] for _ in batch])

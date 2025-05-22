@@ -79,6 +79,10 @@ ignore = [
     # high while allowing development velocity.
     "E501",   # Line length handled by formatter; long strings are acceptable
     "ANN401", # Allow use of Any in complex generic contexts
+    # "TID252", # FIXED: Replaced relative imports with absolute imports
+    # "BLE001", # FIXED: Replaced generic exception handling with specific exceptions
+    # "I001",   # FIXED: Sorted and formatted import blocks
+    # "UP024",  # FIXED: Replaced aliased errors with OSError
     "PLR2004",# Magic numbers are acceptable in limited heuristic code
     "DTZ005", # Allow naive datetime where timezone not critical
     "SLF001", # Allow access to private attributes of 3rd-party objects
