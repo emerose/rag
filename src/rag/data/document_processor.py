@@ -10,9 +10,11 @@ from typing import Any
 
 from langchain.schema import Document
 
-from ..storage.filesystem import FilesystemManager
-from ..utils.logging_utils import log_message
-from ..utils.progress_tracker import ProgressTracker
+from rag.storage.filesystem import FilesystemManager
+from rag.utils.exceptions import DocumentProcessingError, UnsupportedFileError
+from rag.utils.logging_utils import log_message
+from rag.utils.progress_tracker import ProgressTracker
+
 from .document_loader import DocumentLoader
 from .text_splitter import TextSplitterFactory
 
@@ -72,7 +74,8 @@ class DocumentProcessor:
             List of processed document chunks
 
         Raises:
-            ValueError: If the file could not be processed
+            UnsupportedFileError: If the file is not supported or doesn't exist
+            DocumentProcessingError: If the file could not be processed
 
         """
         file_path = Path(file_path)
@@ -81,7 +84,7 @@ class DocumentProcessor:
         if not self.filesystem_manager.is_supported_file(file_path):
             error_msg = f"Unsupported or non-existent file: {file_path}"
             self._log("ERROR", error_msg)
-            raise ValueError(error_msg)
+            raise UnsupportedFileError(file_path)
 
         self._log("INFO", f"Processing file: {file_path}")
 
@@ -113,12 +116,11 @@ class DocumentProcessor:
                 "INFO",
                 f"Processed {file_path}: {len(documents)} document(s) -> {len(enhanced_docs)} chunks",
             )
-
-            return enhanced_docs
-
         except Exception as e:
             self._log("ERROR", f"Failed to process {file_path}: {e}")
-            raise ValueError(f"Failed to process {file_path}: {e}")
+            raise DocumentProcessingError(file_path, str(e)) from e
+        else:
+            return enhanced_docs
 
     def process_directory(self, directory: Path | str) -> dict[str, list[Document]]:
         """Process all supported files in a directory.
@@ -151,7 +153,7 @@ class DocumentProcessor:
                 documents = self.process_file(file_path)
                 results[str(file_path)] = documents
 
-            except Exception as e:
+            except (UnsupportedFileError, DocumentProcessingError, OSError, ValueError, KeyError) as e:
                 self._log("ERROR", f"Failed to process {file_path}: {e}")
 
             # Update progress
@@ -173,14 +175,14 @@ class DocumentProcessor:
     def enhance_documents(
         self,
         documents: list[Document],
-        file_path: Path | str,
+        _file_path: Path | str,
         mime_type: str,
     ) -> list[Document]:
         """Enhance document metadata.
 
         Args:
             documents: List of documents to enhance
-            file_path: Path to the source file
+            _file_path: Path to the source file (unused)
             mime_type: MIME type of the source file
 
         Returns:
@@ -195,10 +197,10 @@ class DocumentProcessor:
             doc.metadata["chunk_total"] = len(documents)
             doc.metadata["mime_type"] = mime_type
 
-            # Add enhancement timestamp
-            from datetime import datetime
-
-            doc.metadata["processed_at"] = datetime.now().timestamp()
+            # Add timestamp for when the document was processed
+            from rag.utils import timestamp_now
+            
+            doc.metadata["processed_at"] = timestamp_now()
 
             # Add token count
             token_count = self.text_splitter_factory._token_length(doc.page_content)

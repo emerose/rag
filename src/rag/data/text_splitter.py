@@ -9,7 +9,7 @@ import os
 import statistics
 import warnings
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import Any, ClassVar
 
 import tiktoken
 from langchain_core.documents import Document
@@ -27,7 +27,8 @@ try:
 except ImportError:
     PDFMINER_AVAILABLE = False
 
-from ..utils.logging_utils import log_message
+from rag.utils.logging_utils import log_message
+
 from .metadata_extractor import DocumentMetadataExtractor
 
 logger = logging.getLogger(__name__)
@@ -80,7 +81,7 @@ class PDFHeadingExtractor:
 
             # Find headings based on font size analysis
             return self._identify_headings(font_data)
-        except Exception as e:
+        except (OSError, ValueError, KeyError, IndexError, AttributeError, TypeError) as e:
             logger.error(f"Error extracting headings from PDF: {e}")
             return []
 
@@ -161,7 +162,7 @@ class PDFHeadingExtractor:
             avg_font_size = 0
 
         # Determine if text is bold (if more than 50% of chars are bold)
-        is_bold = (bold_count / char_count) > 0.5 if char_count > 0 else False
+        is_bold = (bold_count / char_count) > 0.5 if char_count > 0 else False  # noqa: PLR2004
 
         return avg_font_size, is_bold
 
@@ -203,7 +204,7 @@ class PDFHeadingExtractor:
                 position = item["position"]
 
                 # Skip very short texts (likely not headings)
-                if len(text) < 2 or len(text) > 200:
+                if len(text) < 2 or len(text) > 200:  # noqa: PLR2004
                     continue
 
                 # Determine heading level based on font size
@@ -236,12 +237,19 @@ class PDFHeadingExtractor:
 
             # Build heading paths
             self._build_heading_paths(headings)
-
-            return headings
-
-        except Exception as e:
+        except (
+            KeyError,
+            IndexError,
+            ValueError,
+            TypeError,
+            AttributeError,
+            ZeroDivisionError,
+            statistics.StatisticsError
+        ) as e:
             logger.error(f"Error in heading identification: {e}")
             return []
+        else:
+            return headings
 
     def _build_heading_paths(self, headings: list[dict[str, Any]]) -> None:
         """Build hierarchical paths for headings.
@@ -284,7 +292,7 @@ class SemanticRecursiveCharacterTextSplitter:
     """
 
     # Default semantic boundaries from most to least significant
-    DEFAULT_SEPARATORS = [
+    DEFAULT_SEPARATORS: ClassVar[list[str]] = [
         "\n\n\n",  # Multiple paragraph breaks
         "\n\n",  # Paragraph breaks
         "\n",  # Line breaks
@@ -461,7 +469,7 @@ class TextSplitterFactory:
     """
 
     # Define splitter configurations by mime type
-    SPLITTER_CONFIGS = {
+    SPLITTER_CONFIGS: ClassVar[dict[str, dict[str, Any]]] = {
         "text/markdown": {
             "name": "markdown_header_splitter",
             "description": "Markdown header text splitter",
@@ -568,7 +576,7 @@ class TextSplitterFactory:
     }
 
     # Define token splitter config
-    TOKEN_SPLITTER_CONFIG = {
+    TOKEN_SPLITTER_CONFIG: ClassVar[dict[str, str]] = {
         "name": "token_splitter",
         "description": "Token-based text splitter",
     }
@@ -826,7 +834,7 @@ class TextSplitterFactory:
                         )
                         # Store heading hierarchy in document metadata
                         documents[0].metadata["heading_hierarchy"] = headings
-                except Exception as e:
+                except (OSError, ValueError, KeyError, IndexError, AttributeError, TypeError) as e:
                     self._log("WARNING", f"Failed to extract PDF headings: {e}")
 
         return documents

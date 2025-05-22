@@ -26,6 +26,7 @@ from langchain_core.runnables import RunnableLambda, RunnableParallel
 
 # Import the prompt registry
 from rag.prompts import get_prompt
+from rag.utils.exceptions import VectorstoreError
 
 # Forward reference for type checking
 if TYPE_CHECKING:
@@ -116,7 +117,7 @@ def build_rag_chain(engine: RAGEngine, k: int = 4, prompt_id: str = "default"):
     # Merge vectorstores and build retriever
     # ---------------------------------------------------------------------
     if not engine.vectorstores:
-        raise ValueError("No vectorstores available. Index documents first.")
+        raise VectorstoreError()
 
     merged_vs: FAISS = engine.vectorstore_manager.merge_vectorstores(  # type: ignore[arg-type]
         list(engine.vectorstores.values())

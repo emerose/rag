@@ -10,9 +10,10 @@ from typing import Any, TypeVar
 
 from langchain.schema import Document
 
-from ..utils.async_utils import AsyncBatchProcessor, get_optimal_concurrency
-from ..utils.logging_utils import log_message
-from ..utils.progress_tracker import ProgressTracker
+from rag.utils.async_utils import AsyncBatchProcessor, get_optimal_concurrency
+from rag.utils.logging_utils import log_message
+from rag.utils.progress_tracker import ProgressTracker
+
 from .embedding_provider import EmbeddingProvider
 
 logger = logging.getLogger(__name__)
@@ -73,13 +74,13 @@ class EmbeddingBatcher:
             Optimal batch size
 
         """
-        if total_chunks <= 10:
+        if total_chunks <= 10:  # noqa: PLR2004
             return 1  # Single item per batch for very small sets
-        if total_chunks <= 50:
+        if total_chunks <= 50:  # noqa: PLR2004
             return 5  # Small batches for small sets
-        if total_chunks <= 200:
+        if total_chunks <= 200:  # noqa: PLR2004
             return 10  # Medium batches for medium sets
-        if total_chunks <= 1000:
+        if total_chunks <= 1000:  # noqa: PLR2004
             return 20  # Larger batches for larger sets
         return 50  # Very large batches for very large sets
 
@@ -115,13 +116,13 @@ class EmbeddingBatcher:
         # Set up batch processor
         async def process_batch(
             batch: list[str],
-            semaphore: asyncio.Semaphore,
+            _semaphore: asyncio.Semaphore,
         ) -> list[list[float]]:
             """Process a batch of texts.
 
             Args:
                 batch: Batch of texts to embed
-                semaphore: Semaphore for controlling concurrency
+                _semaphore: Semaphore for controlling concurrency (unused)
 
             Returns:
                 List of embeddings
@@ -136,13 +137,12 @@ class EmbeddingBatcher:
                     self.progress_tracker.tasks["embedding"]["current"] + len(batch),
                     len(texts),
                 )
-
-                return embeddings
-
-            except Exception as e:
+            except (ValueError, KeyError, ConnectionError, TimeoutError, OSError) as e:
                 self._log("ERROR", f"Error processing batch: {e}")
                 # Return empty embeddings on error
                 return [[] for _ in batch]
+            else:
+                return embeddings
 
         # Create batch processor
         batch_processor = AsyncBatchProcessor(
@@ -198,7 +198,7 @@ class EmbeddingBatcher:
                 # Update progress
                 self.progress_tracker.update("embedding", i + len(batch), len(texts))
 
-            except Exception as e:
+            except (ValueError, KeyError, ConnectionError, TimeoutError, OSError) as e:
                 self._log("ERROR", f"Error processing batch: {e}")
                 # Add empty embeddings on error
                 embeddings.extend([[] for _ in batch])

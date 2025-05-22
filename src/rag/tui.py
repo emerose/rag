@@ -5,6 +5,7 @@ import logging
 import threading
 import time
 from datetime import datetime
+from typing import ClassVar
 
 from rich.text import Text
 from textual.app import App, ComposeResult
@@ -187,7 +188,7 @@ class ProgressUpdated(Message):
 class RAGTUI(App[None]):
     """The main RAG TUI application."""
 
-    BINDINGS: list[tuple[str, str, str]] = [
+    BINDINGS: ClassVar[list[tuple[str, str, str]]] = [
         ("q", "quit", "Quit"),
         ("r", "refresh", "Refresh"),
         ("h", "help", "Help"),
@@ -436,7 +437,7 @@ class RAGTUI(App[None]):
                 self.logger.error,
                 f"Runtime error during indexing in manual thread: {e!s}",
             )
-        except Exception as e:  # Catch other specific exceptions if known, then generic
+        except (OSError, ValueError, KeyError, ImportError, AttributeError, TypeError, FileNotFoundError, ConnectionError, PermissionError) as e:  # Catch other specific exceptions
             self.call_from_thread(
                 self.logger.error,
                 f"Error during indexing in manual thread: {e!s}",

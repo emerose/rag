@@ -166,7 +166,7 @@ class VectorStoreManager:
             # The pickle file structure varies based on how it was saved
             # It might be a tuple with docstore and index_to_docstore_id
             # Or it might just be the docstore with index_to_docstore_id as an attribute
-            if isinstance(data, tuple) and len(data) == 2:
+            if isinstance(data, tuple) and len(data) == 2:  # noqa: PLR2004
                 docstore, index_to_docstore_id = data
             else:
                 docstore = data
@@ -191,7 +191,15 @@ class VectorStoreManager:
         except (OSError, ValueError) as e:
             self._log("ERROR", f"Failed to load vector store for {file_path}: {e}")
             return None
-        except Exception as e:
+        except (
+            ImportError,
+            AttributeError,
+            TypeError,
+            KeyError,
+            IndexError,
+            faiss.FaissException,
+            pickle.PickleError
+        ) as e:
             self._log("ERROR", f"Unexpected error loading vector store: {e}")
             self._log("ERROR", f"Traceback: {traceback.format_exc()}")
             return None

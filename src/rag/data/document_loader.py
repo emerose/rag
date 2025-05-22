@@ -19,8 +19,14 @@ from langchain_community.document_loaders import (
 )
 from langchain_core.documents import Document
 
-from ..storage.filesystem import FilesystemManager
-from ..utils.logging_utils import log_message
+from rag.storage.filesystem import FilesystemManager
+from rag.utils.exceptions import (
+    DocumentLoadingError,
+    LoaderInitializationError,
+    UnsupportedFileError,
+)
+from rag.utils.logging_utils import log_message
+
 from .metadata_extractor import DocumentMetadataExtractor
 
 logger = logging.getLogger(__name__)
@@ -69,7 +75,8 @@ class DocumentLoader:
             Langchain document loader instance
 
         Raises:
-            ValueError: If the file type is not supported
+            LoaderInitializationError: If the loader could not be initialized
+            UnsupportedFileError: If the file type is not supported
 
         """
         file_path = Path(file_path)
@@ -112,7 +119,7 @@ class DocumentLoader:
             return loader_class(str(file_path))
         except Exception as e:
             self._log("ERROR", f"Failed to initialize loader for {file_path}: {e}")
-            raise ValueError(f"Failed to initialize loader for {file_path}: {e}")
+            raise LoaderInitializationError(file_path, str(e)) from e
 
     def load_document(self, file_path: Path | str) -> list[Document]:
         """Load a document from a file.
@@ -124,7 +131,8 @@ class DocumentLoader:
             List of langchain Document objects
 
         Raises:
-            ValueError: If the file could not be loaded
+            UnsupportedFileError: If the file is not supported or doesn't exist
+            DocumentLoadingError: If the file could not be loaded
 
         """
         file_path = Path(file_path)
@@ -132,7 +140,7 @@ class DocumentLoader:
         # Check if file exists and is supported
         if not self.filesystem_manager.is_supported_file(file_path):
             self._log("ERROR", f"Unsupported or non-existent file: {file_path}")
-            raise ValueError(f"Unsupported or non-existent file: {file_path}")
+            raise UnsupportedFileError(file_path)
 
         # Get loader for the file
         try:
@@ -151,11 +159,11 @@ class DocumentLoader:
             docs = self.metadata_extractor.enhance_documents(docs, mime_type)
 
             self._log("INFO", f"Loaded {len(docs)} document(s) from {file_path}")
-            return docs
-
         except Exception as e:
             self._log("ERROR", f"Failed to load document {file_path}: {e}")
-            raise ValueError(f"Failed to load document {file_path}: {e}")
+            raise DocumentLoadingError(file_path, str(e)) from e
+        else:
+            return docs
 
     def _enhance_document_metadata(
         self,
