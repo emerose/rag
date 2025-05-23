@@ -54,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Log levels are now shown in uppercase for better readability
+- Log level output is colorized according to severity
 - Refactored `TextSplitterFactory` to use a table-driven approach for better maintainability
 - Enhanced PDF processing with improved font analysis for heading detection
 - Separated metadata extraction into dedicated `DocumentMetadataExtractor` classes
@@ -79,3 +80,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed complexity and linting issues in text splitting code
 - Fixed integration tests that were silently skipping failures
 - Ensured consistent cache-dir option handling across all CLI commands
+- Fixed colorized log levels not applying to third-party loggers

@@ -6,10 +6,11 @@ import importlib.util
 import io
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
-from typing import Any
+from typing import Any, Callable
 
 import pytest
 from rich.console import Console
@@ -118,8 +119,10 @@ def _import_logging_utils() -> ModuleType:
     return module
 
 
-def _setup_and_log(json_logs: bool) -> tuple[str, str]:
-    """Configure logging and capture console and file output."""
+def _capture_logs(
+    json_logs: bool, log_fn: Callable[[ModuleType], None]
+) -> tuple[str, str]:
+    """Configure logging and capture output while executing ``log_fn``."""
     logging_utils = _import_logging_utils()
 
     stream = io.StringIO()
@@ -136,22 +139,37 @@ def _setup_and_log(json_logs: bool) -> tuple[str, str]:
     logging_utils.logging.FileHandler = lambda _path: FileHandler()  # type: ignore
 
     logging_utils.setup_logging(log_file="dummy.log", json_logs=json_logs)
-    logger = logging_utils.get_logger()
-    logger.info("test message", subsystem="test")
+    log_fn(logging_utils)
 
     return stream.getvalue().strip(), file_stream.getvalue().strip()
 
 
+def _assert_level_colored(output: str, level: str) -> None:
+    """Assert that ``level`` appears in ``output`` with ANSI colors."""
+    assert level in output
+    assert "\x1b[" in output
+    assert "[red]" not in output
+    assert "[cyan]" not in output
+    assert "[yellow]" not in output
+    assert "[green]" not in output
+    assert "[bold red]" not in output
+    assert "[/" not in output
+
+
 def test_json_logs_are_json() -> None:
     """Ensure logs are JSON-formatted in JSON mode."""
-    console_out, file_out = _setup_and_log(json_logs=True)
+    console_out, file_out = _capture_logs(
+        True, lambda lu: lu.get_logger().info("test message", subsystem="test")
+    )
     assert console_out == ""
     assert json.loads(file_out)
 
 
 def test_rich_logs_in_plain_mode() -> None:
     """Ensure logs are not JSON when JSON mode is disabled."""
-    console_out, file_out = _setup_and_log(json_logs=False)
+    console_out, file_out = _capture_logs(
+        False, lambda lu: lu.get_logger().info("test message", subsystem="test")
+    )
     with pytest.raises(json.JSONDecodeError):
         json.loads(console_out)
     with pytest.raises(json.JSONDecodeError):
@@ -160,6 +178,24 @@ def test_rich_logs_in_plain_mode() -> None:
 
 def test_log_level_uppercase() -> None:
     """Ensure log levels are uppercased."""
-    _, file_out = _setup_and_log(json_logs=True)
+    _, file_out = _capture_logs(
+        True, lambda lu: lu.get_logger().info("test message", subsystem="test")
+    )
     record = json.loads(file_out)
     assert record["level"] == "INFO"
+
+
+def test_log_level_colorized() -> None:
+    """Ensure log levels are colorized without markup artifacts."""
+    console_out, _ = _capture_logs(
+        False, lambda lu: lu.get_logger().info("test message", subsystem="test")
+    )
+    _assert_level_colored(console_out, "INFO")
+
+
+def test_foreign_logger_colorized() -> None:
+    """Ensure logs from other modules are colorized."""
+    console_out, _ = _capture_logs(
+        False, lambda _lu: logging.getLogger("httpx").warning("external warning")
+    )
+    _assert_level_colored(console_out, "WARNING")
