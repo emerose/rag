@@ -1,7 +1,6 @@
 ## 🚀 Next Up (Implementation Plan)
 
 1. Logging fixes:
-1.1 Put the log level in all caps
 1.2 Colorize the log level according to severity (eg, ERROR = red)
 1.3 Put the logger_name immediately after the level. If there is no logger_name, use the subsystem instead
 1.4 The http requests from httpx and the warnings from pdfminer are still appearing by default

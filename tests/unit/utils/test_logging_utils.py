@@ -156,3 +156,10 @@ def test_rich_logs_in_plain_mode() -> None:
         json.loads(console_out)
     with pytest.raises(json.JSONDecodeError):
         json.loads(file_out)
+
+
+def test_log_level_uppercase() -> None:
+    """Ensure log levels are uppercased."""
+    _, file_out = _setup_and_log(json_logs=True)
+    record = json.loads(file_out)
+    assert record["level"] == "INFO"
