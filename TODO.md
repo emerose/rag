@@ -1,9 +1,5 @@
 ## 🚀 Next Up (Implementation Plan)
 
-### 1. **Structured Logging**
-In addition to structured (json) command output, let's use structlog to produce structured logging. logs emitted to the console should be pretty-printed in rich text, but logs emitted to a file or with the --json flag active should be in JSON format
-
-
 ---
 
 ## 🗺️ Roadmap & Priorities  

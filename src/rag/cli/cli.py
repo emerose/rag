@@ -9,6 +9,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+try:
+    import structlog
+except ModuleNotFoundError:  # pragma: no cover - structlog may be missing
+    structlog = None  # type: ignore[assignment]
 import typer
 from dotenv import load_dotenv
 from prompt_toolkit import PromptSession
@@ -18,11 +22,12 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
 from rich.console import Console
-from rich.logging import RichHandler
 from rich.panel import Panel
 from rich.progress import (
     Progress,
 )
+
+from rag.utils.logging_utils import get_logger, setup_logging
 
 # Try both relative and absolute imports
 try:
@@ -113,30 +118,13 @@ def update_console_for_json_mode(json_mode: bool) -> None:
     state.json_mode = json_mode
 
 
-def configure_logging(verbose: bool, log_level: LogLevel) -> logging.Logger:
+def configure_logging(
+    verbose: bool, log_level: LogLevel, json_logs: bool
+) -> logging.Logger:
     """Configure logging based on verbosity settings."""
-    # If verbose is True, use INFO level
-    # Otherwise, use the specified log_level
     level = logging.INFO if verbose else getattr(logging, log_level.value)
-
-    # Get our logger
-    logger = logging.getLogger("rag")
-
-    # Remove any existing handlers
-    logger.handlers = []
-
-    # Create and configure the RichHandler
-    rich_handler = RichHandler(
-        console=Console(stderr=True),  # Use stderr for logging
-        rich_tracebacks=True,
-    )
-    rich_handler.setLevel(level)
-
-    # Add the handler to our logger
-    logger.addHandler(rich_handler)
-    logger.setLevel(level)
-
-    return logger
+    setup_logging(log_level=level, json_logs=json_logs)
+    return get_logger()
 
 
 def signal_handler(_signum, _frame):
@@ -186,8 +174,13 @@ def main(
     # Load environment variables
     load_dotenv()
 
+    # Configure output mode
+    json_mode = json_output if json_output is not None else not sys.stdout.isatty()
+    set_json_mode(json_mode)
+    update_console_for_json_mode(json_mode)
+
     # Configure logging
-    state.logger = configure_logging(verbose, log_level)
+    state.logger = configure_logging(verbose, log_level, json_mode)
 
     # Set cache directory
     state.cache_dir = cache_dir
@@ -195,11 +188,6 @@ def main(
     # Set up signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
-
-    # Configure output mode
-    json_mode = json_output if json_output is not None else not sys.stdout.isatty()
-    set_json_mode(json_mode)
-    update_console_for_json_mode(json_mode)
 
 
 def create_console_progress_callback(progress: Progress) -> Callable[[str, int], None]:
