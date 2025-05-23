@@ -22,6 +22,17 @@ To run the integration tests manually:
 ./tests/run_integration_tests.py --cache-dir /path/to/custom/cache
 ```
 
+## Running on GitHub
+
+This repository includes an **Integration Tests** workflow that runs the same
+commands in GitHub Actions. The workflow is triggered manually and only starts
+when the actor matches the `INTEGRATION_ACTOR` secret.
+
+1. Add your OpenAI key as a repository secret named `OPENAI_API_KEY`.
+2. Add another secret `INTEGRATION_ACTOR` set to your GitHub username.
+3. Go to **Actions → Integration Tests** and click **Run workflow** to launch
+   the tests.
+
 ## Test Selection
 
 The integration tests directory contains two types of tests:
