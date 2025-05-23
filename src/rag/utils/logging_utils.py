@@ -7,6 +7,7 @@ is active are rendered as JSON.
 
 from __future__ import annotations
 
+import inspect
 import logging
 from collections.abc import Callable
 from typing import Any
@@ -90,13 +91,20 @@ def setup_logging(
     root_logger.setLevel(log_level)
     root_logger.handlers = []
 
+    def _console_renderer():
+        try:
+            params = inspect.signature(structlog.dev.ConsoleRenderer).parameters
+            if "colors" in params:
+                return structlog.dev.ConsoleRenderer(colors=False)
+        except (ValueError, TypeError):  # pragma: no cover - stub compatibility
+            pass
+        return structlog.dev.ConsoleRenderer()
+
     timestamper = structlog.processors.TimeStamper(fmt="iso")
     pre_chain = [structlog.stdlib.add_log_level, timestamper]
 
     file_processor = (
-        structlog.processors.JSONRenderer()
-        if json_logs
-        else structlog.dev.ConsoleRenderer()
+        structlog.processors.JSONRenderer() if json_logs else _console_renderer()
     )
     file_handler = logging.FileHandler(log_file)
     file_handler.setFormatter(
@@ -108,9 +116,7 @@ def setup_logging(
     root_logger.addHandler(file_handler)
 
     console_processor = (
-        structlog.processors.JSONRenderer()
-        if json_logs
-        else structlog.dev.ConsoleRenderer()
+        structlog.processors.JSONRenderer() if json_logs else _console_renderer()
     )
     console = Console(stderr=True)
     if json_logs:
