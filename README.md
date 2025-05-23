@@ -374,8 +374,15 @@ Each command produces structured JSON output:
        "tokens_used": 150,
        "model": "gpt-4"
      }
-  }
+ }
   ```
+
+## Running Tests
+
+Execute `./check.sh` to format, lint, and run the unit tests. Network access is
+disabled by default using `pytest-socket`. Tests that require the network should
+be marked with `@pytest.mark.integration` and run with
+`tests/run_integration_tests.py`.
 
 ## GitHub Integration Tests
 

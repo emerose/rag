@@ -15,6 +15,7 @@ from langchain_openai import OpenAIEmbeddings
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.embeddings.embedding_provider import EmbeddingProvider
+from pytest_socket import disable_socket, enable_socket
 
 
 # Define the integration marker - tests with this marker are not run by default
@@ -23,6 +24,17 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "integration: mark test as integration test (not run by default)"
     )
+
+
+@pytest.fixture(autouse=True)
+def disable_network(request: pytest.FixtureRequest) -> Generator[None, None, None]:
+    """Disable network access for tests unless marked as integration."""
+    if "integration" not in request.keywords:
+        disable_socket()
+        yield
+        enable_socket()
+    else:
+        yield
 
 
 @pytest.fixture
