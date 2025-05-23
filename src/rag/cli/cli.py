@@ -284,34 +284,15 @@ def index(  # noqa: PLR0913
             # Run without TUI
             rag_engine = RAGEngine(config, runtime_options)
 
+            cached_before = set(rag_engine.cache_manager.list_cached_files().keys())
+
             # Run indexing
             path_obj = Path(path)
             if path_obj.is_file():
                 # Index just the file that was specified
                 state.logger.info(f"Indexing file: {path_obj}")
-                success = rag_engine.index_file(path_obj)
-                if success:
-                    write(
-                        {
-                            "summary": {
-                                "total": 1,
-                                "successful": 1,
-                                "failed": 0,
-                            },
-                            "results": {str(path_obj): success},
-                        }
-                    )
-                else:
-                    write(
-                        {
-                            "summary": {
-                                "total": 1,
-                                "successful": 0,
-                                "failed": 1,
-                            },
-                            "results": {str(path_obj): success},
-                        }
-                    )
+                success, error = rag_engine.index_file(path_obj)
+                results = {str(path_obj): {"success": success, "error": error}}
             else:
                 # Index the entire directory
                 state.logger.info(f"Indexing directory: {path_obj}")
@@ -327,26 +308,42 @@ def index(  # noqa: PLR0913
                     # Run indexing on the specified directory
                     results = rag_engine.index_directory(path_obj)
 
-                    # Count successful results
-                    success_count = sum(1 for success in results.values() if success)
-                    failed_count = len(results) - success_count
+            success_files = [f for f, r in results.items() if r.get("success")]
+            error_files = {
+                f: r.get("error") for f, r in results.items() if not r.get("success")
+            }
 
-                    # Create output data
-                    output_data = {
-                        "summary": {
-                            "total": len(results),
-                            "successful": success_count,
-                            "failed": failed_count,
-                        },
-                        "results": {
-                            str(file_path): success
-                            for file_path, success in results.items()
-                        },
-                    }
+            cached_in_run = sorted(set(results.keys()) & cached_before)
 
-                    # Write output
-                    write(output_data)
+            tables = []
+            if cached_in_run:
+                tables.append(
+                    TableData(
+                        title="Cached Files",
+                        columns=["File"],
+                        rows=[[f] for f in cached_in_run],
+                    )
+                )
 
+            if success_files:
+                tables.append(
+                    TableData(
+                        title="Indexed Successfully",
+                        columns=["File"],
+                        rows=[[f] for f in sorted(success_files)],
+                    )
+                )
+
+            if error_files:
+                tables.append(
+                    TableData(
+                        title="Errors",
+                        columns=["File", "Error"],
+                        rows=[[f, str(msg)] for f, msg in error_files.items()],
+                    )
+                )
+
+            write({"tables": tables})
     except ValueError as e:
         write(Error(f"Configuration error: {e}"))
         sys.exit(1)

@@ -333,24 +333,26 @@ class RAGEngine:
 
         self._log("INFO", f"Loaded {len(self.vectorstores)} vectorstores")
 
-    def index_file(self, file_path: Path | str) -> bool:
+    def index_file(self, file_path: Path | str) -> tuple[bool, str | None]:
         """Index a file.
 
         Args:
             file_path: Path to the file to index
 
         Returns:
-            True if indexing was successful, False otherwise
+            Tuple of ``(success, error_message)``. ``error_message`` will be
+            ``None`` when indexing succeeds.
 
         """
         file_path = Path(file_path).absolute()
         self._log("INFO", f"Indexing file: {file_path}")
+        error_message: str | None = None
 
         try:
             # Check if file exists
             if not file_path.exists():
                 self._log("ERROR", f"File does not exist: {file_path}")
-                return False
+                return False, "File does not exist"
 
             self._log("DEBUG", f"Starting document ingestion for: {file_path}")
             # Ingest the file
@@ -359,18 +361,19 @@ class RAGEngine:
                 "DEBUG", f"Ingestion result successful: {ingest_result.successful}"
             )
             if not ingest_result.successful:
+                error_message = ingest_result.error_message or "Unknown error"
                 self._log(
                     "ERROR",
-                    f"Failed to process {file_path}: {ingest_result.error_message}",
+                    f"Failed to process {file_path}: {error_message}",
                 )
-                return False
+                return False, error_message
 
             # Get documents from ingestion result
             documents = ingest_result.documents
             self._log("DEBUG", f"Extracted {len(documents)} documents from {file_path}")
             if not documents:
                 self._log("WARNING", f"No documents extracted from {file_path}")
-                return False
+                return False, "No documents extracted"
 
             # Debug: Check first document content
             if documents:
@@ -384,11 +387,12 @@ class RAGEngine:
                 self._log("DEBUG", f"First document metadata: {first_doc.metadata}")
 
             # Generate embeddings and create vectorstore
-            return self._create_vectorstore_from_documents(
+            success = self._create_vectorstore_from_documents(
                 file_path=file_path,
                 documents=documents,
                 file_type=ingest_result.source.mime_type or "text/plain",
             )
+            return success, None
         except (
             OSError,
             ValueError,
@@ -399,8 +403,9 @@ class RAGEngine:
             AttributeError,
             FileNotFoundError,
         ) as e:
-            self._log("ERROR", f"Failed to index {file_path}: {e}")
-            return False
+            error_message = str(e)
+            self._log("ERROR", f"Failed to index {file_path}: {error_message}")
+            return False, error_message
 
     def _create_vectorstore_from_documents(
         self, file_path: Path, documents: list[Document], file_type: str
@@ -506,14 +511,17 @@ class RAGEngine:
             self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
             return False
 
-    def index_directory(self, directory: Path | str | None = None) -> dict[str, bool]:
+    def index_directory(
+        self, directory: Path | str | None = None
+    ) -> dict[str, dict[str, Any]]:
         """Index all files in a directory.
 
         Args:
             directory: Directory containing files to index (defaults to config.documents_dir)
 
         Returns:
-            Dictionary mapping file paths to indexing success status
+            Dictionary mapping file paths to a result dict with ``success`` and
+            optional ``error`` message
 
         """
         directory = Path(directory).absolute() if directory else self.documents_dir
@@ -528,13 +536,13 @@ class RAGEngine:
         ingest_results = self.ingest_manager.ingest_directory(directory)
 
         # Index each file that was successfully processed
-        results = {}
+        results: dict[str, dict[str, Any]] = {}
         for file_path, result in ingest_results.items():
             if not result.successful:
                 self._log(
                     "WARNING", f"Failed to process {file_path}: {result.error_message}"
                 )
-                results[file_path] = False
+                results[file_path] = {"success": False, "error": result.error_message}
                 continue
 
             try:
@@ -542,7 +550,10 @@ class RAGEngine:
                 documents = result.documents
                 if not documents:
                     self._log("WARNING", f"No documents extracted from {file_path}")
-                    results[file_path] = False
+                    results[file_path] = {
+                        "success": False,
+                        "error": "No documents extracted",
+                    }
                     continue
 
                 # Get embeddings
@@ -590,7 +601,7 @@ class RAGEngine:
                 # Add vectorstore to memory cache
                 self.vectorstores[str(file_path)] = vectorstore
 
-                results[file_path] = True
+                results[file_path] = {"success": True}
             except (
                 OSError,
                 ValueError,
@@ -602,14 +613,15 @@ class RAGEngine:
                 FileNotFoundError,
                 TypeError,
             ) as e:
-                self._log("ERROR", f"Error indexing {file_path}: {e}")
-                results[file_path] = False
+                error_msg = str(e)
+                self._log("ERROR", f"Error indexing {file_path}: {error_msg}")
+                results[file_path] = {"success": False, "error": error_msg}
 
         # Clean up invalid caches
         self.cache_manager.cleanup_invalid_caches()
 
         # Summary
-        success_count = sum(1 for status in results.values() if status)
+        success_count = sum(1 for r in results.values() if r.get("success"))
         self._log("INFO", f"Indexed {success_count}/{len(results)} files successfully")
 
         return results
@@ -911,7 +923,7 @@ class RAGEngine:
         for file_path in files:
             try:
                 await asyncio.sleep(0)  # Yield control back to event loop
-                self.index_file(file_path)
+                self.index_file(file_path)[0]
             except (
                 OSError,
                 ValueError,
