@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `summarize`: Table of document summaries
     - `cleanup`: Summary of removed files
     - `invalidate`: Success/error messages
+- Structured logging using structlog with Rich console output
   - Consistent error output format across all commands
   - Integration with tools like `jq` for output processing
   - Comprehensive test suite for JSON output functionality
