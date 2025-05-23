@@ -374,8 +374,19 @@ Each command produces structured JSON output:
        "tokens_used": 150,
        "model": "gpt-4"
      }
-   }
-   ```
+  }
+  ```
+
+## GitHub Integration Tests
+
+Integration tests can be run in GitHub Actions. The workflow is triggered
+manually and requires two repository secrets:
+
+1. `OPENAI_API_KEY` – your OpenAI API key used by the tests.
+2. `INTEGRATION_ACTOR` – the GitHub username allowed to run the workflow.
+
+Head to **Actions → Integration Tests** and choose **Run workflow** to start a
+test run.
 
 ## License
 
