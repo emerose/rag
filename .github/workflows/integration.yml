@@ -5,7 +5,7 @@ on:
 
 jobs:
   integration:
-    if: github.actor == secrets.INTEGRATION_ACTOR
+    if: github.actor == 'emerose'
     runs-on: ubuntu-latest
     env:
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
