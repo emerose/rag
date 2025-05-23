@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from typing import Any
 
 try:
     import structlog
@@ -18,11 +19,72 @@ except ModuleNotFoundError:  # pragma: no cover - structlog may be missing
 from rich.console import Console
 from rich.logging import RichHandler
 
-logger: logging.Logger
+
+class RAGLogger:
+    """Simple logger adapter that supports structured extras."""
+
+    def __init__(self, base_logger: logging.Logger) -> None:
+        """Initialize the adapter.
+
+        Args:
+            base_logger: The underlying logger instance.
+        """
+        self._base_logger = base_logger
+
+    def log(
+        self,
+        level: int,
+        msg: str,
+        *args: Any,
+        subsystem: str = "RAG",
+        **kwargs: Any,
+    ) -> None:
+        """Log a message with optional subsystem context."""
+        if structlog is not None:
+            self._base_logger.log(level, msg, *args, **kwargs)
+        else:
+            extra = kwargs.pop("extra", {})
+            extra["subsystem"] = subsystem
+            self._base_logger.log(
+                level, f"[{subsystem}] {msg}", *args, extra=extra, **kwargs
+            )
+
+    def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Delegate ``DEBUG`` messages."""
+        self.log(logging.DEBUG, msg, *args, **kwargs)
+
+    def info(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Delegate ``INFO`` messages."""
+        self.log(logging.INFO, msg, *args, **kwargs)
+
+    def warning(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Delegate ``WARNING`` messages."""
+        self.log(logging.WARNING, msg, *args, **kwargs)
+
+    def error(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Delegate ``ERROR`` messages."""
+        self.log(logging.ERROR, msg, *args, **kwargs)
+
+    def critical(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Delegate ``CRITICAL`` messages."""
+        self.log(logging.CRITICAL, msg, *args, **kwargs)
+
+    def exception(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        """Delegate ``ERROR`` messages with exception info."""
+        kwargs.setdefault("exc_info", True)
+        self.error(msg, *args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._base_logger, name)
+
+
+_base_logger: logging.Logger
 if structlog is not None:
-    logger = structlog.get_logger("rag")
+    _base_logger = structlog.get_logger("rag")
 else:  # Fallback to standard logging when structlog is unavailable
-    logger = logging.getLogger("rag")
+    _base_logger = logging.getLogger("rag")
+
+logger: RAGLogger = RAGLogger(_base_logger)
 
 
 def setup_logging(
@@ -63,10 +125,15 @@ def setup_logging(
     timestamper = structlog.processors.TimeStamper(fmt="iso")
     pre_chain = [structlog.stdlib.add_log_level, timestamper]
 
+    file_processor = (
+        structlog.processors.JSONRenderer()
+        if json_logs
+        else structlog.dev.ConsoleRenderer()
+    )
     file_handler = logging.FileHandler(log_file)
     file_handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
-            processor=structlog.processors.JSONRenderer(),
+            processor=file_processor,
             foreign_pre_chain=pre_chain,
         ),
     )
@@ -77,7 +144,11 @@ def setup_logging(
         if json_logs
         else structlog.dev.ConsoleRenderer()
     )
-    console_handler = RichHandler(console=Console(stderr=True), rich_tracebacks=True)
+    console = Console(stderr=True)
+    if json_logs:
+        console_handler = logging.StreamHandler(console.file)
+    else:
+        console_handler = RichHandler(console=console, rich_tracebacks=True)
     console_handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
             processor=console_processor,
@@ -115,10 +186,7 @@ def log_message(
 ) -> None:
     """Log a message and optionally send it to a callback."""
     log_level = getattr(logging, level.upper(), logging.INFO)
-    if structlog is not None:
-        logger.bind(subsystem=subsystem).log(log_level, message)
-    else:
-        logger.log(log_level, f"[{subsystem}] {message}")
+    logger.log(log_level, message, subsystem=subsystem)
 
     if callback:
         try:
