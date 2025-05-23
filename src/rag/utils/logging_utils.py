@@ -83,6 +83,16 @@ _base_logger: logging.Logger = structlog.get_logger("rag")
 logger: RAGLogger = RAGLogger(_base_logger)
 
 
+def uppercase_level(
+    _logger: logging.Logger, _name: str, event_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Ensure the ``level`` field is uppercase."""
+    level = event_dict.get("level")
+    if level is not None:
+        event_dict["level"] = str(level).upper()
+    return event_dict
+
+
 def setup_logging(
     log_file: str = "rag.log",
     log_level: int = logging.INFO,
@@ -133,6 +143,7 @@ def setup_logging(
     timestamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S")
     pre_chain = [
         structlog.stdlib.add_log_level,
+        uppercase_level,
         structlog.stdlib.add_logger_name,
         timestamper,
     ]
@@ -176,6 +187,7 @@ def setup_logging(
             structlog.stdlib.filter_by_level,
             structlog.stdlib.add_logger_name,
             structlog.stdlib.add_log_level,
+            uppercase_level,
             timestamper,
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,

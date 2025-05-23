@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Custom exception hierarchy with specific exception classes for better error handling
 
 ### Changed
+- Log levels are now shown in uppercase for better readability
 - Refactored `TextSplitterFactory` to use a table-driven approach for better maintainability
 - Enhanced PDF processing with improved font analysis for heading detection
 - Separated metadata extraction into dedicated `DocumentMetadataExtractor` classes
