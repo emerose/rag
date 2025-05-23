@@ -32,4 +32,7 @@ build/
 Scientific Data
 Ingest
 
+# Coverage files
 .coverage
+.coverage.*
+htmlcov/
