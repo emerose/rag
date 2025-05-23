@@ -171,15 +171,23 @@ def test_log_level_uppercase() -> None:
 def test_log_level_colorized() -> None:
     """Ensure log levels are colorized without markup artifacts."""
     console_out, _ = _setup_and_log(json_logs=False)
-    assert "INFO" in console_out
+
     # Check that INFO is wrapped in ANSI escape codes for color
+    # ie, this asserts that the string *is* colorized
     assert re.search(r"\x1b\[[0-9;]*mINFO\x1b\[[0-9;]*m", console_out)
-    assert "[red]" not in console_out
-    assert "[cyan]" not in console_out
-    assert "[yellow]" not in console_out
-    assert "[green]" not in console_out
-    assert "[bold red]" not in console_out
+
+    # there should not be raw markup in the console output
+    assert "red" not in console_out
+    assert "cyan" not in console_out
+    assert "yellow" not in console_out
+    assert "green" not in console_out
+    assert "bold red" not in console_out
     assert "[/" not in console_out
+
+    # there should also not be literal ANSI escape codes 
+    printed = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', console_out)
+    assert "[[" not in printed
+    assert re.search(r"\[[0-9;]*m", printed) is None
 
 
 def test_foreign_logger_colorized() -> None:
