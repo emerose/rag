@@ -43,13 +43,24 @@
 - **[P2] Golden-set retrieval QA** – `tests/e2e/eval_rag.py` measuring hit-rate + exact-match.
 - **[P3] Synthetic QA generator** – Script to auto-generate QA pairs for regression tests.
 
-### 8 . Packaging & CI
+### 8 . MCP Server Integration
+- **[P2] Core MCP server implementation** – Create `src/rag/mcp_server.py` implementing Model Context Protocol to expose RAG functionality to AI assistants (ChatGPT, Cursor, etc.)
+- **[P2] RAG query tools** – Expose `query`, `search`, and `chat` operations with configurable parameters (top_k, filters, etc.)
+- **[P2] Document management tools** – Implement `list_indexed_files`, `get_document_metadata`, `remove_document` for corpus inspection and management
+- **[P3] Index management tools** – Add `index_folder`, `index_file`, `rebuild_index`, `get_index_stats` for dynamic content management
+- **[P3] Cache management tools** – Expose `clear_cache`, `invalidate_cache`, `get_cache_status` for system maintenance
+- **[P3] System administration tools** – Implement `get_system_status`, `list_available_models`, `update_config` for operational visibility
+- **[P4] MCP server CLI integration** – Add `rag serve-mcp` command with configurable host/port and authentication options
+- **[P4] Tool parameter validation** – Robust input validation and error handling for all MCP tool parameters
+- **[P5] MCP server documentation** – Examples for connecting popular AI assistants and comprehensive tool reference
+
+### 9 . Packaging & CI
 - **[P2] PyProject packaging** – Add `pyproject.toml`, `hatch` build and `[project.scripts] rag = "rag.cli:app"`.
 - **[P3] Version lockfile** – Generate requirements lock (poetry export / pip-tools) to freeze LangChain/OpenAI versions.
 - **[P4] Remove TUI** – Deprecate rich-based TUI since it is fragile; keep plain CLI.
 - **[P5] Deduplicate CSS** – Only relevant if TUI retained; else drop.
 
-### 9 . Documentation & Examples
+### 10 . Documentation & Examples
 - **[P3] CONTRIBUTING.md** – Coding standards, pre-commit, how to run.
 - **[P3] Sphinx docs + GitHub Pages** – Auto-publish API docs & "swap vector store" guide.
 - **[P4] Tutorial notebook** – `examples/rag_basic.ipynb` covering indexing, querying, prompt tweaks.
