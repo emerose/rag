@@ -39,27 +39,35 @@ class RAGLogger:
         """Log a message with optional subsystem context."""
         extra = kwargs.pop("extra", {})
         extra["subsystem"] = subsystem
-        self._base_logger.log(level, msg, *args, extra=extra, **kwargs)
+        stacklevel = kwargs.pop("stacklevel", 1)
+        self._base_logger.log(
+            level,
+            msg,
+            *args,
+            extra=extra,
+            stacklevel=stacklevel + 1,
+            **kwargs,
+        )
 
     def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Delegate ``DEBUG`` messages."""
-        self.log(logging.DEBUG, msg, *args, **kwargs)
+        self.log(logging.DEBUG, msg, *args, stacklevel=2, **kwargs)
 
     def info(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Delegate ``INFO`` messages."""
-        self.log(logging.INFO, msg, *args, **kwargs)
+        self.log(logging.INFO, msg, *args, stacklevel=2, **kwargs)
 
     def warning(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Delegate ``WARNING`` messages."""
-        self.log(logging.WARNING, msg, *args, **kwargs)
+        self.log(logging.WARNING, msg, *args, stacklevel=2, **kwargs)
 
     def error(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Delegate ``ERROR`` messages."""
-        self.log(logging.ERROR, msg, *args, **kwargs)
+        self.log(logging.ERROR, msg, *args, stacklevel=2, **kwargs)
 
     def critical(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Delegate ``CRITICAL`` messages."""
-        self.log(logging.CRITICAL, msg, *args, **kwargs)
+        self.log(logging.CRITICAL, msg, *args, stacklevel=2, **kwargs)
 
     def exception(self, msg: str, *args: Any, **kwargs: Any) -> None:
         """Delegate ``ERROR`` messages with exception info."""
@@ -91,17 +99,43 @@ def setup_logging(
     root_logger.setLevel(log_level)
     root_logger.handlers = []
 
-    def _console_renderer():
+    http_loggers = ["httpx", "urllib3", "requests"]
+    pdf_loggers = ["pdfminer", "unstructured"]
+
+    class DemoteFilter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:
+            """Demote noisy logs to DEBUG."""
+            name = record.name.split(".")[0]
+            if name in http_loggers and record.levelno == logging.INFO:
+                record.levelno = logging.DEBUG
+                record.levelname = "DEBUG"
+            if name in pdf_loggers and record.levelno == logging.WARNING:
+                record.levelno = logging.DEBUG
+                record.levelname = "DEBUG"
+            return True
+
+    root_logger.addFilter(DemoteFilter())
+
+    def _console_renderer() -> structlog.dev.ConsoleRenderer:
         try:
             params = inspect.signature(structlog.dev.ConsoleRenderer).parameters
+            kwargs: dict[str, Any] = {}
             if "colors" in params:
-                return structlog.dev.ConsoleRenderer(colors=False)
+                kwargs["colors"] = False
+            if "sort_keys" in params:
+                kwargs["sort_keys"] = False
+            if "key_order" in params:
+                kwargs["key_order"] = ["timestamp", "subsystem", "event"]
+            return structlog.dev.ConsoleRenderer(**kwargs)
         except (ValueError, TypeError):  # pragma: no cover - stub compatibility
-            pass
-        return structlog.dev.ConsoleRenderer()
+            return structlog.dev.ConsoleRenderer()
 
-    timestamper = structlog.processors.TimeStamper(fmt="iso")
-    pre_chain = [structlog.stdlib.add_log_level, timestamper]
+    timestamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S")
+    pre_chain = [
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.add_logger_name,
+        timestamper,
+    ]
 
     file_processor = (
         structlog.processors.JSONRenderer() if json_logs else _console_renderer()
@@ -121,8 +155,14 @@ def setup_logging(
     console = Console(stderr=True)
     if json_logs:
         console_handler = logging.StreamHandler(console.file)
+        console_handler.setLevel(logging.ERROR)
     else:
-        console_handler = RichHandler(console=console, rich_tracebacks=True)
+        console_handler = RichHandler(
+            console=console,
+            rich_tracebacks=True,
+            show_level=False,
+            show_time=False,
+        )
     console_handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
             processor=console_processor,
@@ -160,7 +200,7 @@ def log_message(
 ) -> None:
     """Log a message and optionally send it to a callback."""
     log_level = getattr(logging, level.upper(), logging.INFO)
-    logger.log(log_level, message, subsystem=subsystem)
+    logger.log(log_level, message, subsystem=subsystem, stacklevel=3)
 
     if callback:
         try:
