@@ -202,6 +202,7 @@ def setup_logging(
             rich_tracebacks=True,
             show_level=False,
             show_time=False,
+            markup=True,
         )
     console_handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
