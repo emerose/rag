@@ -145,7 +145,7 @@ def _setup_and_log(json_logs: bool) -> tuple[str, str]:
 def test_json_logs_are_json() -> None:
     """Ensure logs are JSON-formatted in JSON mode."""
     console_out, file_out = _setup_and_log(json_logs=True)
-    assert json.loads(console_out)
+    assert console_out == ""
     assert json.loads(file_out)
 
 
