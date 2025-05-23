@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -118,7 +119,7 @@ def _import_logging_utils() -> ModuleType:
     return module
 
 
-def _setup_and_log(json_logs: bool) -> tuple[str, str]:
+def _setup_and_log(json_logs: bool, *, foreign: bool = False) -> tuple[str, str]:
     """Configure logging and capture console and file output."""
     logging_utils = _import_logging_utils()
 
@@ -138,6 +139,8 @@ def _setup_and_log(json_logs: bool) -> tuple[str, str]:
     logging_utils.setup_logging(log_file="dummy.log", json_logs=json_logs)
     logger = logging_utils.get_logger()
     logger.info("test message", subsystem="test")
+    if foreign:
+        logging.getLogger("httpx").info("foreign message")
 
     return stream.getvalue().strip(), file_stream.getvalue().strip()
 
@@ -163,3 +166,24 @@ def test_log_level_uppercase() -> None:
     _, file_out = _setup_and_log(json_logs=True)
     record = json.loads(file_out)
     assert record["level"] == "INFO"
+
+
+def test_log_level_colorized() -> None:
+    """Ensure log levels are colorized without markup artifacts."""
+    console_out, _ = _setup_and_log(json_logs=False)
+    assert "INFO" in console_out
+    # Check that INFO is wrapped in ANSI escape codes for color
+    assert re.search(r"\x1b\[[0-9;]*mINFO\x1b\[[0-9;]*m", console_out)
+    assert "[red]" not in console_out
+    assert "[cyan]" not in console_out
+    assert "[yellow]" not in console_out
+    assert "[green]" not in console_out
+    assert "[bold red]" not in console_out
+    assert "[/" not in console_out
+
+
+def test_foreign_logger_colorized() -> None:
+    """Ensure foreign loggers receive colored levels."""
+    console_out, _ = _setup_and_log(json_logs=False, foreign=True)
+    matches = re.findall(r"\x1b\[[0-9;]*mINFO\x1b\[[0-9;]*m", console_out)
+    assert len(matches) >= 2

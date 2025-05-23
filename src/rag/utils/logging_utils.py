@@ -93,6 +93,32 @@ def uppercase_level(
     return event_dict
 
 
+LEVEL_STYLES: dict[str, str] = {
+    "CRITICAL": "bold red",
+    "ERROR": "red",
+    "WARNING": "yellow",
+    "INFO": "cyan",
+    "DEBUG": "green",
+}
+
+
+def _get_console() -> Console | None:
+    return getattr(colorize_level, "console", None)
+
+
+def colorize_level(
+    _logger: logging.Logger, _name: str, event_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Colorize the ``level`` field using Rich markup."""
+    level = event_dict.get("level")
+    console = _get_console()
+    if isinstance(level, str) and console is not None and console.is_terminal:
+        style = LEVEL_STYLES.get(level.upper())
+        if style:
+            event_dict["level"] = f"[{style}]{level}[/]"
+    return event_dict
+
+
 def setup_logging(
     log_file: str = "rag.log",
     log_level: int = logging.INFO,
@@ -148,6 +174,8 @@ def setup_logging(
         timestamper,
     ]
 
+    console_pre_chain = [*pre_chain, colorize_level]
+
     file_processor = (
         structlog.processors.JSONRenderer() if json_logs else _console_renderer()
     )
@@ -164,6 +192,7 @@ def setup_logging(
         structlog.processors.JSONRenderer() if json_logs else _console_renderer()
     )
     console = Console(stderr=True)
+    colorize_level.console = console
     if json_logs:
         console_handler = logging.StreamHandler(console.file)
         console_handler.setLevel(logging.ERROR)
@@ -177,7 +206,7 @@ def setup_logging(
     console_handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
             processor=console_processor,
-            foreign_pre_chain=pre_chain,
+            foreign_pre_chain=console_pre_chain,
         ),
     )
     root_logger.addHandler(console_handler)
@@ -188,6 +217,7 @@ def setup_logging(
             structlog.stdlib.add_logger_name,
             structlog.stdlib.add_log_level,
             uppercase_level,
+            colorize_level,
             timestamper,
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
