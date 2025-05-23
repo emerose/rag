@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import logging
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -163,3 +164,15 @@ def test_log_level_uppercase() -> None:
     _, file_out = _setup_and_log(json_logs=True)
     record = json.loads(file_out)
     assert record["level"] == "INFO"
+
+
+def test_log_level_colorized() -> None:
+    """Ensure log levels are colorized without markup artifacts."""
+    console_out, _ = _setup_and_log(json_logs=False)
+    assert "INFO" in console_out
+    # Output should contain ANSI escape codes but no Rich markup
+    assert "\x1b[" in console_out
+    assert "[cyan]" not in console_out
+    assert "[[cyan]" not in console_out
+    assert "[bold red]" not in console_out
+    assert "[/" not in console_out
