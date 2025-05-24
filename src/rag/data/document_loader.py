@@ -158,7 +158,7 @@ class DocumentLoader:
             self._log("DEBUG", f"Extracting metadata from document: {file_path}")
             docs = self.metadata_extractor.enhance_documents(docs, mime_type)
 
-            self._log("INFO", f"Loaded {len(docs)} document(s) from {file_path}")
+            self._log("DEBUG", f"Loaded {len(docs)} document(s) from {file_path}")
         except Exception as e:
             self._log("ERROR", f"Failed to load document {file_path}: {e}")
             raise DocumentLoadingError(file_path, str(e)) from e

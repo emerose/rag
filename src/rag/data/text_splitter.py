@@ -870,7 +870,7 @@ class TextSplitterFactory:
             # Regular case: use the splitter directly
             chunked_docs = self._split_regular_documents(documents, splitter, mime_type)
 
-        self._log("INFO", f"Split into {len(chunked_docs)} chunks")
+        self._log("DEBUG", f"Split into {len(chunked_docs)} chunks")
 
         # Preserve hierarchy metadata if headings should be preserved
         if self.preserve_headings:
@@ -906,7 +906,7 @@ class TextSplitterFactory:
                     headings = enhanced_metadata.get("heading_hierarchy")
                     if headings:
                         self._log(
-                            "INFO", f"Extracted {len(headings)} headings from PDF"
+                            "DEBUG", f"Extracted {len(headings)} headings from PDF"
                         )
                         # Store heading hierarchy in document metadata
                         documents[0].metadata["heading_hierarchy"] = headings

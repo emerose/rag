@@ -308,7 +308,7 @@ class IngestManager:
 
         try:
             # 1. Load document
-            self._log("INFO", f"Loading document: {file_path}")
+            self._log("DEBUG", f"Loading document: {file_path}")
             doc_loader = DocumentLoader(self.filesystem_manager, self.log_callback)
             docs = doc_loader.load_document(file_path)
 
@@ -324,7 +324,7 @@ class IngestManager:
                     docs = self._apply_preprocessor(docs)
 
                 # 2. Split into chunks
-                self._log("INFO", f"Splitting document into chunks: {file_path}")
+                self._log("DEBUG", f"Splitting document into chunks: {file_path}")
                 try:
                     chunked_docs = self.chunking_strategy.split_documents(
                         docs, mime_type

@@ -380,5 +380,4 @@ class SemanticChunkingStrategy(ChunkingStrategy):
         # Use TextSplitterFactory to split documents
         chunked_docs = self.splitter_factory.split_documents(documents, mime_type)
 
-        self._log("INFO", f"Split into {len(chunked_docs)} chunks")
         return chunked_docs
