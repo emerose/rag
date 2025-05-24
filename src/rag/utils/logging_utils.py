@@ -1,8 +1,9 @@
 """Logging utilities for the RAG system.
 
 This module configures structured logging using structlog. Console logs are
-pretty-printed with Rich, while logs written to file or emitted when JSON mode
-is active are rendered as JSON.
+rendered with :class:`structlog.dev.ConsoleRenderer` and colorized via Rich,
+while logs written to file or emitted when JSON mode is active are rendered as
+JSON.
 """
 
 from __future__ import annotations
@@ -14,7 +15,6 @@ from typing import Any
 
 import structlog
 from rich.console import Console
-from rich.logging import RichHandler
 
 
 class RAGLogger:
@@ -197,13 +197,19 @@ def setup_logging(
         console_handler = logging.StreamHandler(console.file)
         console_handler.setLevel(logging.ERROR)
     else:
-        console_handler = RichHandler(
-            console=console,
-            rich_tracebacks=True,
-            show_level=False,
-            show_time=False,
-            markup=True,
-        )
+
+        class RichConsoleHandler(logging.Handler):
+            def __init__(self, rich_console: Console) -> None:
+                super().__init__()
+                self.console = rich_console
+
+            def emit(
+                self, record: logging.LogRecord
+            ) -> None:  # pragma: no cover - thin wrapper
+                msg = self.format(record)
+                self.console.print(msg)
+
+        console_handler = RichConsoleHandler(console)
     console_handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
             processor=console_processor,
