@@ -248,7 +248,7 @@ couple of endpoints for basic status and cache management:
 - `POST /cache/clear` – clear embedding and search caches.
 - `GET /system/status` – return server status and configuration summary.
 
-Run the server with `uvicorn rag.mcp_server:app` and interact using `curl`:
+Run the server with `rag serve-mcp --host 127.0.0.1 --port 8000` and interact using `curl`:
 
 ```bash
 curl -X POST http://localhost:8000/cache/clear

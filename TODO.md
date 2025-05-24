@@ -3,7 +3,6 @@
 ---
 
 ### MCP Server Integration
-- [#137] **Add CLI command `rag serve-mcp` with host and port options.**
 - [#138] **Provide optional API key authentication using SDK middleware.**
 - [#139] **Write unit tests for tools and authentication logic.**
 - [#140] **Add integration test that queries the running server.**
