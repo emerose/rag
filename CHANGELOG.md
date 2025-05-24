@@ -53,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Custom exception hierarchy with specific exception classes for better error handling
 - Initial design sketch for MCP server integration under `docs/design_sketches`
 - Expanded MCP server design sketch with third-party library recommendations
+- Skeleton FastAPI MCP server module exposing placeholder endpoints
+- Basic endpoint tests for the MCP server using FastAPI's TestClient
 
 ### Changed
 - Log levels are now shown in uppercase for better readability
