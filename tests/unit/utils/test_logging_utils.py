@@ -37,6 +37,10 @@ def _make_structlog_stub() -> ModuleType:
             return json.dumps(event_dict)
 
     class ConsoleRenderer:
+        def __init__(self, **kwargs: Any) -> None:
+            # Accept any parameters to match the real ConsoleRenderer
+            pass
+            
         def __call__(self, _logger: Any, _name: str, event_dict: dict[str, Any]) -> str:
             return str(event_dict)
 
@@ -232,4 +236,4 @@ def test_console_log_structure() -> None:
     record = ast.literal_eval(file_out)
     assert record.get("logger_name") == "rag"
     assert record.get("filename") == "test_logging_utils.py"
-    assert record.get("lineno") == 170
+    assert record.get("lineno") == 174

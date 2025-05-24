@@ -7,7 +7,6 @@ is active are rendered as JSON.
 
 from __future__ import annotations
 
-import inspect
 import logging
 from collections.abc import Callable
 from typing import Any
@@ -177,30 +176,17 @@ def setup_logging(
 
     root_logger.addFilter(DemoteFilter())
 
-    def _console_renderer() -> structlog.dev.ConsoleRenderer:
-        try:
-            params = inspect.signature(structlog.dev.ConsoleRenderer).parameters
-            kwargs: dict[str, Any] = {}
-            if "colors" in params:
-                kwargs["colors"] = False
-            if "sort_keys" in params:
-                kwargs["sort_keys"] = False
-            if "key_order" in params:
-                kwargs["key_order"] = [
-                    "timestamp",
-                    "level",
-                    "logger_name",
-                    "event",
-                ]
-            return structlog.dev.ConsoleRenderer(**kwargs)
-        except (ValueError, TypeError):  # pragma: no cover - stub compatibility
-            return structlog.dev.ConsoleRenderer()
-
     timestamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S")
     callsite = CallsiteParameterAdder(
         [CallsiteParameter.FILENAME, CallsiteParameter.LINENO],
         additional_ignores=["rag.utils.logging_utils"],
     )
+
+    # Configure ConsoleRenderer with specific parameters
+    console_renderer_kwargs: dict[str, Any] = {
+        "colors": False,  # Rich handles coloring, so disable structlog colors
+        "sort_keys": False,
+    }
 
     pre_chain = [
         structlog.stdlib.add_log_level,
@@ -215,7 +201,9 @@ def setup_logging(
     console_pre_chain = [*pre_chain, colorize_level]
 
     file_processor = (
-        structlog.processors.JSONRenderer() if json_logs else _console_renderer()
+        structlog.processors.JSONRenderer()
+        if json_logs
+        else structlog.dev.ConsoleRenderer(**console_renderer_kwargs)
     )
     file_handler = logging.FileHandler(log_file)
     file_handler.setFormatter(
@@ -227,7 +215,9 @@ def setup_logging(
     root_logger.addHandler(file_handler)
 
     console_processor = (
-        structlog.processors.JSONRenderer() if json_logs else _console_renderer()
+        structlog.processors.JSONRenderer()
+        if json_logs
+        else structlog.dev.ConsoleRenderer(**console_renderer_kwargs)
     )
     console = Console(stderr=True)
     colorize_level.console = console
