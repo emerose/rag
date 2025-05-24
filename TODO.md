@@ -2,6 +2,18 @@
 
 ---
 
+- Create server module `src/rag/mcp_server.py` with a FastAPI app exposing the endpoints.
+- Wire existing RAG engine into `/query`, `/search`, and `/chat` endpoints.
+- Implement document management functions for listing, metadata retrieval, and deletion.
+- Add index management endpoints to index paths and rebuild or inspect the index.
+- Expose cache and system tools for clearing caches and checking server status.
+- Provide API key authentication middleware with a configurable key.
+- Integrate CLI command `rag serve-mcp` to start the server with host and port options.
+- Write unit tests covering each endpoint and authentication logic.
+- Add integration test that starts the server and performs a sample query.
+- Document usage including example curl commands and instructions for AI assistants.
+- *Agents should delete these tasks from this list once they are finished.*
+
 ## 🗺️ Roadmap & Priorities  
 *(Priority ‑ **P1** = Do next, … **P5** = Nice-to-have)*
 
