@@ -39,10 +39,28 @@ def _make_structlog_stub() -> ModuleType:
     class ConsoleRenderer:
         def __init__(self, **kwargs: Any) -> None:
             # Accept any parameters to match the real ConsoleRenderer
-            pass
+            self.colors = kwargs.get("colors", True)
+            self.level_styles = kwargs.get("level_styles", {})
             
         def __call__(self, _logger: Any, _name: str, event_dict: dict[str, Any]) -> str:
-            return str(event_dict)
+            # Format like the real ConsoleRenderer but simpler
+            timestamp = event_dict.get("timestamp", "")
+            level = event_dict.get("level", "")
+            event = event_dict.get("event", "")
+            logger_name = event_dict.get("logger_name", "")
+            filename = event_dict.get("filename", "")
+            lineno = event_dict.get("lineno", "")
+            
+            # Apply coloring if enabled
+            if self.colors and level in self.level_styles:
+                level = f"{self.level_styles[level]}{level}\033[0m"
+            
+            # Format similar to real ConsoleRenderer
+            parts = [timestamp, f"[{level}]", event, f"[{logger_name}]"]
+            if filename and lineno:
+                parts.append(f"filename={filename} lineno={lineno}")
+                
+            return " ".join(part for part in parts if part).strip()
 
     class TimeStamper:
         def __init__(self, fmt: str = "iso") -> None:
@@ -156,26 +174,37 @@ def _setup_and_log(json_logs: bool, *, foreign: bool = False) -> tuple[str, str]
     """Configure logging and capture console and file output."""
     logging_utils = _import_logging_utils()
 
-    stream = io.StringIO()
+    console_stream = io.StringIO()
     file_stream = io.StringIO()
 
-    def console_factory(stderr: bool = False) -> Console:  # noqa: ARG001
-        return Console(file=stream, force_terminal=True, width=80)
-
-    class FileHandler(logging.StreamHandler):
-        def __init__(self) -> None:
+    class MockFileHandler(logging.StreamHandler):
+        def __init__(self, filename: str) -> None:
             super().__init__(file_stream)
 
-    logging_utils.Console = console_factory  # type: ignore[assignment]
-    logging_utils.logging.FileHandler = lambda _path: FileHandler()  # type: ignore
+    class MockConsoleHandler(logging.StreamHandler):
+        def __init__(self, stream: Any = None) -> None:
+            super().__init__(console_stream)
 
-    logging_utils.setup_logging(log_file="dummy.log", json_logs=json_logs)
-    logger = logging_utils.get_logger()
-    logger.info("test message", subsystem="test")
-    if foreign:
-        logging.getLogger("httpx").info("foreign message")
+    # Store original classes
+    original_file_handler = logging_utils.logging.FileHandler
+    original_stream_handler = logging_utils.logging.StreamHandler
+    
+    # Mock the handlers
+    logging_utils.logging.FileHandler = MockFileHandler  # type: ignore
+    logging_utils.logging.StreamHandler = MockConsoleHandler  # type: ignore
 
-    return stream.getvalue().strip(), file_stream.getvalue().strip()
+    try:
+        logging_utils.setup_logging(log_file="dummy.log", json_logs=json_logs)
+        logger = logging_utils.get_logger()
+        logger.info("test message", subsystem="test")
+        if foreign:
+            logging.getLogger("httpx").info("foreign message")
+
+        return console_stream.getvalue().strip(), file_stream.getvalue().strip()
+    finally:
+        # Restore original classes
+        logging_utils.logging.FileHandler = original_file_handler
+        logging_utils.logging.StreamHandler = original_stream_handler
 
 
 def test_json_logs_are_json() -> None:
@@ -233,7 +262,8 @@ def test_foreign_logger_colorized() -> None:
 def test_console_log_structure() -> None:
     """Logger name should follow level and callsite info should be present."""
     _, file_out = _setup_and_log(json_logs=False)
-    record = ast.literal_eval(file_out)
-    assert record.get("logger_name") == "rag"
-    assert record.get("filename") == "test_logging_utils.py"
-    assert record.get("lineno") == 174
+    # Now that we use ConsoleRenderer, the output is a formatted string
+    # Check that it contains the expected components
+    assert "[rag]" in file_out
+    assert "filename=test_logging_utils.py" in file_out
+    assert "lineno=199" in file_out

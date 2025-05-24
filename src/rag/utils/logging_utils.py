@@ -12,8 +12,6 @@ from collections.abc import Callable
 from typing import Any
 
 import structlog
-from rich.console import Console
-from rich.logging import RichHandler
 from structlog.processors import CallsiteParameter, CallsiteParameterAdder
 
 
@@ -94,29 +92,12 @@ def uppercase_level(
 
 
 LEVEL_STYLES: dict[str, str] = {
-    "CRITICAL": "bold red",
-    "ERROR": "red",
-    "WARNING": "yellow",
-    "INFO": "cyan",
-    "DEBUG": "green",
+    "CRITICAL": "\033[1;31m",  # bold red
+    "ERROR": "\033[31m",  # red
+    "WARNING": "\033[33m",  # yellow
+    "INFO": "\033[36m",  # cyan
+    "DEBUG": "\033[32m",  # green
 }
-
-
-def _get_console() -> Console | None:
-    return getattr(colorize_level, "console", None)
-
-
-def colorize_level(
-    _logger: logging.Logger, _name: str, event_dict: dict[str, Any]
-) -> dict[str, Any]:
-    """Colorize the ``level`` field using Rich markup."""
-    level = event_dict.get("level")
-    console = _get_console()
-    if isinstance(level, str) and console is not None and console.is_terminal:
-        style = LEVEL_STYLES.get(level.upper())
-        if style:
-            event_dict["level"] = f"[{style}]{level}[/]"
-    return event_dict
 
 
 def insert_logger_name(
@@ -184,8 +165,9 @@ def setup_logging(
 
     # Configure ConsoleRenderer with specific parameters
     console_renderer_kwargs: dict[str, Any] = {
-        "colors": False,  # Rich handles coloring, so disable structlog colors
+        "colors": True,  # Let ConsoleRenderer handle colors
         "sort_keys": False,
+        "level_styles": LEVEL_STYLES,  # Use our custom level styles
     }
 
     pre_chain = [
@@ -198,7 +180,9 @@ def setup_logging(
         insert_logger_name,
     ]
 
-    console_pre_chain = [*pre_chain, colorize_level]
+    console_pre_chain = [
+        *pre_chain
+    ]  # Remove colorize_level since ConsoleRenderer handles colors
 
     file_processor = (
         structlog.processors.JSONRenderer()
@@ -219,19 +203,14 @@ def setup_logging(
         if json_logs
         else structlog.dev.ConsoleRenderer(**console_renderer_kwargs)
     )
-    console = Console(stderr=True)
-    colorize_level.console = console
+
     if json_logs:
-        console_handler = logging.StreamHandler(console.file)
+        console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.ERROR)
     else:
-        console_handler = RichHandler(
-            console=console,
-            rich_tracebacks=True,
-            show_level=False,
-            show_time=False,
-            markup=True,
-        )
+        # Use simple StreamHandler and let ConsoleRenderer handle all formatting
+        console_handler = logging.StreamHandler()
+
     console_handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
             processor=console_processor,
@@ -246,7 +225,6 @@ def setup_logging(
             structlog.stdlib.add_logger_name,
             structlog.stdlib.add_log_level,
             uppercase_level,
-            colorize_level,
             timestamper,
             callsite,
             strip_internal_fields,
