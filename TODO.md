@@ -1,4 +1,4 @@
-## 🚀 Next Up (Implementation Plan)
+## 🚀 Next
 
 ---
 
