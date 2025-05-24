@@ -88,13 +88,16 @@ class TodoTask:
     
     def get_issue_title(self) -> str:
         """Get the cleaned title for the GitHub issue."""
-        # Remove ID and priority markers from title
+        # Remove GitHub issue ID, original ID, and priority markers from title
         title = self.title
         
-        # Remove [ID-XXX] patterns
+        # Remove [#XX] patterns (GitHub issue numbers)
+        title = re.sub(r'\[#\d+\]\s*', '', title)
+        
+        # Remove [ID-XXX] patterns (original TODO IDs)
         title = re.sub(r'\[ID-\d+\]\s*', '', title)
         
-        # Remove [PX] patterns  
+        # Remove [PX] patterns (priority markers)
         title = re.sub(r'\[P\d+\]\s*', '', title)
         
         # Remove bold markdown

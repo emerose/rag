@@ -10,8 +10,6 @@
 - [#43] **Document usage including example curl commands and instructions for AI assistants.**
 - *Agents should delete these tasks from this list once they are finished.*
 
-- [#38] **Expose cache and system tools for clearing caches and checking server status.**
-- [#37] **Add index management endpoints to index paths and rebuild or inspect the index.**
 ## 🗺️ Roadmap & Priorities  
 *(Priority ‑ **P1** = Do next, … **P5** = Nice-to-have)*
 
