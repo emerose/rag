@@ -22,6 +22,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from rag import RAGConfig, RAGEngine, RuntimeOptions
+from rag.mcp_tools import register_tools
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ def get_engine() -> RAGEngine | _DummyEngine:
 
 
 mcp = FastMCP("RAG MCP Server")
+register_tools(mcp)
 
 
 class QueryPayload(BaseModel):
