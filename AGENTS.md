@@ -12,4 +12,21 @@ This repository welcomes contributions from AI-based tools. When acting as an ag
 8. **Never commit secrets or generated files.**
 9. **Keep contributor docs aligned** – update `.cursorrules`, `AGENTS.md`, and `CONTRIBUTING.md` together when guidelines change.
 
+## Working with TODO.md
+
+The project uses TODO.md for task tracking with bidirectional GitHub issue synchronization:
+
+10. **Completed tasks**: Remove finished tasks from TODO.md entirely. The sync system will automatically close the corresponding GitHub issue.
+11. **New tasks**: Add new tasks without GitHub issue numbers. Use this format:
+    ```
+    - **Task title** – Task description
+    ```
+    Or with priority:
+    ```
+    - [P2] **Task title** – Task description
+    ```
+    The sync system will automatically create GitHub issues and add issue numbers to TODO.md.
+12. **Never manually add issue numbers** like `[#123]` to new tasks. Let the sync system handle GitHub integration.
+13. **Task organization**: Place new tasks in the appropriate category section and mark as "Next" if they should be prioritized.
+
 For human contributors, see [CONTRIBUTING.md](CONTRIBUTING.md).
