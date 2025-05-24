@@ -334,10 +334,6 @@ class IngestManager:
                     result = IngestResult(source, IngestStatus.SUCCESS)
                     result.documents = chunked_docs
                     result.processing_time = time.time() - start_time
-                    self._log(
-                        "INFO",
-                        f"Successfully processed {file_path}: {len(chunked_docs)} chunks",
-                    )
                 except Exception as e:
                     self._log("ERROR", f"Error during document chunking: {e}")
                     result = IngestResult(
