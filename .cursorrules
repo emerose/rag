@@ -56,6 +56,9 @@
 8. When the task is complete, run check.sh to ensure no errors or linting problems
 9. Run integration tests to verify end-to-end functionality
 10. Remove completed tasks from TODO.md and update CHANGELOG.md with the changes
+11. Update documentation to reflect your changes before marking the task complete
+12. Keep `.cursorrules`, `AGENTS.md`, and `CONTRIBUTING.md` in sync; update all
+    three when modifying contributor guidelines
 
 # Coding Guidelines
 
@@ -95,6 +98,7 @@
 ## 5. Testing
 
 - **Unit Tests**: Write unit tests using `pytest` for individual components.
+- **Write Tests for Changes**: Add tests for all code changes whenever feasible, especially when fixing bugs or regressions.
 - **Integration Tests**: Include a small number of integration tests focused on common end-user use cases.
 - **Test Coverage**: Aim for high test coverage of business logic, but don't test third-party code.
 - **Test Speed**: Keep tests focused and fast; individual unit tests should take less than 0.5 seconds.
@@ -127,6 +131,7 @@
 # Code Requirements
 
 - **Type Annotations**: All functions must include type annotations.
+- **Pydantic Models**: Use Pydantic models for all API request and response schemas.
 - **Docstrings**: Use Google-style docstrings for all public APIs.
 - **Comments**: Annotate key logic with comments.
 - **Examples**: Provide usage examples in docstrings or tests.
