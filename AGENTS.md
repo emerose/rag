@@ -28,5 +28,6 @@ The project uses TODO.md for task tracking with bidirectional GitHub issue synch
     The sync system will automatically create GitHub issues and add issue numbers to TODO.md.
 12. **Never manually add issue numbers** like `[#123]` to new tasks. Let the sync system handle GitHub integration.
 13. **Task organization**: Place new tasks in the appropriate category section and mark as "Next" if they should be prioritized.
+14. **Link task to PR** by including the issue number in the commit. If a PR completely resolves the issue, include the "closes" keyword: "closes #123". If a commit is just related to an open task, say something like "see #123"
 
 For human contributors, see [CONTRIBUTING.md](CONTRIBUTING.md).
