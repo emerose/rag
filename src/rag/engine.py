@@ -525,7 +525,7 @@ class RAGEngine:
 
         """
         directory = Path(directory).absolute() if directory else self.documents_dir
-        self._log("INFO", f"Indexing directory: {directory}")
+        self._log("DEBUG", f"Indexing directory: {directory}")
 
         # Validate directory
         if not self.filesystem_manager.validate_documents_dir(directory):
@@ -622,7 +622,7 @@ class RAGEngine:
 
         # Summary
         success_count = sum(1 for r in results.values() if r.get("success"))
-        self._log("INFO", f"Indexed {success_count}/{len(results)} files successfully")
+        self._log("DEBUG", f"Indexed {success_count}/{len(results)} files successfully")
 
         return results
 
