@@ -4,7 +4,6 @@
 
 ### MCP Server Integration
 - **Replace custom FastAPI server with the MCP Python SDK and add the `mcp` dependency.**
-- **Create `mcp_tools.py` exposing RAG operations via `mcp.tool` decorators.**
 - **Instantiate `FastMCP` in a server module and register the tools.**
 - **Add CLI command `rag serve-mcp` with host and port options.**
 - **Provide optional API key authentication using SDK middleware.**
