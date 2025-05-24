@@ -3,8 +3,6 @@
 ---
 
 ### MCP Server Integration
-
-- **[ID-002]** Implement document management functions for listing, metadata retrieval, and deletion.
 - **[ID-003]** Add index management endpoints to index paths and rebuild or inspect the index.
 - **[ID-004]** Expose cache and system tools for clearing caches and checking server status.
 - **[ID-005]** Provide API key authentication middleware with a configurable key.
