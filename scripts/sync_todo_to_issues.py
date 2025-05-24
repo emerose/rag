@@ -232,26 +232,45 @@ def parse_todo_tasks(text: str) -> List[TodoTask]:
 
 def existing_issues() -> dict[str, dict[str, Any]]:
     """Return a dictionary of existing GitHub issues with full metadata.
-    
+
     Returns:
-        Dictionary mapping issue titles to issue metadata (number, labels, body)
+        Dictionary mapping issue titles to issue metadata (number, labels, body, state)
+        When there are duplicate titles, prioritizes open issues over closed ones,
+        and lower issue numbers when states are the same.
     """
     try:
         result = subprocess.run(
-            ["gh", "issue", "list", "--state", "all", "--json", "title,number,labels,body"],
+            ["gh", "issue", "list", "--state", "all", "--limit", "1000", "--json", "title,number,labels,body,state"],
             check=True,
             capture_output=True,
             text=True,
         )
         issues = json.loads(result.stdout)
-        return {
-            issue["title"]: {
+        
+        # Build dictionary, handling duplicates by prioritizing open issues
+        issue_dict = {}
+        for issue in issues:
+            title = issue["title"]
+            current_issue = {
                 "number": issue["number"],
                 "labels": [label["name"] for label in issue.get("labels", [])],
                 "body": issue.get("body", ""),
+                "state": issue["state"],
             }
-            for issue in issues
-        }
+            
+            if title in issue_dict:
+                existing = issue_dict[title]
+                # Prioritize open over closed
+                if existing["state"] == "CLOSED" and current_issue["state"] == "OPEN":
+                    issue_dict[title] = current_issue
+                # If same state, prefer lower issue number (older issue)
+                elif existing["state"] == current_issue["state"] and current_issue["number"] < existing["number"]:
+                    issue_dict[title] = current_issue
+                # Otherwise keep existing
+            else:
+                issue_dict[title] = current_issue
+        
+        return issue_dict
     except (subprocess.CalledProcessError, json.JSONDecodeError, FileNotFoundError) as e:
         print(f"Warning: Could not fetch existing issues: {e}")
         return {}
