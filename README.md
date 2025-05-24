@@ -241,8 +241,9 @@ rag invalidate --all path/to/directory
 
 ### MCP Server
 
-The project includes a lightweight FastAPI server exposing RAG functionality.
-Two endpoints are currently available:
+RAG operations are implemented as MCP tools in `rag.mcp_tools`. These tools can
+be served using the `FastMCP` server. The legacy FastAPI server still exposes a
+couple of endpoints for basic status and cache management:
 
 - `POST /cache/clear` – clear embedding and search caches.
 - `GET /system/status` – return server status and configuration summary.
