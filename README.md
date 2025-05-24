@@ -239,6 +239,21 @@ Invalidate all caches in a directory:
 rag invalidate --all path/to/directory
 ```
 
+### MCP Server
+
+The project includes a lightweight FastAPI server exposing RAG functionality.
+Two endpoints are currently available:
+
+- `POST /cache/clear` – clear embedding and search caches.
+- `GET /system/status` – return server status and configuration summary.
+
+Run the server with `uvicorn rag.mcp_server:app` and interact using `curl`:
+
+```bash
+curl -X POST http://localhost:8000/cache/clear
+curl http://localhost:8000/system/status
+```
+
 ### Getting Help
 
 Show general help:

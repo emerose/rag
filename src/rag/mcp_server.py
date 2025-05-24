@@ -103,6 +103,10 @@ class DetailResponse(BaseModel):
 
 class SystemStatus(BaseModel):
     status: str
+    num_documents: int
+    cache_dir: str
+    embedding_model: str
+    chat_model: str
 
 
 class IndexStats(RootModel[dict[str, Any]]):
@@ -260,10 +264,27 @@ async def get_index_stats() -> IndexStats:
 @app.post("/cache/clear", response_model=DetailResponse)
 async def clear_cache() -> DetailResponse:
     """Clear embedding and search caches."""
+
+    engine = get_engine()
+    if hasattr(engine, "invalidate_all_caches"):
+        engine.invalidate_all_caches()
     return DetailResponse(detail="Cache cleared")
 
 
 @app.get("/system/status", response_model=SystemStatus)
 async def system_status() -> SystemStatus:
     """Return server status summary."""
-    return SystemStatus(status="ok")
+
+    engine = get_engine()
+    num_docs = (
+        len(engine.list_indexed_files()) if hasattr(engine, "list_indexed_files") else 0
+    )
+    config = getattr(engine, "config", RAGConfig(documents_dir="docs"))
+
+    return SystemStatus(
+        status="ok",
+        num_documents=num_docs,
+        cache_dir=config.cache_dir,
+        embedding_model=config.embedding_model,
+        chat_model=config.chat_model,
+    )

@@ -9,6 +9,7 @@ fastapi = pytest.importorskip("fastapi")
 os.environ["RAG_MCP_DUMMY"] = "1"
 from fastapi.testclient import TestClient
 from rag.mcp_server import app, _compute_doc_id
+from rag import RAGConfig
 
 client = TestClient(app)
 
@@ -21,10 +22,17 @@ def test_query_endpoint(socket_enabled) -> None:
     assert "answer" in data
 
 
-def test_system_status_endpoint(socket_enabled) -> None:
+@patch("rag.mcp_server.get_engine")
+def test_system_status_endpoint(mock_get_engine: MagicMock, socket_enabled) -> None:
+    engine = _StubEngine([], {})
+    mock_get_engine.return_value = engine
+
     response = client.get("/system/status")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert data["num_documents"] == 0
+    assert data["cache_dir"] == engine.config.cache_dir
 
 
 class _StubIndexMeta:
@@ -40,6 +48,8 @@ class _StubEngine:
         self._info = info
         self.index_meta = _StubIndexMeta(meta)
         self.invalidated: Path | None = None
+        self.cleared = False
+        self.config = RAGConfig(documents_dir="/tmp")
 
     def list_indexed_files(self) -> list[dict[str, Any]]:
         return self._info
@@ -143,3 +153,14 @@ def test_index_endpoints(mock_get_engine: MagicMock, tmp_path: Path, socket_enab
     data = response.json()
     assert data["num_documents"] == 1
     assert data["total_chunks"] == 1
+
+
+@patch("rag.mcp_server.get_engine")
+def test_cache_clear_endpoint(mock_get_engine: MagicMock, socket_enabled) -> None:
+    engine = _StubEngine([], {})
+    mock_get_engine.return_value = engine
+
+    response = client.post("/cache/clear")
+    assert response.status_code == 200
+    assert response.json() == {"detail": "Cache cleared"}
+    assert engine.cleared is True
