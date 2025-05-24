@@ -3,7 +3,6 @@
 ---
 
 ### MCP Server Integration
-- **[ID-003]** Add index management endpoints to index paths and rebuild or inspect the index.
 - **[ID-004]** Expose cache and system tools for clearing caches and checking server status.
 - **[ID-005]** Provide API key authentication middleware with a configurable key.
 - **[ID-006]** Integrate CLI command `rag serve-mcp` to start the server with host and port options.
