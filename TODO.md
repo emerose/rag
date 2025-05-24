@@ -3,14 +3,16 @@
 ---
 
 ### MCP Server Integration
-- **Replace custom FastAPI server with the MCP Python SDK and add the `mcp` dependency.**
-- **Instantiate `FastMCP` in a server module and register the tools.**
-- **Add CLI command `rag serve-mcp` with host and port options.**
-- **Provide optional API key authentication using SDK middleware.**
-- **Write unit tests for tools and authentication logic.**
-- **Add integration test that queries the running server.**
-- **Update documentation with usage examples for MCP.**
-*Agents should delete these tasks from this list once they are finished.*
+- [#137] **Add CLI command `rag serve-mcp` with host and port options.**
+- [#138] **Provide optional API key authentication using SDK middleware.**
+- [#139] **Write unit tests for tools and authentication logic.**
+- [#140] **Add integration test that queries the running server.**
+- [#141] **Update documentation with usage examples for MCP.**
+- [#43] **Document usage including example curl commands and instructions for AI assistants.**
+- [#42] **Add integration test that starts the server and performs a sample query.**
+- [#41] **Write unit tests covering each endpoint and authentication logic.**
+- [#40] **Integrate CLI command `rag serve-mcp` to start the server with host and port options.**
+- [#39] **Provide API key authentication middleware with a configurable key.**
 
 ## 🗺️ Roadmap & Priorities  
 *(Priority ‑ **P1** = Do next, … **P5** = Nice-to-have)*
