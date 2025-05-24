@@ -11,6 +11,8 @@ import sys
 from pathlib import Path
 from types import ModuleType
 from typing import Any
+from enum import Enum
+import ast
 
 import pytest
 from rich.console import Console
@@ -57,7 +59,14 @@ def _make_structlog_stub() -> ModuleType:
             self.pre = foreign_pre_chain or []
 
         def format(self, record: logging.LogRecord) -> str:
-            event_dict = {"event": record.getMessage(), "level": record.levelname}
+            event_dict = {
+                "event": record.getMessage(),
+                "level": record.levelname,
+                "filename": record.filename,
+                "lineno": record.lineno,
+            }
+            if hasattr(record, "subsystem"):
+                event_dict["subsystem"] = record.subsystem
             for proc in self.pre:
                 event_dict = proc(None, record.name, event_dict)
             return self.processor(None, record.name, event_dict)
@@ -75,7 +84,7 @@ def _make_structlog_stub() -> ModuleType:
         def __init__(self) -> None:
             super().__init__("stdlib")
             self.add_log_level = lambda _l, _n, d: d
-            self.add_logger_name = lambda _l, _n, d: d
+            self.add_logger_name = lambda _l, name, d: {**d, "logger": name}
             self.filter_by_level = lambda _l, _n, d: d
             self.ProcessorFormatter = ProcessorFormatter
             self.LoggerFactory = LoggerFactory
@@ -85,6 +94,22 @@ def _make_structlog_stub() -> ModuleType:
             super().__init__("processors")
             self.TimeStamper = TimeStamper
             self.JSONRenderer = JSONRenderer
+
+            class CallsiteParameter(Enum):
+                FILENAME = 1
+                LINENO = 2
+
+            class CallsiteParameterAdder:
+                def __init__(self, _params: list[Any], **_kw: Any) -> None:
+                    pass
+
+                def __call__(
+                    self, _logger: Any, _name: str, event_dict: dict[str, Any]
+                ) -> dict[str, Any]:
+                    return event_dict
+
+            self.CallsiteParameter = CallsiteParameter
+            self.CallsiteParameterAdder = CallsiteParameterAdder
             self.StackInfoRenderer = lambda: (lambda l, n, d: d)
             self.format_exc_info = lambda l, n, d: d
 
@@ -96,6 +121,7 @@ def _make_structlog_stub() -> ModuleType:
     stub.BoundLogger = BoundLogger
     stub.get_logger = get_logger
     stub.processors = Processors()
+    sys.modules["structlog.processors"] = stub.processors
     stub.stdlib = StdLib()
     stub.dev = Dev()
     stub.make_filtering_bound_logger = lambda _lvl: BoundLogger
@@ -107,7 +133,10 @@ def _make_structlog_stub() -> ModuleType:
 def _import_logging_utils() -> ModuleType:
     """Import logging_utils with the structlog stub injected."""
     structlog_stub = _make_structlog_stub()
+    sys.modules.pop("structlog", None)
+    sys.modules.pop("structlog.processors", None)
     sys.modules["structlog"] = structlog_stub
+    sys.modules["structlog.processors"] = structlog_stub.processors
 
     spec = importlib.util.spec_from_file_location(
         "logging_utils",
@@ -184,8 +213,8 @@ def test_log_level_colorized() -> None:
     assert "bold red" not in console_out
     assert "[/" not in console_out
 
-    # there should also not be literal ANSI escape codes 
-    printed = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', console_out)
+    # there should also not be literal ANSI escape codes
+    printed = re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", console_out)
     assert "[[" not in printed
     assert re.search(r"\[[0-9;]*m", printed) is None
 
@@ -194,4 +223,13 @@ def test_foreign_logger_colorized() -> None:
     """Ensure foreign loggers receive colored levels."""
     console_out, _ = _setup_and_log(json_logs=False, foreign=True)
     matches = re.findall(r"\x1b\[[0-9;]*mINFO\x1b\[[0-9;]*m", console_out)
-    assert len(matches) >= 2
+    assert len(matches) == 1
+
+
+def test_console_log_structure() -> None:
+    """Logger name should follow level and callsite info should be present."""
+    _, file_out = _setup_and_log(json_logs=False)
+    record = ast.literal_eval(file_out)
+    assert record.get("logger_name") == "rag"
+    assert record.get("filename") == "test_logging_utils.py"
+    assert record.get("lineno") == 170

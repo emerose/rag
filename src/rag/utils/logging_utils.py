@@ -15,6 +15,7 @@ from typing import Any
 import structlog
 from rich.console import Console
 from rich.logging import RichHandler
+from structlog.processors import CallsiteParameter, CallsiteParameterAdder
 
 
 class RAGLogger:
@@ -119,6 +120,25 @@ def colorize_level(
     return event_dict
 
 
+def insert_logger_name(
+    _logger: logging.Logger, _name: str, event_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Ensure ``logger_name`` is present for rendering."""
+    logger_name = event_dict.pop("logger", None) or event_dict.pop("subsystem", None)
+    if logger_name:
+        event_dict["logger_name"] = logger_name
+    return event_dict
+
+
+def strip_internal_fields(
+    _logger: logging.Logger, _name: str, event_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Remove noisy internal fields from logs."""
+    event_dict.pop("stacklevel", None)
+    event_dict.pop("extra", None)
+    return event_dict
+
+
 def setup_logging(
     log_file: str = "rag.log",
     log_level: int = logging.INFO,
@@ -137,6 +157,11 @@ def setup_logging(
 
     http_loggers = ["httpx", "urllib3", "requests"]
     pdf_loggers = ["pdfminer", "unstructured"]
+
+    for name in http_loggers:
+        logging.getLogger(name).setLevel(logging.WARNING)
+    for name in pdf_loggers:
+        logging.getLogger(name).setLevel(logging.ERROR)
 
     class DemoteFilter(logging.Filter):
         def filter(self, record: logging.LogRecord) -> bool:
@@ -161,17 +186,30 @@ def setup_logging(
             if "sort_keys" in params:
                 kwargs["sort_keys"] = False
             if "key_order" in params:
-                kwargs["key_order"] = ["timestamp", "subsystem", "event"]
+                kwargs["key_order"] = [
+                    "timestamp",
+                    "level",
+                    "logger_name",
+                    "event",
+                ]
             return structlog.dev.ConsoleRenderer(**kwargs)
         except (ValueError, TypeError):  # pragma: no cover - stub compatibility
             return structlog.dev.ConsoleRenderer()
 
     timestamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S")
+    callsite = CallsiteParameterAdder(
+        [CallsiteParameter.FILENAME, CallsiteParameter.LINENO],
+        additional_ignores=["rag.utils.logging_utils"],
+    )
+
     pre_chain = [
         structlog.stdlib.add_log_level,
         uppercase_level,
         structlog.stdlib.add_logger_name,
         timestamper,
+        callsite,
+        strip_internal_fields,
+        insert_logger_name,
     ]
 
     console_pre_chain = [*pre_chain, colorize_level]
@@ -220,6 +258,9 @@ def setup_logging(
             uppercase_level,
             colorize_level,
             timestamper,
+            callsite,
+            strip_internal_fields,
+            insert_logger_name,
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
