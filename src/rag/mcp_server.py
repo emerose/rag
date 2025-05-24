@@ -1,8 +1,9 @@
-"""FastAPI server implementing the Model Context Protocol.
+"""MCP server exposing RAG functionality.
 
-This module defines a FastAPI application exposing a minimal set of
-endpoints for RAG functionality. The handlers are placeholders and will
-be wired into the RAG engine later.
+The custom FastAPI application has been replaced with :class:`FastMCP`
+from the `mcp` SDK.  Legacy HTTP endpoints are still provided via the
+``custom_route`` decorator so existing tests continue to operate while
+future work moves these handlers to proper MCP tools.
 """
 
 from __future__ import annotations
@@ -14,8 +15,11 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, RootModel
+from starlette.exceptions import HTTPException
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 from rag import RAGConfig, RAGEngine, RuntimeOptions
 
@@ -48,7 +52,7 @@ def get_engine() -> RAGEngine | _DummyEngine:
         return _DummyEngine()
 
 
-app = FastAPI(title="RAG MCP Server")
+mcp = FastMCP("RAG MCP Server")
 
 
 class QueryPayload(BaseModel):
@@ -119,48 +123,60 @@ def _compute_doc_id(file_path: str) -> str:
     return hashlib.sha256(file_path.encode()).hexdigest()
 
 
-@app.post("/query", response_model=QueryResponse)
-async def query_endpoint(payload: QueryPayload) -> QueryResponse:
+@mcp.custom_route("/query", methods=["POST"])
+async def query_endpoint(request: Request) -> Response:
     """Run a RAG query against the indexed corpus."""
 
+    payload = QueryPayload(**await request.json())
     engine = get_engine()
     result = engine.answer(payload.question, k=payload.top_k)
-    return QueryResponse(**result)
+    return JSONResponse(QueryResponse(**result).model_dump())
 
 
-@app.post("/search", response_model=SearchResponse)
-async def search_endpoint(payload: QueryPayload) -> SearchResponse:
+@mcp.custom_route("/search", methods=["POST"])
+async def search_endpoint(request: Request) -> Response:
     """Return documents most relevant to *question*."""
 
+    payload = QueryPayload(**await request.json())
     engine = get_engine()
     result = engine.answer(payload.question, k=payload.top_k)
-    return SearchResponse(documents=result.get("sources", []))
+    return JSONResponse(
+        SearchResponse(documents=result.get("sources", [])).model_dump()
+    )
 
 
-@app.post("/chat", response_model=ChatResponse)
-async def chat_endpoint(payload: ChatPayload) -> ChatResponse:
+@mcp.custom_route("/chat", methods=["POST"])
+async def chat_endpoint(request: Request) -> Response:
     """Respond to *message* within a chat session."""
 
+    payload = ChatPayload(**await request.json())
     engine = get_engine()
     result = engine.answer(payload.message, k=4)
-    return ChatResponse(session_id=payload.session_id, answer=result["answer"])
+    return JSONResponse(
+        ChatResponse(
+            session_id=payload.session_id, answer=result["answer"]
+        ).model_dump()
+    )
 
 
-@app.get("/documents", response_model=list[DocumentInfo])
-async def list_documents() -> list[DocumentInfo]:
+@mcp.custom_route("/documents", methods=["GET"])
+async def list_documents(request: Request) -> Response:
     """List indexed documents with basic metadata."""
 
     engine = get_engine()
     if not hasattr(engine, "list_indexed_files"):
-        return []
+        return JSONResponse([])
 
     docs = engine.list_indexed_files()
-    return [DocumentInfo(doc_id=_compute_doc_id(d["file_path"]), **d) for d in docs]
+    payload = [DocumentInfo(doc_id=_compute_doc_id(d["file_path"]), **d) for d in docs]
+    return JSONResponse([d.model_dump() for d in payload])
 
 
-@app.get("/documents/{doc_id}", response_model=DocumentMetadata)
-async def get_document_metadata(doc_id: str) -> DocumentMetadata:
+@mcp.custom_route("/documents/{doc_id}", methods=["GET"])
+async def get_document_metadata(request: Request) -> Response:
     """Retrieve metadata for a document."""
+
+    doc_id = request.path_params["doc_id"]
 
     engine = get_engine()
     if not hasattr(engine, "list_indexed_files"):
@@ -172,14 +188,16 @@ async def get_document_metadata(doc_id: str) -> DocumentMetadata:
             if metadata is None:
                 raise HTTPException(status_code=404, detail="Document not found")
             metadata.update({"doc_id": doc_id, "file_path": info["file_path"]})
-            return DocumentMetadata(**metadata)
+            return JSONResponse(DocumentMetadata(**metadata).model_dump())
 
     raise HTTPException(status_code=404, detail="Document not found")
 
 
-@app.delete("/documents/{doc_id}", response_model=DetailResponse)
-async def remove_document(doc_id: str) -> DetailResponse:
+@mcp.custom_route("/documents/{doc_id}", methods=["DELETE"])
+async def remove_document(request: Request) -> Response:
     """Remove a document from the corpus."""
+
+    doc_id = request.path_params["doc_id"]
 
     engine = get_engine()
     if not hasattr(engine, "list_indexed_files"):
@@ -188,7 +206,9 @@ async def remove_document(doc_id: str) -> DetailResponse:
     for info in engine.list_indexed_files():
         if _compute_doc_id(info["file_path"]) == doc_id:
             engine.invalidate_cache(info["file_path"])
-            return DetailResponse(detail=f"Document {doc_id} removed")
+            return JSONResponse(
+                DetailResponse(detail=f"Document {doc_id} removed").model_dump()
+            )
 
     raise HTTPException(status_code=404, detail="Document not found")
 
@@ -197,9 +217,11 @@ class IndexPath(BaseModel):
     path: str
 
 
-@app.post("/index", response_model=DetailResponse)
-async def index_path(payload: IndexPath) -> DetailResponse:
+@mcp.custom_route("/index", methods=["POST"])
+async def index_path(request: Request) -> Response:
     """Index a file or directory specified in *payload*."""
+
+    payload = IndexPath(**await request.json())
 
     engine = get_engine()
     path = Path(payload.path)
@@ -227,22 +249,22 @@ async def index_path(payload: IndexPath) -> DetailResponse:
             )
         detail = f"Indexed {len(results)} files"
 
-    return DetailResponse(detail=detail)
+    return JSONResponse(DetailResponse(detail=detail).model_dump())
 
 
-@app.post("/index/rebuild", response_model=DetailResponse)
-async def rebuild_index() -> DetailResponse:
+@mcp.custom_route("/index/rebuild", methods=["POST"])
+async def rebuild_index(request: Request) -> Response:
     """Rebuild the entire index from scratch."""
 
     engine = get_engine()
     engine.invalidate_all_caches()
     results = engine.index_directory(engine.documents_dir)
     detail = f"Rebuilt index for {len(results)} files"
-    return DetailResponse(detail=detail)
+    return JSONResponse(DetailResponse(detail=detail).model_dump())
 
 
-@app.get("/index/stats", response_model=IndexStats)
-async def get_index_stats() -> IndexStats:
+@mcp.custom_route("/index/stats", methods=["GET"])
+async def get_index_stats(request: Request) -> Response:
     """Retrieve simple statistics about the index."""
 
     engine = get_engine()
@@ -252,27 +274,28 @@ async def get_index_stats() -> IndexStats:
     total_size = sum(f.get("file_size", 0) for f in files)
     total_chunks = sum(f.get("num_chunks", 0) for f in files)
 
-    return IndexStats(
+    stats = IndexStats(
         {
             "num_documents": num_documents,
             "total_size": total_size,
             "total_chunks": total_chunks,
         }
     )
+    return JSONResponse(stats.model_dump())
 
 
-@app.post("/cache/clear", response_model=DetailResponse)
-async def clear_cache() -> DetailResponse:
+@mcp.custom_route("/cache/clear", methods=["POST"])
+async def clear_cache(request: Request) -> Response:
     """Clear embedding and search caches."""
 
     engine = get_engine()
     if hasattr(engine, "invalidate_all_caches"):
         engine.invalidate_all_caches()
-    return DetailResponse(detail="Cache cleared")
+    return JSONResponse(DetailResponse(detail="Cache cleared").model_dump())
 
 
-@app.get("/system/status", response_model=SystemStatus)
-async def system_status() -> SystemStatus:
+@mcp.custom_route("/system/status", methods=["GET"])
+async def system_status(request: Request) -> Response:
     """Return server status summary."""
 
     engine = get_engine()
@@ -281,10 +304,14 @@ async def system_status() -> SystemStatus:
     )
     config = getattr(engine, "config", RAGConfig(documents_dir="docs"))
 
-    return SystemStatus(
+    status = SystemStatus(
         status="ok",
         num_documents=num_docs,
         cache_dir=config.cache_dir,
         embedding_model=config.embedding_model,
         chat_model=config.chat_model,
     )
+    return JSONResponse(status.model_dump())
+
+
+app = mcp.streamable_http_app()
