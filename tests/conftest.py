@@ -8,6 +8,7 @@ import tempfile
 from collections.abc import Generator
 from pathlib import Path
 from unittest.mock import MagicMock
+from typing import Any
 
 import pytest
 from langchain_core.documents import Document
@@ -16,6 +17,8 @@ from langchain_openai import OpenAIEmbeddings
 from rag.config import RAGConfig, RuntimeOptions
 from rag.embeddings.embedding_provider import EmbeddingProvider
 from pytest_socket import disable_socket, enable_socket
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 # Define the integration marker - tests with this marker are not run by default
@@ -180,3 +183,40 @@ def default_runtime() -> RuntimeOptions:
         progress_callback=None,
         log_callback=None,
     )
+
+
+class DummyEngine:
+    """Simple stand-in for :class:`RAGEngine` used in tests."""
+
+    def answer(self, question: str, k: int = 4) -> dict[str, Any]:
+        return {
+            "question": question,
+            "answer": "RAG engine not available",
+            "sources": [],
+            "num_documents_retrieved": 0,
+        }
+
+
+@pytest.fixture
+def dummy_engine() -> DummyEngine:
+    """Provide a dummy engine for MCP server tests."""
+
+    return DummyEngine()
+
+
+@pytest.fixture
+def mcp_app(dummy_engine: DummyEngine) -> FastAPI:
+    """Create a FastAPI app configured with the dummy engine."""
+
+    from rag.mcp_server import create_app
+
+    return create_app(dummy_engine)
+
+
+@pytest.fixture
+def mcp_client(mcp_app: FastAPI) -> TestClient:
+    """Return a test client for the MCP server."""
+
+    from fastapi.testclient import TestClient
+
+    return TestClient(mcp_app)
