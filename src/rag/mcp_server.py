@@ -195,20 +195,66 @@ class IndexPath(BaseModel):
 
 @app.post("/index", response_model=DetailResponse)
 async def index_path(payload: IndexPath) -> DetailResponse:
-    """Index a file or folder."""
-    return DetailResponse(detail=f"Indexing {payload.path} not implemented")
+    """Index a file or directory specified in *payload*."""
+
+    engine = get_engine()
+    path = Path(payload.path)
+
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Path not found")
+
+    if path.is_file():
+        success, error = engine.index_file(path)
+        if not success:
+            raise HTTPException(
+                status_code=400,
+                detail=error or "Failed to index file",
+            )
+        detail = f"Indexed file {path}"
+    else:
+        results = engine.index_directory(path)
+        failures = {
+            fp: r.get("error") for fp, r in results.items() if not r.get("success")
+        }
+        if failures:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Errors indexing: {failures}",
+            )
+        detail = f"Indexed {len(results)} files"
+
+    return DetailResponse(detail=detail)
 
 
 @app.post("/index/rebuild", response_model=DetailResponse)
 async def rebuild_index() -> DetailResponse:
-    """Rebuild the entire index."""
-    return DetailResponse(detail="Rebuild index not implemented")
+    """Rebuild the entire index from scratch."""
+
+    engine = get_engine()
+    engine.invalidate_all_caches()
+    results = engine.index_directory(engine.documents_dir)
+    detail = f"Rebuilt index for {len(results)} files"
+    return DetailResponse(detail=detail)
 
 
 @app.get("/index/stats", response_model=IndexStats)
 async def get_index_stats() -> IndexStats:
-    """Retrieve index statistics."""
-    return IndexStats({})
+    """Retrieve simple statistics about the index."""
+
+    engine = get_engine()
+    files = engine.list_indexed_files() if hasattr(engine, "list_indexed_files") else []
+
+    num_documents = len(files)
+    total_size = sum(f.get("file_size", 0) for f in files)
+    total_chunks = sum(f.get("num_chunks", 0) for f in files)
+
+    return IndexStats(
+        {
+            "num_documents": num_documents,
+            "total_size": total_size,
+            "total_chunks": total_chunks,
+        }
+    )
 
 
 @app.post("/cache/clear", response_model=DetailResponse)

@@ -47,6 +47,17 @@ class _StubEngine:
     def invalidate_cache(self, file_path: str) -> None:
         self.invalidated = Path(file_path)
 
+    def index_file(self, file_path: Path) -> tuple[bool, str | None]:
+        self.indexed = file_path
+        return True, None
+
+    def index_directory(self, directory: Path) -> dict[str, dict[str, Any]]:
+        self.reindexed = directory
+        return {str(directory / "f.txt"): {"success": True}}
+
+    def invalidate_all_caches(self) -> None:
+        self.cleared = True
+
 
 @patch("rag.mcp_server.get_engine")
 def test_document_endpoints(mock_get_engine: MagicMock, socket_enabled) -> None:
@@ -94,3 +105,41 @@ def test_document_endpoints(mock_get_engine: MagicMock, socket_enabled) -> None:
     response = client.delete(f"/documents/{doc_id}")
     assert response.status_code == 200
     assert engine.invalidated == Path("/tmp/doc.txt")
+
+
+@patch("rag.mcp_server.get_engine")
+def test_index_endpoints(mock_get_engine: MagicMock, tmp_path: Path, socket_enabled) -> None:
+    engine = _StubEngine([], {})
+    engine.documents_dir = tmp_path
+    mock_get_engine.return_value = engine
+
+    file_path = tmp_path / "doc.txt"
+    file_path.write_text("hi")
+
+    response = client.post("/index", json={"path": str(file_path)})
+    assert response.status_code == 200
+    assert engine.indexed == file_path
+
+    response = client.post("/index/rebuild")
+    assert response.status_code == 200
+    assert engine.cleared is True
+    assert engine.reindexed == tmp_path
+
+    engine.list_indexed_files = lambda: [
+        {
+            "file_path": str(file_path),
+            "file_type": "text/plain",
+            "num_chunks": 1,
+            "file_size": 2,
+            "embedding_model": "m",
+            "embedding_model_version": "v",
+            "indexed_at": 1.0,
+            "last_modified": 1.0,
+        }
+    ]
+
+    response = client.get("/index/stats")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["num_documents"] == 1
+    assert data["total_chunks"] == 1
