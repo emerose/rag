@@ -239,7 +239,7 @@ class VectorStoreManager:
             vectorstore.save_local(str(self.cache_dir), base_name)
 
             self._log(
-                "INFO",
+                "DEBUG",
                 f"Successfully saved vector store for {file_path} "
                 f"(files: {base_name}.faiss, {base_name}.pkl)",
             )

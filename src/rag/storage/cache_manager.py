@@ -102,7 +102,7 @@ class CacheManager:
         # Check if JSON cache exists
         if not self.cache_metadata_path.exists():
             # No JSON cache to migrate
-            self._log("INFO", "No JSON cache metadata found, no migration needed")
+            self._log("DEBUG", "No JSON cache metadata found, no migration needed")
             return False
 
         try:

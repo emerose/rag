@@ -686,7 +686,7 @@ class TextSplitterFactory:
         )
 
         self._log(
-            "INFO",
+            "DEBUG",
             f"Initialized with chunk_size={self.chunk_size}, chunk_overlap={self.chunk_overlap}, "
             f"preserve_headings={self.preserve_headings}, semantic_chunking={self.semantic_chunking}",
         )

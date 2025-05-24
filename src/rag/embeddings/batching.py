@@ -103,7 +103,7 @@ class EmbeddingBatcher:
         # Calculate optimal batch size
         batch_size = self.calculate_optimal_batch_size(len(documents))
         self._log(
-            "INFO",
+            "DEBUG",
             f"Processing {len(documents)} documents with batch size {batch_size}",
         )
 
@@ -154,7 +154,7 @@ class EmbeddingBatcher:
         # Process batches
         try:
             embeddings = await batch_processor.process(texts)
-            self._log("INFO", f"Processed {len(embeddings)} embeddings")
+            self._log("DEBUG", f"Processed {len(embeddings)} embeddings")
             return embeddings
 
         finally:
@@ -177,7 +177,7 @@ class EmbeddingBatcher:
         # Calculate optimal batch size
         batch_size = self.calculate_optimal_batch_size(len(documents))
         self._log(
-            "INFO",
+            "DEBUG",
             f"Processing {len(documents)} documents with batch size {batch_size}",
         )
 
@@ -206,5 +206,5 @@ class EmbeddingBatcher:
         # Complete progress tracking
         self.progress_tracker.complete_task("embedding")
 
-        self._log("INFO", f"Processed {len(embeddings)} embeddings")
+        self._log("DEBUG", f"Processed {len(embeddings)} embeddings")
         return embeddings

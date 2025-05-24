@@ -312,7 +312,7 @@ class RAGEngine:
             return
 
         # Load vectorstores for all cached files
-        self._log("INFO", f"Loading {len(self.cache_metadata)} cached files")
+        self._log("DEBUG", f"Loading {len(self.cache_metadata)} cached files")
         for file_path in self.cache_metadata:
             try:
                 vectorstore = self.vectorstore_manager.load_vectorstore(file_path)
@@ -331,7 +331,7 @@ class RAGEngine:
             ) as e:
                 self._log("ERROR", f"Failed to load vectorstore for {file_path}: {e}")
 
-        self._log("INFO", f"Loaded {len(self.vectorstores)} vectorstores")
+        self._log("DEBUG", f"Loaded {len(self.vectorstores)} vectorstores")
 
     def index_file(self, file_path: Path | str) -> tuple[bool, str | None]:
         """Index a file.
@@ -421,9 +421,9 @@ class RAGEngine:
             True if successful, False otherwise
         """
         try:
-            # Generate embeddings
+            # Get embeddings
             self._log(
-                "INFO",
+                "DEBUG",
                 f"Generating embeddings for {len(documents)} documents from {file_path}",
             )
             embeddings = self.embedding_batcher.process_embeddings(documents)
@@ -558,7 +558,7 @@ class RAGEngine:
 
                 # Get embeddings
                 self._log(
-                    "INFO",
+                    "DEBUG",
                     f"Generating embeddings for {len(documents)} documents from {file_path}",
                 )
                 embeddings = self.embedding_batcher.process_embeddings(documents)

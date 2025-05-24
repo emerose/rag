@@ -95,7 +95,7 @@ class FilesystemManager:
             self._log("ERROR", f"Directory not found: {directory}")
             return []
 
-        self._log("INFO", f"Scanning directory: {directory}")
+        self._log("DEBUG", f"Scanning directory: {directory}")
 
         supported_files = []
         for root, _, files in os.walk(directory):
@@ -109,7 +109,7 @@ class FilesystemManager:
                 if self.is_supported_file(file_path):
                     supported_files.append(file_path)
 
-        self._log("INFO", f"Found {len(supported_files)} supported files")
+        self._log("DEBUG", f"Found {len(supported_files)} supported files")
         return supported_files
 
     def is_supported_file(self, file_path: Path | str) -> bool:

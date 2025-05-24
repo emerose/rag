@@ -262,7 +262,7 @@ def index(  # noqa: PLR0913
         state.is_processing = True
 
         # Initialize RAG engine
-        state.logger.info("Initializing RAG engine...")
+        state.logger.debug("Initializing RAG engine...")
         config = RAGConfig(
             documents_dir=str(path),
             embedding_model="text-embedding-3-small",
@@ -508,7 +508,7 @@ def query(
         cache_directory = cache_dir if cache_dir is not None else state.cache_dir
 
         # Initialize RAG engine using RAGConfig with specified cache directory
-        state.logger.info("Initializing RAG engine...")
+        state.logger.debug("Initializing RAG engine...")
         config = RAGConfig(
             documents_dir=".",  # Not used for querying
             embedding_model="text-embedding-3-small",
@@ -615,7 +615,7 @@ def summarize(
     """
     try:
         # Initialize RAG engine using RAGConfig with default cache directory
-        state.logger.info("Initializing RAG engine...")
+        state.logger.debug("Initializing RAG engine...")
         config = RAGConfig(
             documents_dir=".",  # Not used for summarization
             embedding_model="text-embedding-3-small",
