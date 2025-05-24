@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, RootModel
 
 from rag import RAGConfig, RAGEngine, RuntimeOptions
 
@@ -63,40 +63,87 @@ class ChatPayload(BaseModel):
     history: list[str] | None = None
 
 
+class QueryResponse(BaseModel):
+    question: str
+    answer: str
+    sources: list[dict[str, Any]]
+    num_documents_retrieved: int
+
+
+class SearchResponse(BaseModel):
+    documents: list[dict[str, Any]]
+
+
+class ChatResponse(BaseModel):
+    session_id: str
+    answer: str
+
+
+class DocumentInfo(BaseModel):
+    doc_id: str
+    file_path: str
+    file_type: str
+    num_chunks: int
+    file_size: int
+    embedding_model: str
+    embedding_model_version: str
+    indexed_at: float
+    last_modified: float
+
+
+class DocumentMetadata(DocumentInfo):
+    file_hash: str
+    chunk_size: int
+    chunk_overlap: int
+
+
+class DetailResponse(BaseModel):
+    detail: str
+
+
+class SystemStatus(BaseModel):
+    status: str
+
+
+class IndexStats(RootModel[dict[str, Any]]):
+    """Statistics about the index."""
+
+
 def _compute_doc_id(file_path: str) -> str:
     """Return a stable identifier for *file_path*."""
 
     return hashlib.sha256(file_path.encode()).hexdigest()
 
 
-@app.post("/query")
-async def query_endpoint(payload: QueryPayload) -> dict[str, Any]:
+@app.post("/query", response_model=QueryResponse)
+async def query_endpoint(payload: QueryPayload) -> QueryResponse:
     """Run a RAG query against the indexed corpus."""
 
     engine = get_engine()
-    return engine.answer(payload.question, k=payload.top_k)
+    result = engine.answer(payload.question, k=payload.top_k)
+    return QueryResponse(**result)
 
 
-@app.post("/search")
-async def search_endpoint(payload: QueryPayload) -> dict[str, Any]:
+@app.post("/search", response_model=SearchResponse)
+async def search_endpoint(payload: QueryPayload) -> SearchResponse:
     """Return documents most relevant to *question*."""
 
     engine = get_engine()
     result = engine.answer(payload.question, k=payload.top_k)
-    return {"documents": result.get("sources", [])}
+    return SearchResponse(documents=result.get("sources", []))
 
 
-@app.post("/chat")
-async def chat_endpoint(payload: ChatPayload) -> dict[str, Any]:
+@app.post("/chat", response_model=ChatResponse)
+async def chat_endpoint(payload: ChatPayload) -> ChatResponse:
     """Respond to *message* within a chat session."""
 
     engine = get_engine()
     result = engine.answer(payload.message, k=4)
-    return {"session_id": payload.session_id, "answer": result["answer"]}
+    return ChatResponse(session_id=payload.session_id, answer=result["answer"])
 
 
-@app.get("/documents")
-async def list_documents() -> list[dict[str, Any]]:
+@app.get("/documents", response_model=list[DocumentInfo])
+async def list_documents() -> list[DocumentInfo]:
     """List indexed documents with basic metadata."""
 
     engine = get_engine()
@@ -104,14 +151,11 @@ async def list_documents() -> list[dict[str, Any]]:
         return []
 
     docs = engine.list_indexed_files()
-    return [
-        {"doc_id": _compute_doc_id(d["file_path"]), **d}
-        for d in docs
-    ]
+    return [DocumentInfo(doc_id=_compute_doc_id(d["file_path"]), **d) for d in docs]
 
 
-@app.get("/documents/{doc_id}")
-async def get_document_metadata(doc_id: str) -> dict[str, Any]:
+@app.get("/documents/{doc_id}", response_model=DocumentMetadata)
+async def get_document_metadata(doc_id: str) -> DocumentMetadata:
     """Retrieve metadata for a document."""
 
     engine = get_engine()
@@ -124,13 +168,13 @@ async def get_document_metadata(doc_id: str) -> dict[str, Any]:
             if metadata is None:
                 raise HTTPException(status_code=404, detail="Document not found")
             metadata.update({"doc_id": doc_id, "file_path": info["file_path"]})
-            return metadata
+            return DocumentMetadata(**metadata)
 
     raise HTTPException(status_code=404, detail="Document not found")
 
 
-@app.delete("/documents/{doc_id}")
-async def remove_document(doc_id: str) -> dict[str, str]:
+@app.delete("/documents/{doc_id}", response_model=DetailResponse)
+async def remove_document(doc_id: str) -> DetailResponse:
     """Remove a document from the corpus."""
 
     engine = get_engine()
@@ -140,36 +184,40 @@ async def remove_document(doc_id: str) -> dict[str, str]:
     for info in engine.list_indexed_files():
         if _compute_doc_id(info["file_path"]) == doc_id:
             engine.invalidate_cache(info["file_path"])
-            return {"detail": f"Document {doc_id} removed"}
+            return DetailResponse(detail=f"Document {doc_id} removed")
 
     raise HTTPException(status_code=404, detail="Document not found")
 
 
-@app.post("/index")
-async def index_path(path: str) -> dict[str, str]:
+class IndexPath(BaseModel):
+    path: str
+
+
+@app.post("/index", response_model=DetailResponse)
+async def index_path(payload: IndexPath) -> DetailResponse:
     """Index a file or folder."""
-    return {"detail": f"Indexing {path} not implemented"}
+    return DetailResponse(detail=f"Indexing {payload.path} not implemented")
 
 
-@app.post("/index/rebuild")
-async def rebuild_index() -> dict[str, str]:
+@app.post("/index/rebuild", response_model=DetailResponse)
+async def rebuild_index() -> DetailResponse:
     """Rebuild the entire index."""
-    return {"detail": "Rebuild index not implemented"}
+    return DetailResponse(detail="Rebuild index not implemented")
 
 
-@app.get("/index/stats")
-async def get_index_stats() -> dict[str, Any]:
+@app.get("/index/stats", response_model=IndexStats)
+async def get_index_stats() -> IndexStats:
     """Retrieve index statistics."""
-    return {}
+    return IndexStats({})
 
 
-@app.post("/cache/clear")
-async def clear_cache() -> dict[str, str]:
+@app.post("/cache/clear", response_model=DetailResponse)
+async def clear_cache() -> DetailResponse:
     """Clear embedding and search caches."""
-    return {"detail": "Cache cleared"}
+    return DetailResponse(detail="Cache cleared")
 
 
-@app.get("/system/status")
-async def system_status() -> dict[str, str]:
+@app.get("/system/status", response_model=SystemStatus)
+async def system_status() -> SystemStatus:
     """Return server status summary."""
-    return {"status": "ok"}
+    return SystemStatus(status="ok")
