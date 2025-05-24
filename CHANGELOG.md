@@ -51,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `creative`: Engaging, conversational style while maintaining accuracy
   - Integrated prompt registry with the LCEL RAG chain
 - Custom exception hierarchy with specific exception classes for better error handling
+- Initial design sketch for MCP server integration under `docs/design_sketches`
+- Expanded MCP server design sketch with third-party library recommendations
 
 ### Changed
 - Log levels are now shown in uppercase for better readability
