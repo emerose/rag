@@ -37,6 +37,13 @@ Unit tests run with network access disabled using `pytest-socket`. If a test
 needs network access, mark it with `@pytest.mark.integration` and run it via
 `tests/run_integration_tests.py`.
 
+## Development Guidelines
+
+- Write tests for all code changes whenever feasible, especially when fixing bugs or regressions.
+- Use Pydantic models for all API request and response schemas.
+- Update documentation alongside code changes.
+- Keep `.cursorrules`, `AGENTS.md`, and `CONTRIBUTING.md` synchronized when guidelines change.
+
 ## Git Workflow
 
 - Use feature branches for your work and keep them short-lived.

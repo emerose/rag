@@ -377,23 +377,8 @@ Each command produces structured JSON output:
  }
   ```
 
-## Running Tests
-
-Execute `./check.sh` to format, lint, and run the unit tests. Network access is
-disabled by default using `pytest-socket`. Tests that require the network should
-be marked with `@pytest.mark.integration` and run with
-`tests/run_integration_tests.py`.
-
-## GitHub Integration Tests
-
-Integration tests can be run in GitHub Actions. The workflow is triggered
-manually and requires two repository secrets:
-
-1. `OPENAI_API_KEY` – your OpenAI API key used by the tests.
-2. `INTEGRATION_ACTOR` – the GitHub username allowed to run the workflow.
-
-Head to **Actions → Integration Tests** and choose **Run workflow** to start a
-test run.
+For development and testing instructions, see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
