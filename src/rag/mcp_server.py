@@ -10,17 +10,23 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import FastAPI
+from pydantic import BaseModel
 
 app = FastAPI(title="RAG MCP Server")
 
 
+class QueryRequest(BaseModel):
+    """Request body for the ``/query`` endpoint."""
+
+    question: str
+    top_k: int | None = None
+    filters: dict[str, Any] | None = None
+
+
 @app.post("/query")
-async def query_endpoint(
-    question: str,
-    top_k: int | None = None,
-    filters: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+async def query_endpoint(request: QueryRequest) -> dict[str, Any]:
     """Handle RAG query requests."""
+    _ = request
     return {"detail": "Not implemented"}
 
 
