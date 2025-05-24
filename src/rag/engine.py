@@ -354,6 +354,26 @@ class RAGEngine:
                 self._log("ERROR", f"File does not exist: {file_path}")
                 return False, "File does not exist"
 
+            # Skip re-indexing if cached and unchanged
+            if not self.index_manager.needs_reindexing(
+                file_path,
+                self.config.chunk_size,
+                self.config.chunk_overlap,
+                self.config.embedding_model,
+                self.embedding_model_version,
+            ):
+                self._log(
+                    "INFO", f"Skipping {file_path}; already indexed and unchanged"
+                )
+                # Ensure vectorstore is loaded into memory if available
+                if str(file_path) not in self.vectorstores:
+                    vectorstore = self.vectorstore_manager.load_vectorstore(
+                        str(file_path)
+                    )
+                    if vectorstore:
+                        self.vectorstores[str(file_path)] = vectorstore
+                return True, None
+
             self._log("DEBUG", f"Starting document ingestion for: {file_path}")
             # Ingest the file
             ingest_result = self.ingest_manager.ingest_file(file_path)
@@ -532,8 +552,33 @@ class RAGEngine:
             self._log("ERROR", f"Invalid documents directory: {directory}")
             return {}
 
-        # Use the ingest manager for directory processing
-        ingest_results = self.ingest_manager.ingest_directory(directory)
+        # Determine which files need indexing
+        all_files = self.filesystem_manager.scan_directory(directory)
+        files_to_index = [
+            f
+            for f in all_files
+            if self.index_manager.needs_reindexing(
+                f,
+                self.config.chunk_size,
+                self.config.chunk_overlap,
+                self.config.embedding_model,
+                self.embedding_model_version,
+            )
+        ]
+
+        if not files_to_index:
+            self._log("INFO", f"No files require indexing in {directory}")
+            return {}
+
+        # Use the ingest manager for directory processing when all files need indexing
+        if len(files_to_index) == len(all_files):
+            ingest_results = self.ingest_manager.ingest_directory(directory)
+        else:
+            ingest_results = {}
+            for file_path in files_to_index:
+                ingest_results[str(file_path)] = self.ingest_manager.ingest_file(
+                    file_path
+                )
 
         # Index each file that was successfully processed
         results: dict[str, dict[str, Any]] = {}
