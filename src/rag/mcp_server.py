@@ -14,12 +14,29 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, RootModel
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from rag import RAGConfig, RAGEngine, RuntimeOptions
 
 logger = logging.getLogger(__name__)
+
+
+class APIKeyMiddleware(BaseHTTPMiddleware):
+    """Middleware enforcing an API key for incoming requests."""
+
+    def __init__(self, app: FastAPI, api_key: str) -> None:
+        super().__init__(app)
+        self.api_key = api_key
+
+    async def dispatch(self, request: Request, call_next):  # type: ignore[override]
+        if self.api_key:
+            key = request.headers.get("X-API-Key")
+            if key != self.api_key:
+                return JSONResponse({"detail": "Invalid API key"}, status_code=401)
+        return await call_next(request)
 
 
 class _DummyEngine:
@@ -48,7 +65,10 @@ def get_engine() -> RAGEngine | _DummyEngine:
         return _DummyEngine()
 
 
+API_KEY = os.getenv("RAG_MCP_API_KEY", "")
 app = FastAPI(title="RAG MCP Server")
+if API_KEY:
+    app.add_middleware(APIKeyMiddleware, api_key=API_KEY)
 
 
 class QueryPayload(BaseModel):

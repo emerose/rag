@@ -58,7 +58,7 @@ ergonomics, ensuring the server can be implemented and tested efficiently.
 3. **Implement document management** functions for listing, metadata retrieval, and deletion.
 4. **Add index management** endpoints to index paths and rebuild or inspect the index. ✅ Implemented.
 5. **Expose cache and system tools** for clearing caches and checking server status.
-6. **Provide API key authentication** middleware with a configurable key.
+6. **Provide API key authentication** middleware with a configurable key. ✅ Implemented via `RAG_MCP_API_KEY`.
 7. **Integrate CLI command** `rag serve-mcp` to start the server with host and port options.
 8. **Write unit tests** covering each endpoint and authentication logic.
 9. **Add integration test** that starts the server and performs a sample query.

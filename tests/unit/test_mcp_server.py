@@ -143,3 +143,24 @@ def test_index_endpoints(mock_get_engine: MagicMock, tmp_path: Path, socket_enab
     data = response.json()
     assert data["num_documents"] == 1
     assert data["total_chunks"] == 1
+
+
+def test_api_key_authentication(monkeypatch, socket_enabled) -> None:
+    import importlib
+    import rag.mcp_server as mcp_server
+
+    monkeypatch.setenv("RAG_MCP_API_KEY", "secret")
+    mcp_server = importlib.reload(mcp_server)
+    authed_client = TestClient(mcp_server.app)
+
+    unauthorized = authed_client.get("/system/status")
+    assert unauthorized.status_code == 401
+
+    authorized = authed_client.get(
+        "/system/status",
+        headers={"X-API-Key": "secret"},
+    )
+    assert authorized.status_code == 200
+
+    monkeypatch.delenv("RAG_MCP_API_KEY", raising=False)
+    importlib.reload(mcp_server)

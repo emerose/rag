@@ -239,6 +239,12 @@ Invalidate all caches in a directory:
 rag invalidate --all path/to/directory
 ```
 
+### MCP Server
+
+The project includes a lightweight FastAPI server. Set `RAG_MCP_API_KEY` to
+enable API key authentication. When enabled, each request must include an
+`X-API-Key` header matching the configured value.
+
 ### Getting Help
 
 Show general help:

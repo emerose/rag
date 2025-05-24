@@ -57,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic endpoint tests for the MCP server using FastAPI's TestClient
 - Implemented document listing, metadata retrieval and deletion endpoints
 - Added index management endpoints (`/index`, `/index/rebuild`, `/index/stats`) in the MCP server
+- API key authentication middleware for the MCP server via `RAG_MCP_API_KEY`
 
 ### Changed
 - Log levels are now shown in uppercase for better readability
