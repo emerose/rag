@@ -22,6 +22,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from rag import RAGConfig, RAGEngine, RuntimeOptions
+from rag.auth import APIKeyAuthMiddleware
 from rag.mcp_tools import register_tools
 
 logger = logging.getLogger(__name__)
@@ -317,3 +318,8 @@ async def system_status(request: Request) -> Response:
 
 
 app = mcp.streamable_http_app()
+
+# Optional API key authentication
+api_key = os.getenv("RAG_MCP_API_KEY")
+if api_key:
+    app.add_middleware(APIKeyAuthMiddleware, api_key=api_key)

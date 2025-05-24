@@ -4,12 +4,6 @@
 
 ### MCP Server Integration
 - [#138] **Provide optional API key authentication using SDK middleware.**
-- [#139] **Write unit tests for tools and authentication logic.**
-- [#140] **Add integration test that queries the running server.**
-- [#141] **Update documentation with usage examples for MCP.**
-- [#43] **Document usage including example curl commands and instructions for AI assistants.**
-- [#42] **Add integration test that starts the server and performs a sample query.**
-- [#41] **Write unit tests covering each endpoint and authentication logic.**
 - [#40] **Integrate CLI command `rag serve-mcp` to start the server with host and port options.**
 - [#39] **Provide API key authentication middleware with a configurable key.**
 

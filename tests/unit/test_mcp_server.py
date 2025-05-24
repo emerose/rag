@@ -7,6 +7,7 @@ import pytest
 
 fastapi = pytest.importorskip("fastapi")
 os.environ["RAG_MCP_DUMMY"] = "1"
+os.environ.pop("RAG_MCP_API_KEY", None)
 from fastapi.testclient import TestClient
 from rag.mcp_server import app, _compute_doc_id
 from rag import RAGConfig
@@ -164,3 +165,23 @@ def test_cache_clear_endpoint(mock_get_engine: MagicMock, socket_enabled) -> Non
     assert response.status_code == 200
     assert response.json() == {"detail": "Cache cleared"}
     assert engine.cleared is True
+
+
+def test_authentication_required(monkeypatch, socket_enabled) -> None:
+    monkeypatch.setenv("RAG_MCP_DUMMY", "1")
+    monkeypatch.setenv("RAG_MCP_API_KEY", "tok")
+    from importlib import reload
+    import rag.mcp_server as srv
+
+    reload(srv)
+    client_auth = TestClient(srv.app)
+
+    resp = client_auth.get("/system/status")
+    assert resp.status_code == 401
+
+    resp = client_auth.get(
+        "/system/status",
+        headers={"Authorization": "Bearer tok"},
+    )
+    assert resp.status_code == 200
+

@@ -248,12 +248,18 @@ couple of endpoints for basic status and cache management:
 - `POST /cache/clear` – clear embedding and search caches.
 - `GET /system/status` – return server status and configuration summary.
 
-Run the server with `rag serve-mcp --host 127.0.0.1 --port 8000` and interact using `curl`:
+Run the server with `rag serve-mcp --host 127.0.0.1 --port 8000`. When
+`RAG_MCP_API_KEY` is set, include an `Authorization` header in requests:
 
 ```bash
-curl -X POST http://localhost:8000/cache/clear
-curl http://localhost:8000/system/status
+curl -H "Authorization: Bearer $RAG_MCP_API_KEY" \
+  -X POST http://localhost:8000/cache/clear
+curl -H "Authorization: Bearer $RAG_MCP_API_KEY" \
+  http://localhost:8000/system/status
 ```
+
+AI assistants that implement MCP can connect using the same base URL and
+`Authorization` header.
 
 ### Getting Help
 
