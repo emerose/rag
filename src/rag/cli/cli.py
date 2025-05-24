@@ -1108,6 +1108,24 @@ def cleanup(
         raise typer.Exit(code=1) from e
 
 
+@app.command()
+def serve_mcp(
+    host: str = typer.Option(
+        "127.0.0.1", "--host", "-H", help="Host interface to bind the server"
+    ),
+    port: int = typer.Option(8000, "--port", "-p", help="Port number for the server"),
+) -> None:
+    """Start the MCP server using Uvicorn."""
+
+    try:
+        import uvicorn
+
+        uvicorn.run("rag.mcp_server:app", host=host, port=port)
+    except Exception as exc:  # pragma: no cover - runtime errors
+        write(Error(f"Error starting server: {exc}"))
+        raise typer.Exit(code=1) from exc
+
+
 def run_cli() -> None:
     app()
 
