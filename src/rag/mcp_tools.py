@@ -43,9 +43,6 @@ def get_engine() -> RAGEngine | _DummyEngine:
         return _DummyEngine()
 
 
-mcp = FastMCP("RAG MCP Tools")
-
-
 class QueryResponse(BaseModel):
     question: str
     answer: str
@@ -106,7 +103,6 @@ def _compute_doc_id(file_path: str) -> str:
     return hashlib.sha256(file_path.encode()).hexdigest()
 
 
-@mcp.tool()
 def query(
     question: str, top_k: int = 4, filters: dict[str, Any] | None = None
 ) -> QueryResponse:
@@ -117,7 +113,6 @@ def query(
     return QueryResponse(**result)
 
 
-@mcp.tool()
 def search(
     question: str, top_k: int = 4, filters: dict[str, Any] | None = None
 ) -> SearchResponse:
@@ -128,7 +123,6 @@ def search(
     return SearchResponse(documents=result.get("sources", []))
 
 
-@mcp.tool()
 def chat(
     session_id: str, message: str, history: list[str] | None = None
 ) -> ChatResponse:
@@ -139,7 +133,6 @@ def chat(
     return ChatResponse(session_id=session_id, answer=result["answer"])
 
 
-@mcp.tool()
 def list_documents() -> list[DocumentInfo]:
     """List indexed documents with basic metadata."""
 
@@ -151,7 +144,6 @@ def list_documents() -> list[DocumentInfo]:
     return [DocumentInfo(doc_id=_compute_doc_id(d["file_path"]), **d) for d in docs]
 
 
-@mcp.tool()
 def get_document(doc_id: str) -> DocumentMetadata:
     """Retrieve metadata for a document."""
 
@@ -170,7 +162,6 @@ def get_document(doc_id: str) -> DocumentMetadata:
     raise ValueError("Document not found")
 
 
-@mcp.tool()
 def delete_document(doc_id: str) -> DetailResponse:
     """Remove a document from the corpus."""
 
@@ -186,7 +177,6 @@ def delete_document(doc_id: str) -> DetailResponse:
     raise ValueError("Document not found")
 
 
-@mcp.tool()
 def index_path(path: str) -> DetailResponse:
     """Index a file or directory specified by *path*."""
 
@@ -213,7 +203,6 @@ def index_path(path: str) -> DetailResponse:
     return DetailResponse(detail=detail)
 
 
-@mcp.tool()
 def rebuild_index() -> DetailResponse:
     """Rebuild the entire index from scratch."""
 
@@ -224,7 +213,6 @@ def rebuild_index() -> DetailResponse:
     return DetailResponse(detail=detail)
 
 
-@mcp.tool()
 def index_stats() -> IndexStats:
     """Retrieve simple statistics about the index."""
 
@@ -244,7 +232,6 @@ def index_stats() -> IndexStats:
     )
 
 
-@mcp.tool()
 def clear_cache() -> DetailResponse:
     """Clear embedding and search caches."""
 
@@ -254,7 +241,6 @@ def clear_cache() -> DetailResponse:
     return DetailResponse(detail="Cache cleared")
 
 
-@mcp.tool()
 def system_status() -> SystemStatus:
     """Return server status summary."""
 
@@ -271,3 +257,19 @@ def system_status() -> SystemStatus:
         embedding_model=config.embedding_model,
         chat_model=config.chat_model,
     )
+
+
+def register_tools(server: FastMCP) -> None:
+    """Register all RAG tools with *server*."""
+
+    server.add_tool(query)
+    server.add_tool(search)
+    server.add_tool(chat)
+    server.add_tool(list_documents)
+    server.add_tool(get_document)
+    server.add_tool(delete_document)
+    server.add_tool(index_path)
+    server.add_tool(rebuild_index)
+    server.add_tool(index_stats)
+    server.add_tool(clear_cache)
+    server.add_tool(system_status)
