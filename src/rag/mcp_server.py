@@ -7,12 +7,14 @@ be wired into the RAG engine later.
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from rag import RAGConfig, RAGEngine, RuntimeOptions
@@ -61,6 +63,12 @@ class ChatPayload(BaseModel):
     history: list[str] | None = None
 
 
+def _compute_doc_id(file_path: str) -> str:
+    """Return a stable identifier for *file_path*."""
+
+    return hashlib.sha256(file_path.encode()).hexdigest()
+
+
 @app.post("/query")
 async def query_endpoint(payload: QueryPayload) -> dict[str, Any]:
     """Run a RAG query against the indexed corpus."""
@@ -88,21 +96,53 @@ async def chat_endpoint(payload: ChatPayload) -> dict[str, Any]:
 
 
 @app.get("/documents")
-async def list_documents() -> list[str]:
-    """List indexed documents."""
-    return []
+async def list_documents() -> list[dict[str, Any]]:
+    """List indexed documents with basic metadata."""
+
+    engine = get_engine()
+    if not hasattr(engine, "list_indexed_files"):
+        return []
+
+    docs = engine.list_indexed_files()
+    return [
+        {"doc_id": _compute_doc_id(d["file_path"]), **d}
+        for d in docs
+    ]
 
 
 @app.get("/documents/{doc_id}")
 async def get_document_metadata(doc_id: str) -> dict[str, Any]:
     """Retrieve metadata for a document."""
-    return {"doc_id": doc_id}
+
+    engine = get_engine()
+    if not hasattr(engine, "list_indexed_files"):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    for info in engine.list_indexed_files():
+        if _compute_doc_id(info["file_path"]) == doc_id:
+            metadata = engine.index_meta.get_metadata(Path(info["file_path"]))
+            if metadata is None:
+                raise HTTPException(status_code=404, detail="Document not found")
+            metadata.update({"doc_id": doc_id, "file_path": info["file_path"]})
+            return metadata
+
+    raise HTTPException(status_code=404, detail="Document not found")
 
 
 @app.delete("/documents/{doc_id}")
 async def remove_document(doc_id: str) -> dict[str, str]:
     """Remove a document from the corpus."""
-    return {"detail": f"Document {doc_id} removed"}
+
+    engine = get_engine()
+    if not hasattr(engine, "list_indexed_files"):
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    for info in engine.list_indexed_files():
+        if _compute_doc_id(info["file_path"]) == doc_id:
+            engine.invalidate_cache(info["file_path"])
+            return {"detail": f"Document {doc_id} removed"}
+
+    raise HTTPException(status_code=404, detail="Document not found")
 
 
 @app.post("/index")

@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expanded MCP server design sketch with third-party library recommendations
 - Skeleton FastAPI MCP server module exposing placeholder endpoints
 - Basic endpoint tests for the MCP server using FastAPI's TestClient
+- Implemented document listing, metadata retrieval and deletion endpoints
 
 ### Changed
 - Log levels are now shown in uppercase for better readability

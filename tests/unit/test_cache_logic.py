@@ -43,12 +43,17 @@ class TestCacheLogic:
         )
         runtime_options = RuntimeOptions()
         
-        with patch('rag.embeddings.embedding_provider.EmbeddingProvider') as mock_embed_provider:
+        with patch('rag.engine.EmbeddingProvider') as mock_embed_provider, \
+             patch('rag.embeddings.embedding_provider.EmbeddingProvider'), \
+             patch('rag.engine.ChatOpenAI'):
             # Mock embedding provider
             mock_embeddings = MagicMock()
             mock_embeddings.embed_documents.return_value = [[0.1, 0.2, 0.3]] * 2  # Mock embeddings
             mock_embed_provider.return_value.embeddings = mock_embeddings
-            
+            mock_embed_provider.return_value.get_model_info.return_value = {
+                "model_version": "test"
+            }
+
             engine = RAGEngine(config, runtime_options)
             return engine
 
