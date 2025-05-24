@@ -468,10 +468,56 @@ def update_issue(task: TodoTask, issue_number: int, dry_run: bool = False) -> No
     body = "\n\n".join(body_parts) if body_parts else title
     
     if dry_run:
-        print(f"  [DRY RUN] Would update issue #{issue_number}:")
-        print(f"    Title: {title}")
-        print(f"    Labels: {', '.join(labels) if labels else 'none'}")
-        print(f"    Body: {body[:100]}{'...' if len(body) > 100 else ''}")
+        print(f"  [DRY RUN] Would update issue #{issue_number}: {title}")
+        
+        # Get current issue details for comparison
+        try:
+            result = subprocess.run([
+                "gh", "issue", "view", str(issue_number), "--json", "labels,body"
+            ], check=True, capture_output=True, text=True)
+            
+            current_issue = json.loads(result.stdout)
+            current_labels = [label["name"] for label in current_issue.get("labels", [])]
+            current_body = current_issue.get("body", "").strip()
+            
+            # Compare labels
+            expected_labels = set(labels)
+            current_labels_set = set(current_labels)
+            
+            if expected_labels != current_labels_set:
+                print(f"    Labels would change:")
+                print(f"      Current: {', '.join(sorted(current_labels)) if current_labels else 'none'}")
+                print(f"      Expected: {', '.join(sorted(labels)) if labels else 'none'}")
+                
+                added = expected_labels - current_labels_set
+                removed = current_labels_set - expected_labels
+                if added:
+                    print(f"      + Add: {', '.join(sorted(added))}")
+                if removed:
+                    print(f"      - Remove: {', '.join(sorted(removed))}")
+            
+            # Compare body
+            if body.strip() != current_body:
+                print(f"    Body would change:")
+                print(f"      Current length: {len(current_body)} chars")
+                print(f"      Expected length: {len(body)} chars")
+                
+                # Show a diff preview for short bodies, or just indicate change for long ones
+                if len(current_body) < 200 and len(body) < 200:
+                    print(f"      Current: {repr(current_body[:100])}")
+                    print(f"      Expected: {repr(body[:100])}")
+                else:
+                    print(f"      (Body content differs - too long to display)")
+            
+            # If nothing would change, indicate that
+            if expected_labels == current_labels_set and body.strip() == current_body:
+                print(f"    ⚠️  No actual changes detected - this might be a false positive")
+                
+        except (subprocess.CalledProcessError, json.JSONDecodeError) as e:
+            print(f"    Error fetching current issue details: {e}")
+            print(f"    Expected labels: {', '.join(labels) if labels else 'none'}")
+            print(f"    Expected body: {body[:100]}{'...' if len(body) > 100 else ''}")
+        
         return
     
     # Ensure labels exist first
@@ -539,7 +585,7 @@ def sync_tasks(tasks: List[TodoTask], dry_run: bool = False) -> None:
             # Issue exists - check if it needs updating
             existing_issue = existing[title]
             
-            if dry_run or issue_needs_update(task, existing_issue):
+            if issue_needs_update(task, existing_issue):
                 update_issue(task, existing_issue["number"], dry_run)
                 updated_count += 1
             else:
