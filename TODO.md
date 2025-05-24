@@ -3,7 +3,6 @@
 ---
 
 - Create server module `src/rag/mcp_server.py` with a FastAPI app exposing the endpoints.
-- Wire existing RAG engine into `/query`, `/search`, and `/chat` endpoints.
 - Implement document management functions for listing, metadata retrieval, and deletion.
 - Add index management endpoints to index paths and rebuild or inspect the index.
 - Expose cache and system tools for clearing caches and checking server status.
