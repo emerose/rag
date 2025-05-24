@@ -44,6 +44,23 @@ needs network access, mark it with `@pytest.mark.integration` and run it via
 - Update documentation alongside code changes.
 - Keep `.cursorrules`, `AGENTS.md`, and `CONTRIBUTING.md` synchronized when guidelines change.
 
+### Working with TODO.md
+
+The project uses TODO.md for task tracking with bidirectional GitHub issue synchronization:
+
+- **Completed tasks**: Remove finished tasks from TODO.md entirely. The sync system will automatically close the corresponding GitHub issue.
+- **New tasks**: Add new tasks without GitHub issue numbers. Use this format:
+  ```
+  - **Task title** – Task description
+  ```
+  Or with priority:
+  ```
+  - [P2] **Task title** – Task description
+  ```
+  The sync system will automatically create GitHub issues and add issue numbers to TODO.md.
+- **Never manually add issue numbers** like `[#123]` to new tasks. Let the sync system handle GitHub integration.
+- **Task organization**: Place new tasks in the appropriate category section and mark as "Next" if they should be prioritized.
+
 ## Git Workflow
 
 - Use feature branches for your work and keep them short-lived.

@@ -42,6 +42,9 @@
 # Project Management
  - **TODO.md**: Contains a list of features that we are considering adding
    - The "Next Up" section includes the items that we are going to work on next
+   - **Completed tasks**: Remove finished tasks from TODO.md entirely. The sync system will automatically close the corresponding GitHub issue.
+   - **New tasks**: Add new tasks without GitHub issue numbers. Use format: `- **Task title** – Task description` or `- [P2] **Task title** – Task description` for priority tasks. The sync system will automatically create GitHub issues and add issue numbers.
+   - **Never manually add issue numbers** like `[#123]` to new tasks. Let the sync system handle GitHub integration.
  - **CHANGELOG.md**: Documents all notable changes to the project
  - **check.sh**: Script to run tests, formatting, and linting checks
 
