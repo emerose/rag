@@ -80,3 +80,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed complexity and linting issues in text splitting code
 - Fixed integration tests that were silently skipping failures
 - Ensured consistent cache-dir option handling across all CLI commands
+- Improved console logging display: logger name follows level, noisy httpx and
+  pdfminer logs are hidden, and callsite file/line numbers are accurate

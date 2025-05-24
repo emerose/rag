@@ -194,4 +194,4 @@ def test_foreign_logger_colorized() -> None:
     """Ensure foreign loggers receive colored levels."""
     console_out, _ = _setup_and_log(json_logs=False, foreign=True)
     matches = re.findall(r"\x1b\[[0-9;]*mINFO\x1b\[[0-9;]*m", console_out)
-    assert len(matches) >= 2
+    assert len(matches) == 1
