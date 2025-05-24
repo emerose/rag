@@ -41,26 +41,48 @@ def _make_structlog_stub() -> ModuleType:
             # Accept any parameters to match the real ConsoleRenderer
             self.colors = kwargs.get("colors", True)
             self.level_styles = kwargs.get("level_styles", {})
+            self.columns = kwargs.get("columns", None)
             
         def __call__(self, _logger: Any, _name: str, event_dict: dict[str, Any]) -> str:
-            # Format like the real ConsoleRenderer but simpler
-            timestamp = event_dict.get("timestamp", "")
-            level = event_dict.get("level", "")
-            event = event_dict.get("event", "")
-            logger_name = event_dict.get("logger_name", "")
-            filename = event_dict.get("filename", "")
-            lineno = event_dict.get("lineno", "")
-            
-            # Apply coloring if enabled
-            if self.colors and level in self.level_styles:
-                level = f"{self.level_styles[level]}{level}\033[0m"
-            
-            # Format similar to real ConsoleRenderer
-            parts = [timestamp, f"[{level}]", event, f"[{logger_name}]"]
-            if filename and lineno:
-                parts.append(f"filename={filename} lineno={lineno}")
+            if self.columns:
+                # Use column-based formatting
+                formatted_parts = []
+                remaining_dict = dict(event_dict)
                 
-            return " ".join(part for part in parts if part).strip()
+                for col in self.columns:
+                    if col.key and col.key in remaining_dict:
+                        value = remaining_dict.pop(col.key)
+                        formatted_value = col.formatter(col.key, value)
+                        if formatted_value:
+                            formatted_parts.append(formatted_value)
+                    elif not col.key and remaining_dict:
+                        # Default formatter for remaining fields
+                        for key, value in remaining_dict.items():
+                            formatted_value = col.formatter(key, value)
+                            if formatted_value:
+                                formatted_parts.append(formatted_value)
+                        remaining_dict.clear()
+                
+                return " ".join(formatted_parts).strip()
+            else:
+                # Legacy formatting for backward compatibility
+                timestamp = event_dict.get("timestamp", "")
+                level = event_dict.get("level", "")
+                event = event_dict.get("event", "")
+                logger_name = event_dict.get("logger_name", "")
+                filename = event_dict.get("filename", "")
+                lineno = event_dict.get("lineno", "")
+                
+                # Apply coloring if enabled
+                if self.colors and level in self.level_styles:
+                    level = f"{self.level_styles[level]}{level}\033[0m"
+                
+                # Format similar to real ConsoleRenderer
+                parts = [timestamp, f"[{level}]", event, f"[{logger_name}]"]
+                if filename and lineno:
+                    parts.append(f"filename={filename} lineno={lineno}")
+                    
+                return " ".join(part for part in parts if part).strip()
 
     class TimeStamper:
         def __init__(self, fmt: str = "iso") -> None:
@@ -139,6 +161,22 @@ def _make_structlog_stub() -> ModuleType:
         def __init__(self) -> None:
             super().__init__("dev")
             self.ConsoleRenderer = ConsoleRenderer
+
+            # Add Column and formatter classes for custom column support
+            class Column:
+                def __init__(self, key: str, formatter: Any) -> None:
+                    self.key = key
+                    self.formatter = formatter
+
+            class KeyValueColumnFormatter:
+                def __init__(self, **kwargs: Any) -> None:
+                    pass
+                
+                def __call__(self, key: str, value: Any) -> str:
+                    return f"{key}={value}" if key else str(value)
+
+            self.Column = Column
+            self.KeyValueColumnFormatter = KeyValueColumnFormatter
 
     stub.BoundLogger = BoundLogger
     stub.get_logger = get_logger
@@ -262,8 +300,8 @@ def test_foreign_logger_colorized() -> None:
 def test_console_log_structure() -> None:
     """Logger name should follow level and callsite info should be present."""
     _, file_out = _setup_and_log(json_logs=False)
-    # Now that we use ConsoleRenderer, the output is a formatted string
-    # Check that it contains the expected components
-    assert "[rag]" in file_out
-    assert "filename=test_logging_utils.py" in file_out
-    assert "lineno=199" in file_out
+    # Now that we use ConsoleRenderer with custom columns, check the new format
+    # Expected format: timestamp [LEVEL] [logger] message (file.py:line) extra_fields
+    assert "rag" in file_out  # Logger name (now wrapped in color codes)
+    assert "(test_logging_utils.py:" in file_out  # Check for new location format
+    assert "237)" in file_out  # Check for line number

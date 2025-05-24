@@ -12,6 +12,7 @@ from collections.abc import Callable
 from typing import Any
 
 import structlog
+from structlog.dev import Column
 from structlog.processors import CallsiteParameter, CallsiteParameterAdder
 
 
@@ -110,6 +111,19 @@ def insert_logger_name(
     return event_dict
 
 
+def format_location(
+    _logger: logging.Logger, _name: str, event_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Format filename and line number as (file.py:123)."""
+    filename = event_dict.pop("filename", None)
+    lineno = event_dict.pop("lineno", None)
+
+    if filename and lineno:
+        event_dict["location"] = f"({filename}:{lineno})"
+
+    return event_dict
+
+
 def strip_internal_fields(
     _logger: logging.Logger, _name: str, event_dict: dict[str, Any]
 ) -> dict[str, Any]:
@@ -163,11 +177,61 @@ def setup_logging(
         additional_ignores=["rag.utils.logging_utils"],
     )
 
-    # Configure ConsoleRenderer with specific parameters
+    # Define custom columns for desired layout: timestamp [level] [logger] message (location)
+
+    def plain_formatter(key: str, value: Any) -> str:
+        """Simple formatter that returns the value as-is."""
+        return str(value) if value is not None else ""
+
+    def timestamp_formatter(key: str, value: Any) -> str:
+        """Format timestamp with dim gray color."""
+        if not value:
+            return ""
+        return f"\033[90m{value}\033[0m"  # Dim gray
+
+    def level_formatter(key: str, value: Any) -> str:
+        """Format level with brackets and colors."""
+        if not value:
+            return ""
+
+        # Apply color styling manually since level_styles is ignored with columns
+        level_str = str(value)
+        color_code = LEVEL_STYLES.get(level_str, "")
+        reset_code = "\033[0m" if color_code else ""
+
+        return f"[{color_code}{level_str}{reset_code}]"  # No extra space
+
+    def logger_formatter(key: str, value: Any) -> str:
+        """Format logger name with brackets and bright blue color."""
+        if not value:
+            return ""
+        return f"[\033[94m{value}\033[0m]"  # Bright blue for logger name
+
+    def location_formatter(key: str, value: Any) -> str:
+        """Format location with dim gray color."""
+        if not value:
+            return ""
+        return f"\033[90m{value}\033[0m"  # Dim gray for location
+
+    custom_columns = [
+        Column("timestamp", timestamp_formatter),  # Timestamp
+        Column("level", level_formatter),  # [LEVEL] with colors
+        Column("logger_name", logger_formatter),  # [logger_name]
+        Column("event", plain_formatter),  # Main message
+        Column("location", location_formatter),  # (file.py:123)
+        Column(
+            "",
+            structlog.dev.KeyValueColumnFormatter(
+                key_style=None, value_style="", reset_style="", value_repr=str
+            ),
+        ),  # Any remaining fields
+    ]
+
+    # Configure ConsoleRenderer with custom columns
     console_renderer_kwargs: dict[str, Any] = {
         "colors": True,  # Let ConsoleRenderer handle colors
         "sort_keys": False,
-        "level_styles": LEVEL_STYLES,  # Use our custom level styles
+        "columns": custom_columns,  # Use our custom column layout
     }
 
     pre_chain = [
@@ -178,6 +242,7 @@ def setup_logging(
         callsite,
         strip_internal_fields,
         insert_logger_name,
+        format_location,
     ]
 
     console_pre_chain = [
@@ -229,6 +294,7 @@ def setup_logging(
             callsite,
             strip_internal_fields,
             insert_logger_name,
+            format_location,
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
