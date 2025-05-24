@@ -38,7 +38,7 @@
 - **[P3] Synthetic QA generator** – Script to auto-generate QA pairs for regression tests.
 
 ### 8 . MCP Server Integration
-- **[P2] Core MCP server implementation** – Create `src/rag/mcp_server.py` implementing Model Context Protocol to expose RAG functionality to AI assistants (ChatGPT, Cursor, etc.)
+**Completed:** Core MCP server module created.
 - **[P2] RAG query tools** – Expose `query`, `search`, and `chat` operations with configurable parameters (top_k, filters, etc.)
 - **[P2] Document management tools** – Implement `list_indexed_files`, `get_document_metadata`, `remove_document` for corpus inspection and management
 - **[P3] Index management tools** – Add `index_folder`, `index_file`, `rebuild_index`, `get_index_stats` for dynamic content management
