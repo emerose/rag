@@ -57,6 +57,7 @@ class RuntimeOptions:
         log_callback: Optional callback for logging
         preserve_headings: Whether to preserve document heading structure in chunks
         semantic_chunking: Whether to use semantic boundaries for chunking
+        rerank: Enable keyword-based reranking after retrieval
 
     """
 
@@ -66,3 +67,4 @@ class RuntimeOptions:
     # Text splitting options
     preserve_headings: bool = True
     semantic_chunking: bool = True
+    rerank: bool = False

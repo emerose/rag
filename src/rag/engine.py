@@ -17,6 +17,7 @@ from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 
 from rag.chains.rag_chain import build_rag_chain
+from rag.retrieval import KeywordReranker
 from rag.utils.answer_utils import enhance_result
 
 from .config import RAGConfig, RuntimeOptions
@@ -311,6 +312,9 @@ class RAGEngine:
             openai_api_key=self.config.openai_api_key,
             temperature=self.config.temperature,
         )
+
+        # Optional reranker for retrieval results
+        self.reranker = KeywordReranker() if self.runtime.rerank else None
 
         # Lazy-initialised RAG chain cache
         self._rag_chain_cache: dict[tuple[int, str], Any] = {}
@@ -692,7 +696,9 @@ class RAGEngine:
 
         key = (k, prompt_id)
         if key not in self._rag_chain_cache:
-            self._rag_chain_cache[key] = build_rag_chain(self, k=k, prompt_id=prompt_id)
+            self._rag_chain_cache[key] = build_rag_chain(
+                self, k=k, prompt_id=prompt_id, reranker=self.reranker
+            )
         return self._rag_chain_cache[key]
 
     def answer(self, question: str, k: int = 4) -> dict[str, Any]:

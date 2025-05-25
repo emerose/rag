@@ -16,7 +16,6 @@
 ### 2 . Retrieval & Relevance
 - [#47] [P2] **Hybrid retrieval** – Combine BM25 (sparse) + dense scores via reciprocal rank fusion.
 - [#48] [P3] **Per-document embedding model map** – Lookup table (`embeddings.yaml`) to choose domain-specific embedding models.
-- [#51] [P3] **Re-ranking** – Optional Cohere or cross-encoder re-ranker after top-k retrieval.
 
 ### 3 . Prompt Engineering & Generation
 - [#53] [P2] **Context window packing** – LCEL `stuff_documents` / token-length trimming for max context utilisation.
