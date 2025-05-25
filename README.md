@@ -191,6 +191,19 @@ rag query "What are the main findings?" --json | jq .answer
 rag query "What are the main findings?" --json | jq '{answer: .answer, files: [.sources[].file]}'
 ```
 
+#### Metadata Filters
+
+Restrict results to documents matching specific metadata with
+`filter:field=value` expressions. Values may be quoted.
+
+```bash
+rag query 'filter:source=README.md chunking'
+rag query 'filter:heading_path="Introduction > Overview" retrieval'
+```
+
+String fields use case-insensitive substring matching, while numeric fields
+must match exactly. You can combine multiple filters in a single query.
+
 ### Listing Indexed Documents
 
 View all indexed documents and their metadata:
@@ -320,6 +333,12 @@ Available prompt templates:
 - `default`: Standard RAG prompt with citation guidance
 - `cot`: Chain-of-thought prompt encouraging step-by-step reasoning
 - `creative`: Engaging, conversational style while maintaining accuracy
+
+You can view all available prompts at any time:
+
+```bash
+rag prompt list
+```
 
 ### Machine-Readable Output
 
