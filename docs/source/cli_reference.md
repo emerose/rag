@@ -1,0 +1,101 @@
+# CLI Reference
+
+The `rag` command provides several sub-commands for working with your document collection.
+
+## `index`
+
+Process a file or directory and build a vector store for semantic search.
+
+```
+rag index path/to/docs
+```
+
+Options:
+- `--chunk-size` – tokens per chunk (default 1000)
+- `--chunk-overlap` – overlap between chunks (default 200)
+- `--preserve-headings/--no-preserve-headings` – keep document heading structure
+- `--semantic-chunking/--no-semantic-chunking` – split on semantic boundaries
+- `--async-batching/--sync-batching` – perform embedding asynchronously
+- `--cache-dir` – location to store embeddings
+
+## `query`
+
+Retrieve relevant documents and generate an answer.
+
+```
+rag query "What is RAG?"
+```
+
+Options:
+- `--k` – number of documents to retrieve
+- `--prompt` – prompt template (`default`, `cot`, `creative`)
+- `--stream` – stream tokens as they are generated
+- `--cache-dir` – location of cached data
+
+## `summarize`
+
+Generate short summaries for indexed documents.
+
+```
+rag summarize -k 5
+```
+
+## `list`
+
+Show all indexed documents and their metadata.
+
+```
+rag list
+```
+
+## `invalidate`
+
+Remove cached data for a specific file or all caches.
+
+```
+rag invalidate document.pdf
+```
+
+Options:
+- `--all` – invalidate every cache in the directory
+- `--cache-dir` – location of cached data
+
+## `cleanup`
+
+Remove cache entries for files that no longer exist.
+
+```
+rag cleanup
+```
+
+## `repl`
+
+Interactive shell for experimenting with queries.
+
+```
+rag repl
+```
+
+Use `k <n>` inside the REPL to change the number of documents retrieved.
+
+## `prompt list`
+
+Display available prompt templates.
+
+```
+rag prompt list
+```
+
+## `serve-mcp`
+
+Run the MCP HTTP server.
+
+```
+rag serve-mcp --host 0.0.0.0 --port 8000
+```
+
+Global options available on every command include:
+- `--verbose` / `--log-level` – control logging verbosity
+- `--json` – output machine-readable JSON
+- `--vectorstore-backend` – choose FAISS, Qdrant, or Chroma
+- `--max-workers` – number of concurrent tasks

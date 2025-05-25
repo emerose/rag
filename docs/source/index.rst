@@ -5,6 +5,10 @@ RAG Documentation
    :maxdepth: 2
    :caption: Contents
 
+   project_overview
+   cli_reference
+   api_http
+   api_python
    swap_vector_store
    mcp_usage
    incremental_indexing
