@@ -728,7 +728,7 @@ class RAGEngine:
                 k=k,
                 prompt_id=prompt_id,
                 hybrid=self.runtime.hybrid_retrieval,
-                reranker=self.runtime.reranker
+                reranker=self.runtime.reranker,
             )
         return self._rag_chain_cache[key]
 

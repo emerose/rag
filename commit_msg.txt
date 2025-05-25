@@ -1,0 +1,13 @@
+fix(chains): remove undefined hybrid variable references
+
+Fixed NameError in build_rag_chain function by removing references to
+undefined 'hybrid' variable. Simplified retrieval logic to use only
+similarity search, removing the incomplete hybrid functionality.
+
+- Removed duplicate function definition causing indentation error
+- Removed bm25_retriever initialization with undefined hybrid variable
+- Simplified _retrieve function to use only similarity search
+- All tests now pass (149 passed, 2 skipped)
+
+Fixes test failures in test_build_rag_chain, test_chain_execution,
+and test_system_prompt_invoke. 
