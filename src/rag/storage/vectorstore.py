@@ -1,7 +1,7 @@
 """Vectorstore management module for the RAG system.
 
-This module provides functionality for managing vector stores using FAISS,
-including creation, loading, saving, and querying operations.
+This module provides functionality for managing vector stores via the
+``VectorStoreProtocol``. FAISS is used as the default backend.
 """
 
 import logging
@@ -19,6 +19,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
+from rag.storage.protocols import VectorStoreProtocol
 from rag.utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
@@ -27,17 +28,19 @@ logger = logging.getLogger(__name__)
 class VectorStoreManager:
     """Manages vector stores for the RAG system.
 
-    This class provides methods for creating, loading, saving, and querying
-    vector stores using FAISS.
+    This class provides methods for creating, loading, saving and querying
+    vector stores through a pluggable backend implementing
+    :class:`VectorStoreProtocol`.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         cache_dir: Path | str,
         embeddings: Embeddings,
         log_callback: Callable[[str, str, str], None] | None = None,
         lock_timeout: int = 30,
         safe_deserialization: bool = True,
+        backend: str = "faiss",
     ) -> None:
         """Initialize the vector store manager.
 
@@ -48,6 +51,7 @@ class VectorStoreManager:
             lock_timeout: Timeout in seconds for file locks
             safe_deserialization: Whether to use safe deserialization for pickle files.
                 Set to False only if you trust the source of the pickle files.
+            backend: Backend name ("faiss", "qdrant", "chroma")
 
         """
         self.cache_dir = Path(cache_dir)
@@ -55,6 +59,7 @@ class VectorStoreManager:
         self.log_callback = log_callback
         self.lock_timeout = lock_timeout
         self.safe_deserialization = safe_deserialization
+        self.backend = backend
         # Get the embedding dimension once at initialization
         self._embedding_dimension = None
 
@@ -129,14 +134,14 @@ class VectorStoreManager:
         base_name = self._get_cache_base_name(file_path)
         return self.cache_dir / f"{base_name}.faiss"
 
-    def load_vectorstore(self, file_path: str) -> FAISS | None:
+    def load_vectorstore(self, file_path: str) -> VectorStoreProtocol | None:
         """Load a vector store from cache.
 
         Args:
             file_path: Path to the source file
 
         Returns:
-            FAISS vector store if found, None otherwise
+            Vector store if found, ``None`` otherwise
 
         """
         base_name = self._get_cache_base_name(file_path)
@@ -216,12 +221,14 @@ class VectorStoreManager:
         else:
             return vectorstore
 
-    def save_vectorstore(self, file_path: str, vectorstore: FAISS) -> bool:
+    def save_vectorstore(
+        self, file_path: str, vectorstore: VectorStoreProtocol
+    ) -> bool:
         """Save a vector store to cache.
 
         Args:
             file_path: Path to the source file
-            vectorstore: FAISS vector store to save
+            vectorstore: Vector store to save
 
         Returns:
             True if successful, False otherwise
@@ -254,14 +261,14 @@ class VectorStoreManager:
         else:
             return True
 
-    def create_vectorstore(self, documents: list[Document]) -> FAISS:
+    def create_vectorstore(self, documents: list[Document]) -> VectorStoreProtocol:
         """Create a new vector store from documents.
 
         Args:
             documents: List of documents to add to the vector store
 
         Returns:
-            FAISS vector store containing the documents
+            Vector store containing the documents
 
         """
         self._log("DEBUG", f"Creating vector store with {len(documents)} documents")
@@ -269,7 +276,11 @@ class VectorStoreManager:
         self._log("DEBUG", f"Embeddings type: {type(self.embeddings)}")
 
         try:
-            # Create a new FAISS vector store
+            # Create a new vector store
+            if self.backend != "faiss":
+                raise NotImplementedError(
+                    f"Vector store backend '{self.backend}' not supported"
+                )
             return FAISS.from_documents(documents, self.embeddings)
         except Exception as e:
             # If there's an error, try to log more information
@@ -279,11 +290,11 @@ class VectorStoreManager:
                 self._log("ERROR", f"Traceback: {traceback.format_exc()}")
             raise
 
-    def create_empty_vectorstore(self) -> FAISS:
+    def create_empty_vectorstore(self) -> VectorStoreProtocol:
         """Create an empty vector store.
 
         Returns:
-            Empty FAISS vector store
+            Empty vector store
 
         """
         self._log("DEBUG", "Creating empty vector store")
@@ -301,6 +312,11 @@ class VectorStoreManager:
         index_to_docstore_id = {}
 
         # Create FAISS vector store
+        if self.backend != "faiss":
+            raise NotImplementedError(
+                f"Vector store backend '{self.backend}' not supported"
+            )
+
         return FAISS(
             embedding_function=self.embeddings,
             index=index,
@@ -379,10 +395,10 @@ class VectorStoreManager:
 
     def add_documents_to_vectorstore(
         self,
-        vectorstore: FAISS | None,
+        vectorstore: VectorStoreProtocol | None,
         documents: list[Document],
         embeddings: list[list[float]],
-    ) -> FAISS:
+    ) -> VectorStoreProtocol:
         """Add documents to a vector store.
 
         Args:
@@ -391,7 +407,7 @@ class VectorStoreManager:
             embeddings: Pre-computed embeddings for the documents.
 
         Returns:
-            Updated FAISS vector store.
+            Updated vector store.
 
         """
         if not documents:
@@ -552,14 +568,16 @@ class VectorStoreManager:
             )
             return None
 
-    def merge_vectorstores(self, vectorstores: list[FAISS]) -> FAISS:
+    def merge_vectorstores(
+        self, vectorstores: list[VectorStoreProtocol]
+    ) -> VectorStoreProtocol:
         """Merge multiple vector stores into one.
 
         Args:
-            vectorstores: List of FAISS vector stores to merge
+            vectorstores: List of vector stores to merge
 
         Returns:
-            Merged FAISS vector store
+            Merged vector store
         """
         if not vectorstores:
             return self.create_empty_vectorstore()
@@ -578,14 +596,14 @@ class VectorStoreManager:
 
     def similarity_search(
         self,
-        vectorstore: FAISS,
+        vectorstore: VectorStoreProtocol,
         query: str,
         k: int = 4,
     ) -> list[Document]:
         """Perform a similarity search on a vector store.
 
         Args:
-            vectorstore: FAISS vector store to search
+            vectorstore: Vector store to search
             query: Query string
             k: Number of results to return
 
@@ -595,6 +613,10 @@ class VectorStoreManager:
         """
         self._log("DEBUG", f"Performing similarity search with k={k}")
         try:
+            if self.backend != "faiss":
+                raise NotImplementedError(
+                    f"Vector store backend '{self.backend}' not supported"
+                )
             return vectorstore.similarity_search(query, k=k)
         except faiss.FaissException as e:  # Specific FAISS exception
             self._log("ERROR", f"FAISS error during similarity search: {e}")

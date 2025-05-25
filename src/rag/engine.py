@@ -10,7 +10,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 
 # Update LangChain imports to use community packages
@@ -31,6 +30,7 @@ from .ingest import BasicPreprocessor, IngestManager
 from .storage.cache_manager import CacheManager
 from .storage.filesystem import FilesystemManager
 from .storage.index_manager import IndexManager
+from .storage.protocols import VectorStoreProtocol
 from .storage.vectorstore import VectorStoreManager
 from .utils.logging_utils import log_message
 
@@ -170,6 +170,7 @@ class RAGEngine:
             chunk_size=1000,
             chunk_overlap=200,
             openai_api_key=os.getenv("OPENAI_API_KEY", ""),
+            vectorstore_backend="faiss",
         )
 
     def _initialize_from_config(self) -> None:
@@ -235,6 +236,7 @@ class RAGEngine:
             log_callback=self.runtime.log_callback,
             lock_timeout=self.config.lock_timeout,
             safe_deserialization=False,  # We trust our own cache files
+            backend=self.config.vectorstore_backend,
         )
 
     def _initialize_embeddings(self) -> None:
@@ -946,14 +948,14 @@ class RAGEngine:
         """
         return self._load_cache_metadata()
 
-    def load_cached_vectorstore(self, file_path: str) -> FAISS | None:
+    def load_cached_vectorstore(self, file_path: str) -> VectorStoreProtocol | None:
         """Load a cached vectorstore.
 
         Args:
             file_path: Path to the source file
 
         Returns:
-            Loaded FAISS vectorstore or ``None`` if not found
+            Loaded vector store or ``None`` if not found
 
         """
         return self._load_cached_vectorstore(file_path)
@@ -967,14 +969,14 @@ class RAGEngine:
         """
         return self.cache_manager.load_cache_metadata()
 
-    def _load_cached_vectorstore(self, file_path: str) -> FAISS | None:
+    def _load_cached_vectorstore(self, file_path: str) -> VectorStoreProtocol | None:
         """Backward compatibility: Load vectorstore from cache.
 
         Args:
             file_path: Path to the file
 
         Returns:
-            Loaded FAISS vectorstore or ``None`` if not found
+            Loaded vector store or ``None`` if not found
 
         """
         return self.vectorstore_manager.load_vectorstore(file_path)

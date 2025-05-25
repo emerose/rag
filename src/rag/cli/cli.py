@@ -89,6 +89,7 @@ class GlobalState:
     cache_dir: str = CACHE_DIR  # Initialize with default value
     json_mode: bool = False  # Track JSON mode
     console: Console = console  # Store console instance
+    vectorstore_backend: str = "faiss"
 
 
 state = GlobalState()
@@ -105,6 +106,12 @@ JSON_OUTPUT_OPTION = typer.Option(
     None,
     "--json/--no-json",
     help="Output in JSON format",
+)
+
+VECTORSTORE_OPTION = typer.Option(
+    "faiss",
+    "--vectorstore-backend",
+    help="Vector store backend (faiss, qdrant, chroma)",
 )
 
 # Define argument defaults outside functions
@@ -172,6 +179,7 @@ def main(
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
+    vectorstore_backend: str = VECTORSTORE_OPTION,
     json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
     """RAG (Retrieval Augmented Generation) CLI.
@@ -192,6 +200,7 @@ def main(
 
     # Set cache directory
     state.cache_dir = cache_dir
+    state.vectorstore_backend = vectorstore_backend
 
     # Set up signal handlers
     signal.signal(signal.SIGINT, signal_handler)
@@ -273,6 +282,7 @@ def index(  # noqa: PLR0913
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             cache_dir=cache_dir or state.cache_dir,
+            vectorstore_backend=state.vectorstore_backend,
         )
         runtime_options = RuntimeOptions(
             preserve_headings=preserve_headings,
@@ -422,6 +432,7 @@ def invalidate(
             chat_model="gpt-4",
             temperature=0.0,
             cache_dir=cache_directory,
+            vectorstore_backend=state.vectorstore_backend,
         )
         runtime_options = RuntimeOptions()
         rag_engine = RAGEngine(config, runtime_options)
@@ -512,6 +523,7 @@ def query(
             chat_model="gpt-4",
             temperature=0.0,
             cache_dir=cache_directory,
+            vectorstore_backend=state.vectorstore_backend,
         )
         runtime_options = RuntimeOptions()
         rag_engine = RAGEngine(config, runtime_options)
@@ -619,6 +631,7 @@ def summarize(
             chat_model="gpt-4",
             temperature=0.0,
             cache_dir=cache_dir or state.cache_dir,
+            vectorstore_backend=state.vectorstore_backend,
         )
         runtime_options = RuntimeOptions()
         rag_engine = RAGEngine(config, runtime_options)
@@ -727,6 +740,7 @@ def list(
             chat_model="gpt-4",
             temperature=0.0,
             cache_dir=cache_directory,
+            vectorstore_backend=state.vectorstore_backend,
         )
         runtime_options = RuntimeOptions()
         rag_engine = RAGEngine(config, runtime_options)
@@ -806,6 +820,7 @@ def _initialize_rag_engine() -> RAGEngine:
         chat_model="gpt-4",
         temperature=0.0,
         cache_dir=state.cache_dir,
+        vectorstore_backend=state.vectorstore_backend,
     )
     runtime_options = RuntimeOptions()
     return RAGEngine(config, runtime_options)
@@ -1083,6 +1098,7 @@ def cleanup(
         config = RAGConfig(
             documents_dir=".",  # Not used for cleanup, but required
             cache_dir=cache_dir or state.cache_dir,
+            vectorstore_backend=state.vectorstore_backend,
         )
 
         # Initialize the RAG engine
