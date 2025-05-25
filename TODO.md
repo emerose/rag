@@ -4,7 +4,6 @@
 - [#153] [P1] **Increase coverage for utils** – Add tests for `answer_utils` and `async_utils`.
 - [#154] [P1] **Prompt list command** – Add CLI subcommand to list available prompt templates.
 - [#155] [P1] **Refactor MCP utilities** – Consolidate duplicated server logic.
-- [#156] [P1] **Validate OPENAI_API_KEY** – Fail fast if API key is missing.
 ---
 
 ## 🗺️ Roadmap & Priorities
@@ -17,7 +16,6 @@
 - [#44] [P2] **Vector-store abstraction** – Introduce `VectorStoreProtocol` so FAISS can be swapped for Qdrant/Chroma via a CLI flag.
 - [#45] [P3] **Incremental re-indexing** – Hash each chunk and only (re)embed changed chunks to reduce token spend.
 - [P2] **Refactor MCP utilities** – Consolidate duplicated server logic.
-- [P2] **Validate OPENAI_API_KEY** – Fail fast if API key is missing.
 
 ### 2 . Retrieval & Relevance
 - [#47] [P2] **Hybrid retrieval** – Combine BM25 (sparse) + dense scores via reciprocal rank fusion.

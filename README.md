@@ -91,6 +91,9 @@ pip install rag
    RAG_SYSTEM_PROMPT="You are a helpful assistant."
    ```
 
+   The engine validates that `OPENAI_API_KEY` is set and exits with an
+   error if it is missing.
+
 2. The tool will automatically look for the `.env` file in:
    - Current directory
    - Parent directories (up to 3 levels up)
