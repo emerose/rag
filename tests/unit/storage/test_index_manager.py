@@ -461,3 +461,40 @@ def test_remove_metadata(_mock_connect: MagicMock, temp_dir: Path) -> None:
 
     # Verify commit was called
     assert mock_conn.commit.called
+
+
+@patch("sqlite3.connect")
+def test_compute_text_hash(_mock_connect: MagicMock, temp_dir: Path) -> None:
+    """Test computing text hash."""
+
+    manager = IndexManager(cache_dir=temp_dir)
+    text = "hello world"
+    result = manager.compute_text_hash(text)
+
+    assert isinstance(result, str)
+    assert len(result) == 64
+
+
+@patch("sqlite3.connect")
+def test_update_and_get_chunk_hashes(_mock_connect: MagicMock, temp_dir: Path) -> None:
+    """Test storing and retrieving chunk hashes."""
+
+    mock_conn = MagicMock()
+    _mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_cursor = MagicMock()
+    mock_conn.execute.return_value = mock_cursor
+
+    manager = IndexManager(cache_dir=temp_dir)
+    file_path = Path(temp_dir) / "test.txt"
+    hashes = ["a" * 64, "b" * 64]
+
+    manager.update_chunk_hashes(file_path, hashes)
+
+    _mock_connect.assert_called()
+    mock_conn.execute.assert_called()
+
+    mock_cursor.fetchall.return_value = [(0, hashes[0]), (1, hashes[1])]
+
+    result = manager.get_chunk_hashes(file_path)
+
+    assert result == hashes

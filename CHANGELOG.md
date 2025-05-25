@@ -18,7 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `query`: Answer, sources, and metadata
     - `summarize`: Table of document summaries
     - `cleanup`: Summary of removed files
+- Synthetic QA generator script for creating regression test data
     - `invalidate`: Success/error messages
+- Autocomplete support in `rag repl` using `prompt_toolkit` for commands and file paths
+- Documented REPL autocomplete usage in README
 - Structured logging using structlog with Rich console output
   - Consistent error output format across all commands
   - Integration with tools like `jq` for output processing
@@ -28,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `TableData` type for structured table data
     - `Error` type for consistent error reporting
     - Support for nested tables and arbitrary data structures
+- Golden-set retrieval evaluation script under `tests/integration` measuring hit-rate and exact-match
 - Advanced text splitting with semantic chunking for better context preservation
 - Automated heading detection for Markdown, HTML, and PDF documents
 - Improved metadata extraction and preservation during chunking
@@ -64,8 +68,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Step-by-step MCP usage guide for ChatGPT and Cursor in `docs/mcp_usage.md`.
 - Tailscale instructions for remote ChatGPT access added to the MCP usage guide.
 - Added `serve-mcp` CLI command for running the MCP server
+- Initial Sphinx documentation with guide for swapping the vector store
 - Validation check for `OPENAI_API_KEY` during engine initialization
 - Documented metadata filter syntax in README with examples
+- Added optional keyword-based reranker to improve retrieval accuracy
 
 ### Removed
 - Outdated design sketch removed from `docs/design_sketches`.
@@ -92,6 +98,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added underscore prefixes to unused function parameters
 - Reduced the number of ignored ruff linting rules
 - Consolidated MCP server logic by reusing common models
+- Context window packing for retrieval results to maximise prompt space
 
 ### Fixed
 - More reliable heading detection in PDFs by using statistical font analysis

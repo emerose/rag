@@ -16,6 +16,7 @@ from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 
 from rag.chains.rag_chain import build_rag_chain
+from rag.retrieval import KeywordReranker
 from rag.utils.answer_utils import enhance_result
 
 from .config import RAGConfig, RuntimeOptions
@@ -314,6 +315,9 @@ class RAGEngine:
             temperature=self.config.temperature,
         )
 
+        # Optional reranker for retrieval results
+        self.reranker = KeywordReranker() if self.runtime.rerank else None
+
         # Lazy-initialised RAG chain cache
         self._rag_chain_cache: dict[tuple[int, str], Any] = {}
 
@@ -456,21 +460,7 @@ class RAGEngine:
             True if successful, False otherwise
         """
         try:
-            # Get embeddings
-            self._log(
-                "DEBUG",
-                f"Generating embeddings for {len(documents)} documents from {file_path}",
-            )
-            embeddings = self.embedding_batcher.process_embeddings(documents)
-            self._log("DEBUG", f"Generated {len(embeddings)} embeddings")
-
-            # Debug: Check first embedding
-            if embeddings:
-                first_emb = embeddings[0]
-                emb_shape = f"length={len(first_emb)}, type={type(first_emb)}"
-                self._log("DEBUG", f"First embedding shape: {emb_shape}")
-
-            # Get existing vectorstore if available
+            # Load existing vectorstore if available
             existing_vectorstore = self.vectorstores.get(str(file_path))
             if not existing_vectorstore:
                 self._log(
@@ -482,20 +472,56 @@ class RAGEngine:
                 )
                 if existing_vectorstore:
                     self._log("DEBUG", "Loaded existing vectorstore from cache")
-                else:
-                    self._log("DEBUG", "No existing vectorstore found in cache")
 
-            # Create or update vectorstore
-            self._log("DEBUG", "Adding documents to vectorstore")
-            vectorstore = self.vectorstore_manager.add_documents_to_vectorstore(
-                vectorstore=existing_vectorstore,
-                documents=documents,
-                embeddings=embeddings,
-            )
-            self._log(
-                "DEBUG",
-                f"Added documents to vectorstore, store type: {type(vectorstore)}",
-            )
+            old_hashes = self.index_manager.get_chunk_hashes(file_path)
+            new_hashes: list[str] = []
+
+            # Create a new vectorstore and process chunks sequentially
+            vectorstore = self.vectorstore_manager.create_empty_vectorstore()
+
+            docs_to_embed: list[Document] = []
+            embed_indices: list[int] = []
+
+            for idx, doc in enumerate(documents):
+                chunk_hash = self.index_manager.compute_text_hash(doc.page_content)
+                new_hashes.append(chunk_hash)
+
+                if (
+                    existing_vectorstore
+                    and idx < len(old_hashes)
+                    and chunk_hash == old_hashes[idx]
+                ):
+                    try:
+                        emb = existing_vectorstore.index.reconstruct(idx)
+                        self.vectorstore_manager.add_documents_to_vectorstore(
+                            vectorstore,
+                            [doc],
+                            [emb],
+                        )
+                        continue
+                    except Exception:
+                        pass
+
+                docs_to_embed.append(doc)
+                embed_indices.append(idx)
+
+            if docs_to_embed:
+                self._log(
+                    "DEBUG",
+                    f"Generating embeddings for {len(docs_to_embed)} new/changed documents",
+                )
+                embeddings = self.embedding_batcher.process_embeddings(docs_to_embed)
+                self._log("DEBUG", f"Generated {len(embeddings)} embeddings")
+
+                for pos, idx in enumerate(embed_indices):
+                    if pos >= len(embeddings):
+                        break
+                    doc = documents[idx]
+                    self.vectorstore_manager.add_documents_to_vectorstore(
+                        vectorstore,
+                        [doc],
+                        [embeddings[pos]],
+                    )
 
             # Save vectorstore
             self._log("DEBUG", "Saving vectorstore to cache")
@@ -515,6 +541,9 @@ class RAGEngine:
                 file_type=file_type,
                 num_chunks=len(documents),
             )
+
+            # Store chunk hashes for incremental indexing
+            self.index_manager.update_chunk_hashes(file_path, new_hashes)
 
             # Update cache metadata
             self._log("DEBUG", "Getting file metadata")
@@ -694,7 +723,9 @@ class RAGEngine:
 
         key = (k, prompt_id)
         if key not in self._rag_chain_cache:
-            self._rag_chain_cache[key] = build_rag_chain(self, k=k, prompt_id=prompt_id)
+            self._rag_chain_cache[key] = build_rag_chain(
+                self, k=k, prompt_id=prompt_id, reranker=self.reranker
+            )
         return self._rag_chain_cache[key]
 
     def answer(self, question: str, k: int = 4) -> dict[str, Any]:

@@ -17,7 +17,11 @@ import typer
 from dotenv import load_dotenv
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
-from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.completion import (
+    PathCompleter,
+    WordCompleter,
+    merge_completers,
+)
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
@@ -909,6 +913,16 @@ def _get_repl_commands() -> dict[str, Any]:
     }
 
 
+def _get_repl_completer(commands: dict[str, Any]):
+    """Return a completer for the REPL with command and path completion."""
+    return merge_completers(
+        [
+            WordCompleter(commands.keys()),
+            PathCompleter(expanduser=True),
+        ]
+    )
+
+
 def print_welcome_message() -> None:
     """Print welcome message for the CLI."""
     state.console.print(
@@ -979,7 +993,7 @@ def repl(
         session = _create_repl_session()
         style = _get_repl_style()
         commands = _get_repl_commands()
-        command_completer = WordCompleter(commands.keys())
+        command_completer = _get_repl_completer(commands)
 
         # Print welcome message
         print_welcome_message()
