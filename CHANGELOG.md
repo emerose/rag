@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `query`: Answer, sources, and metadata
     - `summarize`: Table of document summaries
     - `cleanup`: Summary of removed files
+- Synthetic QA generator script for creating regression test data
     - `invalidate`: Success/error messages
 - Structured logging using structlog with Rich console output
   - Consistent error output format across all commands
