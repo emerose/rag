@@ -1,6 +1,6 @@
 ## 🚀 Next
 
-- [#155] [P1] **Refactor MCP utilities** – Consolidate duplicated server logic.
+
 ---
 
 ## 🗺️ Roadmap & Priorities
