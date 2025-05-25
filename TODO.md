@@ -33,7 +33,6 @@
 - [#58] [P3] **`--max-workers` CLI option** – Default `min(32, os.cpu_count()+4)`; propagates to async semaphore.
 
 ### 7 . Evaluation & Testing
-- [#59] [P2] **Golden-set retrieval QA** – `tests/e2e/eval_rag.py` measuring hit-rate + exact-match.
 - [#60] [P3] **Synthetic QA generator** – Script to auto-generate QA pairs for regression tests.
 
 ### 8 . Packaging & CI
