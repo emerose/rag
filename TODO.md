@@ -40,8 +40,6 @@
 ### 8 . Packaging & CI
 - [#61] [P2] **PyProject packaging** – Add `pyproject.toml`, `hatch` build and `[project.scripts] rag = "rag.cli:app"`.
 - [#62] [P3] **Version lockfile** – Generate requirements lock (poetry export / pip-tools) to freeze LangChain/OpenAI versions.
-- [#63] [P4] **Remove TUI** – Deprecate rich-based TUI since it is fragile; keep plain CLI.
-- [#64] [P5] **Deduplicate CSS** – Only relevant if TUI retained; else drop.
 
 ### 9 . Documentation & Examples
 - [#65] [P3] **CONTRIBUTING.md** – Coding standards, pre-commit, how to run.

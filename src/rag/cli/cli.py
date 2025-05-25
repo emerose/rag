@@ -35,14 +35,12 @@ try:
     from .cli.output import Error, TableData, set_json_mode, write
     from .config import RAGConfig, RuntimeOptions
     from .engine import RAGEngine
-    from .tui import run_tui
     from .utils import exceptions
 except ImportError:
     # Fall back to absolute imports (for direct script usage)
     from rag.cli.output import Error, TableData, set_json_mode, write
     from rag.config import RAGConfig, RuntimeOptions
     from rag.engine import RAGEngine
-    from rag.tui import run_tui
     from rag.utils import exceptions
 
 
@@ -212,12 +210,6 @@ def index(  # noqa: PLR0913
         file_okay=True,
         resolve_path=True,
     ),
-    use_tui: bool = typer.Option(
-        False,
-        "--tui",
-        "-t",
-        help="Use the TUI interface for indexing",
-    ),
     chunk_size: int = typer.Option(
         1000,
         "--chunk-size",
@@ -277,36 +269,31 @@ def index(  # noqa: PLR0913
             semantic_chunking=semantic_chunking,
         )
 
-        if use_tui:
-            # Run with TUI
-            run_tui(config, runtime_options)
+        rag_engine = RAGEngine(config, runtime_options)
+
+        cached_before = set(rag_engine.cache_manager.list_cached_files().keys())
+
+        # Run indexing
+        path_obj = Path(path)
+        if path_obj.is_file():
+            # Index just the file that was specified
+            state.logger.info(f"Indexing file: {path_obj}")
+            success, error = rag_engine.index_file(path_obj)
+            results = {str(path_obj): {"success": success, "error": error}}
         else:
-            # Run without TUI
-            rag_engine = RAGEngine(config, runtime_options)
+            # Index the entire directory
+            state.logger.info(f"Indexing directory: {path_obj}")
 
-            cached_before = set(rag_engine.cache_manager.list_cached_files().keys())
+            # Create a progress bar
+            with Progress() as progress:
+                # Create progress callback
+                progress_callback = create_console_progress_callback(progress)
 
-            # Run indexing
-            path_obj = Path(path)
-            if path_obj.is_file():
-                # Index just the file that was specified
-                state.logger.info(f"Indexing file: {path_obj}")
-                success, error = rag_engine.index_file(path_obj)
-                results = {str(path_obj): {"success": success, "error": error}}
-            else:
-                # Index the entire directory
-                state.logger.info(f"Indexing directory: {path_obj}")
+                # Set the progress callback
+                rag_engine.runtime.progress_callback = progress_callback
 
-                # Create a progress bar
-                with Progress() as progress:
-                    # Create progress callback
-                    progress_callback = create_console_progress_callback(progress)
-
-                    # Set the progress callback
-                    rag_engine.runtime.progress_callback = progress_callback
-
-                    # Run indexing on the specified directory
-                    results = rag_engine.index_directory(path_obj)
+                # Run indexing on the specified directory
+                results = rag_engine.index_directory(path_obj)
 
             success_files = [f for f, r in results.items() if r.get("success")]
             error_files = {
