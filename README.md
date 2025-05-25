@@ -87,6 +87,8 @@ pip install rag
 
    ```bash
    OPENAI_API_KEY=your-api-key-here
+   # Optional system persona for all chats
+   RAG_SYSTEM_PROMPT="You are a helpful assistant."
    ```
 
 2. The tool will automatically look for the `.env` file in:

@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_community.vectorstores import FAISS  # type: ignore
 from langchain_core.documents import Document
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableLambda, RunnableParallel
 
 # Import the prompt registry
@@ -157,6 +158,15 @@ def build_rag_chain(engine: RAGEngine, k: int = 4, prompt_id: str = "default"):
     def _format_docs(docs: list[Document]) -> str:
         return "\n\n---\n\n".join(doc.page_content for doc in docs)
 
+    def _invoke_llm(prompt_text: str) -> str:
+        if engine.system_prompt:
+            messages = [
+                SystemMessage(content=engine.system_prompt),
+                HumanMessage(content=prompt_text),
+            ]
+            return engine.chat_model.invoke(messages).content
+        return engine.chat_model.invoke(prompt_text).content
+
     # LCEL graph
     chain = (
         RunnableParallel(
@@ -176,7 +186,7 @@ def build_rag_chain(engine: RAGEngine, k: int = 4, prompt_id: str = "default"):
         )
         | RunnableLambda(
             lambda inp: {
-                "answer": engine.chat_model.invoke(inp["prompt"]).content,  # type: ignore[arg-type]
+                "answer": _invoke_llm(inp["prompt"]),
                 "documents": inp["documents"],
             },
         )
