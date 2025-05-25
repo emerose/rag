@@ -48,6 +48,7 @@
 
 ### 8 . Packaging & CI
 
+
 ### 9 . Documentation & Examples
 - [#66] [P3] **Sphinx docs + GitHub Pages** – Auto-publish API docs & "swap vector store" guide.
 - [#67] [P4] **Tutorial notebook** – `examples/rag_basic.ipynb` covering indexing, querying, prompt tweaks.
