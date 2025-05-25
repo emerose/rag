@@ -186,6 +186,20 @@ The chunking behavior can be customized using CLI flags or environment variables
 - `--no-semantic-chunking`: Disables semantic chunking and uses pure token-based chunking
 - `--no-preserve-headings`: Disables document heading structure preservation
 
+#### Per-document Embedding Models
+
+You can specify different embedding models for subsets of your documents using
+an `embeddings.yaml` file placed in the documents directory. The YAML file maps
+glob patterns to model names:
+
+```yaml
+"finance/*.pdf": text-embedding-3-large
+"legal/*": text-embedding-3-small
+```
+
+Files matching a pattern will be embedded with the given model; all others use
+the default model from your configuration.
+
 ### Querying Documents
 
 Query your indexed documents using natural language:

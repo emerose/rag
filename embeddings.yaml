@@ -1,0 +1,2 @@
+# Example embedding model mapping
+"docs/*.pdf": text-embedding-3-small
