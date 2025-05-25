@@ -3,9 +3,7 @@
 ---
 
 ### MCP Server Integration
-- [#138] **Provide optional API key authentication using SDK middleware.**
 - [#40] **Integrate CLI command `rag serve-mcp` to start the server with host and port options.**
-- [#39] **Provide API key authentication middleware with a configurable key.**
 
 ## 🗺️ Roadmap & Priorities  
 *(Priority ‑ **P1** = Do next, … **P5** = Nice-to-have)*
