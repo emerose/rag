@@ -13,6 +13,7 @@ from typing import Any
 
 import faiss
 import numpy as np
+from filelock import FileLock
 from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
@@ -35,6 +36,7 @@ class VectorStoreManager:
         cache_dir: Path | str,
         embeddings: Embeddings,
         log_callback: Callable[[str, str, str], None] | None = None,
+        lock_timeout: int = 30,
         safe_deserialization: bool = True,
     ) -> None:
         """Initialize the vector store manager.
@@ -43,6 +45,7 @@ class VectorStoreManager:
             cache_dir: Directory for storing vector store cache files
             embeddings: Embedding provider
             log_callback: Optional callback for logging
+            lock_timeout: Timeout in seconds for file locks
             safe_deserialization: Whether to use safe deserialization for pickle files.
                 Set to False only if you trust the source of the pickle files.
 
@@ -50,6 +53,7 @@ class VectorStoreManager:
         self.cache_dir = Path(cache_dir)
         self.embeddings = embeddings
         self.log_callback = log_callback
+        self.lock_timeout = lock_timeout
         self.safe_deserialization = safe_deserialization
         # Get the embedding dimension once at initialization
         self._embedding_dimension = None
@@ -150,22 +154,24 @@ class VectorStoreManager:
         try:
             self._log("DEBUG", f"Loading vector store for {file_path}")
 
-            # Load the FAISS index
-            index = faiss.read_index(str(faiss_file))
+            lock_path = self.cache_dir / f"{base_name}.lock"
+            with FileLock(str(lock_path), timeout=self.lock_timeout):
+                # Load the FAISS index
+                index = faiss.read_index(str(faiss_file))
 
-            # Load the pickle file containing docstore and metadata
-            with open(pkl_file, "rb") as f:
-                if not self.safe_deserialization:
-                    data = pickle.load(f)
-                else:
-                    try:
+                # Load the pickle file containing docstore and metadata
+                with open(pkl_file, "rb") as f:
+                    if not self.safe_deserialization:
                         data = pickle.load(f)
-                    except pickle.UnpicklingError:
-                        self._log(
-                            "ERROR",
-                            "Failed to unpickle docstore. Consider setting safe_deserialization=False if you trust the source.",
-                        )
-                        return None
+                    else:
+                        try:
+                            data = pickle.load(f)
+                        except pickle.UnpicklingError:
+                            self._log(
+                                "ERROR",
+                                "Failed to unpickle docstore. Consider setting safe_deserialization=False if you trust the source.",
+                            )
+                            return None
 
             # The pickle file structure varies based on how it was saved
             # It might be a tuple with docstore and index_to_docstore_id
@@ -230,13 +236,12 @@ class VectorStoreManager:
             )
 
             # Ensure cache directory exists
-            self.cache_dir.mkdir(
-                parents=True,
-                exist_ok=True,
-            )  # Changed from os.makedirs
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-            # FAISS.save_local expects the folder and the base name separately
-            vectorstore.save_local(str(self.cache_dir), base_name)
+            lock_path = self.cache_dir / f"{base_name}.lock"
+            with FileLock(str(lock_path), timeout=self.lock_timeout):
+                # FAISS.save_local expects the folder and the base name separately
+                vectorstore.save_local(str(self.cache_dir), base_name)
 
             self._log(
                 "DEBUG",
