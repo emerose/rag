@@ -44,10 +44,8 @@
 - [#64] [P5] **Deduplicate CSS** – Only relevant if TUI retained; else drop.
 
 ### 9 . Documentation & Examples
-- [#65] [P3] **CONTRIBUTING.md** – Coding standards, pre-commit, how to run.
 - [#66] [P3] **Sphinx docs + GitHub Pages** – Auto-publish API docs & "swap vector store" guide.
 - [#67] [P4] **Tutorial notebook** – `examples/rag_basic.ipynb` covering indexing, querying, prompt tweaks.
-- [#68] [P4] **Migration guide** – Explain changes when moving to LCEL + hybrid retrieval.
 
 ---
 
