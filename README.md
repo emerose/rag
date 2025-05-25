@@ -117,12 +117,20 @@ The REPL provides:
 - Command history (up/down arrows)
 - Auto-suggestions from history
 - Syntax highlighting
-- Auto-completion
+- Auto-completion for commands and file paths
 - Built-in commands:
   - `clear` - Clear the screen
   - `exit` or `quit` - Exit the REPL
   - `help` - Show help message
   - `k <number>` - Change number of documents to retrieve
+
+#### Auto-completion
+
+The REPL uses `prompt_toolkit`'s completer system to provide both command and
+file path completion. Press <kbd>TAB</kbd> to cycle through available commands or
+to expand file and directory paths. Paths support `~` for your home directory and
+work with relative or absolute locations. This makes it easy to reference files
+when interacting with the REPL.
 
 ### Indexing Documents
 
