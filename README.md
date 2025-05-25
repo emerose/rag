@@ -332,6 +332,9 @@ make html
 
 Then open `docs/build/html/index.html` in your browser.
 
+The documentation site is automatically rebuilt and published to GitHub Pages
+whenever docs change on the `main` branch.
+
 ### Getting Help
 
 Show general help:

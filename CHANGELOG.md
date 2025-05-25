@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `invalidate`: Success/error messages
 - Autocomplete support in `rag repl` using `prompt_toolkit` for commands and file paths
 - Documented REPL autocomplete usage in README
+- GitHub Pages workflow to automatically build and publish Sphinx docs
 - Async embedding workers using `aiostream` for concurrent processing
 - `--max-workers` CLI flag to control async concurrency
 - Incremental indexing using chunk hashes to skip unchanged chunks
