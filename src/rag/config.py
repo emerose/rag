@@ -70,3 +70,6 @@ class RuntimeOptions:
     preserve_headings: bool = True
     semantic_chunking: bool = True
     rerank: bool = False
+    # Streaming options
+    stream: bool = False
+    stream_callback: Callable[[str], None] | None = None

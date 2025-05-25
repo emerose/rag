@@ -20,8 +20,8 @@
 ### 4 . LangChain Modernisation
 - [#54] [P2] **Enable LangSmith tracing** – Provide `--trace` flag that runs with `langchain.cli trace`.
 
+
 ### 5 . CLI / REPL UX
-- [#55] [P2] **Streaming token output** – `--stream` flag for real-time coloured output.
 
 ### 6 . Performance
 - [#58] [P3] **`--max-workers` CLI option** – Default `min(32, os.cpu_count()+4)`; propagates to async semaphore.

@@ -113,6 +113,9 @@ rag repl
 
 # Start REPL with custom number of documents to retrieve
 rag repl -k 6
+
+# Stream output in real time
+rag repl --stream
 ```
 
 The REPL provides:
@@ -196,6 +199,9 @@ rag query "What are the main findings?"
 
 # Adjust the number of retrieved documents (default: 4)
 rag query "What are the main findings?" -k 6
+
+# Stream tokens as they're generated
+rag query "What are the main findings?" --stream
 
 # Get machine-readable output
 rag query "What are the main findings?" --json | jq .answer

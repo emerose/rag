@@ -313,6 +313,7 @@ class RAGEngine:
             model=self.config.chat_model,
             openai_api_key=self.config.openai_api_key,
             temperature=self.config.temperature,
+            streaming=self.runtime.stream,
         )
 
         # Optional reranker for retrieval results

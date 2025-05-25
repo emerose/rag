@@ -218,3 +218,21 @@ def test_pack_documents_respects_limit():
 
     assert len(packed) == 1
     assert packed[0].page_content == "one two three"
+
+
+def test_streaming_invocation(mock_engine, mock_faiss, mock_documents):
+    """Ensure tokens are streamed when runtime.stream is True."""
+
+    mock_engine.vectorstore_manager.merge_vectorstores.return_value = mock_faiss
+    mock_engine.runtime = MagicMock(stream=True, stream_callback=None)
+    mock_engine.chat_model.stream.return_value = [
+        MagicMock(content="Hello"),
+        MagicMock(content=" world"),
+    ]
+
+    chain = build_rag_chain(mock_engine)
+
+    result = chain.invoke("question")
+
+    assert result["answer"] == "Hello world"
+    mock_engine.chat_model.stream.assert_called_once()
