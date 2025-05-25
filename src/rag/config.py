@@ -8,6 +8,8 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from .utils.async_utils import get_optimal_concurrency
+
 
 @dataclass(frozen=True)
 class RAGConfig:
@@ -27,6 +29,8 @@ class RAGConfig:
         chunk_overlap: Number of tokens to overlap between chunks
         openai_api_key: OpenAI API key (will be set in __post_init__)
         vectorstore_backend: Backend to use for vector storage
+        embedding_model_map_file: Optional path to embeddings.yaml for per-doc
+            model selection
 
     """
 
@@ -40,6 +44,7 @@ class RAGConfig:
     chunk_overlap: int = 200  # tokens
     openai_api_key: str = ""  # Will be set in __post_init__
     vectorstore_backend: str = "faiss"
+    embedding_model_map_file: str | None = None
 
     def __post_init__(self):
         """Initialize derived attributes after instance creation."""
@@ -60,6 +65,7 @@ class RuntimeOptions:
         preserve_headings: Whether to preserve document heading structure in chunks
         semantic_chunking: Whether to use semantic boundaries for chunking
         rerank: Enable keyword-based reranking after retrieval
+        max_workers: Maximum concurrent workers for async tasks
 
     """
 
@@ -73,3 +79,4 @@ class RuntimeOptions:
     # Streaming options
     stream: bool = False
     stream_callback: Callable[[str], None] | None = None
+    max_workers: int = get_optimal_concurrency()

@@ -10,10 +10,8 @@
 
 
 ### 1 . Architecture & Core Design
-- [#45] [P3] **Incremental re-indexing** – Hash each chunk and only (re)embed changed chunks to reduce token spend.
 
 ### 2 . Retrieval & Relevance
-- [#48] [P3] **Per-document embedding model map** – Lookup table (`embeddings.yaml`) to choose domain-specific embedding models.
 
 ### 3 . Prompt Engineering & Generation
 
@@ -24,7 +22,6 @@
 ### 5 . CLI / REPL UX
 
 ### 6 . Performance
-- [#58] [P3] **`--max-workers` CLI option** – Default `min(32, os.cpu_count()+4)`; propagates to async semaphore.
 
 ### 7 . Evaluation & Testing
 

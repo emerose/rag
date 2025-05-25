@@ -52,6 +52,9 @@ def test_runtime_options_defaults() -> None:
     # Verify default values
     assert options.progress_callback is None
     assert options.log_callback is None
+    from rag.utils.async_utils import get_optimal_concurrency
+
+    assert options.max_workers == get_optimal_concurrency()
 
 
 def test_runtime_options_custom_values() -> None:
