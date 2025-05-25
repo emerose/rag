@@ -1,5 +1,10 @@
 ## 🚀 Next
 
+- [P1] **Document metadata filters** – Document filter syntax in README with examples.
+- [P1] **Increase coverage for utils** – Add tests for `answer_utils` and `async_utils`.
+- [P1] **Prompt list command** – Add CLI subcommand to list available prompt templates.
+- [P1] **Refactor MCP utilities** – Consolidate duplicated server logic.
+- [P1] **Validate OPENAI_API_KEY** – Fail fast if API key is missing.
 ---
 
 ## 🗺️ Roadmap & Priorities
@@ -12,6 +17,8 @@
 - [#44] [P2] **Vector-store abstraction** – Introduce `VectorStoreProtocol` so FAISS can be swapped for Qdrant/Chroma via a CLI flag.
 - [#45] [P3] **Incremental re-indexing** – Hash each chunk and only (re)embed changed chunks to reduce token spend.
 - [#46] [P4] **File-locking cleanup** – Replace ad-hoc lockfiles with `filelock.FileLock` context-manager.
+- [P2] **Refactor MCP utilities** – Consolidate duplicated server logic.
+- [P2] **Validate OPENAI_API_KEY** – Fail fast if API key is missing.
 
 ### 2 . Retrieval & Relevance
 - [#47] [P2] **Hybrid retrieval** – Combine BM25 (sparse) + dense scores via reciprocal rank fusion.
@@ -29,6 +36,7 @@
 - [#55] [P2] **Streaming token output** – `--stream` flag for real-time coloured output.
 - [#56] [P3] **Autocomplete in `rag repl`** – Use `prompt_toolkit` for file path & command completion.
 
+- [P2] **Prompt list command** – Add CLI subcommand to list available prompt templates.
 ### 6 . Performance
 - [#57] [P2] **Async embedding workers** – `asyncio` + `aiostream` pipeline instead of ThreadPool; honour OpenAI parallel limits.
 - [#58] [P3] **`--max-workers` CLI option** – Default `min(32, os.cpu_count()+4)`; propagates to async semaphore.
@@ -36,14 +44,14 @@
 ### 7 . Evaluation & Testing
 - [#59] [P2] **Golden-set retrieval QA** – `tests/e2e/eval_rag.py` measuring hit-rate + exact-match.
 - [#60] [P3] **Synthetic QA generator** – Script to auto-generate QA pairs for regression tests.
+- [P2] **Increase coverage for utils** – Add tests for `answer_utils` and `async_utils`.
 
 ### 8 . Packaging & CI
-- [#61] [P2] **PyProject packaging** – Add `pyproject.toml`, `hatch` build and `[project.scripts] rag = "rag.cli:app"`.
-- [#62] [P3] **Version lockfile** – Generate requirements lock (poetry export / pip-tools) to freeze LangChain/OpenAI versions.
 
 ### 9 . Documentation & Examples
 - [#66] [P3] **Sphinx docs + GitHub Pages** – Auto-publish API docs & "swap vector store" guide.
 - [#67] [P4] **Tutorial notebook** – `examples/rag_basic.ipynb` covering indexing, querying, prompt tweaks.
+- [P2] **Document metadata filters** – Document filter syntax in README with examples.
 
 ---
 
