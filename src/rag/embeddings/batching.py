@@ -6,10 +6,12 @@ including adaptive batch sizing and parallel processing.
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator
 from typing import Any, TypeVar
 
 from langchain.schema import Document
 
+from aiostream import stream
 from rag.utils.async_utils import AsyncBatchProcessor, get_optimal_concurrency
 from rag.utils.logging_utils import log_message
 from rag.utils.progress_tracker import ProgressTracker
@@ -83,6 +85,63 @@ class EmbeddingBatcher:
         if total_chunks <= 1000:
             return 20  # Larger batches for larger sets
         return 50  # Very large batches for very large sets
+
+    async def process_embeddings_stream(
+        self, documents: list[Document]
+    ) -> AsyncIterator[list[float]]:
+        """Yield embeddings for documents asynchronously.
+
+        Args:
+            documents: List of documents to embed
+
+        Yields:
+            Embedding vectors as they are produced
+        """
+
+        if not documents:
+            return
+
+        batch_size = self.calculate_optimal_batch_size(len(documents))
+        self._log(
+            "DEBUG",
+            f"Streaming {len(documents)} documents with batch size {batch_size}",
+        )
+
+        texts = [doc.page_content for doc in documents]
+        self.progress_tracker.register_task("embedding", len(texts))
+
+        batches = [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
+        semaphore = asyncio.Semaphore(self.concurrency)
+
+        async def embed_batch(batch: list[str]) -> list[list[float]]:
+            async with semaphore:
+                try:
+                    embeddings = self.embedding_provider.embed_texts(batch)
+                    self.progress_tracker.update(
+                        "embedding",
+                        self.progress_tracker.tasks["embedding"]["current"]
+                        + len(batch),
+                        len(texts),
+                    )
+                    return embeddings
+                except (
+                    ValueError,
+                    KeyError,
+                    ConnectionError,
+                    TimeoutError,
+                    OSError,
+                ) as e:
+                    self._log("ERROR", f"Error processing batch: {e}")
+                    return [[] for _ in batch]
+
+        stream_batches = stream.iterate(batches)
+        mapped = stream.map(stream_batches, embed_batch, task_limit=self.concurrency)
+        pipeline = stream.flatmap(mapped, lambda result: stream.iterate(result))
+
+        async for embedding in pipeline:
+            yield embedding
+
+        self.progress_tracker.complete_task("embedding")
 
     async def process_embeddings_async(
         self,
