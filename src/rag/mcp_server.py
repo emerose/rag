@@ -8,50 +8,35 @@ future work moves these handlers to proper MCP tools.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import os
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from rag import RAGConfig, RAGEngine, RuntimeOptions
+from rag import RAGConfig
 from rag.auth import APIKeyAuthMiddleware
-from rag.mcp_tools import register_tools
+from rag.mcp_tools import (
+    ChatResponse,
+    DetailResponse,
+    DocumentInfo,
+    DocumentMetadata,
+    IndexPath,
+    IndexStats,
+    QueryResponse,
+    SearchResponse,
+    SystemStatus,
+    _compute_doc_id,
+    get_engine,
+    register_tools,
+)
 
 logger = logging.getLogger(__name__)
-
-
-class _DummyEngine:
-    """Fallback engine used when the real RAG engine is unavailable."""
-
-    def answer(self, question: str, k: int = 4) -> dict[str, Any]:
-        return {
-            "question": question,
-            "answer": "RAG engine not available",
-            "sources": [],
-            "num_documents_retrieved": 0,
-        }
-
-
-@lru_cache(maxsize=1)
-def get_engine() -> RAGEngine | _DummyEngine:
-    """Return a cached instance of :class:`RAGEngine` or a dummy replacement."""
-
-    if os.getenv("RAG_MCP_DUMMY"):
-        return _DummyEngine()
-
-    try:
-        return RAGEngine(RAGConfig(documents_dir="docs"), RuntimeOptions())
-    except Exception as exc:  # pragma: no cover - network errors
-        logger.warning("Falling back to dummy engine: %s", exc)
-        return _DummyEngine()
 
 
 mcp = FastMCP("RAG MCP Server")
@@ -68,62 +53,6 @@ class ChatPayload(BaseModel):
     session_id: str
     message: str
     history: list[str] | None = None
-
-
-class QueryResponse(BaseModel):
-    question: str
-    answer: str
-    sources: list[dict[str, Any]]
-    num_documents_retrieved: int
-
-
-class SearchResponse(BaseModel):
-    documents: list[dict[str, Any]]
-
-
-class ChatResponse(BaseModel):
-    session_id: str
-    answer: str
-
-
-class DocumentInfo(BaseModel):
-    doc_id: str
-    file_path: str
-    file_type: str
-    num_chunks: int
-    file_size: int
-    embedding_model: str
-    embedding_model_version: str
-    indexed_at: float
-    last_modified: float
-
-
-class DocumentMetadata(DocumentInfo):
-    file_hash: str
-    chunk_size: int
-    chunk_overlap: int
-
-
-class DetailResponse(BaseModel):
-    detail: str
-
-
-class SystemStatus(BaseModel):
-    status: str
-    num_documents: int
-    cache_dir: str
-    embedding_model: str
-    chat_model: str
-
-
-class IndexStats(RootModel[dict[str, Any]]):
-    """Statistics about the index."""
-
-
-def _compute_doc_id(file_path: str) -> str:
-    """Return a stable identifier for *file_path*."""
-
-    return hashlib.sha256(file_path.encode()).hexdigest()
 
 
 @mcp.custom_route("/query", methods=["POST"])
@@ -163,7 +92,7 @@ async def chat_endpoint(request: Request) -> Response:
 
 
 @mcp.custom_route("/documents", methods=["GET"])
-async def list_documents(request: Request) -> Response:
+async def list_documents_endpoint(request: Request) -> Response:
     """List indexed documents with basic metadata."""
 
     engine = get_engine()
@@ -180,7 +109,6 @@ async def get_document_metadata(request: Request) -> Response:
     """Retrieve metadata for a document."""
 
     doc_id = request.path_params["doc_id"]
-
     engine = get_engine()
     if not hasattr(engine, "list_indexed_files"):
         raise HTTPException(status_code=404, detail="Document not found")
@@ -201,7 +129,6 @@ async def remove_document(request: Request) -> Response:
     """Remove a document from the corpus."""
 
     doc_id = request.path_params["doc_id"]
-
     engine = get_engine()
     if not hasattr(engine, "list_indexed_files"):
         raise HTTPException(status_code=404, detail="Document not found")
@@ -214,10 +141,6 @@ async def remove_document(request: Request) -> Response:
             )
 
     raise HTTPException(status_code=404, detail="Document not found")
-
-
-class IndexPath(BaseModel):
-    path: str
 
 
 @mcp.custom_route("/index", methods=["POST"])
@@ -235,10 +158,7 @@ async def index_path(request: Request) -> Response:
     if path.is_file():
         success, error = engine.index_file(path)
         if not success:
-            raise HTTPException(
-                status_code=400,
-                detail=error or "Failed to index file",
-            )
+            raise HTTPException(status_code=400, detail=error or "Failed to index file")
         detail = f"Indexed file {path}"
     else:
         results = engine.index_directory(path)
@@ -246,10 +166,7 @@ async def index_path(request: Request) -> Response:
             fp: r.get("error") for fp, r in results.items() if not r.get("success")
         }
         if failures:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Errors indexing: {failures}",
-            )
+            raise HTTPException(status_code=400, detail=f"Errors indexing: {failures}")
         detail = f"Indexed {len(results)} files"
 
     return JSONResponse(DetailResponse(detail=detail).model_dump())
@@ -288,7 +205,7 @@ async def get_index_stats(request: Request) -> Response:
 
 
 @mcp.custom_route("/cache/clear", methods=["POST"])
-async def clear_cache(request: Request) -> Response:
+async def clear_cache_endpoint(request: Request) -> Response:
     """Clear embedding and search caches."""
 
     engine = get_engine()
@@ -298,7 +215,7 @@ async def clear_cache(request: Request) -> Response:
 
 
 @mcp.custom_route("/system/status", methods=["GET"])
-async def system_status(request: Request) -> Response:
+async def system_status_endpoint(request: Request) -> Response:
     """Return server status summary."""
 
     engine = get_engine()
@@ -323,3 +240,5 @@ app = mcp.streamable_http_app()
 api_key = os.getenv("RAG_MCP_API_KEY")
 if api_key:
     app.add_middleware(APIKeyAuthMiddleware, api_key=api_key)
+
+__all__ = ["_compute_doc_id", "app", "get_engine"]

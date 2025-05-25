@@ -87,7 +87,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Fixed exception handling by properly chaining exceptions with `from e`
   - Fixed code structure by moving return statements outside of try blocks
   - Added underscore prefixes to unused function parameters
-  - Reduced the number of ignored ruff linting rules
+- Reduced the number of ignored ruff linting rules
+- Consolidated MCP server logic by reusing common models
 
 ### Fixed
 - More reliable heading detection in PDFs by using statistical font analysis
