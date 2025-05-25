@@ -1,10 +1,10 @@
 ## 🚀 Next
 
-- [P1] **Document metadata filters** – Document filter syntax in README with examples.
-- [P1] **Increase coverage for utils** – Add tests for `answer_utils` and `async_utils`.
-- [P1] **Prompt list command** – Add CLI subcommand to list available prompt templates.
-- [P1] **Refactor MCP utilities** – Consolidate duplicated server logic.
-- [P1] **Validate OPENAI_API_KEY** – Fail fast if API key is missing.
+- [#152] [P1] **Document metadata filters** – Document filter syntax in README with examples.
+- [#153] [P1] **Increase coverage for utils** – Add tests for `answer_utils` and `async_utils`.
+- [#154] [P1] **Prompt list command** – Add CLI subcommand to list available prompt templates.
+- [#155] [P1] **Refactor MCP utilities** – Consolidate duplicated server logic.
+- [#156] [P1] **Validate OPENAI_API_KEY** – Fail fast if API key is missing.
 ---
 
 ## 🗺️ Roadmap & Priorities
@@ -16,7 +16,6 @@
 ### 1 . Architecture & Core Design
 - [#44] [P2] **Vector-store abstraction** – Introduce `VectorStoreProtocol` so FAISS can be swapped for Qdrant/Chroma via a CLI flag.
 - [#45] [P3] **Incremental re-indexing** – Hash each chunk and only (re)embed changed chunks to reduce token spend.
-- [#46] [P4] **File-locking cleanup** – Replace ad-hoc lockfiles with `filelock.FileLock` context-manager.
 - [P2] **Refactor MCP utilities** – Consolidate duplicated server logic.
 - [P2] **Validate OPENAI_API_KEY** – Fail fast if API key is missing.
 
