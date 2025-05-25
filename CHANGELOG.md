@@ -99,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added underscore prefixes to unused function parameters
 - Reduced the number of ignored ruff linting rules
 - Consolidated MCP server logic by reusing common models
+- Context window packing for retrieval results to maximise prompt space
 
 ### Fixed
 - More reliable heading detection in PDFs by using statistical font analysis

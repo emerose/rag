@@ -24,6 +24,8 @@ from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableLambda, RunnableParallel
 
+from rag.data.text_splitter import _safe_get_encoding
+
 # Import the prompt registry
 from rag.prompts import get_prompt
 from rag.retrieval import build_bm25_retriever, hybrid_search
@@ -36,6 +38,12 @@ if TYPE_CHECKING:
     from rag.engine import RAGEngine
 
 logger = logging.getLogger(__name__)
+
+# Maximum tokens of context to include in the prompt
+MAX_CONTEXT_TOKENS = 4096
+
+# Tokenizer for estimating token counts
+_tokenizer = _safe_get_encoding("cl100k_base")
 
 # ---------------------------------------------------------------------------
 # Metadata-filter helpers (ported from the old QueryEngine)
@@ -93,6 +101,26 @@ def _doc_matches_filters(doc: Document, filters: _FilterDict) -> bool:
         if not _value_matches_filter(doc.metadata[key], expected):
             return False
     return True
+
+
+def _pack_documents(
+    docs: list[Document], max_tokens: int = MAX_CONTEXT_TOKENS
+) -> list[Document]:
+    """Return subset of *docs* fitting within *max_tokens*."""
+
+    packed: list[Document] = []
+    tokens_used = 0
+
+    for doc in docs:
+        token_count = int(
+            doc.metadata.get("token_count", len(_tokenizer.encode(doc.page_content)))
+        )
+        if tokens_used + token_count > max_tokens:
+            break
+        packed.append(doc)
+        tokens_used += token_count
+
+    return packed
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +220,16 @@ def build_rag_chain(
             return engine.chat_model.invoke(messages).content
         return engine.chat_model.invoke(prompt_text).content
 
+    def _prepare_prompt(inp: dict[str, Any]) -> dict[str, Any]:
+        packed = _pack_documents(inp["documents"])
+        return {
+            "prompt": prompt.format(
+                context=_format_docs(packed),
+                question=inp["question"],
+            ),
+            "documents": packed,
+        }
+
     # LCEL graph
     chain = (
         RunnableParallel(
@@ -200,15 +238,7 @@ def build_rag_chain(
                 "question": RunnableLambda(lambda x: x),  # pass-through
             },
         )
-        | RunnableLambda(
-            lambda inp: {
-                "prompt": prompt.format(
-                    context=_format_docs(inp["documents"]),
-                    question=inp["question"],
-                ),
-                "documents": inp["documents"],
-            },
-        )
+        | RunnableLambda(_prepare_prompt)
         | RunnableLambda(
             lambda inp: {
                 "answer": _invoke_llm(inp["prompt"]),

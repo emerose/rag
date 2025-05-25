@@ -16,7 +16,6 @@
 - [#48] [P3] **Per-document embedding model map** – Lookup table (`embeddings.yaml`) to choose domain-specific embedding models.
 
 ### 3 . Prompt Engineering & Generation
-- [#53] [P2] **Context window packing** – LCEL `stuff_documents` / token-length trimming for max context utilisation.
 
 ### 4 . LangChain Modernisation
 - [#54] [P2] **Enable LangSmith tracing** – Provide `--trace` flag that runs with `langchain.cli trace`.
