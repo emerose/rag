@@ -8,6 +8,8 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from .utils.async_utils import get_optimal_concurrency
+
 
 @dataclass(frozen=True)
 class RAGConfig:
@@ -63,6 +65,7 @@ class RuntimeOptions:
         preserve_headings: Whether to preserve document heading structure in chunks
         semantic_chunking: Whether to use semantic boundaries for chunking
         rerank: Enable keyword-based reranking after retrieval
+        max_workers: Maximum concurrent workers for async tasks
 
     """
 
@@ -73,3 +76,4 @@ class RuntimeOptions:
     preserve_headings: bool = True
     semantic_chunking: bool = True
     rerank: bool = False
+    max_workers: int = get_optimal_concurrency()

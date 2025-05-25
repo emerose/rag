@@ -257,6 +257,7 @@ class RAGEngine:
         # Initialize embedding batcher
         self.embedding_batcher = EmbeddingBatcher(
             embedding_provider=self.embedding_provider,
+            max_concurrency=self.runtime.max_workers,
             log_callback=self.runtime.log_callback,
             progress_callback=self.runtime.progress_callback,
         )

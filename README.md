@@ -160,7 +160,11 @@ rag index path/to/documents --no-preserve-headings
 rag index path/to/documents --chunk-size 2000 --no-preserve-headings
 # Use a different vector store backend
 rag index path/to/documents --vectorstore-backend faiss
+# Control concurrency
+rag index path/to/documents --max-workers 16
 ```
+
+`--max-workers` defaults to `min(32, os.cpu_count() + 4)`.
 
 This will:
 
