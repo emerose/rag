@@ -1,6 +1,5 @@
 ## 🚀 Next
 
-- [#152] [P1] **Document metadata filters** – Document filter syntax in README with examples.
 - [#154] [P1] **Prompt list command** – Add CLI subcommand to list available prompt templates.
 - [#155] [P1] **Refactor MCP utilities** – Consolidate duplicated server logic.
 - [#156] [P1] **Validate OPENAI_API_KEY** – Fail fast if API key is missing.
@@ -48,7 +47,6 @@
 ### 9 . Documentation & Examples
 - [#66] [P3] **Sphinx docs + GitHub Pages** – Auto-publish API docs & "swap vector store" guide.
 - [#67] [P4] **Tutorial notebook** – `examples/rag_basic.ipynb` covering indexing, querying, prompt tweaks.
-- [P2] **Document metadata filters** – Document filter syntax in README with examples.
 
 ---
 
