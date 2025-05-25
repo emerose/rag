@@ -67,7 +67,10 @@ class TestRAGWorkflow:
             
             # Run the command 
             print(f"Running command: {' '.join(str(arg) for arg in cmd_args)}")
-            result = runner.invoke(app, cmd_args)
+            if cmd_args[0] == "invalidate" and "--all" in cmd_args:
+                result = runner.invoke(app, cmd_args, input="y\n")
+            else:
+                result = runner.invoke(app, cmd_args)
             print(f"Command output: {result.stdout}")
             
             return result

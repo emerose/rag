@@ -457,6 +457,13 @@ def invalidate(
         rag_engine = RAGEngine(config, runtime_options)
 
         if all_caches:
+            if not typer.confirm(
+                "This will invalidate all caches. Continue?",
+                default=False,
+            ):
+                write("Cache invalidation cancelled")
+                raise typer.Exit()
+
             # Invalidate all caches
             state.logger.info("Invalidating all caches...")
             rag_engine.invalidate_all_caches()

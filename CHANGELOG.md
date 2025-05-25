@@ -102,6 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reduced the number of ignored ruff linting rules
 - Consolidated MCP server logic by reusing common models
 - Context window packing for retrieval results to maximise prompt space
+- Added confirmation prompt before invalidating all caches
 
 ### Fixed
 - More reliable heading detection in PDFs by using statistical font analysis
