@@ -13,6 +13,7 @@ A powerful command-line tool for building and querying RAG applications via an i
 - 🔍 Interactive REPL for continuous querying
 - 📋 List and manage indexed documents
 - 🤖 Machine-readable JSON output for automation
+- 🛠️ Synthetic QA generator script for regression tests
 - **Document Indexing**: Process and index various document types (PDF, Markdown, Text, etc.)
 - **Vector Search**: Use semantic similarity to find relevant information
 - **Context-Aware Generation**: Generate answers based on retrieved document chunks
