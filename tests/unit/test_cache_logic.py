@@ -40,6 +40,7 @@ class TestCacheLogic:
             chunk_size=100,
             chunk_overlap=20,
             embedding_model="text-embedding-3-small",
+            openai_api_key="test-key",
         )
         runtime_options = RuntimeOptions()
         

@@ -1,7 +1,8 @@
 """Prompt registry for RAG application.
 
 This module provides a registry of prompt templates used for retrieval-augmented generation.
-It exposes a `get_prompt` function that returns a prompt template by ID.
+It exposes helper functions to retrieve prompt templates and list available
+prompt IDs.
 """
 
 from langchain_core.prompts import PromptTemplate
@@ -63,3 +64,12 @@ def get_prompt(prompt_id: str) -> BasePromptTemplate:
         raise PromptNotFoundError(prompt_id, list(_PROMPTS.keys()))
 
     return _PROMPTS[prompt_id]
+
+
+def list_prompts() -> list[str]:
+    """List available prompt template IDs.
+
+    Returns:
+        A sorted list of prompt IDs.
+    """
+    return sorted(_PROMPTS.keys())

@@ -91,6 +91,9 @@ pip install rag
    RAG_SYSTEM_PROMPT="You are a helpful assistant."
    ```
 
+   The engine validates that `OPENAI_API_KEY` is set and exits with an
+   error if it is missing.
+
 2. The tool will automatically look for the `.env` file in:
    - Current directory
    - Parent directories (up to 3 levels up)
@@ -187,6 +190,19 @@ rag query "What are the main findings?" --json | jq .answer
 # Get both answer and sources in JSON format
 rag query "What are the main findings?" --json | jq '{answer: .answer, files: [.sources[].file]}'
 ```
+
+#### Metadata Filters
+
+Restrict results to documents matching specific metadata with
+`filter:field=value` expressions. Values may be quoted.
+
+```bash
+rag query 'filter:source=README.md chunking'
+rag query 'filter:heading_path="Introduction > Overview" retrieval'
+```
+
+String fields use case-insensitive substring matching, while numeric fields
+must match exactly. You can combine multiple filters in a single query.
 
 ### Listing Indexed Documents
 
@@ -317,6 +333,12 @@ Available prompt templates:
 - `default`: Standard RAG prompt with citation guidance
 - `cot`: Chain-of-thought prompt encouraging step-by-step reasoning
 - `creative`: Engaging, conversational style while maintaining accuracy
+
+You can view all available prompts at any time:
+
+```bash
+rag prompt list
+```
 
 ### Machine-Readable Output
 

@@ -5,6 +5,7 @@ Focus on testing our core business logic, not mock interfaces.
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+import os
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.engine import RAGEngine
@@ -90,6 +91,7 @@ def test_engine_backward_compatibility(_mock_initialize: MagicMock) -> None:
         assert engine.config.openai_api_key == "test-key"
 
 
+@patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
 @patch.object(RAGEngine, "_initialize_from_config", autospec=True)
 def test_create_default_config(_mock_initialize: MagicMock) -> None:
     """Test creating default configuration.
@@ -100,7 +102,6 @@ def test_create_default_config(_mock_initialize: MagicMock) -> None:
     """
     # Mock the index_manager attribute to avoid AttributeError
     with patch.object(RAGEngine, "index_manager", create=True, new=MagicMock()):
-        # Create engine with initialization mocked
         engine = RAGEngine()
 
         # Get default config
@@ -126,7 +127,11 @@ def test_initialize_paths(_mock_mkdir: MagicMock) -> None:
 
     """
     # Create config with test directories
-    config = RAGConfig(documents_dir="test_documents", cache_dir="test_cache")
+    config = RAGConfig(
+        documents_dir="test_documents",
+        cache_dir="test_cache",
+        openai_api_key="test-key",
+    )
 
     # Create engine with full initialization mocked
     with (
@@ -152,6 +157,7 @@ def test_initialize_paths(_mock_mkdir: MagicMock) -> None:
         _mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
 
+@patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
 @patch.object(RAGEngine, "_initialize_from_config", autospec=True)
 def test_load_cached_vectorstore_none(_mock_initialize: MagicMock) -> None:
     """Return ``None`` when no cached vectorstore is found."""

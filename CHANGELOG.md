@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `cot`: Chain-of-thought prompt encouraging step-by-step reasoning
     - `creative`: Engaging, conversational style while maintaining accuracy
   - Integrated prompt registry with the LCEL RAG chain
+  - Added `prompt list` command to show available prompt templates
 - Custom exception hierarchy with specific exception classes for better error handling
 - Initial design sketch for MCP server integration under `docs/design_sketches`
 - Expanded MCP server design sketch with third-party library recommendations
@@ -63,6 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Step-by-step MCP usage guide for ChatGPT and Cursor in `docs/mcp_usage.md`.
 - Tailscale instructions for remote ChatGPT access added to the MCP usage guide.
 - Added `serve-mcp` CLI command for running the MCP server
+- Validation check for `OPENAI_API_KEY` during engine initialization
+- Documented metadata filter syntax in README with examples
 
 ### Removed
 - Outdated design sketch removed from `docs/design_sketches`.
