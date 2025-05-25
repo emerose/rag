@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `TableData` type for structured table data
     - `Error` type for consistent error reporting
     - Support for nested tables and arbitrary data structures
+- Golden-set retrieval evaluation script under `tests/integration` measuring hit-rate and exact-match
 - Advanced text splitting with semantic chunking for better context preservation
 - Automated heading detection for Markdown, HTML, and PDF documents
 - Improved metadata extraction and preservation during chunking
