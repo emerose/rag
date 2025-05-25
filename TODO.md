@@ -19,7 +19,6 @@
 - [#51] [P3] **Re-ranking** – Optional Cohere or cross-encoder re-ranker after top-k retrieval.
 
 ### 3 . Prompt Engineering & Generation
-- [#53] [P2] **Context window packing** – LCEL `stuff_documents` / token-length trimming for max context utilisation.
 
 ### 4 . LangChain Modernisation
 - [#54] [P2] **Enable LangSmith tracing** – Provide `--trace` flag that runs with `langchain.cli trace`.
