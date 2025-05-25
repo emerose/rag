@@ -65,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - Outdated design sketch removed from `docs/design_sketches`.
+- Dropped experimental TUI interface and associated CSS
 
 ### Changed
 - Log levels are now shown in uppercase for better readability

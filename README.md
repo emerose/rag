@@ -1,11 +1,10 @@
 # RAG (Retrieval Augmented Generation) CLI
 
-A powerful command-line tool for building and querying RAG applications with a beautiful TUI interface and interactive REPL.
+A powerful command-line tool for building and querying RAG applications via an interactive REPL.
 
 ## Features
 
 - 📚 Index documents with support for multiple file formats (PDF, DOCX, TXT, MD, etc.)
-- 🖥️ Interactive TUI with real-time progress tracking
 - 🔄 Cache management for efficient re-indexing
 - 📝 Rich logging and error reporting
 - 🎯 Modern CLI interface with Typer
