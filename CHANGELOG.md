@@ -60,6 +60,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added cache management (`/cache/clear`) and system status (`/system/status`) endpoints in the MCP server
 - Exposed RAG operations as MCP tools in `rag.mcp_tools`
 - Optional API key authentication for the MCP server via `RAG_MCP_API_KEY`.
+- Step-by-step MCP usage guide for ChatGPT and Cursor in `docs/mcp_usage.md`.
+
+### Removed
+- Outdated design sketch removed from `docs/design_sketches`.
 
 ### Changed
 - Log levels are now shown in uppercase for better readability
