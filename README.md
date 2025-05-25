@@ -13,8 +13,10 @@ A powerful command-line tool for building and querying RAG applications via an i
 - 🔍 Interactive REPL for continuous querying
 - 📋 List and manage indexed documents
 - 🤖 Machine-readable JSON output for automation
+- 🛠️ Synthetic QA generator script for regression tests
 - **Document Indexing**: Process and index various document types (PDF, Markdown, Text, etc.)
 - **Vector Search**: Use semantic similarity to find relevant information
+- **Keyword Reranking**: Optionally reorder results using keyword overlap
 - **Context-Aware Generation**: Generate answers based on retrieved document chunks
 - **Interactive REPL**: Query your documents in an interactive command-line interface
 - **Multiple Prompt Templates**: Choose different prompting strategies with the `--prompt` flag
@@ -117,12 +119,20 @@ The REPL provides:
 - Command history (up/down arrows)
 - Auto-suggestions from history
 - Syntax highlighting
-- Auto-completion
+- Auto-completion for commands and file paths
 - Built-in commands:
   - `clear` - Clear the screen
   - `exit` or `quit` - Exit the REPL
   - `help` - Show help message
   - `k <number>` - Change number of documents to retrieve
+
+#### Auto-completion
+
+The REPL uses `prompt_toolkit`'s completer system to provide both command and
+file path completion. Press <kbd>TAB</kbd> to cycle through available commands or
+to expand file and directory paths. Paths support `~` for your home directory and
+work with relative or absolute locations. This makes it easy to reference files
+when interacting with the REPL.
 
 ### Indexing Documents
 
@@ -281,6 +291,18 @@ AI assistants that implement MCP can connect using the same base URL and
 For step-by-step instructions on using the server with ChatGPT and Cursor,
 including optional remote access via Tailscale, see
 [docs/mcp_usage.md](docs/mcp_usage.md).
+
+### Documentation
+
+The full API reference and additional guides are available in the Sphinx docs.
+Build them locally with:
+
+```bash
+cd docs
+make html
+```
+
+Then open `docs/build/html/index.html` in your browser.
 
 ### Getting Help
 
