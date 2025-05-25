@@ -14,6 +14,7 @@ from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
 import numpy as np
 
+import rag.chains.rag_chain as rag_chain
 from rag.chains.rag_chain import (
     build_rag_chain,
     _parse_metadata_filters,
@@ -201,3 +202,19 @@ def test_system_prompt_invoke(mock_engine, mock_faiss, mock_documents):
     # Expect VectorstoreError when vectorstores is empty
     with pytest.raises(VectorstoreError):
         build_rag_chain(mock_engine)
+
+
+def test_pack_documents_respects_limit():
+    """Ensure documents are truncated to the max token limit."""
+
+    docs = [
+        Document(page_content="one two three", metadata={}),
+        Document(page_content="four five six seven", metadata={}),
+    ]
+
+    with patch.object(rag_chain, "_tokenizer") as mock_tok:
+        mock_tok.encode.side_effect = lambda text: text.split()
+        packed = rag_chain._pack_documents(docs, max_tokens=3)
+
+    assert len(packed) == 1
+    assert packed[0].page_content == "one two three"
