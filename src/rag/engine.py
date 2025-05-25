@@ -721,10 +721,14 @@ class RAGEngine:
         if prompt_id == "default":
             prompt_id = self.default_prompt_id
 
-        key = (k, prompt_id)
+        key = (k, prompt_id, self.runtime.hybrid_retrieval)
         if key not in self._rag_chain_cache:
             self._rag_chain_cache[key] = build_rag_chain(
-                self, k=k, prompt_id=prompt_id, reranker=self.reranker
+                self,
+                k=k,
+                prompt_id=prompt_id,
+                hybrid=self.runtime.hybrid_retrieval,
+                reranker=self.reranker,
             )
         return self._rag_chain_cache[key]
 

@@ -69,4 +69,6 @@ class RuntimeOptions:
     # Text splitting options
     preserve_headings: bool = True
     semantic_chunking: bool = True
+    # Retrieval options
+    hybrid_retrieval: bool = False
     rerank: bool = False

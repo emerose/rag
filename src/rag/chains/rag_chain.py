@@ -28,8 +28,8 @@ from rag.data.text_splitter import _safe_get_encoding
 
 # Import the prompt registry
 from rag.prompts import get_prompt
+from rag.retrieval import BaseReranker, build_bm25_retriever, hybrid_search
 from rag.storage.protocols import VectorStoreProtocol
-from rag.retrieval import BaseReranker
 from rag.utils.exceptions import VectorstoreError
 
 # Forward reference for type checking
@@ -131,6 +131,13 @@ def build_rag_chain(
     engine: RAGEngine,
     k: int = 4,
     prompt_id: str = "default",
+    *,
+    hybrid: bool = False,
+) -> Any:
+def build_rag_chain(
+    engine: RAGEngine,
+    k: int = 4,
+    prompt_id: str = "default",
     reranker: BaseReranker | None = None,
 ) -> RunnableLambda:
     """Return an LCEL pipeline implementing the RAG flow.
@@ -146,6 +153,8 @@ def build_rag_chain(
         - "default": Standard RAG prompt with citation guidance
         - "cot": Chain-of-thought prompt encouraging step-by-step reasoning
         - "creative": Engaging, conversational style while maintaining accuracy
+    hybrid
+        Enable hybrid retrieval using BM25 and dense similarity.
     reranker
         Optional reranker to apply after similarity search
     """
@@ -176,11 +185,17 @@ def build_rag_chain(
     # Helper functions for LCEL lambdas
     # ---------------------------------------------------------------------
 
+    bm25_retriever = build_bm25_retriever(merged_vs) if hybrid else None
+
     def _retrieve(question: str) -> list[Document]:
+        """Retrieve documents with optional metadata filters."""
         """Similarity search with optional metadata filters and reranking."""
         clean_query, mfilters = _parse_metadata_filters(question)
         search_k = k * 3 if mfilters else k
-        docs: list[Document] = merged_vs.similarity_search(clean_query, k=search_k)
+        if hybrid:
+            docs = hybrid_search(clean_query, merged_vs, bm25_retriever, k=search_k)
+        else:
+            docs = merged_vs.similarity_search(clean_query, k=search_k)
         if mfilters:
             docs = [d for d in docs if _doc_matches_filters(d, mfilters)]
         if reranker:
