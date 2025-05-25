@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `invalidate`: Success/error messages
 - Autocomplete support in `rag repl` using `prompt_toolkit` for commands and file paths
 - Documented REPL autocomplete usage in README
+- Async embedding workers using `aiostream` for concurrent processing
 - Structured logging using structlog with Rich console output
   - Consistent error output format across all commands
   - Integration with tools like `jq` for output processing
