@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Documented REPL autocomplete usage in README
 - Async embedding workers using `aiostream` for concurrent processing
 - `--max-workers` CLI flag to control async concurrency
+- Incremental indexing using chunk hashes to skip unchanged chunks
 - Structured logging using structlog with Rich console output
   - Consistent error output format across all commands
   - Integration with tools like `jq` for output processing

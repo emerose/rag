@@ -7,3 +7,4 @@ RAG Documentation
 
    swap_vector_store
    mcp_usage
+   incremental_indexing

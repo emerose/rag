@@ -26,6 +26,7 @@ from .data.document_processor import DocumentProcessor
 from .data.text_splitter import TextSplitterFactory
 from .embeddings.batching import EmbeddingBatcher
 from .embeddings.embedding_provider import EmbeddingProvider
+from .embeddings.model_map import get_model_for_path, load_model_map
 from .ingest import BasicPreprocessor, IngestManager
 from .storage.cache_manager import CacheManager
 from .storage.filesystem import FilesystemManager
@@ -78,6 +79,7 @@ class RAGEngine:
         # Set up configuration
         self.config = config or self._create_default_config()
         self.runtime = runtime_options or RuntimeOptions()
+        self.embedding_model_map: dict[str, str] = {}
         self.default_prompt_id: str = "default"
         self.system_prompt: str = os.getenv("RAG_SYSTEM_PROMPT", "")
 
@@ -260,9 +262,31 @@ class RAGEngine:
             progress_callback=self.runtime.progress_callback,
         )
 
+        # Load per-document embedding model map
+        self._load_embedding_model_map()
+
         self._log(
             "DEBUG",
             f"Using embedding model: {self.config.embedding_model} (version: {self.embedding_model_version})",
+        )
+
+    def _load_embedding_model_map(self) -> None:
+        """Load embedding model mapping from YAML file."""
+        map_file = self.config.embedding_model_map_file
+        if map_file is None:
+            map_file = self.documents_dir / "embeddings.yaml"
+        try:
+            self.embedding_model_map = load_model_map(map_file)
+            if self.embedding_model_map:
+                self._log("DEBUG", f"Loaded embedding model map from {map_file}")
+        except ValueError as exc:
+            self.embedding_model_map = {}
+            self._log("WARNING", f"Failed to load embedding model map: {exc}")
+
+    def _embedding_model_for_file(self, file_path: Path) -> str:
+        """Return embedding model for *file_path* based on the loaded map."""
+        return get_model_for_path(
+            file_path, self.embedding_model_map, self.config.embedding_model
         )
 
     def _initialize_document_processing(self) -> None:
@@ -375,11 +399,12 @@ class RAGEngine:
                 return False, "File does not exist"
 
             # Skip re-indexing if cached and unchanged
+            model_name = self._embedding_model_for_file(file_path)
             if not self.index_manager.needs_reindexing(
                 file_path,
                 self.config.chunk_size,
                 self.config.chunk_overlap,
-                self.config.embedding_model,
+                model_name,
                 self.embedding_model_version,
             ):
                 self._log(
@@ -431,6 +456,7 @@ class RAGEngine:
                 file_path=file_path,
                 documents=documents,
                 file_type=ingest_result.source.mime_type or "text/plain",
+                embedding_model=model_name,
             )
             return success, None
         except (
@@ -447,8 +473,12 @@ class RAGEngine:
             self._log("ERROR", f"Failed to index {file_path}: {error_message}")
             return False, error_message
 
-    def _create_vectorstore_from_documents(
-        self, file_path: Path, documents: list[Document], file_type: str
+    def _create_vectorstore_from_documents(  # noqa: PLR0915
+        self,
+        file_path: Path,
+        documents: list[Document],
+        file_type: str,
+        embedding_model: str | None = None,
     ) -> bool:
         """Create or update a vectorstore from documents.
 
@@ -479,6 +509,20 @@ class RAGEngine:
 
             # Create a new vectorstore and process chunks sequentially
             vectorstore = self.vectorstore_manager.create_empty_vectorstore()
+
+            provider = self.embedding_provider
+            batcher = self.embedding_batcher
+            if embedding_model and embedding_model != self.config.embedding_model:
+                provider = EmbeddingProvider(
+                    model_name=embedding_model,
+                    openai_api_key=self.config.openai_api_key,
+                    log_callback=self.runtime.log_callback,
+                )
+                batcher = EmbeddingBatcher(
+                    embedding_provider=provider,
+                    log_callback=self.runtime.log_callback,
+                    progress_callback=self.runtime.progress_callback,
+                )
 
             docs_to_embed: list[Document] = []
             embed_indices: list[int] = []
@@ -511,7 +555,7 @@ class RAGEngine:
                     "DEBUG",
                     f"Generating embeddings for {len(docs_to_embed)} new/changed documents",
                 )
-                embeddings = self.embedding_batcher.process_embeddings(docs_to_embed)
+                embeddings = batcher.process_embeddings(docs_to_embed)
                 self._log("DEBUG", f"Generated {len(embeddings)} embeddings")
 
                 for pos, idx in enumerate(embed_indices):
@@ -533,11 +577,12 @@ class RAGEngine:
 
             # Update metadata
             self._log("DEBUG", "Updating index metadata")
+            used_model = embedding_model or self.config.embedding_model
             self.index_manager.update_metadata(
                 file_path=file_path,
                 chunk_size=self.config.chunk_size,
                 chunk_overlap=self.config.chunk_overlap,
-                embedding_model=self.config.embedding_model,
+                embedding_model=used_model,
                 embedding_model_version=self.embedding_model_version,
                 file_type=file_type,
                 num_chunks=len(documents),
@@ -576,7 +621,7 @@ class RAGEngine:
             self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
             return False
 
-    def index_directory(
+    def index_directory(  # noqa: PLR0915
         self, directory: Path | str | None = None
     ) -> dict[str, dict[str, Any]]:
         """Index all files in a directory.
@@ -606,7 +651,7 @@ class RAGEngine:
                 f,
                 self.config.chunk_size,
                 self.config.chunk_overlap,
-                self.config.embedding_model,
+                self._embedding_model_for_file(f),
                 self.embedding_model_version,
             )
         ]
@@ -651,7 +696,21 @@ class RAGEngine:
                     "DEBUG",
                     f"Generating embeddings for {len(documents)} documents from {file_path}",
                 )
-                embeddings = self.embedding_batcher.process_embeddings(documents)
+                model_name = self._embedding_model_for_file(Path(file_path))
+                provider = self.embedding_provider
+                batcher = self.embedding_batcher
+                if model_name != self.config.embedding_model:
+                    provider = EmbeddingProvider(
+                        model_name=model_name,
+                        openai_api_key=self.config.openai_api_key,
+                        log_callback=self.runtime.log_callback,
+                    )
+                    batcher = EmbeddingBatcher(
+                        embedding_provider=provider,
+                        log_callback=self.runtime.log_callback,
+                        progress_callback=self.runtime.progress_callback,
+                    )
+                embeddings = batcher.process_embeddings(documents)
 
                 # Get existing vectorstore if available
                 existing_vectorstore = self.vectorstores.get(file_path)
@@ -677,7 +736,7 @@ class RAGEngine:
                     file_path=path_obj,
                     chunk_size=self.config.chunk_size,
                     chunk_overlap=self.config.chunk_overlap,
-                    embedding_model=self.config.embedding_model,
+                    embedding_model=model_name,
                     embedding_model_version=self.embedding_model_version,
                     file_type=mime_type,
                     num_chunks=len(documents),

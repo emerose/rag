@@ -10,10 +10,8 @@
 
 
 ### 1 . Architecture & Core Design
-- [#45] [P3] **Incremental re-indexing** – Hash each chunk and only (re)embed changed chunks to reduce token spend.
 
 ### 2 . Retrieval & Relevance
-- [#48] [P3] **Per-document embedding model map** – Lookup table (`embeddings.yaml`) to choose domain-specific embedding models.
 
 ### 3 . Prompt Engineering & Generation
 
