@@ -267,6 +267,11 @@ def index(  # noqa: PLR0913
         "--semantic-chunking/--no-semantic-chunking",
         help="Use semantic boundaries for chunking (paragraphs, sentences, etc.)",
     ),
+    async_batching: bool = typer.Option(
+        True,
+        "--async-batching/--sync-batching",
+        help="Process embeddings asynchronously",
+    ),
     # Duplicated from app-level callback for Typer CLI compatibility
     cache_dir: str = typer.Option(
         None,  # Default to None to allow app-level value to be used
@@ -300,6 +305,7 @@ def index(  # noqa: PLR0913
             preserve_headings=preserve_headings,
             semantic_chunking=semantic_chunking,
             max_workers=state.max_workers,
+            async_batching=async_batching,
         )
 
         rag_engine = RAGEngine(config, runtime_options)

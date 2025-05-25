@@ -23,7 +23,6 @@
 - [#177] [P3] **Confirm cache invalidation** – Before invalidating the entire cache, ask for confirmation
 
 ### 6 . Performance
-- [#184] [P3] **Actually do async batching** – Add a commandline flag that controls whether batching is performed synchronously (with embedding_batcher.process_embeddings) or async (embedding_batcher.process_embeddings_async).  Default to async.  Add tests to make sure the right method is called in each case
 
 ### 7 . Evaluation & Testing
 

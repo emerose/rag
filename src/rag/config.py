@@ -66,6 +66,7 @@ class RuntimeOptions:
         semantic_chunking: Whether to use semantic boundaries for chunking
         rerank: Enable keyword-based reranking after retrieval
         max_workers: Maximum concurrent workers for async tasks
+        async_batching: Use asynchronous embedding batching
 
     """
 
@@ -80,3 +81,4 @@ class RuntimeOptions:
     stream: bool = False
     stream_callback: Callable[[str], None] | None = None
     max_workers: int = get_optimal_concurrency()
+    async_batching: bool = True
