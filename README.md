@@ -15,6 +15,7 @@ A powerful command-line tool for building and querying RAG applications via an i
 - 🤖 Machine-readable JSON output for automation
 - **Document Indexing**: Process and index various document types (PDF, Markdown, Text, etc.)
 - **Vector Search**: Use semantic similarity to find relevant information
+- **Keyword Reranking**: Optionally reorder results using keyword overlap
 - **Context-Aware Generation**: Generate answers based on retrieved document chunks
 - **Interactive REPL**: Query your documents in an interactive command-line interface
 - **Multiple Prompt Templates**: Choose different prompting strategies with the `--prompt` flag

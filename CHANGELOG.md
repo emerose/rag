@@ -66,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `serve-mcp` CLI command for running the MCP server
 - Validation check for `OPENAI_API_KEY` during engine initialization
 - Documented metadata filter syntax in README with examples
+- Added optional keyword-based reranker to improve retrieval accuracy
 
 ### Removed
 - Outdated design sketch removed from `docs/design_sketches`.

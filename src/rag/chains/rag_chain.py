@@ -27,6 +27,7 @@ from langchain_core.runnables import RunnableLambda, RunnableParallel
 
 # Import the prompt registry
 from rag.prompts import get_prompt
+from rag.retrieval import BaseReranker
 from rag.utils.exceptions import VectorstoreError
 
 # Forward reference for type checking
@@ -98,7 +99,12 @@ def _doc_matches_filters(doc: Document, filters: _FilterDict) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def build_rag_chain(engine: RAGEngine, k: int = 4, prompt_id: str = "default"):
+def build_rag_chain(
+    engine: RAGEngine,
+    k: int = 4,
+    prompt_id: str = "default",
+    reranker: BaseReranker | None = None,
+) -> RunnableLambda:
     """Return an LCEL pipeline implementing the RAG flow.
 
     Parameters
@@ -112,6 +118,8 @@ def build_rag_chain(engine: RAGEngine, k: int = 4, prompt_id: str = "default"):
         - "default": Standard RAG prompt with citation guidance
         - "cot": Chain-of-thought prompt encouraging step-by-step reasoning
         - "creative": Engaging, conversational style while maintaining accuracy
+    reranker
+        Optional reranker to apply after similarity search
     """
 
     # ---------------------------------------------------------------------
@@ -141,14 +149,15 @@ def build_rag_chain(engine: RAGEngine, k: int = 4, prompt_id: str = "default"):
     # ---------------------------------------------------------------------
 
     def _retrieve(question: str) -> list[Document]:
-        """Similarity search with optional metadata filters."""
+        """Similarity search with optional metadata filters and reranking."""
         clean_query, mfilters = _parse_metadata_filters(question)
         search_k = k * 3 if mfilters else k
         docs: list[Document] = merged_vs.similarity_search(clean_query, k=search_k)
         if mfilters:
             docs = [d for d in docs if _doc_matches_filters(d, mfilters)]
-            docs = docs[:k]
-        return docs
+        if reranker:
+            docs = reranker.rerank(clean_query, docs)
+        return docs[:k]
 
     # Use the retriever in the chain (to avoid the F841 unused variable warning)
     _ = retriever  # We're keeping this for future extensibility
