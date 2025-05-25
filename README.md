@@ -165,6 +165,8 @@ rag index path/to/documents --chunk-size 2000 --no-preserve-headings
 rag index path/to/documents --vectorstore-backend faiss
 # Control concurrency
 rag index path/to/documents --max-workers 16
+# Force synchronous embedding batching
+rag index path/to/documents --sync-batching
 ```
 
 `--max-workers` defaults to `min(32, os.cpu_count() + 4)`.

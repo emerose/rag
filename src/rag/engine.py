@@ -474,7 +474,7 @@ class RAGEngine:
             self._log("ERROR", f"Failed to index {file_path}: {error_message}")
             return False, error_message
 
-    def _create_vectorstore_from_documents(  # noqa: PLR0915
+    def _create_vectorstore_from_documents(  # noqa: PLR0915, PLR0912
         self,
         file_path: Path,
         documents: list[Document],
@@ -558,7 +558,12 @@ class RAGEngine:
                     "DEBUG",
                     f"Generating embeddings for {len(docs_to_embed)} new/changed documents",
                 )
-                embeddings = batcher.process_embeddings(docs_to_embed)
+                if self.runtime.async_batching:
+                    embeddings = asyncio.run(
+                        batcher.process_embeddings_async(docs_to_embed)
+                    )
+                else:
+                    embeddings = batcher.process_embeddings(docs_to_embed)
                 self._log("DEBUG", f"Generated {len(embeddings)} embeddings")
 
                 for pos, idx in enumerate(embed_indices):
@@ -624,7 +629,7 @@ class RAGEngine:
             self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
             return False
 
-    def index_directory(  # noqa: PLR0915
+    def index_directory(  # noqa: PLR0915, PLR0912
         self, directory: Path | str | None = None
     ) -> dict[str, dict[str, Any]]:
         """Index all files in a directory.
@@ -713,7 +718,12 @@ class RAGEngine:
                         log_callback=self.runtime.log_callback,
                         progress_callback=self.runtime.progress_callback,
                     )
-                embeddings = batcher.process_embeddings(documents)
+                if self.runtime.async_batching:
+                    embeddings = asyncio.run(
+                        batcher.process_embeddings_async(documents)
+                    )
+                else:
+                    embeddings = batcher.process_embeddings(documents)
 
                 # Get existing vectorstore if available
                 existing_vectorstore = self.vectorstores.get(file_path)
