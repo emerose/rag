@@ -2,10 +2,7 @@
 
 ---
 
-### MCP Server Integration
-- [#40] **Integrate CLI command `rag serve-mcp` to start the server with host and port options.**
-
-## 🗺️ Roadmap & Priorities  
+## 🗺️ Roadmap & Priorities
 *(Priority ‑ **P1** = Do next, … **P5** = Nice-to-have)*
 
 ---
