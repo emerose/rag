@@ -63,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Step-by-step MCP usage guide for ChatGPT and Cursor in `docs/mcp_usage.md`.
 - Tailscale instructions for remote ChatGPT access added to the MCP usage guide.
 - Added `serve-mcp` CLI command for running the MCP server
+- Documented metadata filter syntax in README with examples
 
 ### Removed
 - Outdated design sketch removed from `docs/design_sketches`.
