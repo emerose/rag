@@ -32,6 +32,7 @@ from rag.utils.logging_utils import get_logger, setup_logging
 # Try both relative and absolute imports
 try:
     # Try relative imports first (for module usage)
+    from ..prompts import list_prompts
     from .cli.output import Error, TableData, set_json_mode, write
     from .config import RAGConfig, RuntimeOptions
     from .engine import RAGEngine
@@ -41,6 +42,7 @@ except ImportError:
     from rag.cli.output import Error, TableData, set_json_mode, write
     from rag.config import RAGConfig, RuntimeOptions
     from rag.engine import RAGEngine
+    from rag.prompts import list_prompts
     from rag.utils import exceptions
 
 
@@ -64,6 +66,10 @@ app = typer.Typer(
     add_completion=False,
     context_settings={"help_option_names": ["--help", "-h"]},
 )
+
+# Sub-app for prompt related commands
+prompt_app = typer.Typer(help="Manage prompt templates")
+app.add_typer(prompt_app, name="prompt")
 
 # Global constants
 CACHE_DIR = ".cache"
@@ -775,6 +781,17 @@ def list(
     except (exceptions.RAGError, OSError, KeyError, ValueError, TypeError) as e:
         write(Error(f"Error listing indexed documents: {e}"))
         sys.exit(1)
+
+
+@prompt_app.command("list")
+def prompt_list(json_output: bool = JSON_OUTPUT_OPTION) -> None:
+    """List available prompt templates."""
+    table_data = TableData(
+        title="Available Prompts",
+        columns=["Prompt ID"],
+        rows=[[pid] for pid in list_prompts()],
+    )
+    write(table_data)
 
 
 def _initialize_rag_engine() -> RAGEngine:

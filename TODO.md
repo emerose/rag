@@ -1,6 +1,5 @@
 ## 🚀 Next
 
-- [#154] [P1] **Prompt list command** – Add CLI subcommand to list available prompt templates.
 - [#155] [P1] **Refactor MCP utilities** – Consolidate duplicated server logic.
 - [#156] [P1] **Validate OPENAI_API_KEY** – Fail fast if API key is missing.
 ---

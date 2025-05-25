@@ -331,6 +331,12 @@ Available prompt templates:
 - `cot`: Chain-of-thought prompt encouraging step-by-step reasoning
 - `creative`: Engaging, conversational style while maintaining accuracy
 
+You can view all available prompts at any time:
+
+```bash
+rag prompt list
+```
+
 ### Machine-Readable Output
 
 All commands support machine-readable JSON output through the `--json` flag. JSON output is also automatically enabled when the output is not a terminal (e.g., when piping to another command).
