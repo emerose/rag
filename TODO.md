@@ -31,7 +31,6 @@
 
 ### 9 . Documentation & Examples
 - [#67] [P4] **Tutorial notebook** – `examples/rag_basic.ipynb` covering indexing, querying, prompt tweaks.
-- [#168] [P3] **Automatically publish docs** – Write a GitHub workflow or action to automatically rebuild and republish the sphinx docs to a GitHub pages site whenever the docs are changed
 
 ---
 
