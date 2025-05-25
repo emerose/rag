@@ -204,12 +204,14 @@ def build_rag_chain(
         else:
             messages = prompt_text
 
-        if engine.runtime.stream:
+        streaming = getattr(engine.runtime, "stream", False) is True
+        if streaming:
             parts: list[str] = []
             for chunk in engine.chat_model.stream(messages):
                 token = getattr(chunk, "content", str(chunk))
-                if engine.runtime.stream_callback:
-                    engine.runtime.stream_callback(token)
+                callback = getattr(engine.runtime, "stream_callback", None)
+                if callback:
+                    callback(token)
                 parts.append(token)
             return "".join(parts)
 

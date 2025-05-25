@@ -511,8 +511,8 @@ class RAGEngine:
             # Create a new vectorstore and process chunks sequentially
             vectorstore = self.vectorstore_manager.create_empty_vectorstore()
 
-            provider = self.embedding_provider
-            batcher = self.embedding_batcher
+            provider = getattr(self, "embedding_provider", None)
+            batcher = getattr(self, "embedding_batcher", None)
             if embedding_model and embedding_model != self.config.embedding_model:
                 provider = EmbeddingProvider(
                     model_name=embedding_model,
@@ -524,6 +524,8 @@ class RAGEngine:
                     log_callback=self.runtime.log_callback,
                     progress_callback=self.runtime.progress_callback,
                 )
+            if batcher is None:
+                raise AttributeError("embedding_batcher not initialized")
 
             docs_to_embed: list[Document] = []
             embed_indices: list[int] = []
