@@ -31,6 +31,7 @@ from rich.progress import (
     Progress,
 )
 
+from rag.utils.async_utils import get_optimal_concurrency
 from rag.utils.logging_utils import get_logger, setup_logging
 
 # Try both relative and absolute imports
@@ -78,6 +79,7 @@ app.add_typer(prompt_app, name="prompt")
 # Global constants
 CACHE_DIR = ".cache"
 MAX_K_VALUE = 20
+DEFAULT_MAX_WORKERS = get_optimal_concurrency()
 
 
 # Global state
@@ -90,6 +92,7 @@ class GlobalState:
     json_mode: bool = False  # Track JSON mode
     console: Console = console  # Store console instance
     vectorstore_backend: str = "faiss"
+    max_workers: int = DEFAULT_MAX_WORKERS
 
 
 state = GlobalState()
@@ -112,6 +115,13 @@ VECTORSTORE_OPTION = typer.Option(
     "faiss",
     "--vectorstore-backend",
     help="Vector store backend (faiss, qdrant, chroma)",
+)
+
+MAX_WORKERS_OPTION = typer.Option(
+    DEFAULT_MAX_WORKERS,
+    "--max-workers",
+    "-w",
+    help="Maximum concurrent worker tasks",
 )
 
 # Define argument defaults outside functions
@@ -165,7 +175,7 @@ def validate_path(path: Path) -> Path:
 
 
 @app.callback(rich_help_panel="Global Options")
-def main(
+def main(  # noqa: PLR0913
     verbose: bool = typer.Option(
         False,
         "--verbose",
@@ -180,6 +190,7 @@ def main(
         help="Directory for caching embeddings and vector stores",
     ),
     vectorstore_backend: str = VECTORSTORE_OPTION,
+    max_workers: int = MAX_WORKERS_OPTION,
     json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
     """RAG (Retrieval Augmented Generation) CLI.
@@ -201,6 +212,7 @@ def main(
     # Set cache directory
     state.cache_dir = cache_dir
     state.vectorstore_backend = vectorstore_backend
+    state.max_workers = max_workers
 
     # Set up signal handlers
     signal.signal(signal.SIGINT, signal_handler)
@@ -287,6 +299,7 @@ def index(  # noqa: PLR0913
         runtime_options = RuntimeOptions(
             preserve_headings=preserve_headings,
             semantic_chunking=semantic_chunking,
+            max_workers=state.max_workers,
         )
 
         rag_engine = RAGEngine(config, runtime_options)
@@ -434,7 +447,7 @@ def invalidate(
             cache_dir=cache_directory,
             vectorstore_backend=state.vectorstore_backend,
         )
-        runtime_options = RuntimeOptions()
+        runtime_options = RuntimeOptions(max_workers=state.max_workers)
         rag_engine = RAGEngine(config, runtime_options)
 
         if all_caches:
@@ -525,7 +538,7 @@ def query(
             cache_dir=cache_directory,
             vectorstore_backend=state.vectorstore_backend,
         )
-        runtime_options = RuntimeOptions()
+        runtime_options = RuntimeOptions(max_workers=state.max_workers)
         rag_engine = RAGEngine(config, runtime_options)
 
         # Set the chosen prompt template
@@ -633,7 +646,7 @@ def summarize(
             cache_dir=cache_dir or state.cache_dir,
             vectorstore_backend=state.vectorstore_backend,
         )
-        runtime_options = RuntimeOptions()
+        runtime_options = RuntimeOptions(max_workers=state.max_workers)
         rag_engine = RAGEngine(config, runtime_options)
 
         # Load cache metadata to check if we have any documents
@@ -742,7 +755,7 @@ def list(
             cache_dir=cache_directory,
             vectorstore_backend=state.vectorstore_backend,
         )
-        runtime_options = RuntimeOptions()
+        runtime_options = RuntimeOptions(max_workers=state.max_workers)
         rag_engine = RAGEngine(config, runtime_options)
 
         # Get metadata directly from SQLite
@@ -822,7 +835,7 @@ def _initialize_rag_engine() -> RAGEngine:
         cache_dir=state.cache_dir,
         vectorstore_backend=state.vectorstore_backend,
     )
-    runtime_options = RuntimeOptions()
+    runtime_options = RuntimeOptions(max_workers=state.max_workers)
     return RAGEngine(config, runtime_options)
 
 
