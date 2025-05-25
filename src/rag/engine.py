@@ -78,6 +78,7 @@ class RAGEngine:
         self.config = config or self._create_default_config()
         self.runtime = runtime_options or RuntimeOptions()
         self.default_prompt_id: str = "default"
+        self.system_prompt: str = os.getenv("RAG_SYSTEM_PROMPT", "")
 
         # For backward compatibility
         if self.runtime.progress_callback and not callable(

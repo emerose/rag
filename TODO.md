@@ -19,7 +19,6 @@
 - [#51] [P3] **Re-ranking** – Optional Cohere or cross-encoder re-ranker after top-k retrieval.
 
 ### 3 . Prompt Engineering & Generation
-- [#52] [P2] **System-persona message** – Read `RAG_SYSTEM_PROMPT` env var and prepend to every chat.
 - [#53] [P2] **Context window packing** – LCEL `stuff_documents` / token-length trimming for max context utilisation.
 
 ### 4 . LangChain Modernisation
