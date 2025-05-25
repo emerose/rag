@@ -27,6 +27,7 @@ from langchain_core.runnables import RunnableLambda, RunnableParallel
 
 # Import the prompt registry
 from rag.prompts import get_prompt
+from rag.retrieval import build_bm25_retriever, hybrid_search
 from rag.utils.exceptions import VectorstoreError
 
 # Forward reference for type checking
@@ -98,7 +99,13 @@ def _doc_matches_filters(doc: Document, filters: _FilterDict) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def build_rag_chain(engine: RAGEngine, k: int = 4, prompt_id: str = "default"):
+def build_rag_chain(
+    engine: RAGEngine,
+    k: int = 4,
+    prompt_id: str = "default",
+    *,
+    hybrid: bool = False,
+) -> Any:
     """Return an LCEL pipeline implementing the RAG flow.
 
     Parameters
@@ -112,6 +119,8 @@ def build_rag_chain(engine: RAGEngine, k: int = 4, prompt_id: str = "default"):
         - "default": Standard RAG prompt with citation guidance
         - "cot": Chain-of-thought prompt encouraging step-by-step reasoning
         - "creative": Engaging, conversational style while maintaining accuracy
+    hybrid
+        Enable hybrid retrieval using BM25 and dense similarity.
     """
 
     # ---------------------------------------------------------------------
@@ -140,11 +149,16 @@ def build_rag_chain(engine: RAGEngine, k: int = 4, prompt_id: str = "default"):
     # Helper functions for LCEL lambdas
     # ---------------------------------------------------------------------
 
+    bm25_retriever = build_bm25_retriever(merged_vs) if hybrid else None
+
     def _retrieve(question: str) -> list[Document]:
-        """Similarity search with optional metadata filters."""
+        """Retrieve documents with optional metadata filters."""
         clean_query, mfilters = _parse_metadata_filters(question)
         search_k = k * 3 if mfilters else k
-        docs: list[Document] = merged_vs.similarity_search(clean_query, k=search_k)
+        if hybrid:
+            docs = hybrid_search(clean_query, merged_vs, bm25_retriever, k=search_k)
+        else:
+            docs = merged_vs.similarity_search(clean_query, k=search_k)
         if mfilters:
             docs = [d for d in docs if _doc_matches_filters(d, mfilters)]
             docs = docs[:k]

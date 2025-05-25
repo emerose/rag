@@ -52,6 +52,7 @@ def test_runtime_options_defaults() -> None:
     # Verify default values
     assert options.progress_callback is None
     assert options.log_callback is None
+    assert options.hybrid_retrieval is False
 
 
 def test_runtime_options_custom_values() -> None:
@@ -71,8 +72,10 @@ def test_runtime_options_custom_values() -> None:
     options = RuntimeOptions(
         progress_callback=progress_callback,
         log_callback=log_callback,
+        hybrid_retrieval=True,
     )
 
     # Verify custom values
     assert options.progress_callback == progress_callback
     assert options.log_callback == log_callback
+    assert options.hybrid_retrieval is True

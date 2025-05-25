@@ -204,6 +204,9 @@ rag query 'filter:heading_path="Introduction > Overview" retrieval'
 String fields use case-insensitive substring matching, while numeric fields
 must match exactly. You can combine multiple filters in a single query.
 
+Hybrid retrieval can be enabled via the ``hybrid_retrieval`` runtime option,
+combining BM25 scores with dense similarity for improved relevance.
+
 ### Listing Indexed Documents
 
 View all indexed documents and their metadata:

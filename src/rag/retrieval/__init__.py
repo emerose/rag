@@ -1,5 +1,5 @@
-"""Retrieval module for the RAG system.
+"""Retrieval utilities for the RAG system."""
 
-This module contains components for query processing, context construction,
-and result enhancement.
-"""
+from .hybrid import build_bm25_retriever, hybrid_search
+
+__all__ = ["build_bm25_retriever", "hybrid_search"]
