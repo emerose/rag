@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `cleanup`: Summary of removed files
 - Synthetic QA generator script for creating regression test data
     - `invalidate`: Success/error messages
+- Autocomplete support in `rag repl` using `prompt_toolkit` for commands and file paths
+- Documented REPL autocomplete usage in README
 - Structured logging using structlog with Rich console output
   - Consistent error output format across all commands
   - Integration with tools like `jq` for output processing
