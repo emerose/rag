@@ -155,9 +155,11 @@ def test_create_empty_vectorstore(
     assert vectorstore == mock_instance
 
 
+@patch("rag.storage.vectorstore.FileLock")
 @patch("rag.storage.vectorstore.FAISS")
 def test_save_vectorstore(
     _mock_faiss: MagicMock,
+    mock_filelock: MagicMock,
     temp_dir: Path,
     mock_embedding_provider: MagicMock,
 ) -> None:
@@ -182,6 +184,9 @@ def test_save_vectorstore(
         file_path = "/path/to/test/file.txt"
         success = manager.save_vectorstore(file_path, mock_vectorstore)
 
+    # Verify FileLock was used
+    mock_filelock.assert_called()
+
     # Verify the result
     assert success is True
 
@@ -193,6 +198,7 @@ def test_save_vectorstore(
     )
 
 
+@patch("rag.storage.vectorstore.FileLock")
 @patch("rag.storage.vectorstore.FAISS")
 @patch("rag.storage.vectorstore.faiss")
 @patch("rag.storage.vectorstore.pickle")
@@ -200,6 +206,7 @@ def test_load_vectorstore(
     mock_pickle: MagicMock,
     mock_faiss_lib: MagicMock,
     _mock_faiss_cls: MagicMock,
+    mock_filelock: MagicMock,
     temp_dir: Path,
     mock_embedding_provider: MagicMock,
 ) -> None:
@@ -244,6 +251,9 @@ def test_load_vectorstore(
         # Just verify that FAISS constructor was called and returned our mock
         assert _mock_faiss_cls.called
         assert vectorstore == mock_instance
+
+        # Verify FileLock was used
+        mock_filelock.assert_called()
 
 
 @patch("rag.storage.vectorstore.FAISS")

@@ -220,6 +220,7 @@ class RAGEngine:
             cache_dir=self.cache_dir,
             embeddings=self.embedding_provider.embeddings,
             log_callback=self.runtime.log_callback,
+            lock_timeout=self.config.lock_timeout,
             safe_deserialization=False,  # We trust our own cache files
         )
 
