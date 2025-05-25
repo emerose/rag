@@ -86,6 +86,9 @@ class RAGEngine:
         ):
             self.runtime.progress_callback = None
 
+        # Fail fast if the API key is missing
+        self._validate_api_key()
+
         # Initialize components
         self._initialize_from_config()
 
@@ -140,6 +143,14 @@ class RAGEngine:
 
         """
         log_message(level, message, subsystem, self.runtime.log_callback)
+
+    def _validate_api_key(self) -> None:
+        """Ensure the OpenAI API key is configured."""
+
+        if not self.config.openai_api_key:
+            raise ValueError(
+                "OpenAI API key is missing. Set the OPENAI_API_KEY environment variable."
+            )
 
     def _create_default_config(self) -> RAGConfig:
         """Create default configuration.
