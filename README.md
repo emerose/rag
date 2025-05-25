@@ -282,6 +282,18 @@ For step-by-step instructions on using the server with ChatGPT and Cursor,
 including optional remote access via Tailscale, see
 [docs/mcp_usage.md](docs/mcp_usage.md).
 
+### Documentation
+
+The full API reference and additional guides are available in the Sphinx docs.
+Build them locally with:
+
+```bash
+cd docs
+make html
+```
+
+Then open `docs/build/html/index.html` in your browser.
+
 ### Getting Help
 
 Show general help:
