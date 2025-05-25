@@ -16,7 +16,23 @@ The Model Context Protocol (MCP) lets AI tools connect to your local RAG server.
 
 Keep the terminal open while the server is running.
 
-## 2. Add the server to ChatGPT
+## 2. Expose the server with Tailscale (optional)
+
+Sometimes ChatGPT cannot reach `localhost` directly. Tailscale lets you share
+your local server over a secure tunnel so ChatGPT can connect.
+
+1. [Install Tailscale](https://tailscale.com/download) and run `tailscale up`.
+2. Start the MCP server, listening on all interfaces:
+   ```bash
+   rag serve-mcp --host 0.0.0.0 --port 8000
+   ```
+3. Find your Tailscale IP address:
+   ```bash
+   tailscale ip -4
+   ```
+4. Use `http://<tailscale-ip>:8000` when adding the server in ChatGPT or Cursor.
+
+## 3. Add the server to ChatGPT
 
 1. Open ChatGPT in your browser.
 2. Choose **Settings & beta** → **Model context**.
@@ -26,7 +42,7 @@ Keep the terminal open while the server is running.
 
 ChatGPT can now call your RAG tools whenever you ask a question.
 
-## 3. Add the server to Cursor
+## 4. Add the server to Cursor
 
 1. In Cursor, open **Preferences**.
 2. Go to **AI** → **Model context servers**.
@@ -35,7 +51,7 @@ ChatGPT can now call your RAG tools whenever you ask a question.
 
 Once added, Cursor will use your RAG server for relevant features.
 
-## 4. Stop the server
+## 5. Stop the server
 
 Press `Ctrl+C` in the terminal window running `serve-mcp` when you want to stop the server.
 
