@@ -1,6 +1,5 @@
 ## 🚀 Next
 
-- [#153] [P1] **Increase coverage for utils** – Add tests for `answer_utils` and `async_utils`.
 - [#154] [P1] **Prompt list command** – Add CLI subcommand to list available prompt templates.
 - [#155] [P1] **Refactor MCP utilities** – Consolidate duplicated server logic.
 - [#156] [P1] **Validate OPENAI_API_KEY** – Fail fast if API key is missing.
@@ -41,7 +40,6 @@
 ### 7 . Evaluation & Testing
 - [#59] [P2] **Golden-set retrieval QA** – `tests/e2e/eval_rag.py` measuring hit-rate + exact-match.
 - [#60] [P3] **Synthetic QA generator** – Script to auto-generate QA pairs for regression tests.
-- [P2] **Increase coverage for utils** – Add tests for `answer_utils` and `async_utils`.
 
 ### 8 . Packaging & CI
 
