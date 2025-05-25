@@ -146,6 +146,8 @@ rag index path/to/documents --no-preserve-headings
 
 # Combine options as needed
 rag index path/to/documents --chunk-size 2000 --no-preserve-headings
+# Use a different vector store backend
+rag index path/to/documents --vectorstore-backend faiss
 ```
 
 This will:

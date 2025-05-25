@@ -10,7 +10,6 @@
 
 
 ### 1 . Architecture & Core Design
-- [#44] [P2] **Vector-store abstraction** – Introduce `VectorStoreProtocol` so FAISS can be swapped for Qdrant/Chroma via a CLI flag.
 - [#45] [P3] **Incremental re-indexing** – Hash each chunk and only (re)embed changed chunks to reduce token spend.
 - [P2] **Refactor MCP utilities** – Consolidate duplicated server logic.
 

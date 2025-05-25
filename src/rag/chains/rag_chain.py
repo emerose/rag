@@ -20,13 +20,13 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
-from langchain_community.vectorstores import FAISS  # type: ignore
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableLambda, RunnableParallel
 
 # Import the prompt registry
 from rag.prompts import get_prompt
+from rag.storage.protocols import VectorStoreProtocol
 from rag.utils.exceptions import VectorstoreError
 
 # Forward reference for type checking
@@ -120,7 +120,7 @@ def build_rag_chain(engine: RAGEngine, k: int = 4, prompt_id: str = "default"):
     if not engine.vectorstores:
         raise VectorstoreError()
 
-    merged_vs: FAISS = engine.vectorstore_manager.merge_vectorstores(  # type: ignore[arg-type]
+    merged_vs: VectorStoreProtocol = engine.vectorstore_manager.merge_vectorstores(  # type: ignore[arg-type]
         list(engine.vectorstores.values())
     )
 

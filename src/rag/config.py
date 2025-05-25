@@ -26,6 +26,7 @@ class RAGConfig:
         chunk_size: Number of tokens per chunk
         chunk_overlap: Number of tokens to overlap between chunks
         openai_api_key: OpenAI API key (will be set in __post_init__)
+        vectorstore_backend: Backend to use for vector storage
 
     """
 
@@ -38,6 +39,7 @@ class RAGConfig:
     chunk_size: int = 1000  # tokens
     chunk_overlap: int = 200  # tokens
     openai_api_key: str = ""  # Will be set in __post_init__
+    vectorstore_backend: str = "faiss"
 
     def __post_init__(self):
         """Initialize derived attributes after instance creation."""
