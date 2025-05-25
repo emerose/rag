@@ -447,12 +447,10 @@ def invalidate(
             cache_dir=cache_directory,
             vectorstore_backend=state.vectorstore_backend,
         )
-        def _token_cb(token: str) -> None:
-            state.console.print(token, style="cyan", end="")
 
         runtime_options = RuntimeOptions(
-            stream=stream,
-            stream_callback=_token_cb if stream else None,
+            stream=False,
+            stream_callback=None,
             max_workers=state.max_workers,
         )
 
@@ -498,7 +496,7 @@ def invalidate(
 
 
 @app.command()
-def query(
+def query(  # noqa: PLR0913
     query_text: str = typer.Argument(
         ...,
         help="The query to run against the indexed documents",
@@ -554,6 +552,7 @@ def query(
 
         def _token_cb(token: str) -> None:
             state.console.print(token, style="cyan", end="")
+
         runtime_options = RuntimeOptions(
             stream=stream,
             stream_callback=_token_cb if stream else None,
@@ -1021,6 +1020,7 @@ def repl(
     """
     state.is_processing = True
     try:
+
         def _token_cb(token: str) -> None:
             state.console.print(token, style="cyan", end="")
 
