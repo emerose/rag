@@ -23,7 +23,6 @@
 
 ### 5 . CLI / REPL UX
 - [#55] [P2] **Streaming token output** – `--stream` flag for real-time coloured output.
-- [#56] [P3] **Autocomplete in `rag repl`** – Use `prompt_toolkit` for file path & command completion.
 
 ### 6 . Performance
 - [#57] [P2] **Async embedding workers** – `asyncio` + `aiostream` pipeline instead of ThreadPool; honour OpenAI parallel limits.
