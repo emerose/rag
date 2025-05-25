@@ -96,6 +96,18 @@ class IndexManager:
                     )
                 """)
 
+                # Table for per-chunk hashes used for incremental indexing
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS chunk_metadata (
+                        file_path TEXT NOT NULL,
+                        chunk_id INTEGER NOT NULL,
+                        chunk_hash TEXT NOT NULL,
+                        PRIMARY KEY (file_path, chunk_id)
+                    )
+                    """
+                )
+
                 conn.commit()
                 self._log("DEBUG", "Index database initialized successfully")
         except sqlite3.Error as e:
@@ -116,6 +128,18 @@ class IndexManager:
         with file_path.open("rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+
+    def compute_text_hash(self, text: str) -> str:
+        """Compute the SHA-256 hash of a text string.
+
+        Args:
+            text: Text content
+
+        Returns:
+            SHA-256 hash as a hex string
+        """
+        sha256_hash = hashlib.sha256(text.encode("utf-8"))
         return sha256_hash.hexdigest()
 
     def needs_reindexing(
@@ -243,6 +267,53 @@ class IndexManager:
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to update metadata: {e}")
             raise
+
+    def update_chunk_hashes(self, file_path: Path, chunk_hashes: list[str]) -> None:
+        """Update stored chunk hashes for a file.
+
+        Args:
+            file_path: Path to the file
+            chunk_hashes: List of SHA-256 hashes for each chunk
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute(
+                    "DELETE FROM chunk_metadata WHERE file_path = ?",
+                    (str(file_path),),
+                )
+                conn.executemany(
+                    "INSERT INTO chunk_metadata (file_path, chunk_id, chunk_hash) VALUES (?, ?, ?)",
+                    [(str(file_path), idx, h) for idx, h in enumerate(chunk_hashes)],
+                )
+                conn.commit()
+                self._log(
+                    "DEBUG",
+                    f"Stored {len(chunk_hashes)} chunk hashes for {file_path}",
+                )
+        except sqlite3.Error as e:
+            self._log("ERROR", f"Failed to update chunk hashes: {e}")
+            raise
+
+    def get_chunk_hashes(self, file_path: Path) -> list[str]:
+        """Retrieve stored chunk hashes for a file.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            List of chunk hashes ordered by chunk_id
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute(
+                    "SELECT chunk_id, chunk_hash FROM chunk_metadata WHERE file_path = ? ORDER BY chunk_id",
+                    (str(file_path),),
+                )
+                rows = cursor.fetchall()
+                return [row[1] for row in rows]
+        except sqlite3.Error as e:
+            self._log("ERROR", f"Failed to get chunk hashes: {e}")
+            return []
 
     def update_file_metadata(  # noqa: PLR0913
         self,
