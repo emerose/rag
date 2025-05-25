@@ -197,12 +197,23 @@ def build_rag_chain(
 
     def _invoke_llm(prompt_text: str) -> str:
         if engine.system_prompt:
-            messages = [
+            messages: Any = [
                 SystemMessage(content=engine.system_prompt),
                 HumanMessage(content=prompt_text),
             ]
-            return engine.chat_model.invoke(messages).content
-        return engine.chat_model.invoke(prompt_text).content
+        else:
+            messages = prompt_text
+
+        if engine.runtime.stream:
+            parts: list[str] = []
+            for chunk in engine.chat_model.stream(messages):
+                token = getattr(chunk, "content", str(chunk))
+                if engine.runtime.stream_callback:
+                    engine.runtime.stream_callback(token)
+                parts.append(token)
+            return "".join(parts)
+
+        return engine.chat_model.invoke(messages).content
 
     def _prepare_prompt(inp: dict[str, Any]) -> dict[str, Any]:
         packed = _pack_documents(inp["documents"])

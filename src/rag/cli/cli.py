@@ -447,7 +447,15 @@ def invalidate(
             cache_dir=cache_directory,
             vectorstore_backend=state.vectorstore_backend,
         )
-        runtime_options = RuntimeOptions(max_workers=state.max_workers)
+        def _token_cb(token: str) -> None:
+            state.console.print(token, style="cyan", end="")
+
+        runtime_options = RuntimeOptions(
+            stream=stream,
+            stream_callback=_token_cb if stream else None,
+            max_workers=state.max_workers,
+        )
+
         rag_engine = RAGEngine(config, runtime_options)
 
         if all_caches:
@@ -517,6 +525,11 @@ def query(
         help="Directory for caching embeddings and vector stores",
     ),
     json_output: bool = JSON_OUTPUT_OPTION,
+    stream: bool = typer.Option(
+        False,
+        "--stream",
+        help="Stream tokens in real time",
+    ),
 ) -> None:
     """Run a query against the indexed documents.
 
@@ -538,7 +551,15 @@ def query(
             cache_dir=cache_directory,
             vectorstore_backend=state.vectorstore_backend,
         )
-        runtime_options = RuntimeOptions(max_workers=state.max_workers)
+
+        def _token_cb(token: str) -> None:
+            state.console.print(token, style="cyan", end="")
+        runtime_options = RuntimeOptions(
+            stream=stream,
+            stream_callback=_token_cb if stream else None,
+            max_workers=state.max_workers,
+        )
+
         rag_engine = RAGEngine(config, runtime_options)
 
         # Set the chosen prompt template
@@ -587,6 +608,8 @@ def query(
         state.logger.info(f"Running query: {query_text}")
         state.logger.info(f"Retrieving top {k} most relevant documents...")
         result = rag_engine.answer(query_text, k=k)
+        if stream:
+            state.console.print()
 
         # Write output
         write(
@@ -825,7 +848,7 @@ def prompt_list(json_output: bool = JSON_OUTPUT_OPTION) -> None:
     write(table_data)
 
 
-def _initialize_rag_engine() -> RAGEngine:
+def _initialize_rag_engine(runtime_options: RuntimeOptions | None = None) -> RAGEngine:
     """Initialize and return a RAGEngine instance."""
     config = RAGConfig(
         documents_dir=".",  # Not used for querying
@@ -835,8 +858,8 @@ def _initialize_rag_engine() -> RAGEngine:
         cache_dir=state.cache_dir,
         vectorstore_backend=state.vectorstore_backend,
     )
-    runtime_options = RuntimeOptions(max_workers=state.max_workers)
-    return RAGEngine(config, runtime_options)
+    runtime_opts = runtime_options or RuntimeOptions(max_workers=state.max_workers)
+    return RAGEngine(config, runtime_opts)
 
 
 def _load_vectorstores(rag_engine: RAGEngine) -> None:
@@ -985,6 +1008,11 @@ def repl(
         help="Directory for caching embeddings and vector stores",
     ),
     json_output: bool = JSON_OUTPUT_OPTION,
+    stream: bool = typer.Option(
+        False,
+        "--stream",
+        help="Stream tokens in real time",
+    ),
 ) -> None:
     """Start an interactive REPL session.
 
@@ -993,8 +1021,16 @@ def repl(
     """
     state.is_processing = True
     try:
+        def _token_cb(token: str) -> None:
+            state.console.print(token, style="cyan", end="")
+
+        runtime_options = RuntimeOptions(
+            stream=stream,
+            stream_callback=_token_cb if stream else None,
+        )
+
         # Initialize RAG engine
-        rag_engine = _initialize_rag_engine()
+        rag_engine = _initialize_rag_engine(runtime_options)
 
         # Set the chosen prompt template
         rag_engine.default_prompt_id = prompt
@@ -1040,6 +1076,8 @@ def repl(
                 write("Retrieving documents...")
 
                 result = rag_engine.answer(user_input, k=k)
+                if stream:
+                    state.console.print()
 
                 # Write output
                 write(
