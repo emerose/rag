@@ -1,6 +1,7 @@
 # RAG (Retrieval Augmented Generation) CLI
 
 A powerful command-line tool for building and querying RAG applications via an interactive REPL.
+See the `docs` directory for detailed usage and API information.
 
 ## Features
 
