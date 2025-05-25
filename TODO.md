@@ -10,7 +10,6 @@
 
 
 ### 1 . Architecture & Core Design
-- [#45] [P3] **Incremental re-indexing** – Hash each chunk and only (re)embed changed chunks to reduce token spend.
 
 ### 2 . Retrieval & Relevance
 
