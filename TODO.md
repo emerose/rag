@@ -39,7 +39,6 @@
 
 ### 8 . Packaging & CI
 - [#61] [P2] **PyProject packaging** – Add `pyproject.toml`, `hatch` build and `[project.scripts] rag = "rag.cli:app"`.
-- [#62] [P3] **Version lockfile** – Generate requirements lock (poetry export / pip-tools) to freeze LangChain/OpenAI versions.
 
 ### 9 . Documentation & Examples
 - [#66] [P3] **Sphinx docs + GitHub Pages** – Auto-publish API docs & "swap vector store" guide.
