@@ -184,3 +184,18 @@
 - **History Preservation**: Avoid force pushing to shared branches.
 - **Meaningful History**: Use rebase and interactive rebase to maintain a clean, meaningful history.
 - **Tags**: Use semantic versioning for release tags (vX.Y.Z).
+
+## 4. Commit Message Formatting
+
+- **Use Temporary Files**: Due to tool constraints that don't allow newlines in command parameters, use temporary files for proper multi-line commit messages:
+  ```bash
+  echo "type(scope): subject line (50 chars max)
+
+  Detailed explanation of the change wrapped at 72 characters.
+  Explain what and why, not how. Include context and reasoning
+  for the change.
+
+  closes #123" > commit_msg.txt && git commit -F commit_msg.txt && rm commit_msg.txt
+  ```
+- **Never Use Single Long Lines**: Avoid cramming everything into one line with `git commit -m "very long message..."` as this violates conventional commit message formatting.
+- **Follow Conventional Format**: Always use the structured format with subject, body, and footer separated by blank lines.
