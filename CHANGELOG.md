@@ -61,6 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Exposed RAG operations as MCP tools in `rag.mcp_tools`
 - Optional API key authentication for the MCP server via `RAG_MCP_API_KEY`.
 - Step-by-step MCP usage guide for ChatGPT and Cursor in `docs/mcp_usage.md`.
+- Added `serve-mcp` CLI command for running the MCP server
 
 ### Removed
 - Outdated design sketch removed from `docs/design_sketches`.
