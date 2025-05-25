@@ -36,3 +36,4 @@ Ingest
 .coverage
 .coverage.*
 htmlcov/
+docs/build/
