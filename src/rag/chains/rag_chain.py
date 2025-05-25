@@ -28,8 +28,8 @@ from rag.data.text_splitter import _safe_get_encoding
 
 # Import the prompt registry
 from rag.prompts import get_prompt
-from rag.storage.protocols import VectorStoreProtocol
 from rag.retrieval import BaseReranker
+from rag.storage.protocols import VectorStoreProtocol
 from rag.utils.exceptions import VectorstoreError
 
 # Forward reference for type checking
