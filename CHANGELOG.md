@@ -71,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Exposed RAG operations as MCP tools in `rag.mcp_tools`
 - Optional API key authentication for the MCP server via `RAG_MCP_API_KEY`.
 - Step-by-step MCP usage guide for Claude integration in `docs/mcp_usage.md`.
-- Added `serve-mcp` CLI command for running the MCP server
+- Added `mcp-http` CLI command for running the MCP HTTP server and
+  `mcp-stdio` (alias `mcp`) for stdio transport
 - Initial Sphinx documentation with guide for swapping the vector store
 - Validation check for `OPENAI_API_KEY` during engine initialization
 - Documented metadata filter syntax in README with examples
@@ -104,6 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidated MCP server logic by reusing common models
 - Context window packing for retrieval results to maximise prompt space
 - Added confirmation prompt before invalidating all caches
+- Expanded conceptual overview with technical details on loaders, chunking and caching
 
 ### Fixed
 - More reliable heading detection in PDFs by using statistical font analysis

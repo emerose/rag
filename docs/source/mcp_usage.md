@@ -6,6 +6,7 @@ The Model Context Protocol (MCP) lets AI tools interact with your RAG server. Cl
 
 Run the `mcp install` command from the project root. This adds your RAG server to Claude's configuration:
 
+
 ```bash
 mcp install src/rag/mcp_server.py:mcp --name RAG
 ```

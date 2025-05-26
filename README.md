@@ -306,7 +306,7 @@ couple of endpoints for basic status and cache management:
 - `POST /cache/clear` – clear embedding and search caches.
 - `GET /system/status` – return server status and configuration summary.
 
-Run the server with `rag serve-mcp --host 127.0.0.1 --port 8000`. When
+Run the server with `rag mcp-http --host 127.0.0.1 --port 8000`. When
 `RAG_MCP_API_KEY` is set, include an `Authorization` header in requests:
 
 ```bash

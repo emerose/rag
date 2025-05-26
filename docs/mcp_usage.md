@@ -19,6 +19,7 @@ mcp install src/rag/mcp_server.py:mcp --name RAG \
 
 ## 2. Start the server from Claude
 
+
 Open Claude Desktop and choose your newly added **RAG** server from the MCP servers list. When launched, Claude connects to the server over stdio and can call the available tools.
 
 ## 3. Other integrations

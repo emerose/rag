@@ -40,5 +40,3 @@ P2 = High value, medium effort
 P3 = Medium value / effort  
 P4 = Low value or blocked by earlier work  
 P5 = Nice-to-have / may drop later
-
-- [#194] [P3] **Update conceptual overview** – Rewrite the conceptual overview to better match the actual code.  For each part of the overview, review the code and summarize its behavior.  For example, discuss which document loaders and text splitters are used under what circumstances, whether and how they are configurable, and what the pros/cons of these tools are vs other libraries.  Add details about what metadata is handled, where the cache is stored, what's in the cache, etc.  Generally, add more technical detail to the conceptual overview, but only after confirming the detail is correct

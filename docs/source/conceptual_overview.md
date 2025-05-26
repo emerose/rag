@@ -1,34 +1,34 @@
 # Conceptual Overview
 
-Retrieval Augmented Generation (RAG) combines a document retrieval system with a large language model (LLM). The LLM generates answers using text that is dynamically retrieved from your own documents. This approach keeps the model grounded in real data and lets you tailor responses to a specific knowledge base.
+Retrieval Augmented Generation (RAG) combines a document retrieval system with a large language model (LLM). The LLM generates answers using text that is dynamically retrieved from your own documents. This keeps the model grounded in real data and lets you tailor responses to a specific knowledge base.
 
-A RAG pipeline usually performs these stages in sequence:
+A RAG pipeline in this project performs these stages:
 
 ## 1. Document Loading
-Documents are ingested from PDFs, Markdown files and other formats. The `rag` CLI uses the Unstructured library to standardize text extraction so everything from plain text to richly formatted PDFs can be handled the same way.
+The :class:`~rag.data.document_loader.DocumentLoader` chooses a loader based on MIME type using the :class:`~rag.storage.filesystem.FilesystemManager`. It supports plain text, CSV, Markdown, HTML, PDF, Word and PowerPoint through LangChain community loaders and the Unstructured library. Unsupported types fall back to ``TextLoader`` so even unknown formats can be indexed. Each document is enriched with file metadata (size, modification time, SHA‑256 content hash and source type) and domain specific details extracted by ``DocumentMetadataExtractor``.
 
 ## 2. Text Splitting and Chunking
-Large documents are broken into manageable pieces. The CLI offers token-based and semantic splitting strategies. Splitting first breaks a document into logical paragraphs, then chunking groups those paragraphs into windows of roughly equal length so the LLM can handle them efficiently.
+The :class:`~rag.data.text_splitter.TextSplitterFactory` creates splitters tuned for the incoming file. Markdown files first pass through ``MarkdownHeaderTextSplitter`` to retain heading structure, PDFs and HTML use specialized recursive character splitters and other files default to token or character based splitting via ``RecursiveCharacterTextSplitter``. Chunk size and overlap come from :class:`~rag.config.RAGConfig` and semantic chunking or heading preservation can be toggled at runtime. ``tiktoken`` provides token counting with a dummy fallback when its data is unavailable.
 
 ## 3. Embedding
-Each chunk is turned into a numerical vector representation. RAG relies on the OpenAI embeddings API to capture the semantic meaning of the chunk. The vectors enable similarity search in later steps.
+Chunks are embedded using :class:`~rag.embeddings.embedding_provider.EmbeddingProvider`, which wraps OpenAI's embedding API with retry logic. ``EmbeddingBatcher`` manages asynchronous batching so multiple chunks can be processed in parallel. A per‑document model map allows different embedding models to be used for specific files when ``embeddings.yaml`` is present.
 
 ## 4. Metadata Handling
-Along with the text, RAG records metadata such as the source file, page number and any headings associated with a chunk. This metadata is used to attribute answers and to reconstruct citations in the final response.
+Every chunk retains the metadata added during loading plus additional fields such as ``token_count`` and extracted titles or heading hierarchies. The :class:`~rag.storage.index_manager.IndexManager` records this information in a SQLite database. Per‑chunk hashes enable incremental indexing so unchanged chunks are skipped on re‑runs.
 
 ## 5. Vector Stores and Caching
-Embeddings are persisted in a vector store. By default the project uses FAISS for fast similarity search. The engine also caches embeddings by content hash so re-indexing a document only recomputes vectors for changed chunks.
+Embeddings are stored in a FAISS index managed by :class:`~rag.storage.vectorstore.VectorStoreManager`. Each source file maps to ``.faiss`` and ``.pkl`` files under the ``.cache`` directory. ``CacheManager`` tracks these files and consults ``IndexManager`` to decide when a vector store needs to be rebuilt. This caching keeps indexing fast while allowing stale entries to be invalidated or cleaned up.
 
 ## 6. Similarity Search and Retrieval
-When a query arrives, the vector store returns the chunks whose embeddings are most similar to the query embedding. Optional keyword or hybrid retrieval can rerank those results. The selected chunks become the context passed to the language model.
+Queries are answered by performing a dense similarity search over the cached vector stores. ``HybridRetriever`` can combine BM25 with the dense search and ``KeywordReranker`` optionally re‑ranks results. The selected chunks become the context passed to the LLM.
 
 ## 7. LangChain Chains and Prompts
-RAG chains orchestrate these pieces using LangChain. Prompt templates define how the retrieved text and the user question are combined. Different chains may use conversation history, system prompts, or chain-of-thought reasoning to shape the final LLM request.
+The RAG chains are assembled with LangChain Expression Language in ``build_rag_chain``. Prompt templates in ``prompts/`` define how retrieved text and the user question are combined. Chains may include system prompts or conversation history depending on the command.
 
 ## 8. Querying
-The `rag query` command sends the assembled prompt to GPT‑4 (or another model) and returns the generated answer along with the source citations. The interactive REPL lets you iterate on questions and keeps the conversation state across turns.
+``rag query`` sends the assembled prompt to ``ChatOpenAI`` (GPT‑4 by default) and returns the generated answer with source citations. The interactive ``rag repl`` maintains conversation state across turns and supports streaming output.
 
 ## 9. MCP and Tool Integration
 The Model Context Protocol (MCP) server exposes the same retrieval and generation capabilities. Clients like Claude or the Cursor editor can connect to the server, making it easy to integrate RAG results into other workflows.
 
-These steps work together to provide grounded responses from your own documents. Index your data once, then query it confidently knowing that answers are backed by relevant sources.
+These steps work together to provide grounded responses from your own documents. Index your data once, then query it confidently knowing answers are backed by relevant sources.
