@@ -1206,19 +1206,33 @@ def cleanup(
         raise typer.Exit(code=1) from e
 
 
-@app.command()
-def serve_mcp(
+@app.command(name="mcp-http")
+def mcp_http(
     host: str = typer.Option(
         "127.0.0.1", "--host", "-H", help="Host interface to bind the server"
     ),
     port: int = typer.Option(8000, "--port", "-p", help="Port number for the server"),
 ) -> None:
-    """Start the MCP server using Uvicorn."""
+    """Start the MCP HTTP server using Uvicorn."""
 
     try:
         import uvicorn
 
         uvicorn.run("rag.mcp_server:app", host=host, port=port)
+    except Exception as exc:  # pragma: no cover - runtime errors
+        write(Error(f"Error starting server: {exc}"))
+        raise typer.Exit(code=1) from exc
+
+
+@app.command(name="mcp-stdio")
+@app.command(name="mcp")
+def mcp_stdio() -> None:
+    """Run the MCP server using the stdio transport."""
+
+    try:
+        from rag.mcp_server import mcp
+
+        mcp.run("stdio")
     except Exception as exc:  # pragma: no cover - runtime errors
         write(Error(f"Error starting server: {exc}"))
         raise typer.Exit(code=1) from exc

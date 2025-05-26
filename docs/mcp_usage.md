@@ -4,14 +4,14 @@ The Model Context Protocol (MCP) lets AI tools connect to your local RAG server.
 
 ## 1. Start the MCP server
 
-1. Launch the server:
+1. Launch the HTTP server:
    ```bash
-   rag serve-mcp --host 127.0.0.1 --port 8000
+   rag mcp-http --host 127.0.0.1 --port 8000
    ```
 2. (Optional) Set an API key so only you can access the server:
    ```bash
    export RAG_MCP_API_KEY="my-secret-key"
-   rag serve-mcp --host 127.0.0.1 --port 8000
+   rag mcp-http --host 127.0.0.1 --port 8000
    ```
 
 Keep the terminal open while the server is running.
@@ -24,7 +24,7 @@ your local server over a secure tunnel so ChatGPT can connect.
 1. [Install Tailscale](https://tailscale.com/download) and run `tailscale up`.
 2. Start the MCP server, listening on all interfaces:
    ```bash
-   rag serve-mcp --host 0.0.0.0 --port 8000
+   rag mcp-http --host 0.0.0.0 --port 8000
    ```
 3. Find your Tailscale IP address:
    ```bash
@@ -53,5 +53,5 @@ Once added, Cursor will use your RAG server for relevant features.
 
 ## 5. Stop the server
 
-Press `Ctrl+C` in the terminal window running `serve-mcp` when you want to stop the server.
+Press `Ctrl+C` in the terminal window running `mcp-http` when you want to stop the server.
 
