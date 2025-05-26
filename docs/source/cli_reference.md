@@ -51,6 +51,14 @@ Show all indexed documents and their metadata.
 rag list
 ```
 
+## `chunks`
+
+Dump the stored chunks and metadata for an indexed file.
+
+```
+rag chunks path/to/file.txt
+```
+
 ## `invalidate`
 
 Remove cached data for a specific file or all caches.
