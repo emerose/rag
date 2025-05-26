@@ -54,6 +54,7 @@ class DocumentLoader:
         self.filesystem_manager = filesystem_manager
         self.log_callback = log_callback
         self.metadata_extractor = DocumentMetadataExtractor()
+        self.last_loader_name: str | None = None
 
     def _log(self, level: str, message: str) -> None:
         """Log a message.
@@ -145,6 +146,7 @@ class DocumentLoader:
         # Get loader for the file
         try:
             loader = self.get_loader_for_file(file_path)
+            self.last_loader_name = loader.__class__.__name__
             self._log("DEBUG", f"Loading document: {file_path}")
             docs = loader.load()
 

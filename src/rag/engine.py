@@ -469,6 +469,9 @@ class RAGEngine:
                 documents=documents,
                 file_type=ingest_result.source.mime_type or "text/plain",
                 embedding_model=model_name,
+                loader_name=ingest_result.source.loader_name,
+                tokenizer_name=ingest_result.source.tokenizer_name,
+                text_splitter_name=ingest_result.source.text_splitter_name,
             )
             return success, None
         except (
@@ -485,12 +488,15 @@ class RAGEngine:
             self._log("ERROR", f"Failed to index {file_path}: {error_message}")
             return False, error_message
 
-    def _create_vectorstore_from_documents(  # noqa: PLR0915, PLR0912
+    def _create_vectorstore_from_documents(  # noqa: PLR0915, PLR0912, PLR0913
         self,
         file_path: Path,
         documents: list[Document],
         file_type: str,
         embedding_model: str | None = None,
+        loader_name: str | None = None,
+        tokenizer_name: str | None = None,
+        text_splitter_name: str | None = None,
     ) -> bool:
         """Create or update a vectorstore from documents.
 
@@ -605,6 +611,9 @@ class RAGEngine:
                 embedding_model_version=self.embedding_model_version,
                 file_type=file_type,
                 num_chunks=len(documents),
+                document_loader=loader_name,
+                tokenizer=tokenizer_name,
+                text_splitter=text_splitter_name,
             )
 
             # Store chunk hashes for incremental indexing

@@ -57,6 +57,9 @@ class DocumentSource:
         self.last_modified: float | None = None
         self.content_hash: str | None = None
         self.file_size: int | None = None
+        self.loader_name: str | None = None
+        self.tokenizer_name: str | None = None
+        self.text_splitter_name: str | None = None
 
     def __str__(self) -> str:
         """Get string representation.
@@ -257,6 +260,9 @@ class IngestManager:
             "mtime": file_metadata["mtime"],
             "content_hash": file_metadata["content_hash"],
             "mime_type": source.mime_type,
+            "loader": None,
+            "tokenizer": None,
+            "text_splitter": None,
         }
 
         return source
@@ -311,6 +317,8 @@ class IngestManager:
             self._log("DEBUG", f"Loading document: {file_path}")
             doc_loader = DocumentLoader(self.filesystem_manager, self.log_callback)
             docs = doc_loader.load_document(file_path)
+            source.loader_name = doc_loader.last_loader_name
+            source.metadata["loader"] = doc_loader.last_loader_name
 
             if not docs:
                 result = IngestResult(
@@ -329,6 +337,16 @@ class IngestManager:
                     chunked_docs = self.chunking_strategy.split_documents(
                         docs, mime_type
                     )
+                    source.text_splitter_name = getattr(
+                        self.chunking_strategy,
+                        "last_splitter_name",
+                        None,
+                    )
+                    source.tokenizer_name = getattr(
+                        self.chunking_strategy, "tokenizer_name", None
+                    )
+                    source.metadata["text_splitter"] = source.text_splitter_name
+                    source.metadata["tokenizer"] = source.tokenizer_name
 
                     # 3. Process results
                     result = IngestResult(source, IngestStatus.SUCCESS)

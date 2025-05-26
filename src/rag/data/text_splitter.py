@@ -676,6 +676,10 @@ class TextSplitterFactory:
         # Initialize tokenizer
         self.tokenizer = _safe_encoding_for_model(model_name)
 
+        self.tokenizer_name = (
+            self.tokenizer.name if hasattr(self.tokenizer, "name") else "unknown"
+        )
+
         # Initialize default semantic splitter
         self.semantic_splitter = (
             SemanticRecursiveCharacterTextSplitter.from_tiktoken_encoder(
@@ -684,6 +688,8 @@ class TextSplitterFactory:
                 chunk_overlap=self.chunk_overlap,
             )
         )
+
+        self.last_splitter_name: str | None = None
 
         self._log(
             "DEBUG",
@@ -727,17 +733,23 @@ class TextSplitterFactory:
 
         # Create the appropriate splitter based on name
         if splitter_name == "markdown_header_splitter":
+            self.last_splitter_name = splitter_name
             return self._create_markdown_splitter()
         elif splitter_name == "html_splitter":
+            self.last_splitter_name = splitter_name
             return self._create_splitter_with_separators(config["separators"])
         elif splitter_name == "pdf_splitter":
+            self.last_splitter_name = splitter_name
             return self._create_splitter_with_separators(config["separators"])
         elif splitter_name == "token_splitter":
+            self.last_splitter_name = splitter_name
             return self._create_token_splitter()
         elif splitter_name == "document_splitter":
+            self.last_splitter_name = splitter_name
             return self._create_splitter_with_separators(config["separators"])
         else:
             # Default to semantic recursive character splitter
+            self.last_splitter_name = "semantic_splitter"
             return self.semantic_splitter
 
     def _create_splitter_with_separators(self, separators: list[str]) -> Any:

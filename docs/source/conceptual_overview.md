@@ -18,6 +18,7 @@ Every chunk retains the metadata added during loading plus additional fields suc
 
 ## 5. Vector Stores and Caching
 Embeddings are stored in a FAISS index managed by [VectorStoreManager](https://github.com/emerose/rag/blob/main/src/rag/storage/vectorstore.py). Each source file maps to ``.faiss`` and ``.pkl`` files under the ``.cache`` directory. [CacheManager](https://github.com/emerose/rag/blob/main/src/rag/storage/cache_manager.py) tracks these files and consults [IndexManager](https://github.com/emerose/rag/blob/main/src/rag/storage/index_manager.py) to decide when a vector store needs to be rebuilt. This caching keeps indexing fast while allowing stale entries to be invalidated or cleaned up.
+The index now also records which loader, tokenizer and text splitter were used for each file so indexing is reproducible.
 
 ## 6. Similarity Search and Retrieval
 Queries are answered by performing a dense similarity search over the cached vector stores. [HybridRetriever](https://github.com/emerose/rag/blob/main/src/rag/retrieval/hybrid_retriever.py) can combine BM25 with the dense search and [KeywordReranker](https://github.com/emerose/rag/blob/main/src/rag/retrieval/reranker.py) optionally re‑ranks results. The selected chunks become the context passed to the LLM.
