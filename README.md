@@ -319,8 +319,7 @@ curl -H "Authorization: Bearer $RAG_MCP_API_KEY" \
 AI assistants that implement MCP can connect using the same base URL and
 `Authorization` header.
 
-For step-by-step instructions on using the server with ChatGPT and Cursor,
-including optional remote access via Tailscale, see
+For step-by-step instructions on integrating the server with Claude, see
 [docs/mcp_usage.md](docs/mcp_usage.md).
 
 ### Documentation

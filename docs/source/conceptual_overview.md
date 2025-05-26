@@ -29,6 +29,6 @@ RAG chains orchestrate these pieces using LangChain. Prompt templates define how
 The `rag query` command sends the assembled prompt to GPT‑4 (or another model) and returns the generated answer along with the source citations. The interactive REPL lets you iterate on questions and keeps the conversation state across turns.
 
 ## 9. MCP and Tool Integration
-The Model Context Protocol (MCP) server exposes the same retrieval and generation capabilities over HTTP. Tools like ChatGPT or the Cursor editor can connect to the server, making it easy to integrate RAG results into other workflows.
+The Model Context Protocol (MCP) server exposes the same retrieval and generation capabilities. Clients like Claude or the Cursor editor can connect to the server, making it easy to integrate RAG results into other workflows.
 
 These steps work together to provide grounded responses from your own documents. Index your data once, then query it confidently knowing that answers are backed by relevant sources.
