@@ -9,6 +9,8 @@ fastapi = pytest.importorskip("fastapi")
 os.environ["RAG_MCP_DUMMY"] = "1"
 os.environ.pop("RAG_MCP_API_KEY", None)
 from fastapi.testclient import TestClient
+from langchain_community.docstore.in_memory import InMemoryDocstore
+from langchain_core.documents import Document
 from rag.mcp_server import app, _compute_doc_id, main
 from rag import RAGConfig
 
@@ -23,8 +25,6 @@ def test_query_endpoint(socket_enabled) -> None:
     assert "answer" in data
 
 
-
-
 class _StubIndexMeta:
     def __init__(self, meta: dict[str, dict[str, Any]]) -> None:
         self._meta = meta
@@ -34,12 +34,16 @@ class _StubIndexMeta:
 
 
 class _StubEngine:
-    def __init__(self, info: list[dict[str, Any]], meta: dict[str, dict[str, Any]]) -> None:
+    def __init__(
+        self, info: list[dict[str, Any]], meta: dict[str, dict[str, Any]]
+    ) -> None:
         self._info = info
         self.index_meta = _StubIndexMeta(meta)
         self.invalidated: Path | None = None
         self.cleared = False
         self.config = RAGConfig(documents_dir="/tmp")
+        self.vectorstore_manager = MagicMock()
+        self.vectorstore_manager._get_docstore_items.return_value = []
 
     def list_indexed_files(self) -> list[dict[str, Any]]:
         return self._info
@@ -57,6 +61,15 @@ class _StubEngine:
 
     def invalidate_all_caches(self) -> None:
         self.cleared = True
+
+    def load_cached_vectorstore(self, path: str):
+        return self.cached_vs
+
+    def get_document_summaries(self, k: int = 5):
+        return self.summaries
+
+    def cleanup_orphaned_chunks(self):
+        return self.cleanup_result
 
 
 @patch("rag.mcp_server.get_engine")
@@ -108,7 +121,9 @@ def test_document_endpoints(mock_get_engine: MagicMock, socket_enabled) -> None:
 
 
 @patch("rag.mcp_server.get_engine")
-def test_index_endpoints(mock_get_engine: MagicMock, tmp_path: Path, socket_enabled) -> None:
+def test_index_endpoints(
+    mock_get_engine: MagicMock, tmp_path: Path, socket_enabled
+) -> None:
     engine = _StubEngine([], {})
     engine.documents_dir = tmp_path
     mock_get_engine.return_value = engine
@@ -145,6 +160,46 @@ def test_index_endpoints(mock_get_engine: MagicMock, tmp_path: Path, socket_enab
     assert data["total_chunks"] == 1
 
 
+@patch("rag.mcp_server.get_engine")
+def test_extra_endpoints(
+    mock_get_engine: MagicMock, tmp_path: Path, socket_enabled
+) -> None:
+    engine = _StubEngine([], {})
+    engine.summaries = [
+        {
+            "file_path": str(tmp_path / "doc.txt"),
+            "file_type": "text/plain",
+            "summary": "s",
+            "num_chunks": 1,
+        }
+    ]
+    doc = Document(page_content="hi", metadata={"source": "x"})
+    vs = MagicMock()
+    vs.docstore = InMemoryDocstore({"0": doc})
+    engine.cached_vs = vs
+    engine.vectorstore_manager._get_docstore_items.return_value = [("0", doc)]
+    engine.cleanup_result = {
+        "orphaned_files_removed": 1,
+        "bytes_freed": 5,
+        "size_human": "5 bytes",
+        "removed_paths": ["x"],
+    }
+    mock_get_engine.return_value = engine
+
+    resp = client.get("/summaries")
+    assert resp.status_code == 200
+    assert resp.json()[0]["summary"] == "s"
+
+    resp = client.post("/chunks", json={"path": str(tmp_path / "doc.txt")})
+    assert resp.status_code == 200
+    assert resp.json()[0]["text"] == "hi"
+
+    resp = client.post("/invalidate", json={"path": str(tmp_path / "doc.txt")})
+    assert resp.status_code == 200
+
+    resp = client.post("/cleanup")
+    assert resp.status_code == 200
+    assert resp.json()["summary"]["removed_count"] == 1
 
 
 def test_authentication_required(monkeypatch, socket_enabled) -> None:
@@ -171,4 +226,3 @@ def test_main_entry_point(mock_run):
     """Test that the main entry point calls mcp.run with stdio."""
     main()
     mock_run.assert_called_once_with("stdio")
-

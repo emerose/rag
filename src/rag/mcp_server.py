@@ -22,9 +22,13 @@ from starlette.responses import JSONResponse, Response
 from rag.auth import APIKeyAuthMiddleware
 from rag.mcp_tools import (
     ChatResponse,
+    Chunk,
+    CleanupResult,
+    CleanupSummary,
     DetailResponse,
     DocumentInfo,
     DocumentMetadata,
+    DocumentSummary,
     IndexPath,
     IndexStats,
     QueryResponse,
@@ -200,6 +204,73 @@ async def get_index_stats(request: Request) -> Response:
         }
     )
     return JSONResponse(stats.model_dump())
+
+
+@mcp.custom_route("/summaries", methods=["GET"])
+async def summaries_endpoint(request: Request) -> Response:
+    """Return short summaries of indexed documents."""
+
+    k = int(request.query_params.get("k", 5))
+    engine = get_engine()
+    summaries = engine.get_document_summaries(k=k)
+    payload = [DocumentSummary(**s) for s in summaries]
+    return JSONResponse([p.model_dump() for p in payload])
+
+
+@mcp.custom_route("/chunks", methods=["POST"])
+async def chunks_endpoint(request: Request) -> Response:
+    """Return stored chunks for an indexed file."""
+
+    data = await request.json()
+    path = data.get("path")
+    if not path:
+        raise HTTPException(status_code=400, detail="Path required")
+    engine = get_engine()
+    vectorstore = engine.load_cached_vectorstore(path)
+    if vectorstore is None:
+        raise HTTPException(status_code=404, detail="No cached vectorstore")
+    items = engine.vectorstore_manager._get_docstore_items(vectorstore.docstore)  # type: ignore[attr-defined]
+    chunks = [
+        Chunk(index=idx, text=doc.page_content, metadata=doc.metadata)
+        for idx, (_, doc) in enumerate(items)
+    ]
+    return JSONResponse([c.model_dump() for c in chunks])
+
+
+@mcp.custom_route("/invalidate", methods=["POST"])
+async def invalidate_endpoint(request: Request) -> Response:
+    """Invalidate caches for a path or all caches."""
+
+    data = await request.json()
+    path = data.get("path")
+    all_caches = data.get("all", False)
+    engine = get_engine()
+    if all_caches:
+        engine.invalidate_all_caches()
+        detail = "All caches invalidated"
+    elif path:
+        engine.invalidate_cache(path)
+        detail = f"Cache invalidated for {Path(path).name}"
+    else:
+        raise HTTPException(status_code=400, detail="Path required")
+    return JSONResponse(DetailResponse(detail=detail).model_dump())
+
+
+@mcp.custom_route("/cleanup", methods=["POST"])
+async def cleanup_endpoint(request: Request) -> Response:
+    """Remove orphaned caches and return statistics."""
+
+    engine = get_engine()
+    result = engine.cleanup_orphaned_chunks()
+    summary = CleanupSummary(
+        removed_count=result.get("orphaned_files_removed", 0),
+        bytes_freed=result.get("bytes_freed", 0),
+        size_human=result.get("size_human", "0 bytes"),
+    )
+    payload = CleanupResult(
+        summary=summary, removed_paths=result.get("removed_paths", [])
+    )
+    return JSONResponse(payload.model_dump())
 
 
 app = mcp.streamable_http_app()

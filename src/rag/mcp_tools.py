@@ -77,8 +77,33 @@ class DocumentMetadata(DocumentInfo):
     chunk_overlap: int
 
 
+class DocumentSummary(BaseModel):
+    """Summary information for a document."""
+
+    file_path: str
+    file_type: str
+    summary: str
+    num_chunks: int
+
+
+class Summaries(RootModel[list[DocumentSummary]]):
+    """List of document summaries."""
+
+
 class DetailResponse(BaseModel):
     detail: str
+
+
+class Chunk(BaseModel):
+    """A single chunk of text from a document."""
+
+    index: int
+    text: str
+    metadata: dict[str, Any]
+
+
+class Chunks(RootModel[list[Chunk]]):
+    """List of document chunks."""
 
 
 class SystemStatus(BaseModel):
@@ -87,6 +112,21 @@ class SystemStatus(BaseModel):
     cache_dir: str
     embedding_model: str
     chat_model: str
+
+
+class CleanupSummary(BaseModel):
+    """Summary statistics for a cleanup operation."""
+
+    removed_count: int
+    bytes_freed: int
+    size_human: str
+
+
+class CleanupResult(BaseModel):
+    """Result of a cleanup operation."""
+
+    summary: CleanupSummary
+    removed_paths: list[str]
 
 
 class IndexStats(RootModel[dict[str, Any]]):
@@ -175,6 +215,60 @@ def delete_document(doc_id: str) -> DetailResponse:
             return DetailResponse(detail=f"Document {doc_id} removed")
 
     raise ValueError("Document not found")
+
+
+def summarize_documents(k: int = 5) -> Summaries:
+    """Generate short summaries for the *k* largest documents."""
+
+    engine = get_engine()
+    summaries = engine.get_document_summaries(k=k)
+    items = [DocumentSummary(**s) for s in summaries]
+    return Summaries(items)
+
+
+def dump_chunks(path: str) -> Chunks:
+    """Return stored chunks for an indexed file."""
+
+    engine = get_engine()
+    vectorstore = engine.load_cached_vectorstore(path)
+    if vectorstore is None:
+        raise ValueError(f"No cached vectorstore for {path}")
+
+    items = engine.vectorstore_manager._get_docstore_items(vectorstore.docstore)  # type: ignore[attr-defined]
+    chunks = [
+        Chunk(index=idx, text=doc.page_content, metadata=doc.metadata)
+        for idx, (_, doc) in enumerate(items)
+    ]
+    return Chunks(chunks)
+
+
+def invalidate(path: str | None = None, all_caches: bool = False) -> DetailResponse:
+    """Invalidate caches for *path* or all caches when *all_caches* is True."""
+
+    engine = get_engine()
+    if all_caches:
+        engine.invalidate_all_caches()
+        return DetailResponse(detail="All caches invalidated")
+
+    if path is None:
+        raise ValueError("Path is required when all_caches is False")
+
+    engine.invalidate_cache(path)
+    return DetailResponse(detail=f"Cache invalidated for {Path(path).name}")
+
+
+def cleanup() -> CleanupResult:
+    """Remove orphaned caches and return statistics."""
+
+    engine = get_engine()
+    result = engine.cleanup_orphaned_chunks()
+    summary = CleanupSummary(
+        removed_count=result.get("orphaned_files_removed", 0),
+        bytes_freed=result.get("bytes_freed", 0),
+        size_human=result.get("size_human", "0 bytes"),
+    )
+    removed_paths = result.get("removed_paths", [])
+    return CleanupResult(summary=summary, removed_paths=removed_paths)
 
 
 def index_path(path: str) -> DetailResponse:
@@ -271,5 +365,9 @@ def register_tools(server: FastMCP) -> None:
     server.add_tool(index_path)
     server.add_tool(rebuild_index)
     server.add_tool(index_stats)
+    server.add_tool(summarize_documents)
+    server.add_tool(dump_chunks)
+    server.add_tool(invalidate)
+    server.add_tool(cleanup)
     server.add_tool(clear_cache)
     server.add_tool(system_status)
