@@ -209,4 +209,10 @@ api_key = os.getenv("RAG_MCP_API_KEY")
 if api_key:
     app.add_middleware(APIKeyAuthMiddleware, api_key=api_key)
 
-__all__ = ["_compute_doc_id", "app", "get_engine"]
+
+def main() -> None:
+    """Entry point for the MCP server."""
+    mcp.run("stdio")
+
+
+__all__ = ["_compute_doc_id", "app", "get_engine", "main"]

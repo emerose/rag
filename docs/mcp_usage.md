@@ -4,27 +4,33 @@ The Model Context Protocol (MCP) lets AI tools interact with your RAG server. Cl
 
 ## 1. Install the server in Claude
 
-Run the `mcp install` command from the project root. This adds your RAG server to Claude's configuration:
+First, make sure the RAG package is installed in your Python environment:
 
 ```bash
-mcp install src/rag/mcp_server.py:mcp --name RAG
+# Install the package in development mode
+uv pip install -e ".[dev]"
+```
+
+Then run the `mcp install` command from the project root. This adds your RAG server to Claude's configuration:
+
+```bash
+mcp install rag-mcp --name RAG
 ```
 
 You can include environment variables if needed:
 
 ```bash
-mcp install src/rag/mcp_server.py:mcp --name RAG \
+mcp install rag-mcp --name RAG \
   --env-var RAG_MCP_API_KEY=my-secret-key
 ```
 
 ## 2. Start the server from Claude
 
-
 Open Claude Desktop and choose your newly added **RAG** server from the MCP servers list. When launched, Claude connects to the server over stdio and can call the available tools.
 
 ## 3. Other integrations
 
-The `mcp dev` command runs the server with the MCP Inspector for testing. You can also start the server manually with `mcp run src/rag/mcp_server.py:mcp` if you prefer.
+The `mcp dev` command runs the server with the MCP Inspector for testing. You can also start the server manually with `mcp run rag-mcp` if you prefer.
 
 ## 4. Stop the server
 

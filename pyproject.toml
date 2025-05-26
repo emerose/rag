@@ -46,6 +46,7 @@ license = { text = "MIT" }
 
 [project.scripts]
 rag = "rag.cli.cli:run_cli"
+rag-mcp = "rag.mcp_server:main"
 
 [project.optional-dependencies]
 dev = [

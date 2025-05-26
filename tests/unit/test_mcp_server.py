@@ -9,7 +9,7 @@ fastapi = pytest.importorskip("fastapi")
 os.environ["RAG_MCP_DUMMY"] = "1"
 os.environ.pop("RAG_MCP_API_KEY", None)
 from fastapi.testclient import TestClient
-from rag.mcp_server import app, _compute_doc_id
+from rag.mcp_server import app, _compute_doc_id, main
 from rag import RAGConfig
 
 client = TestClient(app)
@@ -164,4 +164,11 @@ def test_authentication_required(monkeypatch, socket_enabled) -> None:
         headers={"Authorization": "Bearer tok"},
     )
     assert resp.status_code == 200
+
+
+@patch("rag.mcp_server.mcp.run")
+def test_main_entry_point(mock_run):
+    """Test that the main entry point calls mcp.run with stdio."""
+    main()
+    mock_run.assert_called_once_with("stdio")
 
