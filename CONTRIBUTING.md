@@ -18,6 +18,8 @@ Thank you for your interest in improving this project! This guide explains how t
    ```bash
    uv pip install -e ".[dev]"
    ```
+   This installs packages required for development, including
+   `pytest-asyncio` for running asynchronous tests.
 4. **Set your OpenAI API key** in a `.env` file:
    ```bash
    echo "OPENAI_API_KEY=your-api-key" > .env
