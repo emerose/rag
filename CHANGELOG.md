@@ -119,3 +119,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ensured consistent cache-dir option handling across all CLI commands
 - Improved console logging display: logger name follows level, noisy httpx and
   pdfminer logs are hidden, and callsite file/line numbers are accurate
+- Fixed path handling bug when indexing single files via CLI that caused "Not a directory" errors
+- Fixed path resolution inconsistency between file paths and documents directory on macOS
+- Fixed missing JSON output for single file indexing operations
+- Fixed golden set retrieval test to use realistic content matching instead of exact matches
+- Fixed CLI output test failures by resolving stdout capture conflicts in test fixtures
+- Refactored CLI index command to reduce complexity and improve maintainability

@@ -198,7 +198,7 @@ class RAGEngine:
     def _initialize_paths(self) -> None:
         """Initialize paths from configuration."""
         # Set up paths
-        self.documents_dir = Path(self.config.documents_dir).absolute()
+        self.documents_dir = Path(self.config.documents_dir).resolve()
         self.cache_dir = Path(self.config.cache_dir).absolute()
 
         # Ensure cache directory exists

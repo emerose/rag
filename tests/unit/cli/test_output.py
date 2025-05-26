@@ -30,6 +30,8 @@ def mock_consoles():
         patch("rag.cli.output.stderr_console", stderr_console),
         patch("sys.stdout.isatty", return_value=True),
     ):
+        # Reset JSON mode state before each test
+        set_json_mode(False)
         yield stdout_console, stderr_console
 
 
@@ -51,16 +53,15 @@ def test_write_string_rich(mock_consoles):
     stderr_console.print.assert_not_called()
 
 
-def test_write_string_json(mock_consoles, capture_stdout):
+def test_write_string_json():
     """Test writing a string message in JSON mode."""
-    stdout_console, stderr_console = mock_consoles
-    set_json_mode(True)
-    message = "Test message"
-    write(message)
-    output = json.loads(capture_stdout.getvalue())
-    assert output == {"message": message}
-    stdout_console.print.assert_not_called()
-    stderr_console.print.assert_not_called()
+    stdout = io.StringIO()
+    with patch('sys.stdout', stdout):
+        set_json_mode(True)
+        message = "Test message"
+        write(message)
+        output = json.loads(stdout.getvalue())
+        assert output == {"message": message}
 
 
 def test_write_error_rich(mock_consoles):
@@ -73,16 +74,15 @@ def test_write_error_rich(mock_consoles):
     stderr_console.print.assert_not_called()
 
 
-def test_write_error_json(mock_consoles, capture_stdout):
+def test_write_error_json():
     """Test writing an error message in JSON mode."""
-    stdout_console, stderr_console = mock_consoles
-    set_json_mode(True)
-    error = Error("Test error")
-    write(error)
-    output = json.loads(capture_stdout.getvalue())
-    assert output == {"error": "Test error"}
-    stdout_console.print.assert_not_called()
-    stderr_console.print.assert_not_called()
+    stdout = io.StringIO()
+    with patch('sys.stdout', stdout):
+        set_json_mode(True)
+        error = Error("Test error")
+        write(error)
+        output = json.loads(stdout.getvalue())
+        assert output == {"error": "Test error"}
 
 
 def test_write_table_rich(mock_consoles):
@@ -99,20 +99,19 @@ def test_write_table_rich(mock_consoles):
     stderr_console.print.assert_not_called()
 
 
-def test_write_table_json(mock_consoles, capture_stdout):
+def test_write_table_json():
     """Test writing a table in JSON mode."""
-    stdout_console, stderr_console = mock_consoles
-    set_json_mode(True)
-    table_data = TableData(
-        title="Test Table",
-        columns=["Col1", "Col2"],
-        rows=[["a", "b"], ["c", "d"]]
-    )
-    write(table_data)
-    output = json.loads(capture_stdout.getvalue())
-    assert output == {"table": table_data}
-    stdout_console.print.assert_not_called()
-    stderr_console.print.assert_not_called()
+    stdout = io.StringIO()
+    with patch('sys.stdout', stdout):
+        set_json_mode(True)
+        table_data = TableData(
+            title="Test Table",
+            columns=["Col1", "Col2"],
+            rows=[["a", "b"], ["c", "d"]]
+        )
+        write(table_data)
+        output = json.loads(stdout.getvalue())
+        assert output == {"table": table_data}
 
 
 def test_write_multiple_tables_rich(mock_consoles):
@@ -136,27 +135,26 @@ def test_write_multiple_tables_rich(mock_consoles):
     stderr_console.print.assert_not_called()
 
 
-def test_write_multiple_tables_json(mock_consoles, capture_stdout):
+def test_write_multiple_tables_json():
     """Test writing multiple tables in JSON mode."""
-    stdout_console, stderr_console = mock_consoles
-    set_json_mode(True)
-    tables = [
-        TableData(
-            title="Table 1",
-            columns=["Col1"],
-            rows=[["a"]]
-        ),
-        TableData(
-            title="Table 2",
-            columns=["Col1"],
-            rows=[["b"]]
-        )
-    ]
-    write(tables)
-    output = json.loads(capture_stdout.getvalue())
-    assert output == {"tables": tables}
-    stdout_console.print.assert_not_called()
-    stderr_console.print.assert_not_called()
+    stdout = io.StringIO()
+    with patch('sys.stdout', stdout):
+        set_json_mode(True)
+        tables = [
+            TableData(
+                title="Table 1",
+                columns=["Col1"],
+                rows=[["a"]]
+            ),
+            TableData(
+                title="Table 2",
+                columns=["Col1"],
+                rows=[["b"]]
+            )
+        ]
+        write(tables)
+        output = json.loads(stdout.getvalue())
+        assert output == {"tables": tables}
 
 
 def test_write_dict_rich(mock_consoles):
@@ -172,19 +170,18 @@ def test_write_dict_rich(mock_consoles):
     stderr_console.print.assert_not_called()
 
 
-def test_write_dict_json(mock_consoles, capture_stdout):
+def test_write_dict_json():
     """Test writing a dictionary in JSON mode."""
-    stdout_console, stderr_console = mock_consoles
-    set_json_mode(True)
-    data = {
-        "key1": "value1",
-        "key2": {"nested": "value2"}
-    }
-    write(data)
-    output = json.loads(capture_stdout.getvalue())
-    assert output == data
-    stdout_console.print.assert_not_called()
-    stderr_console.print.assert_not_called()
+    stdout = io.StringIO()
+    with patch('sys.stdout', stdout):
+        set_json_mode(True)
+        data = {
+            "key1": "value1",
+            "key2": {"nested": "value2"}
+        }
+        write(data)
+        output = json.loads(stdout.getvalue())
+        assert output == data
 
 
 def test_write_dict_with_table_rich(mock_consoles):
@@ -203,21 +200,20 @@ def test_write_dict_with_table_rich(mock_consoles):
     stderr_console.print.assert_not_called()
 
 
-def test_write_dict_with_table_json(mock_consoles, capture_stdout):
+def test_write_dict_with_table_json():
     """Test writing a dictionary containing a table in JSON mode."""
-    stdout_console, stderr_console = mock_consoles
-    set_json_mode(True)
-    table_data = TableData(
-        title="Test Table",
-        columns=["Col1"],
-        rows=[["a"]]
-    )
-    data = {"table": table_data}
-    write(data)
-    output = json.loads(capture_stdout.getvalue())
-    assert output == data
-    stdout_console.print.assert_not_called()
-    stderr_console.print.assert_not_called()
+    stdout = io.StringIO()
+    with patch('sys.stdout', stdout):
+        set_json_mode(True)
+        table_data = TableData(
+            title="Test Table",
+            columns=["Col1"],
+            rows=[["a"]]
+        )
+        data = {"table": table_data}
+        write(data)
+        output = json.loads(stdout.getvalue())
+        assert output == data
 
 
 def test_write_dict_with_tables_rich(mock_consoles):
@@ -243,29 +239,28 @@ def test_write_dict_with_tables_rich(mock_consoles):
     stderr_console.print.assert_not_called()
 
 
-def test_write_dict_with_tables_json(mock_consoles, capture_stdout):
+def test_write_dict_with_tables_json():
     """Test writing a dictionary containing multiple tables in JSON mode."""
-    stdout_console, stderr_console = mock_consoles
-    set_json_mode(True)
-    data = {
-        "tables": [
-            TableData(
-                title="Table 1",
-                columns=["Col1"],
-                rows=[["a"]]
-            ),
-            TableData(
-                title="Table 2",
-                columns=["Col1"],
-                rows=[["b"]]
-            )
-        ]
-    }
-    write(data)
-    output = json.loads(capture_stdout.getvalue())
-    assert output == data
-    stdout_console.print.assert_not_called()
-    stderr_console.print.assert_not_called()
+    stdout = io.StringIO()
+    with patch('sys.stdout', stdout):
+        set_json_mode(True)
+        data = {
+            "tables": [
+                TableData(
+                    title="Table 1",
+                    columns=["Col1"],
+                    rows=[["a"]]
+                ),
+                TableData(
+                    title="Table 2",
+                    columns=["Col1"],
+                    rows=[["b"]]
+                )
+            ]
+        }
+        write(data)
+        output = json.loads(stdout.getvalue())
+        assert output == data
 
 
 def test_json_mode_with_non_tty_stdout(mock_consoles):

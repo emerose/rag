@@ -150,3 +150,8 @@ exclude = [
     ".mypy_cache/",
     "tests/",
 ]
+
+[dependency-groups]
+dev = [
+    "trio>=0.30.0",
+]

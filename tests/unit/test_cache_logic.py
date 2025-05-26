@@ -24,18 +24,22 @@ class TestCacheLogic:
     @pytest.fixture  
     def sample_text_file(self, temp_dir):
         """Create a sample text file for testing."""
-        file_path = temp_dir / "sample.txt"
+        docs_dir = temp_dir / "docs"
+        docs_dir.mkdir(exist_ok=True)
+        file_path = docs_dir / "sample.txt"
         file_path.write_text("This is a sample document for testing cache logic.")
         return file_path
 
     @pytest.fixture
     def rag_engine(self, temp_dir):
         """Create a RAG engine with mocked components for testing."""
+        docs_dir = temp_dir / "docs"
+        docs_dir.mkdir()
         cache_dir = temp_dir / "cache"
         cache_dir.mkdir()
         
         config = RAGConfig(
-            documents_dir=str(temp_dir),
+            documents_dir=str(docs_dir),
             cache_dir=str(cache_dir),
             chunk_size=100,
             chunk_overlap=20,
@@ -132,42 +136,30 @@ class TestCacheLogic:
 
     def test_directory_indexing_skips_cached_files(self, rag_engine, temp_dir):
         """Test that directory indexing skips files that are already cached."""
-        # Create multiple test files
-        file1 = temp_dir / "file1.txt"
+        # Create multiple test files in the docs directory
+        docs_dir = temp_dir / "docs"
+        docs_dir.mkdir(exist_ok=True)
+        file1 = docs_dir / "file1.txt"
         file1.write_text("Content of file 1")
-        file2 = temp_dir / "file2.txt"
+        file2 = docs_dir / "file2.txt"
         file2.write_text("Content of file 2")
         
-        # Mock the ingest_directory method to track which files are processed
+        # Mock the ingest_file method to track which files are processed
         processed_files = []
+        original_ingest_file = rag_engine.ingest_manager.ingest_file
         
-        def tracking_ingest_directory(directory):
-            # Call the original method but track what files it processes
-            from rag.ingest import IngestResult, IngestStatus, DocumentSource
-            
-            # Simulate processing all files
-            results = {}
-            for file_path in [file1, file2]:
-                processed_files.append(str(file_path))
-                source = DocumentSource(file_path)
-                result = IngestResult(source, IngestStatus.SUCCESS)
-                result.documents = [
-                    Document(
-                        page_content=file_path.read_text(),
-                        metadata={"source": str(file_path)}
-                    )
-                ]
-                results[str(file_path)] = result
-            return results
+        def tracking_ingest_file(file_path):
+            processed_files.append(str(file_path))
+            return original_ingest_file(file_path)
         
-        rag_engine.ingest_manager.ingest_directory = tracking_ingest_directory
+        rag_engine.ingest_manager.ingest_file = tracking_ingest_file
         
         # First directory indexing - should process both files
-        results = rag_engine.index_directory(temp_dir)
+        results = rag_engine.index_directory(docs_dir)
         assert len(processed_files) == 2, "Both files should be processed on first indexing"
         assert all(r.get("success") for r in results.values()), "All files should be successfully indexed"
         
         # Second directory indexing - should process NO files (they're cached)
         processed_files.clear()
-        results = rag_engine.index_directory(temp_dir)
+        results = rag_engine.index_directory(docs_dir)
         assert len(processed_files) == 0, "No files should be processed when all are cached and unchanged" 

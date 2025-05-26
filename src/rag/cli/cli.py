@@ -4,6 +4,7 @@ import signal
 import sys
 import traceback
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -241,6 +242,130 @@ def create_console_progress_callback(progress: Progress) -> Callable[[str, int],
     return update_progress
 
 
+@dataclass
+class IndexingParams:
+    """Parameters for indexing operations."""
+
+    path: str
+    chunk_size: int
+    chunk_overlap: int
+    preserve_headings: bool
+    semantic_chunking: bool
+    async_batching: bool
+    cache_dir: str | None
+
+
+def _create_rag_config_and_runtime(
+    params: IndexingParams,
+) -> tuple[RAGConfig, RuntimeOptions]:
+    """Create RAG configuration and runtime options."""
+    # Determine the documents directory
+    path_obj = Path(params.path)
+    if path_obj.is_file():
+        documents_dir = str(path_obj.parent)
+    else:
+        documents_dir = str(path_obj)
+
+    config = RAGConfig(
+        documents_dir=documents_dir,
+        embedding_model="text-embedding-3-small",
+        chat_model="gpt-4",
+        temperature=0.0,
+        chunk_size=params.chunk_size,
+        chunk_overlap=params.chunk_overlap,
+        cache_dir=params.cache_dir or state.cache_dir,
+        vectorstore_backend=state.vectorstore_backend,
+    )
+    runtime_options = RuntimeOptions(
+        preserve_headings=params.preserve_headings,
+        semantic_chunking=params.semantic_chunking,
+        max_workers=state.max_workers,
+        async_batching=params.async_batching,
+    )
+    return config, runtime_options
+
+
+def _index_single_file(rag_engine: RAGEngine, path_obj: Path) -> None:
+    """Index a single file and output results."""
+    state.logger.info(f"Indexing file: {path_obj}")
+    success, error = rag_engine.index_file(path_obj)
+    results = {str(path_obj): success}
+
+    # Create summary and output results
+    total = 1
+    successful = 1 if success else 0
+    failed = 1 if not success else 0
+
+    output = {
+        "summary": {
+            "total": total,
+            "successful": successful,
+            "failed": failed,
+        },
+        "results": results,
+    }
+
+    if error:
+        output["errors"] = {str(path_obj): error}
+
+    write(output)
+
+
+def _index_directory(
+    rag_engine: RAGEngine, path_obj: Path, cached_before: set[str]
+) -> None:
+    """Index a directory and output results."""
+    state.logger.info(f"Indexing directory: {path_obj}")
+
+    # Create a progress bar
+    with Progress() as progress:
+        # Create progress callback
+        progress_callback = create_console_progress_callback(progress)
+
+        # Set the progress callback
+        rag_engine.runtime.progress_callback = progress_callback
+
+        # Run indexing on the specified directory
+        results = rag_engine.index_directory(path_obj)
+
+    success_files = [f for f, r in results.items() if r.get("success")]
+    error_files = {
+        f: r.get("error") for f, r in results.items() if not r.get("success")
+    }
+
+    cached_in_run = sorted(set(results.keys()) & cached_before)
+
+    tables = []
+    if cached_in_run:
+        tables.append(
+            TableData(
+                title="Cached Files",
+                columns=["File"],
+                rows=[[f] for f in cached_in_run],
+            )
+        )
+
+    if success_files:
+        tables.append(
+            TableData(
+                title="Indexed Successfully",
+                columns=["File"],
+                rows=[[f] for f in sorted(success_files)],
+            )
+        )
+
+    if error_files:
+        tables.append(
+            TableData(
+                title="Errors",
+                columns=["File", "Error"],
+                rows=[[f, str(msg)] for f, msg in error_files.items()],
+            )
+        )
+
+    write({"tables": tables})
+
+
 @app.command()
 def index(  # noqa: PLR0913
     path: str = typer.Argument(
@@ -301,85 +426,29 @@ def index(  # noqa: PLR0913
 
         # Initialize RAG engine
         state.logger.debug("Initializing RAG engine...")
-        config = RAGConfig(
-            documents_dir=str(path),
-            embedding_model="text-embedding-3-small",
-            chat_model="gpt-4",
-            temperature=0.0,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            cache_dir=cache_dir or state.cache_dir,
-            vectorstore_backend=state.vectorstore_backend,
+
+        params = IndexingParams(
+            path,
+            chunk_size,
+            chunk_overlap,
+            preserve_headings,
+            semantic_chunking,
+            async_batching,
+            cache_dir,
         )
-        runtime_options = RuntimeOptions(
-            preserve_headings=preserve_headings,
-            semantic_chunking=semantic_chunking,
-            max_workers=state.max_workers,
-            async_batching=async_batching,
-        )
+
+        config, runtime_options = _create_rag_config_and_runtime(params)
 
         rag_engine = RAGEngine(config, runtime_options)
-
         cached_before = set(rag_engine.cache_manager.list_cached_files().keys())
+        path_obj = Path(path)
 
         # Run indexing
-        path_obj = Path(path)
         if path_obj.is_file():
-            # Index just the file that was specified
-            state.logger.info(f"Indexing file: {path_obj}")
-            success, error = rag_engine.index_file(path_obj)
-            results = {str(path_obj): {"success": success, "error": error}}
+            _index_single_file(rag_engine, path_obj)
         else:
-            # Index the entire directory
-            state.logger.info(f"Indexing directory: {path_obj}")
+            _index_directory(rag_engine, path_obj, cached_before)
 
-            # Create a progress bar
-            with Progress() as progress:
-                # Create progress callback
-                progress_callback = create_console_progress_callback(progress)
-
-                # Set the progress callback
-                rag_engine.runtime.progress_callback = progress_callback
-
-                # Run indexing on the specified directory
-                results = rag_engine.index_directory(path_obj)
-
-            success_files = [f for f, r in results.items() if r.get("success")]
-            error_files = {
-                f: r.get("error") for f, r in results.items() if not r.get("success")
-            }
-
-            cached_in_run = sorted(set(results.keys()) & cached_before)
-
-            tables = []
-            if cached_in_run:
-                tables.append(
-                    TableData(
-                        title="Cached Files",
-                        columns=["File"],
-                        rows=[[f] for f in cached_in_run],
-                    )
-                )
-
-            if success_files:
-                tables.append(
-                    TableData(
-                        title="Indexed Successfully",
-                        columns=["File"],
-                        rows=[[f] for f in sorted(success_files)],
-                    )
-                )
-
-            if error_files:
-                tables.append(
-                    TableData(
-                        title="Errors",
-                        columns=["File", "Error"],
-                        rows=[[f, str(msg)] for f, msg in error_files.items()],
-                    )
-                )
-
-            write({"tables": tables})
     except ValueError as e:
         write(Error(f"Configuration error: {e}"))
         sys.exit(1)
