@@ -72,7 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optional API key authentication for the MCP server via `RAG_MCP_API_KEY`.
 - Step-by-step MCP usage guide for ChatGPT and Cursor in `docs/mcp_usage.md`.
 - Tailscale instructions for remote ChatGPT access added to the MCP usage guide.
-- Added `serve-mcp` CLI command for running the MCP server
+- Added `mcp-http` CLI command for running the MCP HTTP server and
+  `mcp-stdio` (alias `mcp`) for stdio transport
 - Initial Sphinx documentation with guide for swapping the vector store
 - Validation check for `OPENAI_API_KEY` during engine initialization
 - Documented metadata filter syntax in README with examples

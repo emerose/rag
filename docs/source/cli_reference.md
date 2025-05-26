@@ -86,12 +86,21 @@ Display available prompt templates.
 rag prompt list
 ```
 
-## `serve-mcp`
+## `mcp-stdio`
+
+Run the MCP server using the stdio transport. The command `mcp` is an alias of
+`mcp-stdio`.
+
+```
+rag mcp-stdio
+```
+
+## `mcp-http`
 
 Run the MCP HTTP server.
 
 ```
-rag serve-mcp --host 0.0.0.0 --port 8000
+rag mcp-http --host 0.0.0.0 --port 8000
 ```
 
 Global options available on every command include:
