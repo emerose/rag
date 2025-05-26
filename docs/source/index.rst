@@ -6,6 +6,7 @@ RAG Documentation
    :caption: Contents
 
    project_overview
+   getting_started
    conceptual_overview
    cli_reference
    api_http
