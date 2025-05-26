@@ -28,7 +28,7 @@ def test_server_query() -> None:
     try:
         for _ in range(30):
             try:
-                httpx.get(f"http://127.0.0.1:{port}/system/status")
+                httpx.get(f"http://127.0.0.1:{port}/index/stats")
                 break
             except httpx.TransportError:
                 time.sleep(0.1)

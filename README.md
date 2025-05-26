@@ -300,21 +300,11 @@ rag invalidate --all path/to/directory
 ### MCP Server
 
 RAG operations are implemented as MCP tools in `rag.mcp_tools`. These tools can
-be served using the `FastMCP` server. The legacy FastAPI server still exposes a
-couple of endpoints for basic status and cache management:
-
-- `POST /cache/clear` – clear embedding and search caches.
-- `GET /system/status` – return server status and configuration summary.
+be served using the `FastMCP` server. The HTTP server exposes them via the
+standard MCP interface at the `/mcp` endpoint.
 
 Run the server with `rag mcp-http --host 127.0.0.1 --port 8000`. When
-`RAG_MCP_API_KEY` is set, include an `Authorization` header in requests:
-
-```bash
-curl -H "Authorization: Bearer $RAG_MCP_API_KEY" \
-  -X POST http://localhost:8000/cache/clear
-curl -H "Authorization: Bearer $RAG_MCP_API_KEY" \
-  http://localhost:8000/system/status
-```
+`RAG_MCP_API_KEY` is set, include an `Authorization` header in requests.
 
 AI assistants that implement MCP can connect using the same base URL and
 `Authorization` header.
