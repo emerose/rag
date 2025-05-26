@@ -106,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidated MCP server logic by reusing common models
 - Context window packing for retrieval results to maximise prompt space
 - Added confirmation prompt before invalidating all caches
+- Expanded conceptual overview with technical details on loaders, chunking and caching
 
 ### Fixed
 - More reliable heading detection in PDFs by using statistical font analysis
