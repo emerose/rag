@@ -27,6 +27,8 @@ def test_golden_set_retrieval(tmp_path: Path) -> None:
     docs_dir = tmp_path / "docs"
     docs_dir.mkdir()
     sample_file = Path(__file__).parent / "sample.txt"
+    target_file = docs_dir / "sample.txt"
+    shutil.copy(sample_file, target_file)
 
     config = RAGConfig(documents_dir=str(docs_dir), cache_dir=str(cache_dir), openai_api_key="sk-test")
     runtime = RuntimeOptions()
@@ -34,7 +36,7 @@ def test_golden_set_retrieval(tmp_path: Path) -> None:
     with patch("rag.embeddings.embedding_provider.OpenAIEmbeddings", return_value=FakeEmbeddings(size=32)), \
             patch.object(EmbeddingProvider, "_get_embedding_dimension", return_value=32):
         engine = RAGEngine(config, runtime)
-        success, error = engine.index_file(sample_file)
+        success, error = engine.index_file(target_file)
         assert success, f"Indexing failed: {error}"
 
         vectorstore = next(iter(engine.vectorstores.values()))

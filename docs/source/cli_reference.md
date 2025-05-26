@@ -18,6 +18,9 @@ Options:
 - `--async-batching/--sync-batching` – perform embedding asynchronously
 - `--cache-dir` – location to store embeddings
 
+Indexing is restricted to the configured documents directory. Paths
+outside this root are ignored for security reasons.
+
 ## `query`
 
 Retrieve relevant documents and generate an answer.

@@ -378,7 +378,7 @@ class RAGEngine:
 
         self._log("DEBUG", f"Loaded {len(self.vectorstores)} vectorstores")
 
-    def index_file(self, file_path: Path | str) -> tuple[bool, str | None]:
+    def index_file(self, file_path: Path | str) -> tuple[bool, str | None]:  # noqa: PLR0911
         """Index a file.
 
         Args:
@@ -389,8 +389,19 @@ class RAGEngine:
             ``None`` when indexing succeeds.
 
         """
-        file_path = Path(file_path).absolute()
+        file_path = Path(file_path).resolve()
         self._log("INFO", f"Indexing file: {file_path}")
+
+        # Disallow indexing outside the configured documents directory
+        try:
+            file_path.relative_to(self.documents_dir)
+        except ValueError:
+            self._log(
+                "ERROR",
+                f"File path {file_path} is outside the allowed directory"
+                f" {self.documents_dir}",
+            )
+            return False, "File path outside allowed directory"
         error_message: str | None = None
 
         try:
@@ -642,8 +653,19 @@ class RAGEngine:
             optional ``error`` message
 
         """
-        directory = Path(directory).absolute() if directory else self.documents_dir
+        directory = Path(directory).resolve() if directory else self.documents_dir
         self._log("DEBUG", f"Indexing directory: {directory}")
+
+        # Disallow indexing directories outside the configured documents directory
+        try:
+            directory.relative_to(self.documents_dir)
+        except ValueError:
+            self._log(
+                "ERROR",
+                f"Directory {directory} is outside the allowed directory"
+                f" {self.documents_dir}",
+            )
+            return {}
 
         # Validate directory
         if not self.filesystem_manager.validate_documents_dir(directory):
