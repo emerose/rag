@@ -37,3 +37,4 @@ Ingest
 .coverage.*
 htmlcov/
 docs/build/
+commit_msg.txt
