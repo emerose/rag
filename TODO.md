@@ -8,28 +8,32 @@
 
 ---
 
+### Architecture & Core Design
 
-### 1 . Architecture & Core Design
+### Retrieval & Relevance
 
-### 2 . Retrieval & Relevance
+### Prompt Engineering & Generation
 
-### 3 . Prompt Engineering & Generation
-
-### 4 . LangChain Modernisation
+### LangChain Modernisation
 - [#54] [P2] **Enable LangSmith tracing** – Provide `--trace` flag that runs with `langchain.cli trace`.
 
 
-### 5 . CLI / REPL UX
+### MCP Server Integration
 
-### 6 . Performance
-
-### 7 . Evaluation & Testing
+- [#193] [P3] **Move remaining commands out of HTTP and into MCP** – According to the README, there are a couple of legacy HTTP endpoints still exposed -- /cache/clear and /system/status
 
 
-### 8 . Packaging & CI
+### CLI / REPL UX
+
+### Performance
+
+### Evaluation & Testing
 
 
-### 9 . Documentation & Examples
+### Packaging & CI
+
+
+### Documentation & Examples
 - [#67] [P4] **Tutorial notebook** – `examples/rag_basic.ipynb` covering indexing, querying, prompt tweaks.
 
 ---
