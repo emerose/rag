@@ -347,6 +347,9 @@ def test_update_metadata(
             embedding_model_version="test-version",
             file_type="text/plain",
             num_chunks=10,
+            document_loader="TextLoader",
+            tokenizer="cl100k_base",
+            text_splitter="semantic_splitter",
         )
 
     # Verify update_file_metadata was called with the right arguments
@@ -380,6 +383,9 @@ def test_get_metadata(_mock_connect: MagicMock, temp_dir: Path) -> None:
         "text/plain",  # file_type
         10,  # num_chunks
         12345,  # file_size
+        "TextLoader",  # document_loader
+        "cl100k_base",  # tokenizer
+        "semantic_splitter",  # text_splitter
     )
 
     # Create manager with mock
@@ -401,6 +407,9 @@ def test_get_metadata(_mock_connect: MagicMock, temp_dir: Path) -> None:
     assert metadata["file_type"] == "text/plain"
     assert metadata["num_chunks"] == 10
     assert metadata["file_size"] == 12345
+    assert metadata["document_loader"] == "TextLoader"
+    assert metadata["tokenizer"] == "cl100k_base"
+    assert metadata["text_splitter"] == "semantic_splitter"
 
 
 @patch("sqlite3.connect")

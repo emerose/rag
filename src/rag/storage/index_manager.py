@@ -59,7 +59,8 @@ class IndexManager:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 # Create document metadata table
-                conn.execute("""
+                conn.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS document_meta (
                         file_path TEXT PRIMARY KEY,
                         file_hash TEXT NOT NULL,
@@ -71,9 +72,13 @@ class IndexManager:
                         embedding_model_version TEXT NOT NULL,
                         file_type TEXT NOT NULL,
                         num_chunks INTEGER NOT NULL,
-                        file_size INTEGER NOT NULL
+                        file_size INTEGER NOT NULL,
+                        document_loader TEXT,
+                        tokenizer TEXT,
+                        text_splitter TEXT
                     )
-                """)
+                    """
+                )
 
                 # Create global settings table for embedding model info and other settings
                 conn.execute("""
@@ -222,6 +227,9 @@ class IndexManager:
         embedding_model_version: str,
         file_type: str,
         num_chunks: int,
+        document_loader: str | None = None,
+        tokenizer: str | None = None,
+        text_splitter: str | None = None,
     ) -> None:
         """Update the metadata for an indexed file.
 
@@ -233,6 +241,9 @@ class IndexManager:
             embedding_model_version: Version of the embedding model
             file_type: MIME type of the file
             num_chunks: Number of chunks created from the file
+            document_loader: Name of the loader class used
+            tokenizer: Name of the tokenizer
+            text_splitter: Name of the text splitter
 
         """
         file_hash = self.compute_file_hash(file_path)
@@ -243,11 +254,26 @@ class IndexManager:
             with sqlite3.connect(self.db_path) as conn:
                 conn.execute(
                     """
-                    INSERT OR REPLACE INTO document_meta
-                    (file_path, file_hash, chunk_size, chunk_overlap, last_modified,
-                     indexed_at, embedding_model, embedding_model_version, file_type,
-                     num_chunks, file_size)
-                    VALUES (?, ?, ?, ?, ?, strftime('%s', 'now'), ?, ?, ?, ?, ?)
+                    INSERT OR REPLACE INTO document_meta (
+                        file_path,
+                        file_hash,
+                        chunk_size,
+                        chunk_overlap,
+                        last_modified,
+                        indexed_at,
+                        embedding_model,
+                        embedding_model_version,
+                        file_type,
+                        num_chunks,
+                        file_size,
+                        document_loader,
+                        tokenizer,
+                        text_splitter
+                    ) VALUES (
+                        ?, ?, ?, ?, ?,
+                        strftime('%s', 'now'),
+                        ?, ?, ?, ?, ?, ?, ?, ?
+                    )
                     """,
                     (
                         str(file_path),
@@ -260,6 +286,9 @@ class IndexManager:
                         file_type,
                         num_chunks,
                         file_size,
+                        document_loader,
+                        tokenizer,
+                        text_splitter,
                     ),
                 )
                 conn.commit()
@@ -525,7 +554,7 @@ class IndexManager:
                     """
                     SELECT file_hash, chunk_size, chunk_overlap, last_modified,
                     indexed_at, embedding_model, embedding_model_version, file_type,
-                    num_chunks, file_size
+                    num_chunks, file_size, document_loader, tokenizer, text_splitter
                     FROM document_meta
                     WHERE file_path = ?
                     """,
@@ -547,6 +576,9 @@ class IndexManager:
                     "file_type": row[7],
                     "num_chunks": row[8],
                     "file_size": row[9],
+                    "document_loader": row[10],
+                    "tokenizer": row[11],
+                    "text_splitter": row[12],
                 }
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to get metadata: {e}")
@@ -565,7 +597,7 @@ class IndexManager:
                     """
                     SELECT dm.file_path, dm.file_type, dm.num_chunks, dm.file_size,
                     dm.embedding_model, dm.embedding_model_version, dm.indexed_at,
-                    dm.last_modified
+                    dm.last_modified, dm.document_loader, dm.tokenizer, dm.text_splitter
                     FROM document_meta dm
                     JOIN file_metadata fm ON dm.file_path = fm.file_path
                     ORDER BY dm.indexed_at DESC
@@ -583,6 +615,9 @@ class IndexManager:
                         "embedding_model_version": row[5],
                         "indexed_at": row[6],
                         "last_modified": row[7],
+                        "document_loader": row[8],
+                        "tokenizer": row[9],
+                        "text_splitter": row[10],
                     }
                     for row in rows
                 ]

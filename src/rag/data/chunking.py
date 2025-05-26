@@ -349,6 +349,9 @@ class SemanticChunkingStrategy(ChunkingStrategy):
             semantic_chunking=semantic_chunking,
         )
 
+        self.last_splitter_name: str | None = None
+        self.tokenizer_name = self.splitter_factory.tokenizer_name
+
     def _log(self, level: str, message: str) -> None:
         """Log a message.
 
@@ -379,5 +382,7 @@ class SemanticChunkingStrategy(ChunkingStrategy):
 
         # Use TextSplitterFactory to split documents
         chunked_docs = self.splitter_factory.split_documents(documents, mime_type)
+
+        self.last_splitter_name = self.splitter_factory.last_splitter_name
 
         return chunked_docs
