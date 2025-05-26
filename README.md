@@ -13,6 +13,7 @@ See the [Getting Started guide](https://0xSamQ.github.io/rag/getting_started.htm
 - Synthetic QA generator for regression testing
 - MCP server for integrating RAG tools into other applications
 
+
 ## Supported File Types
 
 - PDF (`.pdf`)
