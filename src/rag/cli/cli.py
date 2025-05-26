@@ -134,6 +134,16 @@ INVALIDATE_PATH_ARG = typer.Argument(
     resolve_path=True,
 )
 
+# Path argument for the chunks command
+CHUNKS_PATH_ARG = typer.Argument(
+    ...,  # File path is required
+    help="Indexed file to dump stored chunks for",
+    exists=True,
+    dir_okay=False,
+    file_okay=True,
+    resolve_path=True,
+)
+
 
 def update_console_for_json_mode(json_mode: bool) -> None:
     """Update the global console based on JSON mode."""
@@ -847,6 +857,51 @@ def list(
     except (exceptions.RAGError, OSError, KeyError, ValueError, TypeError) as e:
         write(Error(f"Error listing indexed documents: {e}"))
         sys.exit(1)
+
+
+@app.command()
+def chunks(
+    path: Path = CHUNKS_PATH_ARG,
+    cache_dir: str = typer.Option(
+        None,
+        "--cache-dir",
+        "-c",
+        help="Directory for caching embeddings and vector stores",
+    ),
+    json_output: bool = JSON_OUTPUT_OPTION,
+) -> None:
+    """Dump stored chunks for an indexed file."""
+    try:
+        config = RAGConfig(
+            documents_dir=str(path.parent),
+            embedding_model="text-embedding-3-small",
+            chat_model="gpt-4",
+            temperature=0.0,
+            cache_dir=cache_dir or state.cache_dir,
+            vectorstore_backend=state.vectorstore_backend,
+        )
+        rag_engine = RAGEngine(config)
+
+        vectorstore = rag_engine.load_cached_vectorstore(str(path))
+        if vectorstore is None:
+            write(Error(f"No cached vectorstore for {path}"))
+            raise typer.Exit(1)
+
+        items = rag_engine.vectorstore_manager._get_docstore_items(vectorstore.docstore)  # type: ignore[attr-defined]
+        chunks = [
+            {
+                "index": idx,
+                "text": doc.page_content,
+                "metadata": doc.metadata,
+            }
+            for idx, (_, doc) in enumerate(items)
+        ]
+
+        write({"chunks": chunks})
+
+    except (exceptions.RAGError, OSError, KeyError, ValueError, TypeError) as e:
+        write(Error(f"Error dumping chunks: {e}"))
+        raise typer.Exit(1) from e
 
 
 @prompt_app.command("list")
