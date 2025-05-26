@@ -2,6 +2,9 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+from langchain_community.docstore.in_memory import InMemoryDocstore
+from langchain_core.documents import Document
+
 from rag import RAGConfig
 from rag.mcp_tools import (
     _compute_doc_id,
@@ -15,6 +18,10 @@ from rag.mcp_tools import (
     query,
     rebuild_index,
     system_status,
+    summarize_documents,
+    dump_chunks,
+    invalidate,
+    cleanup,
 )
 
 
@@ -42,6 +49,17 @@ class _StubEngine:
             "sources": [],
             "num_documents_retrieved": 0,
         }
+        self.vectorstore_manager = MagicMock()
+        self.vectorstore_manager._get_docstore_items.return_value = []
+
+    def load_cached_vectorstore(self, path: str):
+        return self.cached_vs
+
+    def get_document_summaries(self, k: int = 5):
+        return self.summaries
+
+    def cleanup_orphaned_chunks(self):
+        return self.cleanup_result
 
     def answer(self, question: str, k: int = 4) -> dict[str, Any]:
         return self.answer_result
@@ -167,3 +185,49 @@ def test_cache_and_status_tools(mock_get_engine: MagicMock) -> None:
     assert status.status == "ok"
     assert status.num_documents == 0
     assert status.cache_dir == engine.config.cache_dir
+
+
+@patch("rag.mcp_tools.get_engine")
+def test_summarize_and_chunks_tools(mock_get_engine: MagicMock, tmp_path: Path) -> None:
+    engine = _StubEngine([], {})
+    engine.summaries = [
+        {
+            "file_path": str(tmp_path / "doc.txt"),
+            "file_type": "text/plain",
+            "summary": "hello",
+            "num_chunks": 1,
+        }
+    ]
+    doc = Document(page_content="hi", metadata={"source": "x"})
+    vs = MagicMock()
+    vs.docstore = InMemoryDocstore({"0": doc})
+    engine.cached_vs = vs
+    engine.vectorstore_manager._get_docstore_items.return_value = [("0", doc)]
+    mock_get_engine.return_value = engine
+
+    summaries = summarize_documents(1)
+    assert summaries.root[0].summary == "hello"
+
+    chunks = dump_chunks(str(tmp_path / "doc.txt"))
+    assert chunks.root[0].text == "hi"
+
+
+@patch("rag.mcp_tools.get_engine")
+def test_invalidate_and_cleanup_tools(mock_get_engine: MagicMock) -> None:
+    engine = _StubEngine([], {})
+    engine.cleanup_result = {
+        "orphaned_files_removed": 1,
+        "bytes_freed": 10,
+        "size_human": "10 bytes",
+        "removed_paths": ["x"],
+    }
+    mock_get_engine.return_value = engine
+
+    detail = invalidate("doc.txt")
+    assert "doc.txt" in detail.detail
+
+    detail_all = invalidate(all_caches=True)
+    assert "All caches" in detail_all.detail
+
+    result = cleanup()
+    assert result.summary.removed_count == 1

@@ -34,3 +34,16 @@ Rebuild the entire index from scratch.
 
 ## GET `/index/stats`
 Return document count, total size, and chunk count.
+
+## GET `/summaries`
+Return short summaries of indexed documents. Query parameter `k` controls the
+number of documents (default 5).
+
+## POST `/chunks`
+Retrieve stored chunks for a file. Payload: `{ "path": "./docs/file.txt" }`.
+
+## POST `/invalidate`
+Invalidate caches for a file or all caches when `{ "all": true }`.
+
+## POST `/cleanup`
+Remove orphaned vector stores and return summary statistics.
