@@ -1,8 +1,8 @@
 # RAG (Retrieval Augmented Generation) CLI
 
 A powerful command-line tool for building and querying RAG applications via an interactive REPL.
-Full documentation is available on [GitHub Pages](https://0xSamQ.github.io/rag/).
-See the [Getting Started guide](https://0xSamQ.github.io/rag/getting_started.html) for installation and usage instructions.
+Full documentation is available on [GitHub Pages](https://emerose.github.io/rag/).
+See the [Getting Started guide](https://emerose.github.io/rag/getting_started.html) for installation and usage instructions.
 
 ## Features
 
