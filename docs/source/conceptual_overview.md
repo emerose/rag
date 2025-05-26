@@ -27,7 +27,7 @@ Queries are answered by performing a dense similarity search over the cached vec
 The RAG chains are assembled with LangChain Expression Language in [``build_rag_chain``](https://github.com/emerose/rag/blob/main/src/rag/chains/rag_chain.py). Prompt templates in ``prompts/`` define how retrieved text and the user question are combined. Chains may include system prompts or conversation history depending on the command.
 
 ## 8. Querying
-``rag query`` sends the assembled prompt to [ChatOpenAI](https://python.langchain.com/docs/integrations/chat/openai) (GPT‑4 by default) and returns the generated answer with source citations. The interactive ``rag repl`` maintains conversation state across turns and supports streaming output.
+``rag query`` sends the assembled prompt to [ChatOpenAI](https://python.langchain.com/docs/integrations/chat/openai) (GPT‑4 by default, configurable with ``--chat-model``) and returns the generated answer with source citations. The interactive ``rag repl`` maintains conversation state across turns and supports streaming output.
 
 ## 9. MCP and Tool Integration
 The Model Context Protocol (MCP) server exposes the same retrieval and generation capabilities. Clients like Claude or the Cursor editor can connect to the server, making it easy to integrate RAG results into other workflows.
