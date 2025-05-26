@@ -29,6 +29,6 @@ The RAG chains are assembled with LangChain Expression Language in ``build_rag_c
 ``rag query`` sends the assembled prompt to ``ChatOpenAI`` (GPT‑4 by default) and returns the generated answer with source citations. The interactive ``rag repl`` maintains conversation state across turns and supports streaming output.
 
 ## 9. MCP and Tool Integration
-The Model Context Protocol (MCP) server exposes the same indexing and querying capabilities over HTTP. Tools like ChatGPT or the Cursor editor can connect to the server, making it easy to integrate RAG results into other workflows.
+The Model Context Protocol (MCP) server exposes the same retrieval and generation capabilities. Clients like Claude or the Cursor editor can connect to the server, making it easy to integrate RAG results into other workflows.
 
 These steps work together to provide grounded responses from your own documents. Index your data once, then query it confidently knowing answers are backed by relevant sources.

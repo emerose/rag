@@ -4,5 +4,5 @@ Retrieval Augmented Generation (RAG) combines document retrieval with language m
 
 ## Current Status
 
-RAG is under active development. The core CLI supports indexing, querying, summarizing, and cache management. An experimental MCP server exposes the same capabilities over HTTP for integration with tools like ChatGPT and Cursor.
+RAG is under active development. The core CLI supports indexing, querying, summarizing, and cache management. An experimental MCP server exposes the same capabilities for integration with clients such as Claude or Cursor.
 

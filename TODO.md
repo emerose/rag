@@ -40,5 +40,3 @@ P2 = High value, medium effort
 P3 = Medium value / effort  
 P4 = Low value or blocked by earlier work  
 P5 = Nice-to-have / may drop later
-
-- [#195] [P2] **MCP server guide is wrong** – The MCP server docs describe integrations with ChatGPT that are not possible yet.  Remove the ChatGPT documentation and replace it with documentation on integrating with Claude, via the MCP stdio server.  Before finishing, double check that the commands and configurations are correct, and that they will result in the integration promised.  If an integration is not possible, just say so.  Mention other MCP integrations that *are* possible, if any
