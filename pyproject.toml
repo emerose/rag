@@ -153,5 +153,6 @@ exclude = [
 
 [dependency-groups]
 dev = [
+    "pytest-asyncio>=1.0.0",
     "trio>=0.30.0",
 ]
