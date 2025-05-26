@@ -13,6 +13,7 @@ See the [Getting Started guide](https://emerose.github.io/rag/getting_started.ht
 - Synthetic QA generator for regression testing
 - MCP server for integrating RAG tools into other applications
 - Customizable prompts for different reasoning styles
+- Selectable OpenAI models for embeddings and chat
 
 ## Why RAG CLI?
 

@@ -119,3 +119,5 @@ Global options available on every command include:
 - `--json` – output machine-readable JSON
 - `--vectorstore-backend` – choose FAISS, Qdrant, or Chroma
 - `--max-workers` – number of concurrent tasks
+- `--embedding-model` – OpenAI embedding model
+- `--chat-model` – OpenAI chat model

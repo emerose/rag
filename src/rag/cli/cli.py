@@ -93,6 +93,8 @@ class GlobalState:
     console: Console = console  # Store console instance
     vectorstore_backend: str = "faiss"
     max_workers: int = DEFAULT_MAX_WORKERS
+    embedding_model: str = "text-embedding-3-small"
+    chat_model: str = "gpt-4"
 
 
 state = GlobalState()
@@ -122,6 +124,20 @@ MAX_WORKERS_OPTION = typer.Option(
     "--max-workers",
     "-w",
     help="Maximum concurrent worker tasks",
+)
+
+EMBEDDING_MODEL_OPTION = typer.Option(
+    "text-embedding-3-small",
+    "--embedding-model",
+    "-e",
+    help="Name of the OpenAI embedding model to use",
+)
+
+CHAT_MODEL_OPTION = typer.Option(
+    "gpt-4",
+    "--chat-model",
+    "-m",
+    help="Name of the OpenAI chat model to use",
 )
 
 # Define argument defaults outside functions
@@ -201,6 +217,8 @@ def main(  # noqa: PLR0913
     ),
     vectorstore_backend: str = VECTORSTORE_OPTION,
     max_workers: int = MAX_WORKERS_OPTION,
+    embedding_model: str = EMBEDDING_MODEL_OPTION,
+    chat_model: str = CHAT_MODEL_OPTION,
     json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
     """RAG (Retrieval Augmented Generation) CLI.
@@ -223,6 +241,8 @@ def main(  # noqa: PLR0913
     state.cache_dir = cache_dir
     state.vectorstore_backend = vectorstore_backend
     state.max_workers = max_workers
+    state.embedding_model = embedding_model
+    state.chat_model = chat_model
 
     # Set up signal handlers
     signal.signal(signal.SIGINT, signal_handler)
@@ -303,8 +323,8 @@ def index(  # noqa: PLR0913
         state.logger.debug("Initializing RAG engine...")
         config = RAGConfig(
             documents_dir=str(path),
-            embedding_model="text-embedding-3-small",
-            chat_model="gpt-4",
+            embedding_model=state.embedding_model,
+            chat_model=state.chat_model,
             temperature=0.0,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
@@ -457,8 +477,8 @@ def invalidate(
         # Initialize RAG engine using RAGConfig
         config = RAGConfig(
             documents_dir=str(documents_dir),
-            embedding_model="text-embedding-3-small",
-            chat_model="gpt-4",
+            embedding_model=state.embedding_model,
+            chat_model=state.chat_model,
             temperature=0.0,
             cache_dir=cache_directory,
             vectorstore_backend=state.vectorstore_backend,
@@ -566,8 +586,8 @@ def query(  # noqa: PLR0913
         state.logger.debug("Initializing RAG engine...")
         config = RAGConfig(
             documents_dir=".",  # Not used for querying
-            embedding_model="text-embedding-3-small",
-            chat_model="gpt-4",
+            embedding_model=state.embedding_model,
+            chat_model=state.chat_model,
             temperature=0.0,
             cache_dir=cache_directory,
             vectorstore_backend=state.vectorstore_backend,
@@ -685,8 +705,8 @@ def summarize(
         state.logger.debug("Initializing RAG engine...")
         config = RAGConfig(
             documents_dir=".",  # Not used for summarization
-            embedding_model="text-embedding-3-small",
-            chat_model="gpt-4",
+            embedding_model=state.embedding_model,
+            chat_model=state.chat_model,
             temperature=0.0,
             cache_dir=cache_dir or state.cache_dir,
             vectorstore_backend=state.vectorstore_backend,
@@ -794,8 +814,8 @@ def list(
         state.logger.debug("Initializing RAG engine")
         config = RAGConfig(
             documents_dir=".",  # Not used for listing
-            embedding_model="text-embedding-3-small",
-            chat_model="gpt-4",
+            embedding_model=state.embedding_model,
+            chat_model=state.chat_model,
             temperature=0.0,
             cache_dir=cache_directory,
             vectorstore_backend=state.vectorstore_backend,
@@ -874,8 +894,8 @@ def chunks(
     try:
         config = RAGConfig(
             documents_dir=str(path.parent),
-            embedding_model="text-embedding-3-small",
-            chat_model="gpt-4",
+            embedding_model=state.embedding_model,
+            chat_model=state.chat_model,
             temperature=0.0,
             cache_dir=cache_dir or state.cache_dir,
             vectorstore_backend=state.vectorstore_backend,
@@ -919,8 +939,8 @@ def _initialize_rag_engine(runtime_options: RuntimeOptions | None = None) -> RAG
     """Initialize and return a RAGEngine instance."""
     config = RAGConfig(
         documents_dir=".",  # Not used for querying
-        embedding_model="text-embedding-3-small",
-        chat_model="gpt-4",
+        embedding_model=state.embedding_model,
+        chat_model=state.chat_model,
         temperature=0.0,
         cache_dir=state.cache_dir,
         vectorstore_backend=state.vectorstore_backend,
@@ -1218,6 +1238,8 @@ def cleanup(
             documents_dir=".",  # Not used for cleanup, but required
             cache_dir=cache_dir or state.cache_dir,
             vectorstore_backend=state.vectorstore_backend,
+            embedding_model=state.embedding_model,
+            chat_model=state.chat_model,
         )
 
         # Initialize the RAG engine
