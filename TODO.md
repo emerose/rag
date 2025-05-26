@@ -20,8 +20,6 @@
 
 ### MCP Server Integration
 
-- [#193] [P3] **Move remaining commands out of HTTP and into MCP** – According to the README, there are a couple of legacy HTTP endpoints still exposed -- /cache/clear and /system/status
-
 
 ### CLI / REPL UX
 

@@ -19,7 +19,6 @@ from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from rag import RAGConfig
 from rag.auth import APIKeyAuthMiddleware
 from rag.mcp_tools import (
     ChatResponse,
@@ -30,7 +29,6 @@ from rag.mcp_tools import (
     IndexStats,
     QueryResponse,
     SearchResponse,
-    SystemStatus,
     _compute_doc_id,
     get_engine,
     register_tools,
@@ -202,36 +200,6 @@ async def get_index_stats(request: Request) -> Response:
         }
     )
     return JSONResponse(stats.model_dump())
-
-
-@mcp.custom_route("/cache/clear", methods=["POST"])
-async def clear_cache_endpoint(request: Request) -> Response:
-    """Clear embedding and search caches."""
-
-    engine = get_engine()
-    if hasattr(engine, "invalidate_all_caches"):
-        engine.invalidate_all_caches()
-    return JSONResponse(DetailResponse(detail="Cache cleared").model_dump())
-
-
-@mcp.custom_route("/system/status", methods=["GET"])
-async def system_status_endpoint(request: Request) -> Response:
-    """Return server status summary."""
-
-    engine = get_engine()
-    num_docs = (
-        len(engine.list_indexed_files()) if hasattr(engine, "list_indexed_files") else 0
-    )
-    config = getattr(engine, "config", RAGConfig(documents_dir="docs"))
-
-    status = SystemStatus(
-        status="ok",
-        num_documents=num_docs,
-        cache_dir=config.cache_dir,
-        embedding_model=config.embedding_model,
-        chat_model=config.chat_model,
-    )
-    return JSONResponse(status.model_dump())
 
 
 app = mcp.streamable_http_app()

@@ -34,9 +34,3 @@ Rebuild the entire index from scratch.
 
 ## GET `/index/stats`
 Return document count, total size, and chunk count.
-
-## POST `/cache/clear`
-Clear all cached embeddings and vector stores.
-
-## GET `/system/status`
-Return server status and configuration summary.

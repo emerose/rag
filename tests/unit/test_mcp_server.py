@@ -23,17 +23,6 @@ def test_query_endpoint(socket_enabled) -> None:
     assert "answer" in data
 
 
-@patch("rag.mcp_server.get_engine")
-def test_system_status_endpoint(mock_get_engine: MagicMock, socket_enabled) -> None:
-    engine = _StubEngine([], {})
-    mock_get_engine.return_value = engine
-
-    response = client.get("/system/status")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "ok"
-    assert data["num_documents"] == 0
-    assert data["cache_dir"] == engine.config.cache_dir
 
 
 class _StubIndexMeta:
@@ -156,15 +145,6 @@ def test_index_endpoints(mock_get_engine: MagicMock, tmp_path: Path, socket_enab
     assert data["total_chunks"] == 1
 
 
-@patch("rag.mcp_server.get_engine")
-def test_cache_clear_endpoint(mock_get_engine: MagicMock, socket_enabled) -> None:
-    engine = _StubEngine([], {})
-    mock_get_engine.return_value = engine
-
-    response = client.post("/cache/clear")
-    assert response.status_code == 200
-    assert response.json() == {"detail": "Cache cleared"}
-    assert engine.cleared is True
 
 
 def test_authentication_required(monkeypatch, socket_enabled) -> None:
@@ -176,11 +156,11 @@ def test_authentication_required(monkeypatch, socket_enabled) -> None:
     reload(srv)
     client_auth = TestClient(srv.app)
 
-    resp = client_auth.get("/system/status")
+    resp = client_auth.get("/index/stats")
     assert resp.status_code == 401
 
     resp = client_auth.get(
-        "/system/status",
+        "/index/stats",
         headers={"Authorization": "Bearer tok"},
     )
     assert resp.status_code == 200
