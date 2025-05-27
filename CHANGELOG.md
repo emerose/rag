@@ -133,6 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved console logging display: logger name follows level, noisy httpx and
   pdfminer logs are hidden, and callsite file/line numbers are accurate
 - Fixed path handling bug when indexing single files via CLI
+- Fixed Excel ingestion by adding a simple openpyxl-based loader
   - Fixed issue where `documents_dir` was set to file path instead of parent directory
   - Prevented "Not a directory" errors when accessing cache files
 - Fixed path resolution inconsistency on macOS

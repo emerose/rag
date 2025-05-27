@@ -18,6 +18,7 @@ from langchain_community.document_loaders import (
     UnstructuredPowerPointLoader,
 )
 from langchain_core.documents import Document
+from openpyxl import load_workbook
 
 from rag.storage.filesystem import FilesystemManager
 from rag.utils.exceptions import (
@@ -30,6 +31,25 @@ from rag.utils.logging_utils import log_message
 from .metadata_extractor import DocumentMetadataExtractor
 
 logger = logging.getLogger(__name__)
+
+
+class SimpleExcelLoader:
+    """Minimal loader for Excel ``.xlsx`` files."""
+
+    def __init__(self, file_path: str) -> None:
+        """Create loader for Excel files."""
+        self.file_path = file_path
+
+    def load(self) -> list[Document]:
+        """Load workbook contents as a single document."""
+        wb = load_workbook(self.file_path, read_only=True, data_only=True)
+        lines: list[str] = []
+        for sheet in wb.worksheets:
+            for row in sheet.iter_rows(values_only=True):
+                values = [str(cell) for cell in row if cell is not None]
+                if values:
+                    lines.append(" ".join(values))
+        return [Document(page_content="\n".join(lines))]
 
 
 class DocumentLoader:
@@ -94,6 +114,7 @@ class DocumentLoader:
             "application/msword": Docx2txtLoader,
             "application/vnd.openxmlformats-officedocument.presentationml.presentation": UnstructuredPowerPointLoader,
             "application/vnd.ms-powerpoint": UnstructuredPowerPointLoader,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": SimpleExcelLoader,
         }
 
         # Special handling for text files with different extensions

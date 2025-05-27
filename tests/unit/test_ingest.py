@@ -3,6 +3,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from openpyxl import Workbook
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -450,6 +451,22 @@ class TestIngestManager(unittest.TestCase):
             result = ingest_manager.ingest_file(self.test_file_path)
             self.assertEqual(result.status, IngestStatus.SUCCESS)
             self.assertEqual(result.documents[0].page_content, "LOWERCASE TEXT")
+
+    def test_ingest_xlsx_file(self) -> None:
+        """Ingest a simple Excel file."""
+
+        xlsx_path = Path(self.temp_dir.name) / "data.xlsx"
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet["A1"] = "header"
+        sheet["A2"] = "row1"
+        workbook.save(xlsx_path)
+
+        result = self.ingest_manager.ingest_file(xlsx_path)
+
+        self.assertEqual(result.status, IngestStatus.SUCCESS)
+        self.assertGreater(len(result.documents), 0)
+        self.assertIn("row1", result.documents[0].page_content)
 
 
 if __name__ == "__main__":
