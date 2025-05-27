@@ -787,18 +787,22 @@ wheels = [
 ]
 
 [[package]]
+name = "fastmcp"
 version = "2.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "exceptiongroup" },
     { name = "httpx" },
+    { name = "mcp" },
     { name = "openapi-pydantic" },
     { name = "python-dotenv" },
     { name = "rich" },
     { name = "typer" },
     { name = "websockets" },
 ]
+sdist = { url = "https://files.pythonhosted.org/packages/5d/cc/37ff3a96338234a697df31d2c70b50a1d0f5e20f045d9b7cbba052be36af/fastmcp-2.5.1.tar.gz", hash = "sha256:0d10ec65a362ae4f78bdf3b639faf35b36cc0a1c8f5461a54fac906fe821b84d", size = 1035613, upload-time = "2025-05-24T11:48:27.873Z" }
 wheels = [
+    { url = "https://files.pythonhosted.org/packages/df/4f/e7ec7b63eadcd5b10978dbc472fc3c36de3fc8c91f60ad7642192ed78836/fastmcp-2.5.1-py3-none-any.whl", hash = "sha256:a6fe50693954a6aed89fc6e43f227dcd66e112e3d3a1d633ee22b4f435ee8aed", size = 105789, upload-time = "2025-05-24T11:48:26.371Z" },
 ]
 
 [[package]]
@@ -3587,6 +3591,7 @@ dependencies = [
     { name = "docx2txt" },
     { name = "faiss-cpu" },
     { name = "fastapi" },
+    { name = "fastmcp" },
     { name = "filelock" },
     { name = "langchain" },
     { name = "langchain-community" },
@@ -3637,6 +3642,7 @@ requires-dist = [
     { name = "docx2txt", specifier = ">=0.8" },
     { name = "faiss-cpu", specifier = ">=1.7.4" },
     { name = "fastapi", specifier = ">=0.110.0" },
+    { name = "fastmcp", specifier = ">=2.5.1" },
     { name = "filelock", specifier = ">=3.12.0" },
     { name = "furo", marker = "extra == 'dev'", specifier = ">=2024.1.29" },
     { name = "hatch", marker = "extra == 'dev'", specifier = ">=1.9.0" },
