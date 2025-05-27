@@ -10,6 +10,7 @@ RAG Documentation
    conceptual_overview
    cli_reference
    api_http
+   mcp_server
    api_python
    swap_vector_store
    incremental_indexing
