@@ -36,10 +36,8 @@ dependencies = [
     "fastapi>=0.110.0",
     "uvicorn>=0.29.0",
     "filelock>=3.12.0",
-    "mcp[cli]>=1.9.1",
     "aiostream>=0.6.4",
     "pyyaml>=6.0",
-    "fastmcp>=2.5.1",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
@@ -47,7 +45,6 @@ license = { text = "MIT" }
 
 [project.scripts]
 rag = "rag.cli.cli:run_cli"
-rag-mcp = "rag.mcp_server:main"
 
 [project.optional-dependencies]
 dev = [
