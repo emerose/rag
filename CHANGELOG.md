@@ -87,6 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Error handling tests for invalid requests
   - Test server lifecycle management with automatic port allocation
   - Support for testing with dummy engine to avoid external dependencies
+- Complete MCP server documentation with integration guides for Claude and Cursor
 
 ### Removed
 - Outdated design sketch removed from `docs/design_sketches`.
