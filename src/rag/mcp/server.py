@@ -8,7 +8,6 @@ from typing import Any
 
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
-from mcp.server.fastmcp.tools import Tool
 from pydantic import BaseModel
 
 from rag.auth import APIKeyAuthMiddleware
@@ -120,18 +119,18 @@ class RAGMCPServer(FastMCP):
         return self.engine.cleanup_orphaned_chunks()
 
     def _register_tools(self) -> None:
-        self.add_tool(Tool.from_function(self.tool_query))
-        self.add_tool(Tool.from_function(self.tool_search))
-        self.add_tool(Tool.from_function(self.tool_index))
-        self.add_tool(Tool.from_function(self.tool_rebuild))
-        self.add_tool(Tool.from_function(self.tool_index_stats))
-        self.add_tool(Tool.from_function(self.tool_documents))
-        self.add_tool(Tool.from_function(self.tool_get_document))
-        self.add_tool(Tool.from_function(self.tool_delete_document))
-        self.add_tool(Tool.from_function(self.tool_summaries))
-        self.add_tool(Tool.from_function(self.tool_chunks))
-        self.add_tool(Tool.from_function(self.tool_invalidate))
-        self.add_tool(Tool.from_function(self.tool_cleanup))
+        self.add_tool(self.tool_query)
+        self.add_tool(self.tool_search)
+        self.add_tool(self.tool_index)
+        self.add_tool(self.tool_rebuild)
+        self.add_tool(self.tool_index_stats)
+        self.add_tool(self.tool_documents)
+        self.add_tool(self.tool_get_document)
+        self.add_tool(self.tool_delete_document)
+        self.add_tool(self.tool_summaries)
+        self.add_tool(self.tool_chunks)
+        self.add_tool(self.tool_invalidate)
+        self.add_tool(self.tool_cleanup)
 
 
 # ----------------------------------------------------------------------
