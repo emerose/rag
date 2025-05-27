@@ -103,9 +103,3 @@ rag invalidate path/to/file
 rag invalidate --all path/to/directory
 ```
 
-### MCP Server
-Run the HTTP server:
-```bash
-rag mcp-http --host 127.0.0.1 --port 8000
-```
-Include `Authorization` headers when `RAG_MCP_API_KEY` is set.
