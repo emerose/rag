@@ -10,17 +10,17 @@
 
 ### Architecture & Core Design
 
-- [P3] **Configuration validation** – Add comprehensive config validation
-- [P4] **Plugin system** – Create extensible plugin architecture
-- [P3] **API versioning** – Add proper API versioning support
-- [P4] **Migration tools** – Create tools for data migration between versions
+- [#225] [P3] **Configuration validation** – Add comprehensive config validation
+- [#226] [P4] **Plugin system** – Create extensible plugin architecture
+- [#227] [P3] **API versioning** – Add proper API versioning support
+- [#228] [P4] **Migration tools** – Create tools for data migration between versions
 
 ### Retrieval & Relevance
 
-- [P2] **Query optimization** – Add query rewriting and expansion capabilities
-- [P3] **Advanced embeddings** – Support for different embedding models and strategies
-- [P4] **Multi-language support** – Add support for multiple languages
-- [P4] **Real-time updates** – Implement real-time document updates and reindexing
+- [#229] [P2] **Query optimization** – Add query rewriting and expansion capabilities
+- [#230] [P3] **Advanced embeddings** – Support for different embedding models and strategies
+- [#231] [P4] **Multi-language support** – Add support for multiple languages
+- [#232] [P4] **Real-time updates** – Implement real-time document updates and reindexing
 
 ### Prompt Engineering & Generation
 
@@ -30,29 +30,29 @@
 
 ### MCP Server Integration
 
-- [P2] **Security enhancements** – Implement comprehensive security measures
-- [P3] **Rate limiting** – Implement rate limiting for API endpoints
-- [P3] **Health checks** – Add comprehensive health check endpoints
-- [P3] **Backup and restore** – Add backup and restore functionality
+- [#233] [P2] **Security enhancements** – Implement comprehensive security measures
+- [#234] [P3] **Rate limiting** – Implement rate limiting for API endpoints
+- [#235] [P3] **Health checks** – Add comprehensive health check endpoints
+- [#236] [P3] **Backup and restore** – Add backup and restore functionality
 
 
 ### CLI / REPL UX
 
-- [P4] **Web interface** – Build web-based interface for RAG system
+- [#237] [P4] **Web interface** – Build web-based interface for RAG system
 
 ### Performance
 
-- [P2] **Caching improvements** – Implement more sophisticated caching strategies
-- [P3] **Performance monitoring** – Add detailed performance metrics and monitoring
-- [P3] **Memory optimization** – Optimize memory usage for large document collections
-- [P3] **Batch processing** – Implement efficient batch processing for large datasets
-- [P5] **Distributed processing** – Add support for distributed processing
-- [P3] **Metrics collection** – Implement detailed metrics collection and reporting
+- [#238] [P2] **Caching improvements** – Implement more sophisticated caching strategies
+- [#239] [P3] **Performance monitoring** – Add detailed performance metrics and monitoring
+- [#240] [P3] **Memory optimization** – Optimize memory usage for large document collections
+- [#241] [P3] **Batch processing** – Implement efficient batch processing for large datasets
+- [#242] [P5] **Distributed processing** – Add support for distributed processing
+- [#243] [P3] **Metrics collection** – Implement detailed metrics collection and reporting
 
 ### Evaluation & Testing
 
-- [P2] **Evaluation framework** – Comprehensive RAG evaluation with multiple metrics
-- [P2] **Integration tests** – Expand integration test coverage
+- [#244] [P2] **Evaluation framework** – Comprehensive RAG evaluation with multiple metrics
+- [#245] [P2] **Integration tests** – Expand integration test coverage
 
 
 ### Packaging & CI
@@ -60,7 +60,7 @@
 
 ### Documentation & Examples
 - [#67] [P4] **Tutorial notebook** – `examples/rag_basic.ipynb` covering indexing, querying, prompt tweaks.
-- [P4] **Documentation generation** – Auto-generate API documentation from code
+- [#246] [P4] **Documentation generation** – Auto-generate API documentation from code
 
 ---
 
