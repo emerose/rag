@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- FastMCP server exposing RAG functionality over HTTP and stdio
+- Unit tests for the new MCP server
 - Network isolation for unit tests using `pytest-socket`
 - Machine-readable JSON output for all CLI commands:
   - Added `--json` flag to enable JSON output
