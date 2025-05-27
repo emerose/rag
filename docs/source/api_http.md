@@ -1,6 +1,15 @@
 # MCP HTTP API
 
-The MCP server exposes a simple JSON API. All endpoints accept and return `application/json`.
+The MCP server exposes a simple JSON API. All endpoints accept and return
+`application/json`.
+
+### Authentication
+
+When the HTTP server is started with an API key, clients must send an
+`Authorization: Bearer <API_KEY>` header with every request. If no API key is
+configured, the endpoints are publicly accessible. The API key can be supplied
+when calling `run_http_server()` or via any wrapper CLI that exposes this
+option.
 
 ## POST `/query`
 Run a RAG query.
