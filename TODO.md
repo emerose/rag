@@ -1,5 +1,15 @@
 ## 🚀 Next
 
+### MCP Rewrite
+We are going to fully rewrite the MCP code using a new library.  Please do the following:
+
+- remove all mcp code
+- remove tests and documentation related to MCP
+- verify that no MCP code remains
+- write a new MCP server integration using FastMCP rather than the previous library ("mcp")
+- ensure feature parity between the CLI and the MCP interfaces
+- make sure the MCP server supports both HTTP and stdio interfaces
+- write a comprehensive test suite for the MCP code, using the FastMCP client to connect to both the HTTP and stdio interfaces, and exercising all of the APIs
 
 ---
 
@@ -70,23 +80,4 @@ P2 = High value, medium effort
 P3 = Medium value / effort  
 P4 = Low value or blocked by earlier work  
 P5 = Nice-to-have / may drop later
-
-# TODO
-
-## Next Up
-
-- **Improve MCP comprehensive testing** – Enhance MCP server tests to cover all commands via HTTP interface
-  - ✅ Created comprehensive HTTP interface tests for basic MCP commands (query, search, chat, list_documents, system_status, authentication)
-  - ✅ Added authentication testing with proper API key management  
-  - ✅ Added error handling tests for invalid requests and dummy engine responses
-  - ✅ Implemented test server lifecycle management with automatic port allocation
-  - ✅ Added support for testing with dummy engine to avoid external dependencies
-  - ⏸️ **Stdio tests properly skipped** with detailed explanation of hanging issues
-  - 🔄 **Next**: Add more HTTP endpoint coverage (index management, cache operations)
-  - 🔄 **Next**: Add integration tests for MCP tool functionality
-
-- **Chunk explorer** – Create a tool to explore document chunks and their metadata
-  - Interactive CLI for browsing indexed documents
-  - Show chunk boundaries, overlap, and metadata
-  - Search and filter chunks by various criteria
 
