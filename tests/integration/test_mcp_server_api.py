@@ -16,7 +16,6 @@ def _build_test_server(tmp_path: Path):
     config = RAGConfig(
         documents_dir=str(tmp_path / "docs"),
         cache_dir=str(tmp_path / "cache"),
-        openai_api_key="sk-test",
     )
     runtime = RuntimeOptions()
     server = build_server(config, runtime)
@@ -25,9 +24,9 @@ def _build_test_server(tmp_path: Path):
     engine.answer = lambda q, k=4: {"answer": "ok"}
     engine.vectorstores = {"vs": object()}
     engine.vectorstore_manager.merge_vectorstores = lambda stores: None
-    engine.vectorstore_manager.similarity_search = (
-        lambda merged, q, k=4: [Document(page_content="doc", metadata={})]
-    )
+    engine.vectorstore_manager.similarity_search = lambda merged, q, k=4: [
+        Document(page_content="doc", metadata={})
+    ]
     engine.index_directory = lambda path: {"indexed": True}
     engine.index_file = lambda path: (True, "")
     engine.invalidate_all_caches = lambda: None
@@ -69,7 +68,10 @@ def test_http_transport(tmp_path: Path) -> None:
 
     assert client.post("/query", json={"question": "hi", "top_k": 1}).status_code == 200
     assert client.post("/search", json={"query": "hi", "top_k": 1}).status_code == 200
-    assert client.post("/chat", json={"session_id": "1", "message": "hi"}).status_code == 200
+    assert (
+        client.post("/chat", json={"session_id": "1", "message": "hi"}).status_code
+        == 200
+    )
     assert client.get("/documents").status_code == 200
     assert client.get("/documents/sample.txt").status_code == 200
     assert client.delete("/documents/sample.txt").status_code == 200

@@ -30,11 +30,16 @@ def test_golden_set_retrieval(tmp_path: Path) -> None:
     target_file = docs_dir / "sample.txt"
     shutil.copy(sample_file, target_file)
 
-    config = RAGConfig(documents_dir=str(docs_dir), cache_dir=str(cache_dir), openai_api_key="sk-test")
+    config = RAGConfig(documents_dir=str(docs_dir), cache_dir=str(cache_dir))
     runtime = RuntimeOptions()
 
-    with patch("rag.embeddings.embedding_provider.OpenAIEmbeddings", return_value=FakeEmbeddings(size=32)), \
-            patch.object(EmbeddingProvider, "_get_embedding_dimension", return_value=32):
+    with (
+        patch(
+            "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+            return_value=FakeEmbeddings(size=32),
+        ),
+        patch.object(EmbeddingProvider, "_get_embedding_dimension", return_value=32),
+    ):
         engine = RAGEngine(config, runtime)
         success, error = engine.index_file(target_file)
         assert success, f"Indexing failed: {error}"
@@ -43,7 +48,9 @@ def test_golden_set_retrieval(tmp_path: Path) -> None:
         hits = 0
         contains_answer = 0
         for question, expected_sentence in GOLDEN_QA:
-            docs = engine.vectorstore_manager.similarity_search(vectorstore, question, k=1)
+            docs = engine.vectorstore_manager.similarity_search(
+                vectorstore, question, k=1
+            )
             assert docs, "No documents retrieved"
             doc_text = docs[0].page_content.strip()
             if expected_sentence.lower() in doc_text.lower():
