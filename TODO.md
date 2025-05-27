@@ -1,12 +1,5 @@
 ## 🚀 Next
 
-### MCP Rewrite
-We are going to fully rewrite the MCP code using a new library.  Please do the following:
-
-- write a new MCP server integration using FastMCP rather than the previous library ("mcp")
-- ensure feature parity between the CLI and the MCP interfaces
-- make sure the MCP server supports both HTTP and stdio interfaces
-- write a comprehensive test suite for the MCP code, using the FastMCP client to connect to both the HTTP and stdio interfaces, and exercising all of the APIs
 
 ---
 
