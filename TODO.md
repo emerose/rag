@@ -76,17 +76,13 @@ P5 = Nice-to-have / may drop later
 
 ## Backlog
 
-- **Enhanced retrieval methods** – Implement hybrid search combining semantic and keyword search
 - **Query optimization** – Add query rewriting and expansion capabilities  
 - **Evaluation framework** – Comprehensive RAG evaluation with multiple metrics
-- **Advanced chunking strategies** – Implement semantic chunking and document-aware splitting
 - **Caching improvements** – Implement more sophisticated caching strategies
 - **Performance monitoring** – Add detailed performance metrics and monitoring
 - **Documentation generation** – Auto-generate API documentation from code
 - **Integration tests** – Expand integration test coverage
-- **Error handling** – Improve error messages and recovery mechanisms
 - **Configuration validation** – Add comprehensive config validation
-- **Logging enhancements** – Structured logging with better formatting
 - **Memory optimization** – Optimize memory usage for large document collections
 - **Batch processing** – Implement efficient batch processing for large datasets
 - **Plugin system** – Create extensible plugin architecture

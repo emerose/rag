@@ -71,7 +71,7 @@ async def query_endpoint(request: Request) -> Response:
     # Normalise unsupported filter formats (the dummy engine ignores filters).
     filters = payload.filters
     if isinstance(filters, str):
-        # Simple key:value filter string – convert to a dict with "_raw" key so
+        # Simple key:value filter string - convert to a dict with "_raw" key so
         # downstream code can decide what to do.  Real implementation would
         # parse properly.
         filters = {"_raw": filters}
@@ -322,16 +322,20 @@ async def system_status_endpoint(_: Request) -> Response:  # pragma: no cover
     engine = get_engine()
     docs = engine.list_indexed_files() if hasattr(engine, "list_indexed_files") else []
 
-    return JSONResponse({
-        "status": "ok",
-        "version": "dummy",
-        "uptime": 0,
-        "health": "green",
-        "num_documents": len(docs),
-        "cache_dir": os.getenv("RAG_CACHE_DIR", ".cache"),
-        "embedding_model": os.getenv("RAG_EMBEDDING_MODEL", "text-embedding-3-small"),
-        "chat_model": os.getenv("RAG_CHAT_MODEL", "gpt-4"),
-    })
+    return JSONResponse(
+        {
+            "status": "ok",
+            "version": "dummy",
+            "uptime": 0,
+            "health": "green",
+            "num_documents": len(docs),
+            "cache_dir": os.getenv("RAG_CACHE_DIR", ".cache"),
+            "embedding_model": os.getenv(
+                "RAG_EMBEDDING_MODEL", "text-embedding-3-small"
+            ),
+            "chat_model": os.getenv("RAG_CHAT_MODEL", "gpt-4"),
+        }
+    )
 
 
 app = mcp.streamable_http_app()

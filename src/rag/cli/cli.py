@@ -192,6 +192,7 @@ def signal_handler(_signum, _frame):
 
 def async_signal_handler(loop: asyncio.AbstractEventLoop):
     """Create an async-aware signal handler that can properly terminate async operations."""
+
     def handler(_signum, _frame):
         write(Error("Interrupt received. Exiting..."))
         # Cancel all running tasks
@@ -199,6 +200,7 @@ def async_signal_handler(loop: asyncio.AbstractEventLoop):
             task.cancel()
         # Stop the event loop
         loop.stop()
+
     return handler
 
 
@@ -257,7 +259,7 @@ def main(  # noqa: PLR0913
     # stdio MCP server command, which requires default signal behaviour.  Typer
     # exposes the invoked subcommand name via the context object, but it is
     # easiest to check ``sys.argv`` for ``mcp-stdio`` / ``mcp``.
-    if not any(cmd in sys.argv for cmd in {"mcp-stdio", "mcp"}):
+    if not any(cmd in sys.argv for cmd in ("mcp-stdio", "mcp")):
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
@@ -1394,21 +1396,21 @@ def mcp_stdio() -> None:
 
         # Fix IO buffering issues that can cause stdio hanging
         import sys
-        
+
         # Force unbuffered output for stdio communication
         sys.stdout.reconfigure(line_buffering=True)
         sys.stderr.reconfigure(line_buffering=True)
-        
+
         # Alternative: Force flush after every write
         sys.stdout.flush()
         sys.stderr.flush()
-        
+
         # Import and run the MCP server directly
         from rag.mcp_server import mcp
-        
+
         # The FastMCP run method should handle stdio properly
         mcp.run("stdio")
-        
+
     except KeyboardInterrupt:
         write(Error("Interrupt received. Shutting down..."))
     except Exception as exc:  # pragma: no cover - runtime errors
