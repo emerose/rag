@@ -8,6 +8,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.tools.base import Tool
 from pydantic import BaseModel
 
 from rag.auth import APIKeyAuthMiddleware
@@ -50,6 +51,12 @@ class RAGMCPServer(FastMCP):
         super().__init__(**settings)
         self.engine = engine
         self._register_tools()
+
+    @property
+    def tools(self) -> list[Tool]:
+        """List tools registered with the server."""
+
+        return self._tool_manager.list_tools()
 
     # ------------------------------------------------------------------
     # MCP tools
