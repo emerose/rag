@@ -10,7 +10,17 @@
 
 ### Architecture & Core Design
 
+- [P3] **Configuration validation** – Add comprehensive config validation
+- [P4] **Plugin system** – Create extensible plugin architecture
+- [P3] **API versioning** – Add proper API versioning support
+- [P4] **Migration tools** – Create tools for data migration between versions
+
 ### Retrieval & Relevance
+
+- [P2] **Query optimization** – Add query rewriting and expansion capabilities
+- [P3] **Advanced embeddings** – Support for different embedding models and strategies
+- [P4] **Multi-language support** – Add support for multiple languages
+- [P4] **Real-time updates** – Implement real-time document updates and reindexing
 
 ### Prompt Engineering & Generation
 
@@ -20,12 +30,29 @@
 
 ### MCP Server Integration
 
+- [P2] **Security enhancements** – Implement comprehensive security measures
+- [P3] **Rate limiting** – Implement rate limiting for API endpoints
+- [P3] **Health checks** – Add comprehensive health check endpoints
+- [P3] **Backup and restore** – Add backup and restore functionality
+
 
 ### CLI / REPL UX
 
+- [P4] **Web interface** – Build web-based interface for RAG system
+
 ### Performance
 
+- [P2] **Caching improvements** – Implement more sophisticated caching strategies
+- [P3] **Performance monitoring** – Add detailed performance metrics and monitoring
+- [P3] **Memory optimization** – Optimize memory usage for large document collections
+- [P3] **Batch processing** – Implement efficient batch processing for large datasets
+- [P5] **Distributed processing** – Add support for distributed processing
+- [P3] **Metrics collection** – Implement detailed metrics collection and reporting
+
 ### Evaluation & Testing
+
+- [P2] **Evaluation framework** – Comprehensive RAG evaluation with multiple metrics
+- [P2] **Integration tests** – Expand integration test coverage
 
 
 ### Packaging & CI
@@ -33,6 +60,7 @@
 
 ### Documentation & Examples
 - [#67] [P4] **Tutorial notebook** – `examples/rag_basic.ipynb` covering indexing, querying, prompt tweaks.
+- [P4] **Documentation generation** – Auto-generate API documentation from code
 
 ---
 
@@ -74,27 +102,3 @@ P5 = Nice-to-have / may drop later
   - Show chunk boundaries, overlap, and metadata
   - Search and filter chunks by various criteria
 
-## Backlog
-
-- **Query optimization** – Add query rewriting and expansion capabilities  
-- **Evaluation framework** – Comprehensive RAG evaluation with multiple metrics
-- **Caching improvements** – Implement more sophisticated caching strategies
-- **Performance monitoring** – Add detailed performance metrics and monitoring
-- **Documentation generation** – Auto-generate API documentation from code
-- **Integration tests** – Expand integration test coverage
-- **Configuration validation** – Add comprehensive config validation
-- **Memory optimization** – Optimize memory usage for large document collections
-- **Batch processing** – Implement efficient batch processing for large datasets
-- **Plugin system** – Create extensible plugin architecture
-- **Web interface** – Build web-based interface for RAG system
-- **Multi-language support** – Add support for multiple languages
-- **Advanced embeddings** – Support for different embedding models and strategies
-- **Real-time updates** – Implement real-time document updates and reindexing
-- **Distributed processing** – Add support for distributed processing
-- **Security enhancements** – Implement comprehensive security measures
-- **API versioning** – Add proper API versioning support
-- **Rate limiting** – Implement rate limiting for API endpoints
-- **Health checks** – Add comprehensive health check endpoints
-- **Metrics collection** – Implement detailed metrics collection and reporting
-- **Backup and restore** – Add backup and restore functionality
-- **Migration tools** – Create tools for data migration between versions
