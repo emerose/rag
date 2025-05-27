@@ -75,18 +75,6 @@ P5 = Nice-to-have / may drop later
 
 ## Next Up
 
-- **MCP stdio server hanging issue - LIBRARY BUG** – Critical issue in MCP library's stdio transport implementation
-  - 🔍 **Root cause confirmed**: The MCP library's `mcp.run("stdio")` has fundamental signal handling problems
-  - Multiple approaches attempted:
-    - ✅ Async signal handlers with `loop.add_signal_handler()` 
-    - ✅ Wrapping in `asyncio.to_thread()` with cancellation
-    - ✅ Direct low-level server API usage
-    - ✅ Simplified FastMCP.run() calls
-  - **All approaches fail** - the issue is in the MCP library's stdio transport itself
-  - The `timeout` command gets interrupted, indicating the process hangs at the library level
-  - **Workaround**: Use HTTP transport for production, skip stdio tests
-  - **Future**: Monitor MCP library updates for stdio signal handling fixes
-
 - **Improve MCP comprehensive testing** – Enhance MCP server tests to cover all commands via HTTP interface
   - ✅ Created comprehensive HTTP interface tests for basic MCP commands (query, search, chat, list_documents, system_status, authentication)
   - ✅ Added authentication testing with proper API key management  
