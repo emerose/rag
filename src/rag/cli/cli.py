@@ -202,11 +202,6 @@ def async_signal_handler(loop: asyncio.AbstractEventLoop):
     return handler
 
 
-# Register signal handlers
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
-
-
 def validate_path(path: Path) -> Path:
     """Validate a path is a file."""
     if not path.exists():
@@ -258,9 +253,13 @@ def main(  # noqa: PLR0913
     state.embedding_model = embedding_model
     state.chat_model = chat_model
 
-    # Set up signal handlers
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    # Install signal handlers for graceful shutdown **except** when running the
+    # stdio MCP server command, which requires default signal behaviour.  Typer
+    # exposes the invoked subcommand name via the context object, but it is
+    # easiest to check ``sys.argv`` for ``mcp-stdio`` / ``mcp``.
+    if not any(cmd in sys.argv for cmd in {"mcp-stdio", "mcp"}):
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
 
 
 def create_console_progress_callback(progress: Progress) -> Callable[[str, int], None]:
@@ -1387,6 +1386,12 @@ def mcp_stdio() -> None:
     """Run the MCP server using the stdio transport."""
 
     try:
+        # Restore default signal handling to avoid double-handling inside
+        # FastMCP.  The CLI's global ``signal_handler`` writes a message and
+        # calls ``sys.exit`` which breaks FastMCP's clean-up sequence.
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+
         # Fix IO buffering issues that can cause stdio hanging
         import sys
         
@@ -1402,7 +1407,7 @@ def mcp_stdio() -> None:
         from rag.mcp_server import mcp
         
         # The FastMCP run method should handle stdio properly
-        mcp.run(transport="stdio")
+        mcp.run("stdio")
         
     except KeyboardInterrupt:
         write(Error("Interrupt received. Shutting down..."))
