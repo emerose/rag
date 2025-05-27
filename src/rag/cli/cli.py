@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import asyncio
 import logging
-import signal
 import sys
 import traceback
 from collections.abc import Callable
@@ -254,14 +253,6 @@ def main(  # noqa: PLR0913
     state.max_workers = max_workers
     state.embedding_model = embedding_model
     state.chat_model = chat_model
-
-    # Install signal handlers for graceful shutdown **except** when running the
-    # stdio MCP server command, which requires default signal behaviour.  Typer
-    # exposes the invoked subcommand name via the context object, but it is
-    # easiest to check ``sys.argv`` for ``mcp-stdio`` / ``mcp``.
-    if not any(cmd in sys.argv for cmd in ("mcp-stdio", "mcp")):
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
 
 
 def create_console_progress_callback(progress: Progress) -> Callable[[str, int], None]:
@@ -1362,60 +1353,6 @@ def cleanup(
     except (exceptions.RAGError, OSError, ValueError, KeyError, FileNotFoundError) as e:
         write(Error(f"Error during cache cleanup: {e}"))
         raise typer.Exit(code=1) from e
-
-
-@app.command(name="mcp-http")
-def mcp_http(
-    host: str = typer.Option(
-        "127.0.0.1", "--host", "-H", help="Host interface to bind the server"
-    ),
-    port: int = typer.Option(8000, "--port", "-p", help="Port number for the server"),
-) -> None:
-    """Start the MCP HTTP server using Uvicorn."""
-
-    try:
-        import uvicorn
-
-        uvicorn.run("rag.mcp_server:app", host=host, port=port)
-    except Exception as exc:  # pragma: no cover - runtime errors
-        write(Error(f"Error starting server: {exc}"))
-        raise typer.Exit(code=1) from exc
-
-
-@app.command(name="mcp-stdio")
-@app.command(name="mcp")
-def mcp_stdio() -> None:
-    """Run the MCP server using the stdio transport."""
-
-    try:
-        # Restore default signal handling to avoid double-handling inside
-        # FastMCP.  The CLI's global ``signal_handler`` writes a message and
-        # calls ``sys.exit`` which breaks FastMCP's clean-up sequence.
-        signal.signal(signal.SIGINT, signal.SIG_DFL)
-        signal.signal(signal.SIGTERM, signal.SIG_DFL)
-
-        # Fix IO buffering issues that can cause stdio hanging
-        import sys
-
-        # Force unbuffered output for stdio communication
-        sys.stdout.reconfigure(line_buffering=True)
-        sys.stderr.reconfigure(line_buffering=True)
-
-        # Alternative: Force flush after every write
-        sys.stdout.flush()
-        sys.stderr.flush()
-
-        # Import and run the MCP server directly
-        from rag.mcp_server import mcp
-
-        # The FastMCP run method should handle stdio properly
-        mcp.run("stdio")
-
-    except KeyboardInterrupt:
-        write(Error("Interrupt received. Shutting down..."))
-    except Exception as exc:  # pragma: no cover - runtime errors
-        write(Error(f"Error starting server: {exc}"))
-        raise typer.Exit(code=1) from exc
 
 
 def run_cli() -> None:

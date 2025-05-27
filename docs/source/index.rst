@@ -12,7 +12,6 @@ RAG Documentation
    api_http
    api_python
    swap_vector_store
-   mcp_usage
    incremental_indexing
    customizing_prompts
    machine_readable_output
