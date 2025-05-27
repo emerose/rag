@@ -7,12 +7,15 @@ import logging
 import os
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, RootModel
 
-from rag import RAGConfig, RAGEngine, RuntimeOptions
+from rag import RAGConfig, RuntimeOptions
+
+if TYPE_CHECKING:  # pragma: no cover - only for type checking
+    from rag import RAGEngine
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +40,8 @@ def get_engine() -> RAGEngine | _DummyEngine:
         return _DummyEngine()
 
     try:
+        from rag import RAGEngine
+
         return RAGEngine(RAGConfig(documents_dir="docs"), RuntimeOptions())
     except Exception as exc:  # pragma: no cover - network errors
         logger.warning("Falling back to dummy engine: %s", exc)
