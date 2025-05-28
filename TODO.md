@@ -60,7 +60,6 @@
 
 ### Documentation & Examples
 - [#67] [P4] **Tutorial notebook** – `examples/rag_basic.ipynb` covering indexing, querying, prompt tweaks.
-- [#246] [P4] **Documentation generation** – Auto-generate API documentation from code
 
 ---
 
