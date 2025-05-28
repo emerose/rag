@@ -100,6 +100,7 @@ class GlobalState:
     max_workers: int = DEFAULT_MAX_WORKERS
     embedding_model: str = DEFAULT_EMBEDDING_MODEL
     chat_model: str = DEFAULT_CHAT_MODEL
+    log_file: str | None = None
 
 
 state = GlobalState()
@@ -143,6 +144,12 @@ MAX_WORKERS_OPTION = typer.Option(
     help="Maximum concurrent worker tasks",
 )
 
+LOG_FILE_OPTION = typer.Option(
+    None,
+    "--log-file",
+    help="Write logs to the specified file instead of stderr",
+)
+
 # Define argument defaults outside functions
 INVALIDATE_PATH_ARG = typer.Argument(
     None,
@@ -173,11 +180,11 @@ def update_console_for_json_mode(json_mode: bool) -> None:
 
 
 def configure_logging(
-    verbose: bool, log_level: LogLevel, json_logs: bool
+    verbose: bool, log_level: LogLevel, json_logs: bool, log_file: str | None
 ) -> logging.Logger:
-    """Configure logging based on verbosity settings."""
+    """Configure logging based on CLI options."""
     level = logging.INFO if verbose else getattr(logging, log_level.value)
-    setup_logging(log_level=level, json_logs=json_logs)
+    setup_logging(log_file=log_file, log_level=level, json_logs=json_logs)
     return get_logger()
 
 
@@ -231,6 +238,7 @@ def main(  # noqa: PLR0913
     max_workers: int = MAX_WORKERS_OPTION,
     embedding_model: str = EMBEDDING_MODEL_OPTION,
     chat_model: str = CHAT_MODEL_OPTION,
+    log_file: str | None = LOG_FILE_OPTION,
     json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
     """RAG (Retrieval Augmented Generation) CLI.
@@ -247,7 +255,8 @@ def main(  # noqa: PLR0913
     update_console_for_json_mode(json_mode)
 
     # Configure logging
-    state.logger = configure_logging(verbose, log_level, json_mode)
+    state.log_file = log_file
+    state.logger = configure_logging(verbose, log_level, json_mode, log_file)
 
     # Set cache directory
     state.cache_dir = cache_dir

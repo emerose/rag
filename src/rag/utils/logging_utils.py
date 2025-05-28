@@ -134,14 +134,15 @@ def strip_internal_fields(
 
 
 def setup_logging(
-    log_file: str = "rag.log",
+    log_file: str | None = None,
     log_level: int = logging.INFO,
     json_logs: bool = False,
 ) -> None:
     """Configure structlog and standard logging.
 
     Args:
-        log_file: Path to the log file.
+        log_file: Optional path to the log file. If ``None`` logs are written
+            to ``stderr``.
         log_level: Logging level.
         json_logs: Emit JSON logs to the console if True.
     """
@@ -249,19 +250,20 @@ def setup_logging(
         *pre_chain
     ]  # Remove colorize_level since ConsoleRenderer handles colors
 
-    file_processor = (
-        structlog.processors.JSONRenderer()
-        if json_logs
-        else structlog.dev.ConsoleRenderer(**console_renderer_kwargs)
-    )
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setFormatter(
-        structlog.stdlib.ProcessorFormatter(
-            processor=file_processor,
-            foreign_pre_chain=pre_chain,
-        ),
-    )
-    root_logger.addHandler(file_handler)
+    if log_file:
+        file_processor = (
+            structlog.processors.JSONRenderer()
+            if json_logs
+            else structlog.dev.ConsoleRenderer(**console_renderer_kwargs)
+        )
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(
+            structlog.stdlib.ProcessorFormatter(
+                processor=file_processor,
+                foreign_pre_chain=pre_chain,
+            ),
+        )
+        root_logger.addHandler(file_handler)
 
     console_processor = (
         structlog.processors.JSONRenderer()
@@ -269,11 +271,10 @@ def setup_logging(
         else structlog.dev.ConsoleRenderer(**console_renderer_kwargs)
     )
 
-    if json_logs:
+    if json_logs and log_file:
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.ERROR)
     else:
-        # Use simple StreamHandler and let ConsoleRenderer handle all formatting
         console_handler = logging.StreamHandler()
 
     console_handler.setFormatter(

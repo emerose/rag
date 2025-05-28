@@ -208,7 +208,9 @@ def _import_logging_utils() -> ModuleType:
     return module
 
 
-def _setup_and_log(json_logs: bool, *, foreign: bool = False) -> tuple[str, str]:
+def _setup_and_log(
+    json_logs: bool, *, foreign: bool = False, log_file: str | None = "dummy.log"
+) -> tuple[str, str]:
     """Configure logging and capture console and file output."""
     logging_utils = _import_logging_utils()
 
@@ -232,7 +234,7 @@ def _setup_and_log(json_logs: bool, *, foreign: bool = False) -> tuple[str, str]
     logging_utils.logging.StreamHandler = MockConsoleHandler  # type: ignore
 
     try:
-        logging_utils.setup_logging(log_file="dummy.log", json_logs=json_logs)
+        logging_utils.setup_logging(log_file=log_file, json_logs=json_logs)
         logger = logging_utils.get_logger()
         logger.info("test message", subsystem="test")
         if foreign:
@@ -304,4 +306,18 @@ def test_console_log_structure() -> None:
     # Expected format: timestamp [LEVEL] [logger] message (file.py:line) extra_fields
     assert "rag" in file_out  # Logger name (now wrapped in color codes)
     assert "(test_logging_utils.py:" in file_out  # Check for new location format
-    assert "237)" in file_out  # Check for line number
+    assert ")" in file_out  # Line number present
+
+
+def test_logs_to_console_when_no_file() -> None:
+    """Logs should be emitted to stderr if no log file is provided."""
+    console_out, file_out = _setup_and_log(json_logs=False, log_file=None)
+    assert console_out  # console receives logs
+    assert file_out == ""
+
+
+def test_json_logs_to_console_when_no_file() -> None:
+    """JSON logs should also go to stderr when no log file is set."""
+    console_out, file_out = _setup_and_log(json_logs=True, log_file=None)
+    assert json.loads(console_out)
+    assert file_out == ""

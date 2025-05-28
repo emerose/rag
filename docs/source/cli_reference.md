@@ -115,3 +115,4 @@ Global options available on every command include:
 - `--max-workers` – number of concurrent tasks
 - `--embedding-model` – OpenAI embedding model (default `text-embedding-3-small`)
 - `--chat-model` – OpenAI chat model (default `gpt-4`)
+- `--log-file` – write logs to the specified file
