@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
+from fastmcp import Context
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.tools.base import Tool
 from mcp.types import EmbeddedResource, ImageContent, TextContent
@@ -83,11 +84,47 @@ class RAGMCPServer(FastMCP):
         docs = self.engine.vectorstore_manager.similarity_search(merged, query, k=top_k)
         return [doc.dict() for doc in docs]
 
-    async def tool_index(self, path: str) -> dict[str, Any]:
+    async def tool_index(self, path: str, ctx: Context) -> dict[str, Any]:
         p = Path(path)
+        loop = asyncio.get_running_loop()
+
         if p.is_dir():
-            return await asyncio.to_thread(self.engine.index_directory, p)
-        success, error = await asyncio.to_thread(self.engine.index_file, p)
+            files = self.engine.filesystem_manager.scan_directory(p)
+            total = len(files) if files else 1
+            count = 0
+
+            def cb(event: str, fp: Path, error: str | None) -> None:
+                nonlocal count
+                count += 1
+                msg = f"{event}: {fp}"
+                if error:
+                    msg += f" ({error})"
+                asyncio.run_coroutine_threadsafe(
+                    ctx.report_progress(progress=count, total=total, message=msg),
+                    loop,
+                )
+
+            return await asyncio.to_thread(
+                self.engine.index_directory, p, progress_callback=cb
+            )
+
+        total = 1
+        count = 0
+
+        def cb(event: str, fp: Path, error: str | None) -> None:
+            nonlocal count
+            count += 1
+            msg = f"{event}: {fp}"
+            if error:
+                msg += f" ({error})"
+            asyncio.run_coroutine_threadsafe(
+                ctx.report_progress(progress=count, total=total, message=msg),
+                loop,
+            )
+
+        success, error = await asyncio.to_thread(
+            self.engine.index_file, p, progress_callback=cb
+        )
         return {"success": success, "error": error}
 
     async def tool_rebuild(self) -> dict[str, Any]:
