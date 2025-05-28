@@ -86,13 +86,15 @@ class RAGMCPServer(FastMCP):
     async def tool_index(self, path: str) -> dict[str, Any]:
         p = Path(path)
         if p.is_dir():
-            return self.engine.index_directory(p)
-        success, error = self.engine.index_file(p)
+            return await asyncio.to_thread(self.engine.index_directory, p)
+        success, error = await asyncio.to_thread(self.engine.index_file, p)
         return {"success": success, "error": error}
 
     async def tool_rebuild(self) -> dict[str, Any]:
         self.engine.invalidate_all_caches()
-        return self.engine.index_directory(self.engine.documents_dir)
+        return await asyncio.to_thread(
+            self.engine.index_directory, self.engine.documents_dir
+        )
 
     async def tool_index_stats(self) -> dict[str, Any]:
         files = self.engine.list_indexed_files()
