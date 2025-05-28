@@ -79,6 +79,15 @@ Remove cache entries for files that no longer exist.
 rag cleanup
 ```
 
+## `mcp`
+
+Launch the MCP server using HTTP or STDIO transport.
+
+```
+rag mcp --stdio  # STDIO transport
+rag mcp --http   # HTTP transport
+```
+
 ## `repl`
 
 Interactive shell for experimenting with queries.

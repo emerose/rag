@@ -16,7 +16,14 @@ server = build_server(config, runtime)
 asyncio.run(run_http_server(server))
 ```
 
-Use `run_stdio_server(server)` for STDIO transport. See [MCP HTTP API](api_http.md) for endpoint details.
+Use `run_stdio_server(server)` for STDIO transport. You can also launch the
+server from the CLI:
+
+```bash
+rag mcp --http
+```
+
+See [MCP HTTP API](api_http.md) for endpoint details.
 
 ## Integrating with Claude
 
