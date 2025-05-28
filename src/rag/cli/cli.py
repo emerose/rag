@@ -39,10 +39,10 @@ from rag.utils.logging_utils import get_logger, setup_logging
 try:
     # Try relative imports first (for module usage)
     from ..prompts import list_prompts
-    from .cli.output import Error, TableData, set_json_mode, write
     from .config import RAGConfig, RuntimeOptions
     from .engine import RAGEngine
     from .mcp import build_server, run_http_server, run_stdio_server
+    from .output import Error, TableData, set_json_mode, write
     from .utils import exceptions
 except ImportError:
     # Fall back to absolute imports (for direct script usage)
