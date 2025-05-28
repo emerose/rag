@@ -37,6 +37,20 @@ from .utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
 
+# Common exception types raised by RAGEngine operations
+ENGINE_EXCEPTIONS = (
+    OSError,
+    ValueError,
+    KeyError,
+    ConnectionError,
+    TimeoutError,
+    ImportError,
+    AttributeError,
+    FileNotFoundError,
+    IndexError,
+    TypeError,
+)
+
 
 class RAGEngine:
     """Main RAG Engine class.
@@ -289,6 +303,27 @@ class RAGEngine:
             file_path, self.embedding_model_map, self.config.embedding_model
         )
 
+    def _get_embedding_tools(
+        self, model_name: str
+    ) -> tuple[EmbeddingProvider, EmbeddingBatcher]:
+        """Return embedding provider and batcher for *model_name*."""
+        provider = getattr(self, "embedding_provider", None)
+        batcher = getattr(self, "embedding_batcher", None)
+
+        if model_name != self.config.embedding_model or batcher is None:
+            provider = EmbeddingProvider(
+                model_name=model_name,
+                openai_api_key=self.config.openai_api_key,
+                log_callback=self.runtime.log_callback,
+            )
+            batcher = EmbeddingBatcher(
+                embedding_provider=provider,
+                log_callback=self.runtime.log_callback,
+                progress_callback=self.runtime.progress_callback,
+            )
+
+        return provider, batcher
+
     def _initialize_document_processing(self) -> None:
         """Initialize document processing components."""
         # Initialize document loader and text splitter
@@ -364,16 +399,7 @@ class RAGEngine:
                 if vectorstore:
                     self.vectorstores[file_path] = vectorstore
 
-            except (
-                OSError,
-                ValueError,
-                KeyError,
-                ConnectionError,
-                TimeoutError,
-                ImportError,
-                AttributeError,
-                FileNotFoundError,
-            ) as e:
+            except ENGINE_EXCEPTIONS as e:
                 self._log("ERROR", f"Failed to load vectorstore for {file_path}: {e}")
 
         self._log("DEBUG", f"Loaded {len(self.vectorstores)} vectorstores")
@@ -474,21 +500,12 @@ class RAGEngine:
                 text_splitter_name=ingest_result.source.text_splitter_name,
             )
             return success, None
-        except (
-            OSError,
-            ValueError,
-            KeyError,
-            ConnectionError,
-            TimeoutError,
-            ImportError,
-            AttributeError,
-            FileNotFoundError,
-        ) as e:
+        except ENGINE_EXCEPTIONS as e:
             error_message = str(e)
             self._log("ERROR", f"Failed to index {file_path}: {error_message}")
             return False, error_message
 
-    def _create_vectorstore_from_documents(  # noqa: PLR0915, PLR0912, PLR0913
+    def _create_vectorstore_from_documents(  # noqa: PLR0915, PLR0913
         self,
         file_path: Path,
         documents: list[Document],
@@ -528,21 +545,9 @@ class RAGEngine:
             # Create a new vectorstore and process chunks sequentially
             vectorstore = self.vectorstore_manager.create_empty_vectorstore()
 
-            provider = getattr(self, "embedding_provider", None)
-            batcher = getattr(self, "embedding_batcher", None)
-            if embedding_model and embedding_model != self.config.embedding_model:
-                provider = EmbeddingProvider(
-                    model_name=embedding_model,
-                    openai_api_key=self.config.openai_api_key,
-                    log_callback=self.runtime.log_callback,
-                )
-                batcher = EmbeddingBatcher(
-                    embedding_provider=provider,
-                    log_callback=self.runtime.log_callback,
-                    progress_callback=self.runtime.progress_callback,
-                )
-            if batcher is None:
-                raise AttributeError("embedding_batcher not initialized")
+            provider, batcher = self._get_embedding_tools(
+                embedding_model or self.config.embedding_model
+            )
 
             docs_to_embed: list[Document] = []
             embed_indices: list[int] = []
@@ -636,20 +641,11 @@ class RAGEngine:
             )
 
             return True
-        except (
-            OSError,
-            ValueError,
-            KeyError,
-            ConnectionError,
-            TimeoutError,
-            ImportError,
-            AttributeError,
-            FileNotFoundError,
-        ) as e:
+        except ENGINE_EXCEPTIONS as e:
             self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
             return False
 
-    def index_directory(  # noqa: PLR0915, PLR0912
+    def index_directory(
         self, directory: Path | str | None = None
     ) -> dict[str, dict[str, Any]]:
         """Index all files in a directory.
@@ -719,93 +715,28 @@ class RAGEngine:
                 results[file_path] = {"success": False, "error": result.error_message}
                 continue
 
+            documents = result.documents
+            if not documents:
+                self._log("WARNING", f"No documents extracted from {file_path}")
+                results[file_path] = {
+                    "success": False,
+                    "error": "No documents extracted",
+                }
+                continue
+
             try:
-                # We've already processed the file, so we just need to embed and store
-                documents = result.documents
-                if not documents:
-                    self._log("WARNING", f"No documents extracted from {file_path}")
-                    results[file_path] = {
-                        "success": False,
-                        "error": "No documents extracted",
-                    }
-                    continue
-
-                # Get embeddings
-                self._log(
-                    "DEBUG",
-                    f"Generating embeddings for {len(documents)} documents from {file_path}",
-                )
                 model_name = self._embedding_model_for_file(Path(file_path))
-                provider = self.embedding_provider
-                batcher = self.embedding_batcher
-                if model_name != self.config.embedding_model:
-                    provider = EmbeddingProvider(
-                        model_name=model_name,
-                        openai_api_key=self.config.openai_api_key,
-                        log_callback=self.runtime.log_callback,
-                    )
-                    batcher = EmbeddingBatcher(
-                        embedding_provider=provider,
-                        log_callback=self.runtime.log_callback,
-                        progress_callback=self.runtime.progress_callback,
-                    )
-                if self.runtime.async_batching:
-                    embeddings = asyncio.run(
-                        batcher.process_embeddings_async(documents)
-                    )
-                else:
-                    embeddings = batcher.process_embeddings(documents)
-
-                # Get existing vectorstore if available
-                existing_vectorstore = self.vectorstores.get(file_path)
-                if not existing_vectorstore:
-                    existing_vectorstore = self.vectorstore_manager.load_vectorstore(
-                        file_path
-                    )
-
-                # Create or update vectorstore
-                mime_type = result.source.mime_type or "text/plain"
-                vectorstore = self.vectorstore_manager.add_documents_to_vectorstore(
-                    vectorstore=existing_vectorstore,
+                success = self._create_vectorstore_from_documents(
+                    file_path=Path(file_path),
                     documents=documents,
-                    embeddings=embeddings,
-                )
-
-                # Save vectorstore
-                self.vectorstore_manager.save_vectorstore(str(file_path), vectorstore)
-
-                # Update metadata
-                path_obj = Path(file_path)
-                self.index_manager.update_metadata(
-                    file_path=path_obj,
-                    chunk_size=self.config.chunk_size,
-                    chunk_overlap=self.config.chunk_overlap,
+                    file_type=result.source.mime_type or "text/plain",
                     embedding_model=model_name,
-                    embedding_model_version=self.embedding_model_version,
-                    file_type=mime_type,
-                    num_chunks=len(documents),
+                    loader_name=result.source.loader_name,
+                    tokenizer_name=result.source.tokenizer_name,
+                    text_splitter_name=result.source.text_splitter_name,
                 )
-
-                # Update cache metadata
-                file_metadata = self.filesystem_manager.get_file_metadata(path_obj)
-                file_metadata["chunks"] = {"total": len(documents)}
-                self.cache_manager.update_cache_metadata(str(file_path), file_metadata)
-
-                # Add vectorstore to memory cache
-                self.vectorstores[str(file_path)] = vectorstore
-
-                results[file_path] = {"success": True}
-            except (
-                OSError,
-                ValueError,
-                KeyError,
-                ConnectionError,
-                TimeoutError,
-                ImportError,
-                AttributeError,
-                FileNotFoundError,
-                TypeError,
-            ) as e:
+                results[file_path] = {"success": success}
+            except ENGINE_EXCEPTIONS as e:
                 error_msg = str(e)
                 self._log("ERROR", f"Error indexing {file_path}: {error_msg}")
                 results[file_path] = {"success": False, "error": error_msg}
@@ -869,17 +800,7 @@ class RAGEngine:
             result = enhance_result(question, answer_text, documents)
             result["num_documents_retrieved"] = len(documents)
             self._log("INFO", "Successfully generated answer (LCEL)")
-        except (
-            OSError,
-            ValueError,
-            KeyError,
-            ConnectionError,
-            TimeoutError,
-            ImportError,
-            AttributeError,
-            IndexError,
-            TypeError,
-        ) as e:
+        except ENGINE_EXCEPTIONS as e:
             self._log("ERROR", f"Failed to answer question: {e}")
             return {
                 "question": question,
@@ -937,28 +858,9 @@ class RAGEngine:
                             "num_chunks": file_info.get("num_chunks", 0),
                         }
                     )
-                except (
-                    OSError,
-                    ValueError,
-                    KeyError,
-                    ConnectionError,
-                    ImportError,
-                    AttributeError,
-                    IndexError,
-                    TypeError,
-                ) as e:
+                except ENGINE_EXCEPTIONS as e:
                     self._log("ERROR", f"Failed to summarize {file_path}: {e}")
-        except (
-            OSError,
-            ValueError,
-            KeyError,
-            ConnectionError,
-            TimeoutError,
-            ImportError,
-            AttributeError,
-            IndexError,
-            TypeError,
-        ) as e:
+        except ENGINE_EXCEPTIONS as e:
             self._log("ERROR", f"Failed to generate document summaries: {e}")
             return []
         else:
@@ -1119,16 +1021,7 @@ class RAGEngine:
             try:
                 await asyncio.sleep(0)  # Yield control back to event loop
                 self.index_file(file_path)[0]
-            except (
-                OSError,
-                ValueError,
-                KeyError,
-                ConnectionError,
-                TimeoutError,
-                ImportError,
-                AttributeError,
-                FileNotFoundError,
-            ) as e:
+            except ENGINE_EXCEPTIONS as e:
                 self._log("ERROR", f"Error indexing {file_path}: {e}")
 
         # Clean up invalid caches

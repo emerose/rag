@@ -124,6 +124,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Created `IndexingParams` dataclass for parameter management
   - Extracted `_create_rag_config_and_runtime()`, `_index_single_file()`, and `_index_directory()` helper functions
   - Fixed import ordering issues
+- Simplified `RAGEngine` by deduplicating embedding and error handling logic
 
 ### Fixed
 - More reliable heading detection in PDFs by using statistical font analysis
