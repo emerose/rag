@@ -3,6 +3,8 @@ from unittest.mock import patch
 
 import pytest
 
+import logging
+
 from rag.config import RAGConfig, RuntimeOptions
 from rag.mcp import build_server, create_http_app, run_stdio_server
 
@@ -50,3 +52,20 @@ def test_run_stdio_server_invokes_fastmcp(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "run_stdio_async", fake_run)
     run_stdio_server(server)
     assert called
+
+
+@pytest.mark.integration
+def test_call_tool_logs_name_and_args(tmp_path, caplog):
+    config = _dummy_config(tmp_path)
+    runtime = RuntimeOptions()
+    server = build_server(config, runtime)
+
+    with caplog.at_level(logging.INFO):
+        asyncio.run(server.call_tool("tool_query", {"question": "hi"}))
+
+    assert any(
+        record.message == "CallToolRequest"
+        and getattr(record, "tool", None) == "tool_query"
+        and getattr(record, "arguments", None) == {"question": "hi"}
+        for record in caplog.records
+    )
