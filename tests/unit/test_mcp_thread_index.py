@@ -10,11 +10,11 @@ class DummyEngine:
     def __init__(self, base: Path) -> None:
         self.documents_dir = base
 
-    def index_directory(self, path: Path):
+    def index_directory(self, path: Path, cb=None):
         asyncio.run(asyncio.sleep(0))
         return {"success": True}
 
-    def index_file(self, path: Path):
+    def index_file(self, path: Path, cb=None):
         asyncio.run(asyncio.sleep(0))
         return True, None
 
@@ -25,5 +25,15 @@ class DummyEngine:
 @pytest.mark.asyncio
 async def test_tool_index_runs_in_thread(tmp_path: Path) -> None:
     server = RAGMCPServer(engine=DummyEngine(tmp_path))
-    result = await server.tool_index(str(tmp_path))
+
+    class DummyCtx:
+        async def report_progress(
+            self,
+            progress: float,
+            total: float | None = None,
+            message: str | None = None,
+        ) -> None:
+            pass
+
+    result = await server.tool_index(str(tmp_path), DummyCtx())
     assert result["success"]

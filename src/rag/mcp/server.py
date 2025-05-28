@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
+from mcp.server.context import Context
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.tools.base import Tool
 from mcp.types import EmbeddedResource, ImageContent, TextContent
@@ -83,11 +84,19 @@ class RAGMCPServer(FastMCP):
         docs = self.engine.vectorstore_manager.similarity_search(merged, query, k=top_k)
         return [doc.dict() for doc in docs]
 
-    async def tool_index(self, path: str) -> dict[str, Any]:
+    async def tool_index(self, path: str, ctx: Context) -> dict[str, Any]:
         p = Path(path)
+        loop = asyncio.get_running_loop()
+
+        def cb(progress: float, total: float | None, message: str | None) -> None:
+            asyncio.run_coroutine_threadsafe(
+                ctx.report_progress(progress, total, message),
+                loop,
+            )
+
         if p.is_dir():
-            return await asyncio.to_thread(self.engine.index_directory, p)
-        success, error = await asyncio.to_thread(self.engine.index_file, p)
+            return await asyncio.to_thread(self.engine.index_directory, p, cb)
+        success, error = await asyncio.to_thread(self.engine.index_file, p, cb)
         return {"success": success, "error": error}
 
     async def tool_rebuild(self) -> dict[str, Any]:

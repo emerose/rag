@@ -7,6 +7,7 @@ RAG system through dependency injection pattern.
 import asyncio
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -378,19 +379,26 @@ class RAGEngine:
 
         self._log("DEBUG", f"Loaded {len(self.vectorstores)} vectorstores")
 
-    def index_file(self, file_path: Path | str) -> tuple[bool, str | None]:  # noqa: PLR0911
+    def index_file(  # noqa: PLR0911, PLR0912
+        self,
+        file_path: Path | str,
+        progress_callback: Callable[[float, float | None, str | None], None]
+        | None = None,
+    ) -> tuple[bool, str | None]:
         """Index a file.
 
         Args:
             file_path: Path to the file to index
+            progress_callback: Optional callback for progress updates
 
         Returns:
-            Tuple of ``(success, error_message)``. ``error_message`` will be
-            ``None`` when indexing succeeds.
+            Tuple of ``(success, error_message)``. ``error_message`` will be ``None`` when indexing succeeds.
 
         """
         file_path = Path(file_path).resolve()
         self._log("INFO", f"Indexing file: {file_path}")
+        if progress_callback:
+            progress_callback(0.0, 1.0, f"Indexing {file_path}")
 
         # Disallow indexing outside the configured documents directory
         try:
@@ -408,6 +416,10 @@ class RAGEngine:
             # Check if file exists
             if not file_path.exists():
                 self._log("ERROR", f"File does not exist: {file_path}")
+                if progress_callback:
+                    progress_callback(
+                        1.0, 1.0, f"Error {file_path}: File does not exist"
+                    )
                 return False, "File does not exist"
 
             # Skip re-indexing if cached and unchanged
@@ -429,6 +441,8 @@ class RAGEngine:
                     )
                     if vectorstore:
                         self.vectorstores[str(file_path)] = vectorstore
+                if progress_callback:
+                    progress_callback(1.0, 1.0, f"Cached {file_path}")
                 return True, None
 
             self._log("DEBUG", f"Starting document ingestion for: {file_path}")
@@ -443,6 +457,8 @@ class RAGEngine:
                     "ERROR",
                     f"Failed to process {file_path}: {error_message}",
                 )
+                if progress_callback:
+                    progress_callback(1.0, 1.0, f"Error {file_path}: {error_message}")
                 return False, error_message
 
             # Get documents from ingestion result
@@ -473,6 +489,8 @@ class RAGEngine:
                 tokenizer_name=ingest_result.source.tokenizer_name,
                 text_splitter_name=ingest_result.source.text_splitter_name,
             )
+            if progress_callback:
+                progress_callback(1.0, 1.0, f"Indexed {file_path}")
             return success, None
         except (
             OSError,
@@ -486,6 +504,8 @@ class RAGEngine:
         ) as e:
             error_message = str(e)
             self._log("ERROR", f"Failed to index {file_path}: {error_message}")
+            if progress_callback:
+                progress_callback(1.0, 1.0, f"Error {file_path}: {error_message}")
             return False, error_message
 
     def _create_vectorstore_from_documents(  # noqa: PLR0915, PLR0912, PLR0913
@@ -649,17 +669,20 @@ class RAGEngine:
             self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
             return False
 
-    def index_directory(  # noqa: PLR0915, PLR0912
-        self, directory: Path | str | None = None
+    def index_directory(
+        self,
+        directory: Path | str | None = None,
+        progress_callback: Callable[[float, float | None, str | None], None]
+        | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Index all files in a directory.
 
         Args:
-            directory: Directory containing files to index (defaults to config.documents_dir)
+            directory: Directory containing files to index (defaults to ``config.documents_dir``)
+            progress_callback: Optional callback for progress updates
 
         Returns:
-            Dictionary mapping file paths to a result dict with ``success`` and
-            optional ``error`` message
+            Dictionary mapping file paths to a result dict with ``success`` and optional ``error`` message
 
         """
         directory = Path(directory).resolve() if directory else self.documents_dir
@@ -683,6 +706,7 @@ class RAGEngine:
 
         # Determine which files need indexing
         all_files = self.filesystem_manager.scan_directory(directory)
+        total_files = len(all_files)
         files_to_index = [
             f
             for f in all_files
@@ -695,120 +719,26 @@ class RAGEngine:
             )
         ]
 
+        for idx, f in enumerate(all_files, start=1):
+            if f not in files_to_index and progress_callback:
+                progress_callback(float(idx), float(total_files), f"Cached {f}")
+
         if not files_to_index:
             self._log("INFO", f"No files require indexing in {directory}")
             return {}
 
-        # Use the ingest manager for directory processing when all files need indexing
-        if len(files_to_index) == len(all_files):
-            ingest_results = self.ingest_manager.ingest_directory(directory)
-        else:
-            ingest_results = {}
-            for file_path in files_to_index:
-                ingest_results[str(file_path)] = self.ingest_manager.ingest_file(
-                    file_path
-                )
-
-        # Index each file that was successfully processed
         results: dict[str, dict[str, Any]] = {}
-        for file_path, result in ingest_results.items():
-            if not result.successful:
-                self._log(
-                    "WARNING", f"Failed to process {file_path}: {result.error_message}"
-                )
-                results[file_path] = {"success": False, "error": result.error_message}
-                continue
+        for file_path in files_to_index:
+            idx = all_files.index(file_path) + 1
 
-            try:
-                # We've already processed the file, so we just need to embed and store
-                documents = result.documents
-                if not documents:
-                    self._log("WARNING", f"No documents extracted from {file_path}")
-                    results[file_path] = {
-                        "success": False,
-                        "error": "No documents extracted",
-                    }
-                    continue
+            def cb(_p: float, _t: float | None, message: str | None, idx=idx) -> None:
+                if progress_callback:
+                    progress_callback(float(idx), float(total_files), message)
 
-                # Get embeddings
-                self._log(
-                    "DEBUG",
-                    f"Generating embeddings for {len(documents)} documents from {file_path}",
-                )
-                model_name = self._embedding_model_for_file(Path(file_path))
-                provider = self.embedding_provider
-                batcher = self.embedding_batcher
-                if model_name != self.config.embedding_model:
-                    provider = EmbeddingProvider(
-                        model_name=model_name,
-                        openai_api_key=self.config.openai_api_key,
-                        log_callback=self.runtime.log_callback,
-                    )
-                    batcher = EmbeddingBatcher(
-                        embedding_provider=provider,
-                        log_callback=self.runtime.log_callback,
-                        progress_callback=self.runtime.progress_callback,
-                    )
-                if self.runtime.async_batching:
-                    embeddings = asyncio.run(
-                        batcher.process_embeddings_async(documents)
-                    )
-                else:
-                    embeddings = batcher.process_embeddings(documents)
-
-                # Get existing vectorstore if available
-                existing_vectorstore = self.vectorstores.get(file_path)
-                if not existing_vectorstore:
-                    existing_vectorstore = self.vectorstore_manager.load_vectorstore(
-                        file_path
-                    )
-
-                # Create or update vectorstore
-                mime_type = result.source.mime_type or "text/plain"
-                vectorstore = self.vectorstore_manager.add_documents_to_vectorstore(
-                    vectorstore=existing_vectorstore,
-                    documents=documents,
-                    embeddings=embeddings,
-                )
-
-                # Save vectorstore
-                self.vectorstore_manager.save_vectorstore(str(file_path), vectorstore)
-
-                # Update metadata
-                path_obj = Path(file_path)
-                self.index_manager.update_metadata(
-                    file_path=path_obj,
-                    chunk_size=self.config.chunk_size,
-                    chunk_overlap=self.config.chunk_overlap,
-                    embedding_model=model_name,
-                    embedding_model_version=self.embedding_model_version,
-                    file_type=mime_type,
-                    num_chunks=len(documents),
-                )
-
-                # Update cache metadata
-                file_metadata = self.filesystem_manager.get_file_metadata(path_obj)
-                file_metadata["chunks"] = {"total": len(documents)}
-                self.cache_manager.update_cache_metadata(str(file_path), file_metadata)
-
-                # Add vectorstore to memory cache
-                self.vectorstores[str(file_path)] = vectorstore
-
-                results[file_path] = {"success": True}
-            except (
-                OSError,
-                ValueError,
-                KeyError,
-                ConnectionError,
-                TimeoutError,
-                ImportError,
-                AttributeError,
-                FileNotFoundError,
-                TypeError,
-            ) as e:
-                error_msg = str(e)
-                self._log("ERROR", f"Error indexing {file_path}: {error_msg}")
-                results[file_path] = {"success": False, "error": error_msg}
+            success, error = self.index_file(file_path, progress_callback=cb)
+            results[str(file_path)] = {"success": success}
+            if error:
+                results[str(file_path)]["error"] = error
 
         # Clean up invalid caches
         self.cache_manager.cleanup_invalid_caches()
