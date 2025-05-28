@@ -153,6 +153,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Ensured cache directory separation from documents directory
   - Prevented cache files from being indexed as documents
 - Fixed relative import causing `ModuleNotFoundError` when running CLI as a module
+- Fixed ChatOpenAI patch path in integration tests
 
 ### Technical Debt
 - Added pytest-asyncio dependency for async test support
