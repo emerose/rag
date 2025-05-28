@@ -228,7 +228,8 @@ def create_http_app(server: RAGMCPServer, api_key: str | None = None) -> FastAPI
 
     @app.post("/index")
     async def index(req: IndexRequest) -> dict[str, Any]:
-        return await server.tool_index(req.path)
+        ctx = server.get_context()
+        return await server.tool_index(req.path, ctx)
 
     @app.post("/index/rebuild")
     async def rebuild() -> dict[str, Any]:
