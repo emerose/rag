@@ -16,3 +16,4 @@ RAG Documentation
    incremental_indexing
    customizing_prompts
    machine_readable_output
+   evaluation_framework
