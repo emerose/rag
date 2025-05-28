@@ -524,7 +524,7 @@ class RAGEngine:
                 progress_callback("error", file_path, error_message)
             return False, error_message
 
-    def _create_vectorstore_from_documents(  # noqa: PLR0915, PLR0913
+    def _create_vectorstore_from_documents(  # noqa: PLR0915, PLR0913, PLR0912
         self,
         file_path: Path,
         documents: list[Document],
@@ -627,28 +627,40 @@ class RAGEngine:
             # Update metadata
             self._log("DEBUG", "Updating index metadata")
             used_model = embedding_model or self.config.embedding_model
-            self.index_manager.update_metadata(
-                file_path=file_path,
-                chunk_size=self.config.chunk_size,
-                chunk_overlap=self.config.chunk_overlap,
-                embedding_model=used_model,
-                embedding_model_version=self.embedding_model_version,
-                file_type=file_type,
-                num_chunks=len(documents),
-                document_loader=loader_name,
-                tokenizer=tokenizer_name,
-                text_splitter=text_splitter_name,
-            )
+            if file_path.exists():
+                self.index_manager.update_metadata(
+                    file_path=file_path,
+                    chunk_size=self.config.chunk_size,
+                    chunk_overlap=self.config.chunk_overlap,
+                    embedding_model=used_model,
+                    embedding_model_version=self.embedding_model_version,
+                    file_type=file_type,
+                    num_chunks=len(documents),
+                    document_loader=loader_name,
+                    tokenizer=tokenizer_name,
+                    text_splitter=text_splitter_name,
+                )
+            else:
+                self._log(
+                    "DEBUG",
+                    f"File {file_path} does not exist, skipping metadata update",
+                )
 
             # Store chunk hashes for incremental indexing
             self.index_manager.update_chunk_hashes(file_path, new_hashes)
 
             # Update cache metadata
-            self._log("DEBUG", "Getting file metadata")
-            file_metadata = self.filesystem_manager.get_file_metadata(file_path)
-            file_metadata["chunks"] = {"total": len(documents)}
-            self._log("DEBUG", "Updating cache metadata")
-            self.cache_manager.update_cache_metadata(str(file_path), file_metadata)
+            if file_path.exists():
+                self._log("DEBUG", "Getting file metadata")
+                file_metadata = self.filesystem_manager.get_file_metadata(file_path)
+                file_metadata["chunks"] = {"total": len(documents)}
+                self._log("DEBUG", "Updating cache metadata")
+                self.cache_manager.update_cache_metadata(str(file_path), file_metadata)
+            else:
+                self._log(
+                    "DEBUG",
+                    f"File {file_path} does not exist, skipping cache metadata update",
+                )
 
             # Add vectorstore to memory cache
             self._log("DEBUG", "Adding vectorstore to memory cache")
