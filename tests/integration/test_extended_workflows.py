@@ -220,7 +220,9 @@ def test_json_output_piping(tmp_path: Path) -> None:
         )
         assert result_index.exit_code == 0
         result_query = runner.invoke(
-            app, ["query", "hello", "--cache-dir", str(tmp_path)]
+            app,
+            ["query", "hello", "--cache-dir", str(tmp_path)],
         )
-    data = json.loads(result_query.stdout)
+    output_lines = result_query.stdout.strip().splitlines()
+    data = json.loads(output_lines[-1])
     assert "answer" in data
