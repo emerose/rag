@@ -8,17 +8,28 @@ from starlette.testclient import TestClient
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.mcp import build_server, create_http_app
+from rag.embeddings.embedding_provider import EmbeddingProvider
+from langchain_core.embeddings import FakeEmbeddings
+from unittest.mock import patch
 
 pytestmark = pytest.mark.integration
 
 
 def _build_test_server(tmp_path: Path):
-    config = RAGConfig(
-        documents_dir=str(tmp_path / "docs"),
-        cache_dir=str(tmp_path / "cache"),
-    )
-    runtime = RuntimeOptions()
-    server = build_server(config, runtime)
+    with (
+        patch(
+            "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+            return_value=FakeEmbeddings(size=32),
+        ),
+        patch.object(EmbeddingProvider, "_get_embedding_dimension", return_value=32),
+    ):
+        config = RAGConfig(
+            documents_dir=str(tmp_path / "docs"),
+            cache_dir=str(tmp_path / "cache"),
+            openai_api_key="dummy",
+        )
+        runtime = RuntimeOptions()
+        server = build_server(config, runtime)
 
     engine = server.engine
     engine.answer = lambda q, k=4: {"answer": "ok"}
@@ -27,8 +38,8 @@ def _build_test_server(tmp_path: Path):
     engine.vectorstore_manager.similarity_search = lambda merged, q, k=4: [
         Document(page_content="doc", metadata={})
     ]
-    engine.index_directory = lambda path: {"indexed": True}
-    engine.index_file = lambda path: (True, "")
+    engine.index_directory = lambda path, progress_callback=None: {"indexed": True}
+    engine.index_file = lambda path, progress_callback=None: (True, "")
     engine.invalidate_all_caches = lambda: None
     engine.list_indexed_files = lambda: [
         {"file_path": "sample.txt", "num_chunks": 1, "file_size": 1}
