@@ -44,3 +44,19 @@ regressions over time.
 
 This framework allows rapid experimentation with different loaders, splitters or retrievers while
 producing consistent metrics for each run.
+
+## Implementation Steps
+
+The following incremental steps outline how to build the evaluation framework. Each is designed to be small and testable, with documentation updates along the way.
+
+1. **Define dataset and config models** – Create Pydantic models for datasets and evaluation settings stored under `tests/data/`.
+2. **Implement dataset loading with metrics** – Build loaders that track file type, size and parsing time, adding unit tests for failure cases.
+3. **Add text splitting instrumentation** – Log chunk sizes and token counts via `tiktoken`; test with small sample documents.
+4. **Capture indexing and retrieval metrics** – Measure FAISS indexing throughput, memory usage and retrieval quality (recall@k, MRR) against ground truth pairs.
+5. **Instrument query and generation** – Mock the OpenAI API to collect latency and token stats, then compute answer similarity using `sacrebleu`.
+6. **Persist metrics to files** – Write results to CSV/JSON with `pandas` and generate simple plots using `matplotlib`.
+7. **Create `rag eval` CLI command** – Wire components together behind a CLI entry point that prints a summary table.
+8. **Write unit tests for the CLI and metrics** – Ensure core functions behave deterministically and cover error scenarios.
+9. **Document usage** – Add documentation describing how to run evaluations and interpret the output.
+10. **Integrate into CI** – Schedule regular runs of `rag eval` and store artifacts for trend analysis.
+
