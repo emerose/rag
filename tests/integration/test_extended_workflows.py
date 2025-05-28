@@ -213,7 +213,7 @@ def test_json_output_piping(tmp_path: Path) -> None:
             return_value=FakeEmbeddings(size=8),
         ),
         patch.object(EmbeddingProvider, "_get_embedding_dimension", return_value=8),
-        patch("rag.cli.cli.ChatOpenAI"),
+        patch("rag.engine.ChatOpenAI"),
     ):
         result_index = runner.invoke(
             app, ["index", str(file_path), "--cache-dir", str(tmp_path)]
