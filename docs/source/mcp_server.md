@@ -30,17 +30,28 @@ and any arguments. This can help when debugging custom integrations.
 
 ## Integrating with Claude
 
-1. Install the FastMCP CLI:
-   ```bash
-   pip install fastmcp
-   ```
-2. Save the example server above as `server.py`.
-3. Install it into Claude:
-   ```bash
-   fastmcp install server.py
-   ```
-4. Provide dependencies with `--with` or `--with-editable` as needed. Claude runs each server in an isolated environment, so `uv` must be available on your system.
-5. After installation, choose the server from Claude's **Tools** menu.
+1. Add the following to your `~/Library/Application Support/Claude/claude_desktop_config.json` file:
+
+```json
+{
+  "mcpServers": {
+    "RAG": {
+      "command": "/path/to/rag/.venv/bin/rag",
+      "args": [
+        "--log-file",
+        "/path/to/rag/rag.log",
+        "--cache-dir",
+        "/path/to/rag/.cache",
+        "mcp",
+        "--stdio"
+      ]
+    }
+  }
+} 
+
+```
+
+2. Restart Claude Desktop
 
 ## Integrating with Cursor
 
