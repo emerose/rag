@@ -12,16 +12,15 @@ class DummyEngine:
         self.filesystem_manager = self
 
     def scan_directory(self, path: Path):
-        return [path]
+        return [path / "a.txt", path / "b.txt"]
 
     def index_directory(self, path: Path, *, progress_callback=None):
-        asyncio.run(asyncio.sleep(0))
         if progress_callback:
-            progress_callback("indexed", path, None)
-        return {"success": True}
+            progress_callback("indexed", path / "a.txt", None)
+            progress_callback("indexed", path / "b.txt", None)
+        return {"a": {"success": True}, "b": {"success": True}}
 
     def index_file(self, path: Path, *, progress_callback=None):
-        asyncio.run(asyncio.sleep(0))
         if progress_callback:
             progress_callback("indexed", path, None)
         return True, None
@@ -34,16 +33,25 @@ class DummyContext:
     def __init__(self) -> None:
         self.calls: list[tuple[float, float | None, str | None]] = []
 
-    async def report_progress(
-        self, progress: float, total: float | None, message: str | None
-    ) -> None:
+    async def report_progress(self, progress: float, total: float | None, message: str | None) -> None:
         self.calls.append((progress, total, message))
 
 
 @pytest.mark.asyncio
-async def test_tool_index_runs_in_thread(tmp_path: Path) -> None:
+async def test_directory_progress(tmp_path: Path) -> None:
     server = RAGMCPServer(engine=DummyEngine(tmp_path))
     ctx = DummyContext()
-    result = await server.tool_index(str(tmp_path), ctx)
-    assert result["success"]
-    assert ctx.calls
+    await server.tool_index(str(tmp_path), ctx)
+    assert len(ctx.calls) == 2
+    assert ctx.calls[0][0] == 1
+    assert ctx.calls[-1][0] == 2
+
+
+@pytest.mark.asyncio
+async def test_file_progress(tmp_path: Path) -> None:
+    server = RAGMCPServer(engine=DummyEngine(tmp_path))
+    ctx = DummyContext()
+    file_path = tmp_path / "file.txt"
+    await server.tool_index(str(file_path), ctx)
+    assert len(ctx.calls) == 1
+    assert ctx.calls[0][0] == 1
