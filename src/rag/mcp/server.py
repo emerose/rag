@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from mcp.server.fastmcp.tools.base import Tool
 from mcp.types import EmbeddedResource, ImageContent, TextContent
 from pydantic import BaseModel
@@ -83,11 +83,59 @@ class RAGMCPServer(FastMCP):
         docs = self.engine.vectorstore_manager.similarity_search(merged, query, k=top_k)
         return [doc.dict() for doc in docs]
 
-    async def tool_index(self, path: str) -> dict[str, Any]:
+    async def tool_index(self, path: str, ctx: Context | None = None) -> dict[str, Any]:
+        """Index *path* and stream progress messages if context provided."""
+
         p = Path(path)
+
+        async def progress_cb(name: str, value: int, total: int | None) -> None:
+            if ctx is not None:
+                await ctx.report_progress(float(value), total and float(total), name)
+
+        self.engine.runtime.progress_callback = progress_cb if ctx else None
+
         if p.is_dir():
-            return self.engine.index_directory(p)
+            files = self.engine.filesystem_manager.scan_directory(p)
+            total = len(files)
+            results: dict[str, Any] = {}
+            for i, file_path in enumerate(files, start=1):
+                if not self.engine.index_manager.needs_reindexing(
+                    file_path,
+                    self.engine.config.chunk_size,
+                    self.engine.config.chunk_overlap,
+                    self.engine._embedding_model_for_file(file_path),
+                    self.engine.embedding_model_version,
+                ):
+                    results[str(file_path)] = {"success": True, "cached": True}
+                    if ctx is not None:
+                        await ctx.report_progress(
+                            float(i), float(total), f"cached {file_path}"
+                        )
+                    continue
+                success, error = self.engine.index_file(file_path)
+                results[str(file_path)] = {"success": success, "error": error}
+                message = (
+                    f"indexed {file_path}" if success else f"error {file_path}: {error}"
+                )
+                if ctx is not None:
+                    await ctx.report_progress(float(i), float(total), message)
+            return results
+
+        if not self.engine.index_manager.needs_reindexing(
+            p,
+            self.engine.config.chunk_size,
+            self.engine.config.chunk_overlap,
+            self.engine._embedding_model_for_file(p),
+            self.engine.embedding_model_version,
+        ):
+            if ctx is not None:
+                await ctx.report_progress(1.0, 1.0, f"cached {p}")
+            return {"success": True, "cached": True}
+
         success, error = self.engine.index_file(p)
+        message = f"indexed {p}" if success else f"error {p}: {error}"
+        if ctx is not None:
+            await ctx.report_progress(1.0, 1.0, message)
         return {"success": success, "error": error}
 
     async def tool_rebuild(self) -> dict[str, Any]:
