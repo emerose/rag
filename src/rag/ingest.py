@@ -177,6 +177,8 @@ class IngestManager:
         filesystem_manager: FilesystemManager,
         chunking_strategy: ChunkingStrategy,
         preprocessor: Preprocessor | None = None,
+        *,
+        document_loader: DocumentLoader | None = None,
         log_callback: Any | None = None,
         progress_callback: Any | None = None,
         file_filter: Callable[[Path], bool] | None = None,
@@ -187,9 +189,11 @@ class IngestManager:
             filesystem_manager: Manager for filesystem operations
             chunking_strategy: Strategy for document chunking
             preprocessor: Optional text preprocessor
+            document_loader: Optional ``DocumentLoader`` to reuse
             log_callback: Optional callback for logging
             progress_callback: Optional callback for progress tracking
-            file_filter: Optional callable that takes a Path and returns bool to filter files
+            file_filter: Optional callable that takes a ``Path`` and returns
+                ``bool`` to filter files
         """
         self.filesystem_manager = filesystem_manager
         self.chunking_strategy = chunking_strategy
@@ -197,6 +201,10 @@ class IngestManager:
         self.log_callback = log_callback
         self.progress_tracker = ProgressTracker(progress_callback)
         self.file_filter = file_filter
+        self.document_loader = document_loader or DocumentLoader(
+            filesystem_manager,
+            log_callback,
+        )
 
     def _log(self, level: str, message: str) -> None:
         """Log a message.
@@ -315,10 +323,9 @@ class IngestManager:
         try:
             # 1. Load document
             self._log("DEBUG", f"Loading document: {file_path}")
-            doc_loader = DocumentLoader(self.filesystem_manager, self.log_callback)
-            docs = doc_loader.load_document(file_path)
-            source.loader_name = doc_loader.last_loader_name
-            source.metadata["loader"] = doc_loader.last_loader_name
+            docs = self.document_loader.load_document(file_path)
+            source.loader_name = self.document_loader.last_loader_name
+            source.metadata["loader"] = self.document_loader.last_loader_name
 
             if not docs:
                 result = IngestResult(
