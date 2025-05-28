@@ -108,15 +108,6 @@ class AsyncBatchProcessor(Generic[T, R]):
             return await self.processor_func(batch, self.semaphore)
 
 
-async def yield_control() -> None:
-    """Yield control to the event loop, allowing other tasks to execute.
-
-    This function is useful in long-running operations to prevent
-    blocking the event loop.
-    """
-    await asyncio.sleep(0)
-
-
 def run_coro_sync(coro: Awaitable[T]) -> T:
     """Run *coro* and return its result from synchronous code.
 
