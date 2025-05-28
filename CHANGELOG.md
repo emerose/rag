@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cache metadata records loader, tokenizer and text splitter used per file
   - Consistent error output format across all commands
   - Integration with tools like `jq` for output processing
+  - Progress callbacks for `index_file` and `index_directory`
   - Comprehensive test suite for JSON output functionality
   - Refactored output handling into dedicated `cli.output` module with:
     - `Message` type for simple text output

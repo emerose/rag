@@ -7,6 +7,7 @@ RAG system through dependency injection pattern.
 import asyncio
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -395,11 +396,18 @@ class RAGEngine:
 
         self._log("DEBUG", f"Loaded {len(self.vectorstores)} vectorstores")
 
-    def index_file(self, file_path: Path | str) -> tuple[bool, str | None]:  # noqa: PLR0911
+    def index_file(  # noqa: PLR0912, PLR0915, PLR0911
+        self,
+        file_path: Path | str,
+        *,
+        progress_callback: Callable[[str, Path, str | None], None] | None = None,
+    ) -> tuple[bool, str | None]:
         """Index a file.
 
         Args:
             file_path: Path to the file to index
+            progress_callback: Optional callback invoked with
+                ``(event, path, error)`` when progress is made
 
         Returns:
             Tuple of ``(success, error_message)``. ``error_message`` will be
@@ -418,6 +426,10 @@ class RAGEngine:
                 f"File path {file_path} is outside the allowed directory"
                 f" {self.documents_dir}",
             )
+            if progress_callback:
+                progress_callback(
+                    "error", file_path, "File path outside allowed directory"
+                )
             return False, "File path outside allowed directory"
         error_message: str | None = None
 
@@ -425,6 +437,8 @@ class RAGEngine:
             # Check if file exists
             if not file_path.exists():
                 self._log("ERROR", f"File does not exist: {file_path}")
+                if progress_callback:
+                    progress_callback("error", file_path, "File does not exist")
                 return False, "File does not exist"
 
             # Skip re-indexing if cached and unchanged
@@ -446,6 +460,8 @@ class RAGEngine:
                     )
                     if vectorstore:
                         self.vectorstores[str(file_path)] = vectorstore
+                if progress_callback:
+                    progress_callback("cached", file_path, None)
                 return True, None
 
             self._log("DEBUG", f"Starting document ingestion for: {file_path}")
@@ -460,6 +476,8 @@ class RAGEngine:
                     "ERROR",
                     f"Failed to process {file_path}: {error_message}",
                 )
+                if progress_callback:
+                    progress_callback("error", file_path, error_message)
                 return False, error_message
 
             # Get documents from ingestion result
@@ -467,6 +485,8 @@ class RAGEngine:
             self._log("DEBUG", f"Extracted {len(documents)} documents from {file_path}")
             if not documents:
                 self._log("WARNING", f"No documents extracted from {file_path}")
+                if progress_callback:
+                    progress_callback("error", file_path, "No documents extracted")
                 return False, "No documents extracted"
 
             # Debug: Check first document content
@@ -490,10 +510,17 @@ class RAGEngine:
                 tokenizer_name=ingest_result.source.tokenizer_name,
                 text_splitter_name=ingest_result.source.text_splitter_name,
             )
+            if progress_callback:
+                event = "indexed" if success else "error"
+                progress_callback(
+                    event, file_path, None if success else "Vectorstore creation failed"
+                )
             return success, None
         except ENGINE_EXCEPTIONS as e:
             error_message = str(e)
             self._log("ERROR", f"Failed to index {file_path}: {error_message}")
+            if progress_callback:
+                progress_callback("error", file_path, error_message)
             return False, error_message
 
     def _create_vectorstore_from_documents(  # noqa: PLR0915, PLR0913
@@ -636,13 +663,19 @@ class RAGEngine:
             self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
             return False
 
-    def index_directory(
-        self, directory: Path | str | None = None
+    def index_directory(  # noqa: PLR0912, PLR0915
+        self,
+        directory: Path | str | None = None,
+        *,
+        progress_callback: Callable[[str, Path, str | None], None] | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Index all files in a directory.
 
         Args:
-            directory: Directory containing files to index (defaults to config.documents_dir)
+            directory: Directory containing files to index (defaults to
+                ``config.documents_dir``)
+            progress_callback: Optional callback invoked with
+                ``(event, path, error)`` for each file processed
 
         Returns:
             Dictionary mapping file paths to a result dict with ``success`` and
@@ -661,11 +694,17 @@ class RAGEngine:
                 f"Directory {directory} is outside the allowed directory"
                 f" {self.documents_dir}",
             )
+            if progress_callback:
+                progress_callback(
+                    "error", directory, "Directory outside allowed directory"
+                )
             return {}
 
         # Validate directory
         if not self.filesystem_manager.validate_documents_dir(directory):
             self._log("ERROR", f"Invalid documents directory: {directory}")
+            if progress_callback:
+                progress_callback("error", directory, "Invalid documents directory")
             return {}
 
         # Determine which files need indexing
@@ -681,6 +720,10 @@ class RAGEngine:
                 self.embedding_model_version,
             )
         ]
+        cached_files = [f for f in all_files if f not in files_to_index]
+        for f in cached_files:
+            if progress_callback:
+                progress_callback("cached", f, None)
 
         if not files_to_index:
             self._log("INFO", f"No files require indexing in {directory}")
@@ -704,6 +747,8 @@ class RAGEngine:
                     "WARNING", f"Failed to process {file_path}: {result.error_message}"
                 )
                 results[file_path] = {"success": False, "error": result.error_message}
+                if progress_callback:
+                    progress_callback("error", Path(file_path), result.error_message)
                 continue
 
             documents = result.documents
@@ -713,6 +758,10 @@ class RAGEngine:
                     "success": False,
                     "error": "No documents extracted",
                 }
+                if progress_callback:
+                    progress_callback(
+                        "error", Path(file_path), "No documents extracted"
+                    )
                 continue
 
             try:
@@ -727,9 +776,18 @@ class RAGEngine:
                     text_splitter_name=result.source.text_splitter_name,
                 )
                 results[file_path] = {"success": success}
+                if progress_callback:
+                    event = "indexed" if success else "error"
+                    progress_callback(
+                        event,
+                        Path(file_path),
+                        None if success else "Vectorstore creation failed",
+                    )
             except ENGINE_EXCEPTIONS as e:
                 error_msg = str(e)
                 self._log("ERROR", f"Error indexing {file_path}: {error_msg}")
+                if progress_callback:
+                    progress_callback("error", Path(file_path), error_msg)
                 results[file_path] = {"success": False, "error": error_msg}
 
         # Clean up invalid caches
