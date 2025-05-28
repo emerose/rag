@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
-from fastmcp import Context
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.server import Context
 from mcp.server.fastmcp.tools.base import Tool
 from mcp.types import EmbeddedResource, ImageContent, TextContent
 from pydantic import BaseModel
@@ -285,3 +285,7 @@ async def run_http_server(
 
 def run_stdio_server(server: RAGMCPServer) -> None:
     asyncio.run(server.run_stdio_async())
+
+
+# Ensure Pydantic context injection works with postponed annotations
+RAGMCPServer.tool_index.__annotations__["ctx"] = Context
