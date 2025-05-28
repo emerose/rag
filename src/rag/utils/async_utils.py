@@ -7,6 +7,7 @@ in the RAG system, including semaphore management and task coordination.
 import asyncio
 import logging
 import os
+import threading
 from collections.abc import Awaitable, Callable
 from typing import Generic, TypeVar
 
@@ -114,3 +115,41 @@ async def yield_control() -> None:
     blocking the event loop.
     """
     await asyncio.sleep(0)
+
+
+def run_coro_sync(coro: Awaitable[T]) -> T:
+    """Run *coro* and return its result from synchronous code.
+
+    If called while an event loop is running in the current thread, the
+    coroutine is executed in a new background thread to avoid ``RuntimeError``
+    from ``asyncio.run``.  Otherwise ``asyncio.run`` is used directly.
+
+    Args:
+        coro: Coroutine to execute
+
+    Returns:
+        Result of the coroutine
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+
+    result: T | None = None
+    exc: Exception | None = None
+
+    def _runner() -> None:
+        nonlocal result, exc
+        try:
+            result = asyncio.run(coro)
+        except Exception as e:  # pragma: no cover - pass through
+            exc = e
+
+    thread = threading.Thread(target=_runner)
+    thread.start()
+    thread.join()
+
+    if exc is not None:
+        raise exc
+    assert result is not None
+    return result

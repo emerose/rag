@@ -9,6 +9,7 @@ from rag.utils.async_utils import (
     AsyncBatchProcessor,
     get_optimal_concurrency,
     yield_control,
+    run_coro_sync,
 )
 
 
@@ -40,4 +41,21 @@ async def test_yield_control_returns_none() -> None:
     """Yielding control should simply return."""
     result = await yield_control()
     assert result is None
+
+
+def test_run_coro_sync_from_sync() -> None:
+    async def coro() -> int:
+        await asyncio.sleep(0)
+        return 42
+
+    assert run_coro_sync(coro()) == 42
+
+
+@pytest.mark.asyncio
+async def test_run_coro_sync_from_async() -> None:
+    async def coro() -> int:
+        await asyncio.sleep(0)
+        return 24
+
+    assert run_coro_sync(coro()) == 24
 

@@ -33,6 +33,7 @@ from .storage.filesystem import FilesystemManager
 from .storage.index_manager import IndexManager
 from .storage.protocols import VectorStoreProtocol
 from .storage.vectorstore import VectorStoreManager
+from .utils.async_utils import run_coro_sync
 from .utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
@@ -599,7 +600,7 @@ class RAGEngine:
                     f"Generating embeddings for {len(docs_to_embed)} new/changed documents",
                 )
                 if self.runtime.async_batching:
-                    embeddings = asyncio.run(
+                    embeddings = run_coro_sync(
                         batcher.process_embeddings_async(docs_to_embed)
                     )
                 else:
