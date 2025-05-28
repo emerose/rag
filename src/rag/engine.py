@@ -22,7 +22,6 @@ from rag.utils.answer_utils import enhance_result
 from .config import RAGConfig, RuntimeOptions
 from .data.chunking import SemanticChunkingStrategy
 from .data.document_loader import DocumentLoader
-from .data.document_processor import DocumentProcessor
 from .data.text_splitter import TextSplitterFactory
 from .embeddings.batching import EmbeddingBatcher
 from .embeddings.embedding_provider import EmbeddingProvider
@@ -341,16 +340,7 @@ class RAGEngine:
             semantic_chunking=self.runtime.semantic_chunking,
         )
 
-        # Initialize document processor
-        self.document_processor = DocumentProcessor(
-            filesystem_manager=self.filesystem_manager,
-            document_loader=self.document_loader,
-            text_splitter_factory=self.text_splitter_factory,
-            log_callback=self.runtime.log_callback,
-            progress_callback=self.runtime.progress_callback,
-        )
-
-        # Initialize ingest manager (new!)
+        # Initialize ingest manager
         self.chunking_strategy = SemanticChunkingStrategy(
             chunk_size=self.config.chunk_size,
             chunk_overlap=self.config.chunk_overlap,
@@ -362,6 +352,7 @@ class RAGEngine:
             filesystem_manager=self.filesystem_manager,
             chunking_strategy=self.chunking_strategy,
             preprocessor=BasicPreprocessor(),
+            document_loader=self.document_loader,
             log_callback=self.runtime.log_callback,
             progress_callback=self.runtime.progress_callback,
         )
