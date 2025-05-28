@@ -184,7 +184,8 @@ def test_repl_session(tmp_path: Path) -> None:
 def test_mcp_server_end_to_end(tmp_path: Path) -> None:
     async def fake_run_http_server(server, host="127.0.0.1", port=8000, api_key=None):
         app = create_http_app(server)
-        async with httpx.AsyncClient(app=app, base_url="http://test") as client:
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             resp = await client.post("/index", json={"path": "."})
             assert resp.status_code == 200
             resp = await client.post("/query", json={"question": "hi", "top_k": 1})
