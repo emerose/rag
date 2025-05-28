@@ -41,6 +41,10 @@ or embed retrieval inside larger systems.
 For development and testing instructions, see
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Building documentation
+
+Run `python scripts/generate_docs.py` to generate API docs and build HTML output in `docs/build`.
+
 ## License
 
 MIT License - see [LICENSE](LICENSE)

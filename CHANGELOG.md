@@ -157,5 +157,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added pytest-asyncio dependency for async test support
 - Improved test coverage for MCP server components
 - Enhanced cross-platform compatibility for path handling
+- Added generate_docs.py for auto-generated API documentation
 
 ## [0.1.0] - 2024-12-XX
