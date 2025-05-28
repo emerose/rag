@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.tools.base import Tool
+from mcp.types import EmbeddedResource, ImageContent, TextContent
 from pydantic import BaseModel
 
 from rag.auth import APIKeyAuthMiddleware
 from rag.config import RAGConfig, RuntimeOptions
 from rag.engine import RAGEngine
+from rag.utils.logging_utils import logger
 
 
 class QueryRequest(BaseModel):
@@ -57,6 +60,14 @@ class RAGMCPServer(FastMCP):
         """List tools registered with the server."""
 
         return self._tool_manager.list_tools()
+
+    async def call_tool(
+        self, name: str, arguments: dict[str, Any]
+    ) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
+        """Call a tool and log the request."""
+
+        logger.info("CallToolRequest", extra={"tool": name, "arguments": arguments})
+        return await super().call_tool(name, arguments)
 
     # ------------------------------------------------------------------
     # MCP tools

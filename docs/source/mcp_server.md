@@ -25,6 +25,9 @@ rag mcp --http
 
 See [MCP HTTP API](api_http.md) for endpoint details.
 
+The server logs every `CallToolRequest` at info level, including the tool name
+and any arguments. This can help when debugging custom integrations.
+
 ## Integrating with Claude
 
 1. Install the FastMCP CLI:
