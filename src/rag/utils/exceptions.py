@@ -71,7 +71,7 @@ class UnsupportedFileError(RAGError):
         super().__init__(f"Unsupported or non-existent file: {self.file_path}")
 
 
-class FileNotFoundError(RAGError):
+class RAGFileNotFoundError(RAGError):
     """Exception raised when a file is not found."""
 
     def __init__(self, file_path: str | Path):

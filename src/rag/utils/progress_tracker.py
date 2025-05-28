@@ -89,34 +89,3 @@ class ProgressTracker:
             if task["total"] is not None:
                 self.update(name, task["total"], task["total"])
             del self.tasks[name]
-
-
-def update_progress(
-    name: str,
-    value: int,
-    total: int | None = None,
-    callback: Callable[[str, int, int | None], None] | None = None,
-) -> None:
-    """Update progress for a task and report it via callback.
-
-    This is a convenience function for one-off progress updates.
-
-    Args:
-        name: Name of the task
-        value: Current progress value
-        total: Total number of items (optional)
-        callback: Optional callback function for progress updates
-
-    """
-    if callback:
-        try:
-            callback(name, value, total)
-        except TypeError as e:
-            log_message(
-                "WARNING",
-                f"Failed to update progress via callback due to TypeError: {e}. "
-                "Check callback signature.",
-                "Progress",
-            )
-        except (ValueError, KeyError) as e:
-            log_message("WARNING", f"Failed to update progress: {e}", "Progress")
