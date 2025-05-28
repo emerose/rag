@@ -52,7 +52,6 @@
 ### Evaluation & Testing
 
 - [#244] [P2] **Evaluation framework** – Comprehensive RAG evaluation with multiple metrics
-- [#245] [P2] **Integration tests** – Expand integration test coverage
 
 
 ### Packaging & CI
