@@ -42,12 +42,14 @@ try:
     from .cli.output import Error, TableData, set_json_mode, write
     from .config import RAGConfig, RuntimeOptions
     from .engine import RAGEngine
+    from .mcp import build_server, run_http_server, run_stdio_server
     from .utils import exceptions
 except ImportError:
     # Fall back to absolute imports (for direct script usage)
     from rag.cli.output import Error, TableData, set_json_mode, write
     from rag.config import RAGConfig, RuntimeOptions
     from rag.engine import RAGEngine
+    from rag.mcp import build_server, run_http_server, run_stdio_server
     from rag.prompts import list_prompts
     from rag.utils import exceptions
 
@@ -1353,6 +1355,32 @@ def cleanup(
     except (exceptions.RAGError, OSError, ValueError, KeyError, FileNotFoundError) as e:
         write(Error(f"Error during cache cleanup: {e}"))
         raise typer.Exit(code=1) from e
+
+
+@app.command()
+def mcp(
+    stdio: bool = typer.Option(False, "--stdio", help="Use STDIO transport"),
+    http: bool = typer.Option(False, "--http", help="Use HTTP transport"),
+) -> None:
+    """Launch the MCP server."""
+    if (stdio and http) or (not stdio and not http):
+        raise typer.BadParameter("Specify either --stdio or --http")
+
+    config = RAGConfig(
+        documents_dir=".",
+        cache_dir=state.cache_dir,
+        vectorstore_backend=state.vectorstore_backend,
+        embedding_model=state.embedding_model,
+        chat_model=state.chat_model,
+        temperature=0.0,
+    )
+    runtime = RuntimeOptions(max_workers=state.max_workers)
+    server = build_server(config, runtime)
+
+    if stdio:
+        run_stdio_server(server)
+    else:
+        asyncio.run(run_http_server(server))
 
 
 def run_cli() -> None:
