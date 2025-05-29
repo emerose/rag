@@ -32,6 +32,7 @@ rag query "What is RAG?"
 Options:
 - `--k` – number of documents to retrieve
 - `--prompt` – prompt template (`default`, `cot`, `creative`)
+- `--retriever` – retrieval strategy (`standard`, `multivector`)
 - `--stream` – stream tokens as they are generated
 - `--cache-dir` – location of cached data
 
@@ -87,6 +88,7 @@ Launch the MCP server using HTTP or STDIO transport.
 rag mcp --stdio  # STDIO transport
 rag mcp --http   # HTTP transport
 ```
+- `--retriever` – retrieval strategy (`standard`, `multivector`)
 
 ## `repl`
 

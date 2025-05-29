@@ -101,6 +101,7 @@ class GlobalState:
     embedding_model: str = DEFAULT_EMBEDDING_MODEL
     chat_model: str = DEFAULT_CHAT_MODEL
     log_file: str | None = None
+    retriever: str = "standard"
 
 
 state = GlobalState()
@@ -135,6 +136,12 @@ CHAT_MODEL_OPTION = typer.Option(
     DEFAULT_CHAT_MODEL,
     "--chat-model",
     help="OpenAI chat model to use",
+)
+
+RETRIEVER_OPTION = typer.Option(
+    "standard",
+    "--retriever",
+    help="Retriever type (standard or multivector)",
 )
 
 MAX_WORKERS_OPTION = typer.Option(
@@ -238,6 +245,7 @@ def main(  # noqa: PLR0913
     max_workers: int = MAX_WORKERS_OPTION,
     embedding_model: str = EMBEDDING_MODEL_OPTION,
     chat_model: str = CHAT_MODEL_OPTION,
+    retriever: str = RETRIEVER_OPTION,
     log_file: str | None = LOG_FILE_OPTION,
     json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
@@ -264,6 +272,7 @@ def main(  # noqa: PLR0913
     state.max_workers = max_workers
     state.embedding_model = embedding_model
     state.chat_model = chat_model
+    state.retriever = retriever
 
 
 def create_console_progress_callback(progress: Progress) -> Callable[[str, int], None]:
@@ -643,6 +652,7 @@ def query(  # noqa: PLR0913
         "-p",
         help="Prompt template to use (default, cot, creative)",
     ),
+    retriever: str = RETRIEVER_OPTION,
     # Duplicated from app-level callback for Typer CLI compatibility
     cache_dir: str = typer.Option(
         None,  # Default to None to allow app-level value to be used
@@ -685,6 +695,7 @@ def query(  # noqa: PLR0913
             stream=stream,
             stream_callback=_token_cb if stream else None,
             max_workers=state.max_workers,
+            retriever=retriever,
         )
 
         rag_engine = RAGEngine(config, runtime_options)
@@ -1370,6 +1381,7 @@ def cleanup(
 def mcp(
     stdio: bool = typer.Option(False, "--stdio", help="Use STDIO transport"),
     http: bool = typer.Option(False, "--http", help="Use HTTP transport"),
+    retriever: str = RETRIEVER_OPTION,
 ) -> None:
     """Launch the MCP server."""
     if (stdio and http) or (not stdio and not http):
@@ -1383,7 +1395,7 @@ def mcp(
         chat_model=state.chat_model,
         temperature=0.0,
     )
-    runtime = RuntimeOptions(max_workers=state.max_workers)
+    runtime = RuntimeOptions(max_workers=state.max_workers, retriever=retriever)
     server = build_server(config, runtime)
 
     if stdio:

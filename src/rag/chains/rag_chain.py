@@ -28,7 +28,7 @@ from rag.data.text_splitter import _safe_get_encoding
 
 # Import the prompt registry
 from rag.prompts import get_prompt
-from rag.retrieval import BaseReranker
+from rag.retrieval import BaseReranker, MultiVectorRetrieverWrapper
 from rag.storage.protocols import VectorStoreProtocol
 from rag.utils.exceptions import VectorstoreError
 
@@ -161,6 +161,9 @@ def build_rag_chain(
     )
 
     retriever = merged_vs.as_retriever(search_type="similarity", search_kwargs={"k": k})
+    mv_retriever = None
+    if getattr(engine.runtime, "retriever", "standard") == "multivector":
+        mv_retriever = MultiVectorRetrieverWrapper(merged_vs)
 
     # ---------------------------------------------------------------------
     # Get prompt template from registry
@@ -180,7 +183,10 @@ def build_rag_chain(
         """Similarity search with optional metadata filters and reranking."""
         clean_query, mfilters = _parse_metadata_filters(question)
         search_k = k * 3 if mfilters else k
-        docs: list[Document] = merged_vs.similarity_search(clean_query, k=search_k)
+        if mv_retriever is not None:
+            docs = mv_retriever.retrieve(clean_query, k=search_k)
+        else:
+            docs = merged_vs.similarity_search(clean_query, k=search_k)
         if mfilters:
             docs = [d for d in docs if _doc_matches_filters(d, mfilters)]
         if reranker:
@@ -188,7 +194,7 @@ def build_rag_chain(
         return docs[:k]
 
     # Use the retriever in the chain (to avoid the F841 unused variable warning)
-    _ = retriever  # We're keeping this for future extensibility
+    _ = retriever or mv_retriever  # We're keeping this for future extensibility
 
     retrieve_op = RunnableLambda(_retrieve)
 

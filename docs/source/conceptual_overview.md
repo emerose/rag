@@ -22,6 +22,7 @@ The index now also records which loader, tokenizer and text splitter were used f
 
 ## 6. Similarity Search and Retrieval
 Queries are answered by performing a dense similarity search over the cached vector stores. [HybridRetriever](https://github.com/emerose/rag/blob/main/src/rag/retrieval/hybrid_retriever.py) can combine BM25 with the dense search and [KeywordReranker](https://github.com/emerose/rag/blob/main/src/rag/retrieval/reranker.py) optionally re‑ranks results. The selected chunks become the context passed to the LLM.
+`MultiVectorRetrieverWrapper` offers an alternative strategy that aggregates multiple vectors per document and can be enabled with the `--retriever` option.
 
 ## 7. LangChain Chains and Prompts
 The RAG chains are assembled with LangChain Expression Language in [``build_rag_chain``](https://github.com/emerose/rag/blob/main/src/rag/chains/rag_chain.py). Prompt templates in ``prompts/`` define how retrieved text and the user question are combined. Chains may include system prompts or conversation history depending on the command.
