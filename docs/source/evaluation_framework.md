@@ -7,9 +7,9 @@ regressions over time.
 ## Objectives
 - Measure performance of document loading, text splitting, indexing, retrieval and answer generation.
 - Track metrics such as latency, token counts, recall/precision and generated answer quality.
-- Provide a reproducible benchmark harness using open source tools such as
-  [OpenEvals](https://github.com/open-evals/openevals).
-- Leverage OpenEvals to evaluate the performance of each subsystem.
+- Provide a reproducible benchmark harness using
+  [LangSmith](https://smith.langchain.com/) for dataset management and evaluation.
+- Leverage LangSmith to track metrics for each subsystem and compare runs over time.
 
 ## Key Components
 1. **Dataset management**
@@ -39,9 +39,8 @@ regressions over time.
    - Store metrics in CSV/JSON files via [`pandas`](https://pandas.pydata.org/).
    - Generate plots with [`matplotlib`](https://matplotlib.org/) or [`seaborn`](https://seaborn.pydata.org/).
    - Compare historical runs to highlight improvements or regressions.
-7. **OpenEvals integration**
-   - Use [OpenEvals](https://github.com/open-evals/openevals) tasks to compute
-     standard metrics across retrieval and generation subsystems.
+7. **LangSmith integration**
+   - Use LangSmith evaluation APIs to compute standard metrics across retrieval and generation subsystems.
 
 ## Automation
 - Provide a `rag eval` CLI command that runs the full suite and outputs a summary table.
@@ -59,10 +58,9 @@ The following incremental steps outline how to build the evaluation framework. E
 3. **Add text splitting instrumentation** – Log chunk sizes and token counts via `tiktoken`; test with small sample documents.
 4. **Capture indexing and retrieval metrics** – Measure FAISS indexing throughput
    and memory usage, then compute recall@k and MRR with
-   [OpenEvals](https://github.com/open-evals/openevals) tasks.
+   LangSmith evaluation APIs.
 5. **Instrument query and generation** – Mock the OpenAI API to collect latency
-   and token stats, then evaluate answer quality using OpenEvals similarity
-   metrics.
+   and token stats, then evaluate answer quality using LangSmith metrics.
 6. **Persist metrics to files** – Write results to CSV/JSON with `pandas` and generate simple plots using `matplotlib`.
 7. **Create `rag eval` CLI command** – Wire components together behind a CLI entry point that prints a summary table.
 8. **Write unit tests for the CLI and metrics** – Ensure core functions behave deterministically and cover error scenarios.
