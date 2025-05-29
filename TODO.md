@@ -51,6 +51,9 @@
 
 ### Evaluation & Testing
 
+- [P3] **OpenEvals integration** – Evaluate subsystem performance using the
+  OpenEvals library
+
 
 
 ### Packaging & CI
