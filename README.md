@@ -11,6 +11,7 @@ See the [Getting Started guide](https://emerose.github.io/rag/getting_started.ht
 - Hybrid retrieval combining BM25 with dense similarity search
 - Machine-readable JSON output for automation workflows
 - Synthetic QA generator for regression testing
+- BEIR dataset uploader for LangSmith integration
 - MCP server for integrating RAG tools into other applications
 - Customizable prompts for different reasoning styles
 

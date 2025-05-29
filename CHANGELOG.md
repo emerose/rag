@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `summarize`: Table of document summaries
     - `cleanup`: Summary of removed files
 - Synthetic QA generator script for creating regression test data
+- BEIR dataset uploader script for LangSmith integration
 - Evaluation framework design sketch in docs; updated to use OpenEvals for
   subsystem metrics
     - `invalidate`: Success/error messages
