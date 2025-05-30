@@ -15,17 +15,19 @@ from .types import Evaluation, EvaluationResult
 class RetrievalEvaluator:
     """Evaluator for retrieval metrics using BEIR datasets."""
 
-    def __init__(self, evaluation: Evaluation) -> None:
-        """Store evaluation configuration."""
+    def __init__(self, evaluation: Evaluation, dataset: str = "BeIR/scifact") -> None:
+        """Store evaluation configuration and dataset name."""
         self.evaluation = evaluation
+        self.dataset = dataset
 
     # Internal helpers -------------------------------------------------
     def _index_corpus(self, cache_dir: Path) -> RAGEngine:
-        """Download and index the Scifact corpus."""
+        """Download and index the selected corpus."""
         from datasets import load_dataset
 
-        dataset = load_dataset("BeIR/scifacts", "corpus", split="corpus")
-        docs_dir = cache_dir / "scifacts-corpus"
+        dataset = load_dataset(self.dataset, "corpus", split="corpus")
+        dataset_slug = self.dataset.rsplit("/", 1)[-1]
+        docs_dir = cache_dir / f"{dataset_slug}-corpus"
         docs_dir.mkdir(parents=True, exist_ok=True)
 
         for item in dataset:
@@ -70,8 +72,8 @@ class RetrievalEvaluator:
 
         engine = self._index_corpus(cache_dir)
 
-        queries = load_dataset("BeIR/scifacts", "queries", split="test")
-        qrels = load_dataset("BeIR/scifacts", "qrels", split="test")
+        queries = load_dataset(self.dataset, "queries", split="test")
+        qrels = load_dataset(self.dataset, "qrels", split="test")
 
         query_list = [dict(q) for q in queries]
         results = self._run_retrieval(engine, query_list, k=10)
