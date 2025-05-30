@@ -67,6 +67,20 @@ def parse_examples(dataset_path: Path) -> list[Example]:
     return examples
 
 
+def upload_to_langsmith(dataset_name: str, examples: list[Example]) -> None:
+    """Upload *dataset_name* and *examples* to LangSmith."""
+    client = Client()
+    if client.has_dataset(dataset_name=dataset_name):
+        typer.echo(f"Dataset '{dataset_name}' already exists on LangSmith")
+        raise typer.Exit(0)
+
+    client.create_dataset(dataset_name)
+    client.create_examples(
+        dataset_name=dataset_name,
+        examples=[e.model_dump() for e in examples],
+    )
+
+
 DEFAULT_CACHE_DIR = Path("beir_data")
 
 app = typer.Typer(add_completion=False)
@@ -76,21 +90,24 @@ app = typer.Typer(add_completion=False)
 def main(
     dataset_name: str,
     cache_dir: Path = typer.Option(DEFAULT_CACHE_DIR),  # noqa: B008
+    upload: bool = typer.Option(
+        False,
+        "--upload/--no-upload",
+        help="Upload dataset to LangSmith after download.",
+    ),
 ) -> None:
-    """Download and upload a BEIR dataset to LangSmith."""
-    client = Client()
-    if client.has_dataset(dataset_name=dataset_name):
-        typer.echo(f"Dataset '{dataset_name}' already exists on LangSmith")
-        raise typer.Exit(0)
+    """Download a BEIR dataset and optionally upload it to LangSmith."""
 
     dataset_path = download_dataset(dataset_name, cache_dir)
     examples = parse_examples(dataset_path)
 
-    client.create_dataset(dataset_name)
-    client.create_examples(
-        dataset_name=dataset_name, examples=[e.model_dump() for e in examples]
-    )
-    typer.echo(f"Uploaded {len(examples)} examples to '{dataset_name}'")
+    if upload:
+        upload_to_langsmith(dataset_name, examples)
+        typer.echo(f"Uploaded {len(examples)} examples to '{dataset_name}'")
+    else:
+        typer.echo(
+            f"Parsed {len(examples)} examples from '{dataset_name}' without upload"
+        )
 
 
 if __name__ == "__main__":
