@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import typer
@@ -23,13 +24,24 @@ class Example(BaseModel):
 
 
 def download_dataset(name: str, cache_dir: Path) -> Path:
-    """Download *name* dataset via BEIR into *cache_dir*."""
+    """Download *name* dataset via BEIR and unpack into ``tests/data``."""
     if util is None:
         raise RuntimeError("beir package is not installed")
+
     url = (
         f"https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{name}.zip"
     )
-    return Path(util.download_and_unzip(url, cache_dir))
+    dataset_path = Path(util.download_and_unzip(url, cache_dir))
+
+    target_root = Path("tests") / "data"
+    target_root.mkdir(parents=True, exist_ok=True)
+    target_path = target_root / dataset_path.name
+
+    if target_path.exists():
+        shutil.rmtree(target_path)
+    shutil.move(str(dataset_path), target_path)
+
+    return target_path
 
 
 def parse_examples(dataset_path: Path) -> list[Example]:
