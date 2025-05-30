@@ -22,7 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `query`: Answer, sources, and metadata
     - `summarize`: Table of document summaries
     - `cleanup`: Summary of removed files
-- Synthetic QA generator script for creating regression test data
 - BEIR dataset uploader script for LangSmith integration
 - Evaluation framework design sketch in docs; updated to use OpenEvals for
   subsystem metrics
@@ -100,6 +99,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Outdated design sketch removed from `docs/design_sketches`.
 - Dropped experimental TUI interface and associated CSS
 - Legacy `/cache/clear` and `/system/status` HTTP endpoints removed in favour of MCP tools
+- Synthetic QA generator script removed
 
 ### Changed
 - Log levels are now shown in uppercase for better readability
