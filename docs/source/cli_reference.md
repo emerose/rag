@@ -98,6 +98,16 @@ rag repl
 
 Use `k <n>` inside the REPL to change the number of documents retrieved.
 
+## `eval`
+
+Run the evaluation suite and display metrics.
+
+```
+rag eval
+```
+
+Results are shown as a table by default or as JSON when using `--json`.
+
 ## `prompt list`
 
 Display available prompt templates.

@@ -38,6 +38,7 @@ from rag.utils.logging_utils import get_logger, setup_logging
 # Try both relative and absolute imports
 try:
     # Try relative imports first (for module usage)
+    from ..evaluation import Evaluation, run_evaluations
     from ..prompts import list_prompts
     from .config import RAGConfig, RuntimeOptions
     from .engine import RAGEngine
@@ -49,6 +50,7 @@ except ImportError:
     from rag.cli.output import Error, TableData, set_json_mode, write
     from rag.config import RAGConfig, RuntimeOptions
     from rag.engine import RAGEngine
+    from rag.evaluation import Evaluation, run_evaluations
     from rag.mcp import build_server, run_http_server, run_stdio_server
     from rag.prompts import list_prompts
     from rag.utils import exceptions
@@ -85,6 +87,15 @@ MAX_K_VALUE = 20
 DEFAULT_MAX_WORKERS = get_optimal_concurrency()
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 DEFAULT_CHAT_MODEL = "gpt-4"
+
+# Default evaluations to run
+DEFAULT_EVALUATIONS = [
+    Evaluation(
+        category="retrieval",
+        test="dummy",
+        metrics=["recall", "precision", "hit_rate", "mrr", "ndcg"],
+    )
+]
 
 
 # Global state
@@ -1363,6 +1374,35 @@ def cleanup(
 
     except (exceptions.RAGError, OSError, ValueError, KeyError, FileNotFoundError) as e:
         write(Error(f"Error during cache cleanup: {e}"))
+        raise typer.Exit(code=1) from e
+
+
+@app.command(name="eval")
+def eval_command(
+    cache_dir: str = typer.Option(
+        None,
+        "--cache-dir",
+        "-c",
+        help="Directory for caching embeddings and vector stores",
+    ),
+    json_output: bool = JSON_OUTPUT_OPTION,
+) -> None:
+    """Run evaluation test suite."""
+    try:
+        results = run_evaluations(DEFAULT_EVALUATIONS)
+
+        tables = [
+            TableData(
+                title=f"{res.category}: {res.test}",
+                columns=list(res.metrics.keys()),
+                rows=[[f"{val:.3f}" for val in res.metrics.values()]],
+            )
+            for res in results
+        ]
+
+        write({"tables": tables})
+    except Exception as e:
+        write(Error(f"Error during evaluation: {e}"))
         raise typer.Exit(code=1) from e
 
 

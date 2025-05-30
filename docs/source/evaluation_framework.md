@@ -43,7 +43,7 @@ regressions over time.
    - Use LangSmith evaluation APIs to compute standard metrics across retrieval and generation subsystems.
 
 ## Automation
-- Provide a `rag eval` CLI command that runs the full suite and outputs a summary table.
+- Provide a `rag eval` CLI command that runs the full suite and outputs a summary table. The current implementation uses a placeholder evaluator and returns dummy metrics.
 - Schedule evaluations in CI to track performance over time.
 
 This framework allows rapid experimentation with different loaders, splitters or retrievers while
