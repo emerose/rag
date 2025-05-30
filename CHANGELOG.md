@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - BEIR dataset uploader script for LangSmith integration
 - Evaluation framework design sketch in docs; updated to use OpenEvals for
   subsystem metrics
+- Initial retrieval evaluator indexing the BEIR Scifact dataset
     - `invalidate`: Success/error messages
 - Autocomplete support in `rag repl` using `prompt_toolkit` for commands and file paths
 - Documented REPL autocomplete usage in README
