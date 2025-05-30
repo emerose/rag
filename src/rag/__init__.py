@@ -8,5 +8,14 @@ from scripts.generate_synthetic_qa import generate_pairs
 
 from .config import RAGConfig, RuntimeOptions
 from .engine import RAGEngine
+from .evaluation import Evaluation, EvaluationResult, run_evaluations
 
-__all__ = ["RAGConfig", "RAGEngine", "RuntimeOptions", "generate_pairs"]
+__all__ = [
+    "Evaluation",
+    "EvaluationResult",
+    "RAGConfig",
+    "RAGEngine",
+    "RuntimeOptions",
+    "generate_pairs",
+    "run_evaluations",
+]
