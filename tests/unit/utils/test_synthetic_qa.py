@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from rag.scripts.generate_synthetic_qa import generate_pairs
+from scripts.generate_synthetic_qa import generate_pairs
 
 
 def test_generate_pairs(tmp_path: Path) -> None:
@@ -10,4 +10,3 @@ def test_generate_pairs(tmp_path: Path) -> None:
     assert len(pairs) == 2
     assert pairs[0].answer == "Answer one."
     assert pairs[1].answer == "Question two."
-
