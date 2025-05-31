@@ -73,7 +73,11 @@ class RetrievalEvaluator:
         engine = self._index_corpus(cache_dir)
 
         queries = load_dataset(self.dataset, "queries")
-        qrels = load_dataset(self.dataset, "qrels", split="test")
+        dataset_slug = self.dataset.rsplit("/", 1)[-1]
+        qrels_ds = f"{dataset_slug}-qrels"
+        qrels_train = load_dataset(qrels_ds, split="train")
+        qrels_test = load_dataset(qrels_ds, split="test")
+        qrels = list(qrels_train) + list(qrels_test)
 
         query_list = [dict(q) for q in queries]
         results = self._run_retrieval(engine, query_list, k=10)
