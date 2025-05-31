@@ -27,9 +27,7 @@ build/
 
 # Ignore cache directory
 .cache/
-.cache/cache_metadata.json
-.cache/index_meta.db
-Scientific Data
+.cache-evals/
 Ingest
 
 # Coverage files

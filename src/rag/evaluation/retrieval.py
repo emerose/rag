@@ -72,7 +72,7 @@ class RetrievalEvaluator:
 
         engine = self._index_corpus(cache_dir)
 
-        queries = load_dataset(self.dataset, "queries", split="test")
+        queries = load_dataset(self.dataset, "queries")
         qrels = load_dataset(self.dataset, "qrels", split="test")
 
         query_list = [dict(q) for q in queries]
