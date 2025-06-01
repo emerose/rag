@@ -29,6 +29,6 @@ def test_retrieval_evaluator_uses_beir() -> None:
         mock_index.assert_called_once()
         mock_eval.assert_called_once()
         mock_load.assert_any_call("BeIR/scifact", "queries")
-        mock_load.assert_any_call("scifact-qrels", split="train")
-        mock_load.assert_any_call("scifact-qrels", split="test")
+        mock_load.assert_any_call("BeIR/scifact-qrels", split="train")
+        mock_load.assert_any_call("BeIR/scifact-qrels", split="test")
         assert result.metrics == {"ndcg@10": 0.5}
