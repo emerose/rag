@@ -8,6 +8,7 @@ from typing import Any
 from rag.config import RAGConfig, RuntimeOptions
 from rag.engine import RAGEngine
 from rag.storage.vectorstore import VectorStoreManager
+from rag.utils.logging_utils import get_logger
 
 from .types import Evaluation, EvaluationResult
 
@@ -19,6 +20,8 @@ class RetrievalEvaluator:
         """Store evaluation configuration and dataset name."""
         self.evaluation = evaluation
         self.dataset = dataset
+
+        self._logger = get_logger()
 
     # Internal helpers -------------------------------------------------
     def _index_corpus(self, cache_dir: Path) -> RAGEngine:
@@ -67,12 +70,18 @@ class RetrievalEvaluator:
         from beir.retrieval.evaluation import EvaluateRetrieval
         from datasets import load_dataset
 
+        self._logger.debug(
+            f"Starting retrieval evaluation using dataset: {self.dataset}"
+        )
+
         cache_dir = Path(".cache-evals")
         cache_dir.mkdir(exist_ok=True)
 
         engine = self._index_corpus(cache_dir)
+        self._logger.debug("Corpus indexed")
 
         queries = load_dataset(self.dataset, "queries")
+        self._logger.debug(f"Loaded {len(queries)} queries")
         qrels_ds = f"{self.dataset}-qrels"
         qrels_train = load_dataset(qrels_ds, split="train")
         qrels_test = load_dataset(qrels_ds, split="test")
@@ -80,6 +89,7 @@ class RetrievalEvaluator:
 
         query_list = [dict(q) for q in queries]
         results = self._run_retrieval(engine, query_list, k=10)
+        self._logger.debug(f"Retrieved documents for {len(query_list)} queries")
 
         qrels_dict: dict[str, dict[str, int]] = {}
         for row in qrels:
@@ -95,6 +105,8 @@ class RetrievalEvaluator:
             metric: float(metrics_result.get(metric, {10: 0.0}).get(10, 0.0))
             for metric in self.evaluation.metrics
         }
+
+        self._logger.debug(f"Evaluation metrics: {metrics}")
 
         return EvaluationResult(
             category=self.evaluation.category,
