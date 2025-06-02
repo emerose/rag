@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -676,7 +677,7 @@ class RAGEngine:
             self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
             return False
 
-    def index_directory(  # noqa: PLR0912, PLR0915
+    def index_directory(
         self,
         directory: Path | str | None = None,
         *,
@@ -742,45 +743,27 @@ class RAGEngine:
             self._log("INFO", f"No files require indexing in {directory}")
             return {}
 
-        # Use the ingest manager for directory processing when all files need indexing
-        if len(files_to_index) == len(all_files):
-            ingest_results = self.ingest_manager.ingest_directory(directory)
-        else:
-            ingest_results = {}
-            for file_path in files_to_index:
-                ingest_results[str(file_path)] = self.ingest_manager.ingest_file(
-                    file_path
-                )
-
-        # Index each file that was successfully processed
-        results: dict[str, dict[str, Any]] = {}
-        for file_path, result in ingest_results.items():
+        def worker(path: Path) -> tuple[str, dict[str, Any]]:
+            result = self.ingest_manager.ingest_file(path)
             if not result.successful:
                 self._log(
-                    "WARNING", f"Failed to process {file_path}: {result.error_message}"
+                    "WARNING", f"Failed to process {path}: {result.error_message}"
                 )
-                results[file_path] = {"success": False, "error": result.error_message}
                 if progress_callback:
-                    progress_callback("error", Path(file_path), result.error_message)
-                continue
+                    progress_callback("error", path, result.error_message)
+                return str(path), {"success": False, "error": result.error_message}
 
             documents = result.documents
             if not documents:
-                self._log("WARNING", f"No documents extracted from {file_path}")
-                results[file_path] = {
-                    "success": False,
-                    "error": "No documents extracted",
-                }
+                self._log("WARNING", f"No documents extracted from {path}")
                 if progress_callback:
-                    progress_callback(
-                        "error", Path(file_path), "No documents extracted"
-                    )
-                continue
+                    progress_callback("error", path, "No documents extracted")
+                return str(path), {"success": False, "error": "No documents extracted"}
 
             try:
-                model_name = self._embedding_model_for_file(Path(file_path))
+                model_name = self._embedding_model_for_file(path)
                 success = self._create_vectorstore_from_documents(
-                    file_path=Path(file_path),
+                    file_path=path,
                     documents=documents,
                     file_type=result.source.mime_type or "text/plain",
                     embedding_model=model_name,
@@ -788,20 +771,27 @@ class RAGEngine:
                     tokenizer_name=result.source.tokenizer_name,
                     text_splitter_name=result.source.text_splitter_name,
                 )
-                results[file_path] = {"success": success}
                 if progress_callback:
                     event = "indexed" if success else "error"
                     progress_callback(
-                        event,
-                        Path(file_path),
-                        None if success else "Vectorstore creation failed",
+                        event, path, None if success else "Vectorstore creation failed"
                     )
+                return str(path), {"success": success}
             except ENGINE_EXCEPTIONS as e:
                 error_msg = str(e)
-                self._log("ERROR", f"Error indexing {file_path}: {error_msg}")
+                self._log("ERROR", f"Error indexing {path}: {error_msg}")
                 if progress_callback:
-                    progress_callback("error", Path(file_path), error_msg)
-                results[file_path] = {"success": False, "error": error_msg}
+                    progress_callback("error", path, error_msg)
+                return str(path), {"success": False, "error": error_msg}
+
+        results: dict[str, dict[str, Any]] = {}
+        with ThreadPoolExecutor(max_workers=self.runtime.max_workers) as executor:
+            future_to_file = {
+                executor.submit(worker, Path(f)): f for f in files_to_index
+            }
+            for future in as_completed(future_to_file):
+                file_path, res = future.result()
+                results[file_path] = res
 
         # Clean up invalid caches
         self.cache_manager.cleanup_invalid_caches()
