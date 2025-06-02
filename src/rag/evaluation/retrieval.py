@@ -91,6 +91,7 @@ class RetrievalEvaluator:
         merged_vs = vs_manager.merge_vectorstores(list(engine.vectorstores.values()))
         self._logger.debug("Merged vectorstores")
         results: dict[str, dict[str, float]] = {}
+        self._logger.debug(f"Queries: {queries}")
         for q in queries:
             qid = q.get("query_id") or q.get("_id") or q["id"]
             text = q.get("text") or q.get("query")
@@ -104,28 +105,33 @@ class RetrievalEvaluator:
             results[str(qid)] = scores
         return results
 
-    # Public API -------------------------------------------------------
-    def evaluate(self) -> EvaluationResult:
-        """Index the dataset and compute retrieval metrics."""
-        from beir.retrieval.evaluation import EvaluateRetrieval
+    def _load_queries(self) -> list[dict[str, Any]]:
+        """Load and parse queries from the dataset.
+
+        Returns:
+            List of query dictionaries sorted by ID.
+            Each dict has structure: {'_id': '1', 'title': '...', 'text': '...'}
+        """
         from datasets import load_dataset
-
-        self._logger.debug(
-            f"Starting retrieval evaluation using dataset: {self.dataset}"
-        )
-
-        cache_dir = Path(".cache-evals")
-        cache_dir.mkdir(exist_ok=True)
-
-        engine = self._index_corpus(cache_dir)
-        self._logger.debug("Corpus indexed")
 
         queries = load_dataset(self.dataset, "queries")
         query_list = [dict(q) for q in queries["queries"]]
+        # Sort queries by ID numerically for consistent ordering
+        query_list.sort(key=lambda x: int(x["_id"]))
         self._logger.debug(f"Loaded {len(query_list)} queries")
+        return query_list
+
+    def _load_qrels(self) -> dict[str, dict[str, int]]:
+        """Load and parse relevance judgments (qrels) from the dataset.
+
+        Returns:
+            Dictionary mapping query IDs to dictionaries of {doc_id: relevance_score}.
+        """
+        from datasets import load_dataset
 
         qrels_ds = f"{self.dataset}-qrels"
         qrels = load_dataset(qrels_ds, split="test")
+
         qrels_dict: dict[str, dict[str, int]] = {}
         for row in qrels:
             qid = str(row.get("query-id") or row.get("query_id"))
@@ -134,45 +140,103 @@ class RetrievalEvaluator:
             if qid not in qrels_dict:
                 qrels_dict[qid] = {}
             qrels_dict[qid][doc_id] = score
+
         self._logger.debug(f"Loaded {len(qrels_dict)} qrels")
+        return qrels_dict
 
-        results = self._run_retrieval(engine, query_list, k=20)
-        self._logger.debug(f"Retrieved documents for {len(query_list)} queries")
+    def _extract_k_values(self) -> set[int]:
+        """Extract k values from metric names (e.g., 'ndcg@10' -> {10}).
 
-        # Simplify paths to query IDs before evaluation
-        simplified_results = self._simplify_retrieval_paths(results)
+        Returns:
+            Set of k values to evaluate at.
+        """
+        k_values = set()
+        for metric in self.evaluation.metrics:
+            if "@" in metric:
+                try:
+                    k = int(metric.split("@")[1])
+                    k_values.add(k)
+                except (IndexError, ValueError):
+                    self._logger.warning(
+                        f"Could not parse k value from metric: {metric}"
+                    )
 
-        self._logger.debug("Running evaluation")
-        evaluator = EvaluateRetrieval()
-        metrics_result = evaluator.evaluate(
-            qrels_dict, simplified_results, k_values=[1, 5, 10, 20]
+        if not k_values:
+            self._logger.warning("No k values found in metrics, using default k values")
+            k_values = {1, 5, 10, 20}  # Default k values if none specified
+
+        self._logger.debug(f"Using k values: {sorted(k_values)}")
+        return k_values
+
+    def _process_metrics(
+        self, metrics_result: tuple[dict[str, float], ...]
+    ) -> dict[str, float]:
+        """Process raw metrics results into final metrics dictionary.
+
+        Args:
+            metrics_result: Tuple of metric dictionaries from BEIR evaluation.
+
+        Returns:
+            Dictionary mapping metric names to their values.
+        """
+        # First collect all available metrics
+        available_metrics = {}
+        for result_dict in metrics_result:
+            if isinstance(result_dict, dict):
+                for metric_name, value in result_dict.items():
+                    if (
+                        metric_name not in available_metrics
+                        or value > available_metrics[metric_name]
+                    ):
+                        available_metrics[metric_name] = value
+
+        # Then only keep the metrics that were requested
+        metrics = {
+            metric: available_metrics[metric]
+            for metric in self.evaluation.metrics
+            if metric in available_metrics
+        }
+
+        self._logger.debug(f"Processed metrics: {metrics}")
+        return metrics
+
+    # Public API -------------------------------------------------------
+    def evaluate(self) -> EvaluationResult:
+        """Index the dataset and compute retrieval metrics."""
+        from beir.retrieval.evaluation import EvaluateRetrieval
+
+        self._logger.debug(
+            f"Starting retrieval evaluation using dataset: {self.dataset}"
         )
 
-        metrics: dict[str, float] = {}
-        for metric in self.evaluation.metrics:
-            metric_key = metric
-            k_value: int | None = None
-            if "@" in metric:
-                metric_key, k_str = metric.split("@", 1)
-                try:
-                    k_value = int(k_str)
-                except ValueError:
-                    k_value = None
+        # Create unique cache dir for each dataset
+        dataset_name = self.dataset.replace("/", "-").lower()
+        cache_dir = Path(f".cache-evals/{dataset_name}")
+        cache_dir.mkdir(exist_ok=True)
 
-            metric_dict = metrics_result.get(metric_key) or metrics_result.get(metric)
+        # Initialize corpus and engine
+        engine = self._index_corpus(cache_dir)
+        self._logger.debug("Corpus indexed")
 
-            if isinstance(metric_dict, dict):
-                if k_value is not None:
-                    metrics[metric] = metric_dict.get(k_value)
-                else:
-                    # Use the first value if no k specified
-                    first_key = next(iter(metric_dict))
-                    metrics[metric] = metric_dict[first_key]
-            elif metric_dict is not None:
-                metrics[metric] = metric_dict
+        # Load evaluation data
+        query_list = self._load_queries()
+        qrels_dict = self._load_qrels()
+        k_values = self._extract_k_values()
 
-        self._logger.debug(f"Evaluation metrics: {metrics}")
+        # Run retrieval with maximum k value needed
+        max_k = max(k_values)
+        results = self._run_retrieval(engine, query_list, k=max_k)
+        self._logger.debug(f"Retrieved documents for {len(query_list)} queries")
 
+        # Prepare results and evaluate
+        simplified_results = self._simplify_retrieval_paths(results)
+        evaluator = EvaluateRetrieval()
+        metrics_result = evaluator.evaluate(
+            qrels_dict, simplified_results, k_values=sorted(k_values)
+        )
+
+        # Process metrics and return results
+        metrics = self._process_metrics(metrics_result)
         return EvaluationResult(
             category=self.evaluation.category,
             test=self.evaluation.test,
