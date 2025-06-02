@@ -120,17 +120,17 @@ class RetrievalEvaluator:
         engine = self._index_corpus(cache_dir)
         self._logger.debug("Corpus indexed")
 
-        queries = load_dataset(self.dataset, "queries", split="test")
-        query_list = [dict(q) for q in queries["queries"]]
+        queries = load_dataset(self.dataset, "queries")
+        query_list = [dict(q) for q in queries]
         self._logger.debug(f"Loaded {len(query_list)} queries")
 
         qrels_ds = f"{self.dataset}-qrels"
         qrels = load_dataset(qrels_ds, split="test")
         qrels_dict: dict[str, dict[str, int]] = {}
         for row in qrels:
-            qid = str(row["query-id"])
-            doc_id = str(row["corpus-id"])
-            score = int(row["score"])
+            qid = str(row.get("query-id") or row.get("query_id"))
+            doc_id = str(row.get("corpus-id") or row.get("doc_id"))
+            score = int(row.get("score", 0))
             if qid not in qrels_dict:
                 qrels_dict[qid] = {}
             qrels_dict[qid][doc_id] = score
@@ -148,12 +148,28 @@ class RetrievalEvaluator:
             qrels_dict, simplified_results, k_values=[1, 5, 10, 20]
         )
 
-        metrics = {}
+        metrics: dict[str, float] = {}
         for metric in self.evaluation.metrics:
-            # metrics_result is a tuple of dicts, one for each k value
-            for result_dict in metrics_result:
-                for key, value in result_dict.items():
-                    metrics[key] = value
+            metric_key = metric
+            k_value: int | None = None
+            if "@" in metric:
+                metric_key, k_str = metric.split("@", 1)
+                try:
+                    k_value = int(k_str)
+                except ValueError:
+                    k_value = None
+
+            metric_dict = metrics_result.get(metric_key) or metrics_result.get(metric)
+
+            if isinstance(metric_dict, dict):
+                if k_value is not None:
+                    metrics[metric] = metric_dict.get(k_value)
+                else:
+                    # Use the first value if no k specified
+                    first_key = next(iter(metric_dict))
+                    metrics[metric] = metric_dict[first_key]
+            elif metric_dict is not None:
+                metrics[metric] = metric_dict
 
         self._logger.debug(f"Evaluation metrics: {metrics}")
 
