@@ -11,7 +11,7 @@ def _run_cli(runner: CliRunner, opts: list[str], tmp_path: Path) -> None:
     engine_instance = MagicMock()
     engine_instance.index_meta.list_indexed_files.return_value = []
     with patch("rag.cli.cli.RAGEngine", return_value=engine_instance):
-        result = runner.invoke(app, [*opts, "--cache-dir", str(tmp_path), "list"])
+        result = runner.invoke(app, [*opts, "--cache-dir", str(tmp_path), "list"]) 
     assert result.exit_code == 0
 
 
@@ -49,4 +49,14 @@ def test_debug_specific_modules(tmp_path: Path) -> None:
     finally:
         logger_a.setLevel(prev_a)
         logger_b.setLevel(prev_b)
+
+
+def test_debug_logs_emitted(tmp_path: Path) -> None:
+    """Debug flag should emit debug messages to the log file."""
+    runner = CliRunner()
+    log_file = tmp_path / "debug.log"
+    _run_cli(runner, ["--debug", f"--log-file={log_file}"], tmp_path)
+    logs = log_file.read_text()
+    assert "DEBUG" in logs
+    assert "Initializing RAG engine" in logs
 
