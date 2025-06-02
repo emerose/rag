@@ -11,6 +11,9 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
+# Prevent logging output before setup_logging configures handlers
+logging.getLogger().addHandler(logging.NullHandler())
+
 import structlog
 from structlog.dev import Column
 from structlog.processors import CallsiteParameter, CallsiteParameterAdder

@@ -67,10 +67,17 @@ def test_write_string_json():
 def test_write_error_rich(mock_consoles):
     """Test writing an error message in Rich mode."""
     stdout_console, stderr_console = mock_consoles
-    set_json_mode(False)
-    error = Error("Test error")
-    write(error)
-    stdout_console.print.assert_called_once_with("[red]Error: Test error[/red]")
+    with (
+        patch("rag.cli.output.logger") as mock_logger,
+        patch("rag.cli.output.structlog.is_configured", return_value=True),
+    ):
+        set_json_mode(False)
+        error = Error("Test error")
+        write(error)
+        mock_logger.error.assert_called_once_with(
+            "Test error", subsystem="CLI"
+        )
+    stdout_console.print.assert_not_called()
     stderr_console.print.assert_not_called()
 
 
