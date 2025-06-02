@@ -8,15 +8,16 @@ is active are rendered as JSON.
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable
 from typing import Any
-
-# Prevent logging output before setup_logging configures handlers
-logging.getLogger().addHandler(logging.NullHandler())
 
 import structlog
 from structlog.dev import Column
 from structlog.processors import CallsiteParameter, CallsiteParameterAdder
+
+# Prevent logging output before setup_logging configures handlers
+logging.getLogger().addHandler(logging.NullHandler())
 
 
 class RAGLogger:
@@ -319,10 +320,19 @@ def log_message(
     message: str,
     subsystem: str = "RAG",
     callback: Callable[[str, str, str], None] | None = None,
+    worker_id: str | None = None,
 ) -> None:
     """Log a message and optionally send it to a callback."""
     log_level = getattr(logging, level.upper(), logging.INFO)
-    logger.log(log_level, message, subsystem=subsystem, stacklevel=3)
+    if worker_id is None:
+        worker_id = threading.current_thread().name
+    logger.log(
+        log_level,
+        message,
+        subsystem=subsystem,
+        stacklevel=3,
+        extra={"worker_id": worker_id},
+    )
 
     if callback:
         try:
