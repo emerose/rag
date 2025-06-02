@@ -14,7 +14,11 @@ regressions over time.
 ## Key Components
 1. **Dataset management**
    - Use a small collection of documents and question/answer pairs (e.g. samples from the [BEIR](https://github.com/beir-datasets/beir) dataset).
-  - The retrieval evaluator downloads the `BeIR/scifact` dataset from Hugging Face and indexes the corpus under a dedicated `.cache-evals` directory. The dataset name is configurable to support additional BEIR collections. Qrels are fetched from the companion `scifact-qrels` dataset by merging both the `train` and `test` splits.
+  - The retrieval evaluator downloads BEIR datasets (e.g. `BeIR/scifact`) from
+    Hugging Face and indexes the corpus under a dedicated `.cache-evals`
+    directory. The dataset name is configurable to support additional
+    collections. Qrels are fetched from the companion `<dataset>-qrels` dataset
+    by merging both the `train` and `test` splits.
    - Store datasets under `tests/data/` so evaluations run offline.
    - Pydantic models define dataset schema and evaluation configuration.
 

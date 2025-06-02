@@ -17,10 +17,19 @@ from .types import Evaluation, EvaluationResult
 class RetrievalEvaluator:
     """Evaluator for retrieval metrics using BEIR datasets."""
 
-    def __init__(self, evaluation: Evaluation, dataset: str = "BeIR/scifact") -> None:
-        """Store evaluation configuration and dataset name."""
+    def __init__(self, evaluation: Evaluation, dataset: str | None = None) -> None:
+        """Store evaluation configuration and dataset name.
+
+        Args:
+            evaluation: Evaluation settings including the dataset name in
+                ``evaluation.test``.
+            dataset: Optional explicit dataset override. If ``None`` the value
+                from ``evaluation.test`` is used. Defaults to ``BeIR/scifact``
+                when neither is provided.
+        """
+
         self.evaluation = evaluation
-        self.dataset = dataset
+        self.dataset = dataset or evaluation.test or "BeIR/scifact"
 
         self._logger = get_logger()
 

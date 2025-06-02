@@ -6,7 +6,9 @@ from rag.evaluation.types import Evaluation
 
 def test_retrieval_evaluator_uses_beir() -> None:
     evaluation = Evaluation(
-        category="retrieval", test="BeIR/scifact", metrics=["ndcg@10"]
+        category="retrieval",
+        test="BeIR/fiqa",
+        metrics=["ndcg@10"],
     )
 
     with (
@@ -27,6 +29,6 @@ def test_retrieval_evaluator_uses_beir() -> None:
 
         mock_index.assert_called_once()
         mock_eval.assert_called_once()
-        mock_load.assert_any_call("BeIR/scifact", "queries", split="test")
-        mock_load.assert_any_call("BeIR/scifact-qrels", split="test")
+        mock_load.assert_any_call("BeIR/fiqa", "queries")
+        mock_load.assert_any_call("BeIR/fiqa-qrels", split="test")
         assert result.metrics == {"ndcg@10": 0.5}

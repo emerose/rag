@@ -92,9 +92,29 @@ DEFAULT_CHAT_MODEL = "gpt-4"
 DEFAULT_EVALUATIONS = [
     Evaluation(
         category="retrieval",
-        test="dummy",
+        test="BeIR/scifact",
         metrics=["NDCG@10", "MAP@10", "MRR@10", "Recall@10", "Precision@10"],
-    )
+    ),
+    Evaluation(
+        category="retrieval",
+        test="BeIR/scidocs",
+        metrics=["NDCG@10", "MAP@10", "MRR@10", "Recall@10", "Precision@10"],
+    ),
+    Evaluation(
+        category="retrieval",
+        test="BeIR/trec-covid",
+        metrics=["NDCG@10", "MAP@10", "MRR@10", "Recall@10", "Precision@10"],
+    ),
+    Evaluation(
+        category="retrieval",
+        test="BeIR/fever",
+        metrics=["NDCG@10", "MAP@10", "MRR@10", "Recall@10", "Precision@10"],
+    ),
+    Evaluation(
+        category="retrieval",
+        test="BeIR/fiqa",
+        metrics=["NDCG@10", "MAP@10", "MRR@10", "Recall@10", "Precision@10"],
+    ),
 ]
 
 
