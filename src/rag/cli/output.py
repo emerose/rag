@@ -5,9 +5,14 @@ and machine-readable (JSON) formats.
 """
 
 import json
+import logging
 import sys
+
+import structlog
 from dataclasses import dataclass
 from typing import Any, TypedDict
+
+from rag.utils.logging_utils import get_logger
 
 from rich.console import Console
 from rich.table import Table
@@ -18,6 +23,9 @@ stderr_console = Console(stderr=True)
 
 # Global state for output mode
 _json_mode = False
+
+# Use the central logger for error messages
+logger = get_logger()
 
 
 def set_json_mode(value: bool) -> None:
@@ -127,6 +135,9 @@ def _write_json(
         print(json.dumps({"message": payload}))
     elif isinstance(payload, Error):
         print(json.dumps({"error": payload.message}))
+        # Also log the error using the standard logger if configured
+        if structlog.is_configured():
+            logger.error(payload.message, subsystem="CLI")
     elif isinstance(payload, list):
         print(json.dumps({"tables": payload}))
     elif isinstance(payload, dict):
@@ -173,7 +184,9 @@ def _write_rich(
     if isinstance(payload, str):
         get_console().print(payload)
     elif isinstance(payload, Error):
-        get_console().print(f"[red]Error: {payload.message}[/red]")
+        # Log the error so it includes timestamp and file location if configured
+        if structlog.is_configured():
+            logger.error(payload.message, subsystem="CLI")
     elif isinstance(payload, list):
         for table_data in payload:
             _print_table(table_data)

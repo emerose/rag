@@ -243,6 +243,7 @@ def configure_logging(
         else:
             for name in debug_modules:
                 logging.getLogger(name).setLevel(logging.DEBUG)
+            logging.getLogger().setLevel(logging.DEBUG)
             final_level = logging.DEBUG
 
     if structlog is not None:
