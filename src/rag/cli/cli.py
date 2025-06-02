@@ -35,12 +35,6 @@ from rich.progress import (
 from rag.utils.async_utils import get_optimal_concurrency
 from rag.utils.logging_utils import get_logger, setup_logging
 
-# Allow `--debug` with no value by rewriting argv before Typer parses it
-if "--debug" in sys.argv:
-    idx = sys.argv.index("--debug")
-    if idx == len(sys.argv) - 1 or sys.argv[idx + 1].startswith("-"):
-        sys.argv[idx] = "--debug=rag"
-
 # Try both relative and absolute imports
 try:
     # Try relative imports first (for module usage)
@@ -167,16 +161,18 @@ LOG_FILE_OPTION = typer.Option(
     help="Write logs to the specified file instead of stderr",
 )
 
-# Debug option with optional modules
+# Debug options
 DEBUG_OPTION = typer.Option(
-    None,
+    False,
     "--debug",
-    help=(
-        "Enable debug logging. Optionally specify comma-separated modules; "
-        "use 'all' for all modules"
-    ),
+    help="Enable debug logging for the rag module",
     is_flag=True,
-    flag_value="rag",
+)
+
+DEBUG_MODULES_OPTION = typer.Option(
+    None,
+    "--debug-modules",
+    help="Enable debug logging for 'all' or a comma separated list of modules",
 )
 
 # Define argument defaults outside functions
@@ -280,7 +276,8 @@ def main(  # noqa: PLR0913
     embedding_model: str = EMBEDDING_MODEL_OPTION,
     chat_model: str = CHAT_MODEL_OPTION,
     log_file: str | None = LOG_FILE_OPTION,
-    debug: str | None = DEBUG_OPTION,
+    debug: bool = DEBUG_OPTION,
+    debug_modules: str | None = DEBUG_MODULES_OPTION,
     json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
     """RAG (Retrieval Augmented Generation) CLI.
@@ -298,13 +295,17 @@ def main(  # noqa: PLR0913
 
     # Configure logging
     state.log_file = log_file
-    debug_modules = [] if debug is None else [m.strip() for m in debug.split(",")]
+    modules: list[str] = []
+    if debug:
+        modules.append("rag")
+    if debug_modules:
+        modules.extend(m.strip() for m in debug_modules.split(","))
     state.logger = configure_logging(
         verbose,
         log_level,
         json_mode,
         log_file,
-        debug_modules,
+        modules or None,
     )
 
     # Set cache directory

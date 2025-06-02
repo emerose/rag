@@ -126,4 +126,5 @@ Global options available on every command include:
 - `--embedding-model` – OpenAI embedding model (default `text-embedding-3-small`)
 - `--chat-model` – OpenAI chat model (default `gpt-4`)
 - `--log-file` – write logs to the specified file
-- `--debug[=MODULES]` – enable debug logging for `rag`, `all`, or specific modules
+- `--debug` – enable debug logging for the `rag` module
+- `--debug-modules=MODULES` – enable debug logging for `all` or specific modules
