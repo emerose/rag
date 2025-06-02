@@ -35,6 +35,12 @@ from rich.progress import (
 from rag.utils.async_utils import get_optimal_concurrency
 from rag.utils.logging_utils import get_logger, setup_logging
 
+# Allow `--debug` with no value by rewriting argv before Typer parses it
+if "--debug" in sys.argv:
+    idx = sys.argv.index("--debug")
+    if idx == len(sys.argv) - 1 or sys.argv[idx + 1].startswith("-"):
+        sys.argv[idx] = "--debug=rag"
+
 # Try both relative and absolute imports
 try:
     # Try relative imports first (for module usage)
@@ -161,6 +167,18 @@ LOG_FILE_OPTION = typer.Option(
     help="Write logs to the specified file instead of stderr",
 )
 
+# Debug option with optional modules
+DEBUG_OPTION = typer.Option(
+    None,
+    "--debug",
+    help=(
+        "Enable debug logging. Optionally specify comma-separated modules; "
+        "use 'all' for all modules"
+    ),
+    is_flag=True,
+    flag_value="rag",
+)
+
 # Define argument defaults outside functions
 INVALIDATE_PATH_ARG = typer.Argument(
     None,
@@ -191,11 +209,23 @@ def update_console_for_json_mode(json_mode: bool) -> None:
 
 
 def configure_logging(
-    verbose: bool, log_level: LogLevel, json_logs: bool, log_file: str | None
+    verbose: bool,
+    log_level: LogLevel,
+    json_logs: bool,
+    log_file: str | None,
+    debug_modules: list[str] | None = None,
 ) -> logging.Logger:
     """Configure logging based on CLI options."""
     level = logging.INFO if verbose else getattr(logging, log_level.value)
     setup_logging(log_file=log_file, log_level=level, json_logs=json_logs)
+
+    if debug_modules:
+        if "all" in debug_modules:
+            logging.getLogger().setLevel(logging.DEBUG)
+        else:
+            for name in debug_modules:
+                logging.getLogger(name).setLevel(logging.DEBUG)
+
     return get_logger()
 
 
@@ -250,6 +280,7 @@ def main(  # noqa: PLR0913
     embedding_model: str = EMBEDDING_MODEL_OPTION,
     chat_model: str = CHAT_MODEL_OPTION,
     log_file: str | None = LOG_FILE_OPTION,
+    debug: str | None = DEBUG_OPTION,
     json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
     """RAG (Retrieval Augmented Generation) CLI.
@@ -267,7 +298,14 @@ def main(  # noqa: PLR0913
 
     # Configure logging
     state.log_file = log_file
-    state.logger = configure_logging(verbose, log_level, json_mode, log_file)
+    debug_modules = [] if debug is None else [m.strip() for m in debug.split(",")]
+    state.logger = configure_logging(
+        verbose,
+        log_level,
+        json_mode,
+        log_file,
+        debug_modules,
+    )
 
     # Set cache directory
     state.cache_dir = cache_dir
