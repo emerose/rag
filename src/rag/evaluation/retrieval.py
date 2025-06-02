@@ -121,7 +121,7 @@ class RetrievalEvaluator:
         self._logger.debug("Corpus indexed")
 
         queries = load_dataset(self.dataset, "queries")
-        query_list = [dict(q) for q in queries]
+        query_list = [dict(q) for q in queries["queries"]]
         self._logger.debug(f"Loaded {len(query_list)} queries")
 
         qrels_ds = f"{self.dataset}-qrels"
