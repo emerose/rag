@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,32 @@ class RetrievalEvaluator:
         self._logger = get_logger()
 
     # Internal helpers -------------------------------------------------
+    def _simplify_retrieval_paths(
+        self, results: dict[str, dict[str, float]]
+    ) -> dict[str, dict[str, float]]:
+        """Transform retrieval results by replacing full file paths with query IDs.
+
+        Args:
+            results: Dictionary mapping query indices to dictionaries of {file_path: score}.
+                Example: {'0': {'/path/to/123.txt': 1.0, ...}, ...}
+
+        Returns:
+            Dictionary with the same structure but using query IDs instead of full paths.
+            Example: {'0': {'123': 1.0, ...}, ...}
+        """
+        simplified = {}
+        for query_idx, paths_dict in results.items():
+            # Create a new inner dictionary for this query
+            simplified[query_idx] = {}
+
+            # Transform each path to just the query ID
+            for path, score in paths_dict.items():
+                # Extract the filename without extension and directory
+                query_id = os.path.splitext(os.path.basename(path))[0]
+                simplified[query_idx][query_id] = score
+
+        return simplified
+
     def _index_corpus(self, cache_dir: Path) -> RAGEngine:
         """Download and index the selected corpus."""
         from datasets import load_dataset
@@ -51,12 +78,16 @@ class RetrievalEvaluator:
     ) -> dict[str, dict[str, float]]:
         """Run similarity search for each query and return ranking results."""
         vs_manager: VectorStoreManager = engine.vectorstore_manager
+        self._logger.debug(f"Running retrieval for {len(queries)} queries with k={k}")
         merged_vs = vs_manager.merge_vectorstores(list(engine.vectorstores.values()))
+        self._logger.debug("Merged vectorstores")
         results: dict[str, dict[str, float]] = {}
         for q in queries:
             qid = q.get("query_id") or q.get("_id") or q["id"]
             text = q.get("text") or q.get("query")
+            self._logger.debug(f"Running similarity search for query {qid}")
             docs = vs_manager.similarity_search(merged_vs, text, k=k)
+            self._logger.debug(f"Found {len(docs)} documents")
             scores = {
                 d.metadata.get("source", str(idx)): 1.0 / (idx + 1)
                 for idx, d in enumerate(docs)
@@ -81,28 +112,39 @@ class RetrievalEvaluator:
         self._logger.debug("Corpus indexed")
 
         queries = load_dataset(self.dataset, "queries", split="test")
-        self._logger.debug(f"Loaded {len(queries)} queries")
+        query_list = [dict(q) for q in queries["queries"]]
+        self._logger.debug(f"Loaded {len(query_list)} queries")
+
         qrels_ds = f"{self.dataset}-qrels"
         qrels = load_dataset(qrels_ds, split="test")
-
-        query_list = [dict(q) for q in queries]
-        results = self._run_retrieval(engine, query_list, k=10)
-        self._logger.debug(f"Retrieved documents for {len(query_list)} queries")
-
         qrels_dict: dict[str, dict[str, int]] = {}
         for row in qrels:
-            qid = str(row.get("query_id") or row.get("_id") or row["id"])
-            doc_id = str(row.get("doc_id") or row.get("corpus_id"))
-            score = int(row.get("score", 1))
-            qrels_dict.setdefault(qid, {})[doc_id] = score
+            qid = str(row["query-id"])
+            doc_id = str(row["corpus-id"])
+            score = int(row["score"])
+            if qid not in qrels_dict:
+                qrels_dict[qid] = {}
+            qrels_dict[qid][doc_id] = score
+        self._logger.debug(f"Loaded {len(qrels_dict)} qrels")
 
+        results = self._run_retrieval(engine, query_list, k=20)
+        self._logger.debug(f"Retrieved documents for {len(query_list)} queries")
+
+        # Simplify paths to query IDs before evaluation
+        simplified_results = self._simplify_retrieval_paths(results)
+
+        self._logger.debug("Running evaluation")
         evaluator = EvaluateRetrieval()
-        metrics_result = evaluator.evaluate(qrels_dict, results, k_values=[10])
+        metrics_result = evaluator.evaluate(
+            qrels_dict, simplified_results, k_values=[1, 5, 10, 20]
+        )
 
-        metrics = {
-            metric: float(metrics_result.get(metric, {10: 0.0}).get(10, 0.0))
-            for metric in self.evaluation.metrics
-        }
+        metrics = {}
+        for metric in self.evaluation.metrics:
+            # metrics_result is a tuple of dicts, one for each k value
+            for result_dict in metrics_result:
+                for key, value in result_dict.items():
+                    metrics[key] = value
 
         self._logger.debug(f"Evaluation metrics: {metrics}")
 

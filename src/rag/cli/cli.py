@@ -93,7 +93,7 @@ DEFAULT_EVALUATIONS = [
     Evaluation(
         category="retrieval",
         test="dummy",
-        metrics=["recall", "precision", "hit_rate", "mrr", "ndcg"],
+        metrics=["NDCG@10", "MAP@10", "MRR@10", "Recall@10", "Precision@10"],
     )
 ]
 
