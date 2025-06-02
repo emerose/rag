@@ -215,12 +215,20 @@ def configure_logging(
     level = logging.INFO if verbose else getattr(logging, log_level.value)
     setup_logging(log_file=log_file, log_level=level, json_logs=json_logs)
 
+    final_level = level
     if debug_modules:
         if "all" in debug_modules:
             logging.getLogger().setLevel(logging.DEBUG)
+            final_level = logging.DEBUG
         else:
             for name in debug_modules:
                 logging.getLogger(name).setLevel(logging.DEBUG)
+            final_level = logging.DEBUG
+
+    if structlog is not None:
+        structlog.configure(
+            wrapper_class=structlog.make_filtering_bound_logger(final_level)
+        )
 
     return get_logger()
 
