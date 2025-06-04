@@ -67,6 +67,7 @@ class RuntimeOptions:
         rerank: Enable keyword-based reranking after retrieval
         max_workers: Maximum concurrent workers for async tasks
         async_batching: Use asynchronous embedding batching
+        retriever: Retrieval strategy ("standard" or "multivector")
 
     """
 
@@ -82,3 +83,5 @@ class RuntimeOptions:
     stream_callback: Callable[[str], None] | None = None
     max_workers: int = get_optimal_concurrency()
     async_batching: bool = True
+    # Retrieval options
+    retriever: str = "standard"
