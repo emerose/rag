@@ -206,14 +206,14 @@ class IngestManager:
             log_callback,
         )
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
             level: Log level (INFO, WARNING, ERROR, etc.)
             message: The log message
         """
-        log_message(level, message, "IngestManager", self.log_callback)
+        log_message(level, message, "IngestManager", self.log_callback, task_id)
 
     def _apply_preprocessor(self, documents: list[Document]) -> list[Document]:
         """Apply preprocessor to all documents.
@@ -275,7 +275,7 @@ class IngestManager:
 
         return source
 
-    def ingest_file(self, file_path: Path | str) -> IngestResult:
+    def ingest_file(self, file_path: Path | str, task_id: str | None = None) -> IngestResult:
         """Ingest a single file.
 
         Args:
@@ -322,7 +322,7 @@ class IngestManager:
 
         try:
             # 1. Load document
-            self._log("DEBUG", f"Loading document: {file_path}")
+            self._log("DEBUG", f"Loading document: {file_path}", task_id)
             docs = self.document_loader.load_document(file_path)
             source.loader_name = self.document_loader.last_loader_name
             source.metadata["loader"] = self.document_loader.last_loader_name
@@ -339,7 +339,7 @@ class IngestManager:
                     docs = self._apply_preprocessor(docs)
 
                 # 2. Split into chunks
-                self._log("DEBUG", f"Splitting document into chunks: {file_path}")
+                self._log("DEBUG", f"Splitting document into chunks: {file_path}", task_id)
                 try:
                     chunked_docs = self.chunking_strategy.split_documents(
                         docs, mime_type
@@ -360,21 +360,21 @@ class IngestManager:
                     result.documents = chunked_docs
                     result.processing_time = time.time() - start_time
                 except Exception as e:
-                    self._log("ERROR", f"Error during document chunking: {e}")
+                    self._log("ERROR", f"Error during document chunking: {e}", task_id)
                     result = IngestResult(
                         source,
                         IngestStatus.PROCESSING_ERROR,
                         error_message=f"Error during document chunking: {e}",
                     )
         except ValueError as e:
-            self._log("ERROR", f"Error loading document: {e}")
+            self._log("ERROR", f"Error loading document: {e}", task_id)
             result = IngestResult(
                 source,
                 IngestStatus.LOADING_ERROR,
                 error_message=f"Error loading document: {e}",
             )
         except Exception as e:
-            self._log("ERROR", f"Unexpected error processing document: {e}")
+            self._log("ERROR", f"Unexpected error processing document: {e}", task_id)
             result = IngestResult(
                 source,
                 IngestStatus.PROCESSING_ERROR,

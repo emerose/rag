@@ -54,7 +54,7 @@ class EmbeddingBatcher:
         self.log_callback = log_callback
         self.progress_tracker = ProgressTracker(progress_callback)
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
@@ -62,7 +62,7 @@ class EmbeddingBatcher:
             message: The log message
 
         """
-        log_message(level, message, "EmbeddingBatcher", self.log_callback)
+        log_message(level, message, "EmbeddingBatcher", self.log_callback, task_id)
 
     def calculate_optimal_batch_size(self, total_chunks: int) -> int:
         """Calculate the optimal batch size based on total chunks.
@@ -116,7 +116,7 @@ class EmbeddingBatcher:
         async def embed_batch(batch: list[str]) -> list[list[float]]:
             async with semaphore:
                 try:
-                    embeddings = self.embedding_provider.embed_texts(batch)
+                    embeddings = await self.embedding_provider.embed_texts_async(batch)
                     self.progress_tracker.update(
                         "embedding",
                         self.progress_tracker.tasks["embedding"]["current"]
@@ -188,7 +188,7 @@ class EmbeddingBatcher:
 
             """
             try:
-                embeddings = self.embedding_provider.embed_texts(batch)
+                embeddings = await self.embedding_provider.embed_texts_async(batch)
 
                 # Update progress
                 self.progress_tracker.update(

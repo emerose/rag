@@ -3,7 +3,8 @@
 Focus on testing our own logic, not the OpenAI API interactions.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
+import pytest
 
 from rag.embeddings.embedding_provider import EmbeddingProvider
 
@@ -77,3 +78,19 @@ def test_get_model_info(mock_openai_embeddings: MagicMock) -> None:
             assert model_info["embedding_model"] == model_name
             assert model_info["model_version"] == expected_version
             assert model_info["embedding_dimension"] == "1536"
+
+
+@patch("rag.embeddings.embedding_provider.AsyncOpenAI")
+@pytest.mark.asyncio
+async def test_embed_texts_async(mock_async_openai: MagicMock) -> None:
+    mock_client = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.data = [MagicMock(embedding=[0.1])]
+    mock_client.embeddings.create = AsyncMock(return_value=mock_resp)
+    mock_async_openai.return_value = mock_client
+
+    with patch.object(EmbeddingProvider, "_get_embedding_dimension", return_value=1):
+        provider = EmbeddingProvider(openai_api_key="key")
+        result = await provider.embed_texts_async(["hi"])
+        assert result == [[0.1]]
+        mock_client.embeddings.create.assert_awaited_once()

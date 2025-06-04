@@ -16,7 +16,7 @@ from rag.utils.logging_utils import log_message
 logger = logging.getLogger(__name__)
 
 # TypeAlias for log callback function
-LogCallback: TypeAlias = Callable[[str, str, str], None]
+LogCallback: TypeAlias = Callable[[str, str, str, str | None], None]
 
 
 class IndexManager:
@@ -44,7 +44,7 @@ class IndexManager:
         self.log_callback = log_callback
         self._init_db()
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
@@ -52,7 +52,7 @@ class IndexManager:
             message: The log message
 
         """
-        log_message(level, message, "IndexManager", self.log_callback)
+        log_message(level, message, "IndexManager", self.log_callback, task_id)
 
     def _init_db(self) -> None:
         """Initialize the SQLite database with required tables."""

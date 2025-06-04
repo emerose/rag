@@ -45,7 +45,6 @@
 - [#238] [P2] **Caching improvements** – Implement more sophisticated caching strategies
 - [#239] [P3] **Performance monitoring** – Add detailed performance metrics and monitoring
 - [#240] [P3] **Memory optimization** – Optimize memory usage for large document collections
-- [#241] [P3] **Batch processing** – Implement efficient batch processing for large datasets
 - [#242] [P5] **Distributed processing** – Add support for distributed processing
 - [#243] [P3] **Metrics collection** – Implement detailed metrics collection and reporting
 

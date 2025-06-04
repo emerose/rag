@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 from collections.abc import Callable
+import inspect
 from pathlib import Path
 from typing import Any
 
@@ -151,7 +152,13 @@ class RAGEngine:
         config = RAGConfig(documents_dir=documents_dir, cache_dir=cache_dir)
         return cls(config)
 
-    def _log(self, level: str, message: str, subsystem: str = "RAGEngine") -> None:
+    def _log(
+        self,
+        level: str,
+        message: str,
+        subsystem: str = "RAGEngine",
+        task_id: str | None = None,
+    ) -> None:
         """Log a message.
 
         Args:
@@ -160,7 +167,7 @@ class RAGEngine:
             subsystem: The subsystem generating the log
 
         """
-        log_message(level, message, subsystem, self.runtime.log_callback)
+        log_message(level, message, subsystem, self.runtime.log_callback, task_id)
 
     def _validate_api_key(self) -> None:
         """Ensure the OpenAI API key is configured."""
@@ -465,9 +472,17 @@ class RAGEngine:
                     progress_callback("cached", file_path, None)
                 return True, None
 
-            self._log("DEBUG", f"Starting document ingestion for: {file_path}")
-            # Ingest the file
-            ingest_result = self.ingest_manager.ingest_file(file_path)
+            self._log(
+                "DEBUG",
+                f"Starting document ingestion for: {file_path}",
+                task_id=str(file_path),
+            )
+            if "task_id" in inspect.signature(self.ingest_manager.ingest_file).parameters:
+                ingest_result = self.ingest_manager.ingest_file(
+                    file_path, task_id=str(file_path)
+                )
+            else:
+                ingest_result = self.ingest_manager.ingest_file(file_path)
             self._log(
                 "DEBUG", f"Ingestion result successful: {ingest_result.successful}"
             )
@@ -483,9 +498,17 @@ class RAGEngine:
 
             # Get documents from ingestion result
             documents = ingest_result.documents
-            self._log("DEBUG", f"Extracted {len(documents)} documents from {file_path}")
+            self._log(
+                "DEBUG",
+                f"Extracted {len(documents)} documents from {file_path}",
+                task_id=str(file_path),
+            )
             if not documents:
-                self._log("WARNING", f"No documents extracted from {file_path}")
+                self._log(
+                    "WARNING",
+                    f"No documents extracted from {file_path}",
+                    task_id=str(file_path),
+                )
                 if progress_callback:
                     progress_callback("error", file_path, "No documents extracted")
                 return False, "No documents extracted"
@@ -498,8 +521,16 @@ class RAGEngine:
                     if len(first_doc.page_content) > 100
                     else first_doc.page_content
                 )
-                self._log("DEBUG", f"First document content preview: {content_preview}")
-                self._log("DEBUG", f"First document metadata: {first_doc.metadata}")
+                self._log(
+                    "DEBUG",
+                    f"First document content preview: {content_preview}",
+                    task_id=str(file_path),
+                )
+                self._log(
+                    "DEBUG",
+                    f"First document metadata: {first_doc.metadata}",
+                    task_id=str(file_path),
+                )
 
             # Generate embeddings and create vectorstore
             success = self._create_vectorstore_from_documents(
@@ -510,6 +541,7 @@ class RAGEngine:
                 loader_name=ingest_result.source.loader_name,
                 tokenizer_name=ingest_result.source.tokenizer_name,
                 text_splitter_name=ingest_result.source.text_splitter_name,
+                task_id=str(file_path),
             )
             if progress_callback:
                 event = "indexed" if success else "error"
@@ -524,6 +556,39 @@ class RAGEngine:
                 progress_callback("error", file_path, error_message)
             return False, error_message
 
+    async def index_file_async(
+        self,
+        file_path: Path | str,
+        *,
+        progress_callback: Callable[[str, Path, str | None], None] | None = None,
+    ) -> tuple[bool, str | None]:
+        """Asynchronously index a single file."""
+        return await asyncio.to_thread(
+            self.index_file, file_path, progress_callback=progress_callback
+        )
+
+    async def _index_files_batch_async(
+        self,
+        files: list[Path],
+        progress_callback: Callable[[str, Path, str | None], None] | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Process multiple files concurrently."""
+        semaphore = asyncio.Semaphore(self.runtime.max_workers)
+
+        async def worker(path: Path) -> tuple[str, dict[str, Any]]:
+            async with semaphore:
+                success, err = await self.index_file_async(
+                    path, progress_callback=progress_callback
+                )
+                return str(path), {"success": success, "error": err}
+
+        tasks = [asyncio.create_task(worker(p)) for p in files]
+        results: dict[str, dict[str, Any]] = {}
+        for task in asyncio.as_completed(tasks):
+            key, value = await task
+            results[key] = value
+        return results
+
     def _create_vectorstore_from_documents(  # noqa: PLR0915, PLR0913, PLR0912
         self,
         file_path: Path,
@@ -533,6 +598,7 @@ class RAGEngine:
         loader_name: str | None = None,
         tokenizer_name: str | None = None,
         text_splitter_name: str | None = None,
+        task_id: str | None = None,
     ) -> bool:
         """Create or update a vectorstore from documents.
 
@@ -556,7 +622,11 @@ class RAGEngine:
                     str(file_path)
                 )
                 if existing_vectorstore:
-                    self._log("DEBUG", "Loaded existing vectorstore from cache")
+                    self._log(
+                        "DEBUG",
+                        "Loaded existing vectorstore from cache",
+                        task_id=task_id,
+                    )
 
             old_hashes = self.index_manager.get_chunk_hashes(file_path)
             new_hashes: list[str] = []
@@ -598,6 +668,7 @@ class RAGEngine:
                 self._log(
                     "DEBUG",
                     f"Generating embeddings for {len(docs_to_embed)} new/changed documents",
+                    task_id=task_id,
                 )
                 if self.runtime.async_batching:
                     embeddings = run_coro_sync(
@@ -605,7 +676,7 @@ class RAGEngine:
                     )
                 else:
                     embeddings = batcher.process_embeddings(docs_to_embed)
-                self._log("DEBUG", f"Generated {len(embeddings)} embeddings")
+                self._log("DEBUG", f"Generated {len(embeddings)} embeddings", task_id=task_id)
 
                 for pos, idx in enumerate(embed_indices):
                     if pos >= len(embeddings):
@@ -618,14 +689,14 @@ class RAGEngine:
                     )
 
             # Save vectorstore
-            self._log("DEBUG", "Saving vectorstore to cache")
+            self._log("DEBUG", "Saving vectorstore to cache", task_id=task_id)
             save_result = self.vectorstore_manager.save_vectorstore(
                 str(file_path), vectorstore
             )
-            self._log("DEBUG", f"Vectorstore save result: {save_result}")
+            self._log("DEBUG", f"Vectorstore save result: {save_result}", task_id=task_id)
 
             # Update metadata
-            self._log("DEBUG", "Updating index metadata")
+            self._log("DEBUG", "Updating index metadata", task_id=task_id)
             used_model = embedding_model or self.config.embedding_model
             if file_path.exists():
                 self.index_manager.update_metadata(
@@ -644,6 +715,7 @@ class RAGEngine:
                 self._log(
                     "DEBUG",
                     f"File {file_path} does not exist, skipping metadata update",
+                    task_id=task_id,
                 )
 
             # Store chunk hashes for incremental indexing
@@ -651,29 +723,35 @@ class RAGEngine:
 
             # Update cache metadata
             if file_path.exists():
-                self._log("DEBUG", "Getting file metadata")
+                self._log("DEBUG", "Getting file metadata", task_id=task_id)
                 file_metadata = self.filesystem_manager.get_file_metadata(file_path)
                 file_metadata["chunks"] = {"total": len(documents)}
-                self._log("DEBUG", "Updating cache metadata")
+                self._log("DEBUG", "Updating cache metadata", task_id=task_id)
                 self.cache_manager.update_cache_metadata(str(file_path), file_metadata)
             else:
                 self._log(
                     "DEBUG",
                     f"File {file_path} does not exist, skipping cache metadata update",
+                    task_id=task_id,
                 )
 
             # Add vectorstore to memory cache
-            self._log("DEBUG", "Adding vectorstore to memory cache")
+            self._log("DEBUG", "Adding vectorstore to memory cache", task_id=task_id)
             self.vectorstores[str(file_path)] = vectorstore
 
             self._log(
                 "INFO",
                 f"Successfully indexed {file_path} with {len(documents)} chunks",
+                task_id=task_id,
             )
 
             return True
         except ENGINE_EXCEPTIONS as e:
-            self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
+            self._log(
+                "ERROR",
+                f"Failed to create vectorstore for {file_path}: {e}",
+                task_id=task_id,
+            )
             return False
 
     def index_directory(  # noqa: PLR0912, PLR0915
@@ -742,71 +820,14 @@ class RAGEngine:
             self._log("INFO", f"No files require indexing in {directory}")
             return {}
 
-        # Use the ingest manager for directory processing when all files need indexing
-        if len(files_to_index) == len(all_files):
-            ingest_results = self.ingest_manager.ingest_directory(directory)
-        else:
-            ingest_results = {}
-            for file_path in files_to_index:
-                ingest_results[str(file_path)] = self.ingest_manager.ingest_file(
-                    file_path
-                )
-
-        # Index each file that was successfully processed
-        results: dict[str, dict[str, Any]] = {}
-        for file_path, result in ingest_results.items():
-            if not result.successful:
-                self._log(
-                    "WARNING", f"Failed to process {file_path}: {result.error_message}"
-                )
-                results[file_path] = {"success": False, "error": result.error_message}
-                if progress_callback:
-                    progress_callback("error", Path(file_path), result.error_message)
-                continue
-
-            documents = result.documents
-            if not documents:
-                self._log("WARNING", f"No documents extracted from {file_path}")
-                results[file_path] = {
-                    "success": False,
-                    "error": "No documents extracted",
-                }
-                if progress_callback:
-                    progress_callback(
-                        "error", Path(file_path), "No documents extracted"
-                    )
-                continue
-
-            try:
-                model_name = self._embedding_model_for_file(Path(file_path))
-                success = self._create_vectorstore_from_documents(
-                    file_path=Path(file_path),
-                    documents=documents,
-                    file_type=result.source.mime_type or "text/plain",
-                    embedding_model=model_name,
-                    loader_name=result.source.loader_name,
-                    tokenizer_name=result.source.tokenizer_name,
-                    text_splitter_name=result.source.text_splitter_name,
-                )
-                results[file_path] = {"success": success}
-                if progress_callback:
-                    event = "indexed" if success else "error"
-                    progress_callback(
-                        event,
-                        Path(file_path),
-                        None if success else "Vectorstore creation failed",
-                    )
-            except ENGINE_EXCEPTIONS as e:
-                error_msg = str(e)
-                self._log("ERROR", f"Error indexing {file_path}: {error_msg}")
-                if progress_callback:
-                    progress_callback("error", Path(file_path), error_msg)
-                results[file_path] = {"success": False, "error": error_msg}
+        # Process files concurrently
+        results = run_coro_sync(
+            self._index_files_batch_async(files_to_index, progress_callback)
+        )
 
         # Clean up invalid caches
         self.cache_manager.cleanup_invalid_caches()
 
-        # Summary
         success_count = sum(1 for r in results.values() if r.get("success"))
         self._log("DEBUG", f"Indexed {success_count}/{len(results)} files successfully")
 

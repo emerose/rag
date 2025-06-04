@@ -18,7 +18,7 @@ from rag.utils.logging_utils import log_message
 logger = logging.getLogger(__name__)
 
 # TypeAlias for log callback function
-LogCallback: TypeAlias = Callable[[str, str, str], None]
+LogCallback: TypeAlias = Callable[[str, str, str, str | None], None]
 
 # Map of supported MIME types to their file extensions
 SUPPORTED_MIME_TYPES = {
@@ -70,7 +70,7 @@ class FilesystemManager:
             for ext in extensions:
                 mimetypes.add_type(mime_type, ext)
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
@@ -78,7 +78,7 @@ class FilesystemManager:
             message: The log message
 
         """
-        log_message(level, message, "Filesystem", self.log_callback)
+        log_message(level, message, "Filesystem", self.log_callback, task_id)
 
     def scan_directory(self, directory: Path | str) -> list[Path]:
         """Scan a directory for supported files.

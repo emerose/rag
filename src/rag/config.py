@@ -72,7 +72,7 @@ class RuntimeOptions:
 
     # Define more specific type hints
     progress_callback: Callable[[str, int, int | None], None] | None = None
-    log_callback: Callable[[str, str, str], None] | None = None
+    log_callback: Callable[[str, str, str, str | None], None] | None = None
     # Text splitting options
     preserve_headings: bool = True
     semantic_chunking: bool = True

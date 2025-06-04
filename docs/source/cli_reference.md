@@ -122,7 +122,7 @@ Global options available on every command include:
 - `--verbose` / `--log-level` – control logging verbosity
 - `--json` – output machine-readable JSON
 - `--vectorstore-backend` – choose FAISS, Qdrant, or Chroma
-- `--max-workers` – number of concurrent tasks
+- `--max-workers` – number of concurrent tasks (used for parallel file indexing)
 - `--embedding-model` – OpenAI embedding model (default `text-embedding-3-small`)
 - `--chat-model` – OpenAI chat model (default `gpt-4`)
 - `--log-file` – write logs to the specified file

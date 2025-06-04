@@ -20,19 +20,25 @@ except ImportError:
     from openai import APIConnectionError, APIError, RateLimitError
 
 from tenacity import (
+    AsyncRetrying,
     before_sleep_log,
     retry,
     retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
 )
+from aiolimiter import AsyncLimiter
+try:
+    from openai import AsyncOpenAI
+except Exception:  # pragma: no cover - handle older versions
+    AsyncOpenAI = None  # type: ignore
 
 from rag.utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
 
 # TypeAlias for log callback function
-LogCallback: TypeAlias = Callable[[str, str, str], None]
+LogCallback: TypeAlias = Callable[[str, str, str, str | None], None]
 
 
 class EmbeddingProvider:
@@ -70,10 +76,14 @@ class EmbeddingProvider:
             show_progress_bar=show_progress_bar,
         )
 
+        # Initialize async client and rate limiter if available
+        self.async_client = AsyncOpenAI(api_key=openai_api_key) if AsyncOpenAI else None
+        self._limiter = AsyncLimiter(50, 60)
+
         # Store the model's embedding dimension
         self._embedding_dimension = self._get_embedding_dimension()
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
@@ -81,7 +91,7 @@ class EmbeddingProvider:
             message: The log message
 
         """
-        log_message(level, message, "Embeddings", self.log_callback)
+        log_message(level, message, "Embeddings", self.log_callback, task_id)
 
     def _get_embedding_dimension(self) -> int:
         """Get the dimension of embeddings.
@@ -166,6 +176,31 @@ class EmbeddingProvider:
         else:
             return embeddings
 
+    async def embed_texts_async(self, texts: list[str]) -> list[list[float]]:
+        """Asynchronously generate embeddings for a list of texts."""
+        if not texts:
+            return []
+
+        if self.async_client is None:
+            return self.embed_texts(texts)
+
+        self._log("DEBUG", f"Generating embeddings for {len(texts)} texts")
+
+        async for attempt in AsyncRetrying(
+            retry=retry_if_exception_type((RateLimitError, APIError, APIConnectionError)),
+            wait=wait_exponential(multiplier=1, min=1, max=60),
+            stop=stop_after_attempt(8),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+        ):
+            with attempt:
+                async with self._limiter:
+                    resp = await self.async_client.embeddings.create(
+                        model=self.model_name,
+                        input=texts,
+                    )
+                self._log("DEBUG", f"Successfully embedded {len(texts)} texts")
+                return [d.embedding for d in resp.data]
+
     @retry(
         retry=retry_if_exception_type((RateLimitError, APIError, APIConnectionError)),
         wait=wait_exponential(multiplier=1, min=1, max=60),
@@ -199,6 +234,28 @@ class EmbeddingProvider:
             raise
         else:
             return embedding
+
+    async def embed_query_async(self, query: str) -> list[float]:
+        """Asynchronously generate an embedding for a query."""
+        if self.async_client is None:
+            return self.embed_query(query)
+
+        self._log("DEBUG", "Embedding query")
+
+        async for attempt in AsyncRetrying(
+            retry=retry_if_exception_type((RateLimitError, APIError, APIConnectionError)),
+            wait=wait_exponential(multiplier=1, min=1, max=60),
+            stop=stop_after_attempt(8),
+            before_sleep=before_sleep_log(logger, logging.WARNING),
+        ):
+            with attempt:
+                async with self._limiter:
+                    resp = await self.async_client.embeddings.create(
+                        model=self.model_name,
+                        input=query,
+                    )
+                self._log("DEBUG", "Successfully embedded query")
+                return resp.data[0].embedding
 
     def get_model_info(self) -> dict[str, str]:
         """Get information about the embeddings model.
