@@ -37,7 +37,7 @@ class VectorStoreManager:
         self,
         cache_dir: Path | str,
         embeddings: Embeddings,
-        log_callback: Callable[[str, str, str], None] | None = None,
+        log_callback: Callable[[str, str, str, str | None], None] | None = None,
         lock_timeout: int = 30,
         safe_deserialization: bool = True,
         backend: str = "faiss",
@@ -77,7 +77,7 @@ class VectorStoreManager:
                 f"Embeddings provider is a valid Embeddings object: {type(self.embeddings)}",
             )
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
@@ -85,7 +85,7 @@ class VectorStoreManager:
             message: The log message
 
         """
-        log_message(level, message, "VectorStore", self.log_callback)
+        log_message(level, message, "VectorStore", self.log_callback, task_id)
 
     def _get_embedding_dimension(self) -> int:
         """Get the dimension of embeddings.

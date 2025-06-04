@@ -52,14 +52,14 @@ class DefaultChunkingStrategy(ChunkingStrategy):
         # Initialize tokenizer
         self.tokenizer = _safe_encoding_for_model(model_name)
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
             level: Log level (INFO, WARNING, ERROR, etc.)
             message: The log message
         """
-        log_message(level, message, "ChunkingStrategy", self.log_callback)
+        log_message(level, message, "ChunkingStrategy", self.log_callback, task_id)
 
     def _token_length(self, text: str) -> int:
         """Calculate the number of tokens in a text.
@@ -352,14 +352,14 @@ class SemanticChunkingStrategy(ChunkingStrategy):
         self.last_splitter_name: str | None = None
         self.tokenizer_name = self.splitter_factory.tokenizer_name
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
             level: Log level (INFO, WARNING, ERROR, etc.)
             message: The log message
         """
-        log_message(level, message, "SemanticChunking", self.log_callback)
+        log_message(level, message, "SemanticChunking", self.log_callback, task_id)
 
     def split_documents(
         self, documents: list[Document], mime_type: str

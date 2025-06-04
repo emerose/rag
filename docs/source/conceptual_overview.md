@@ -12,6 +12,8 @@ The [TextSplitterFactory](https://github.com/emerose/rag/blob/main/src/rag/data/
 
 ## 3. Embedding
 Chunks are embedded using [EmbeddingProvider](https://github.com/emerose/rag/blob/main/src/rag/embeddings/embedding_provider.py), which wraps OpenAI's embedding API with retry logic. [EmbeddingBatcher](https://github.com/emerose/rag/blob/main/src/rag/embeddings/batching.py) manages asynchronous batching so multiple chunks can be processed in parallel. A per‑document model map allows different embedding models to be used for specific files when ``embeddings.yaml`` is present.
+During indexing a batch of files is processed concurrently, each handled in its
+own asynchronous task using OpenAI's async API with rate limiting and retries.
 
 ## 4. Metadata Handling
 Every chunk retains the metadata added during loading plus additional fields such as ``token_count`` and extracted titles or heading hierarchies. The [IndexManager](https://github.com/emerose/rag/blob/main/src/rag/storage/index_manager.py) records this information in a SQLite database. Per‑chunk hashes enable incremental indexing so unchanged chunks are skipped on re‑runs.

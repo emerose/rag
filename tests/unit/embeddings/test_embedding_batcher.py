@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 
 from langchain.schema import Document
 
@@ -9,7 +9,7 @@ from rag.embeddings.embedding_provider import EmbeddingProvider
 
 def test_process_embeddings_stream_yields_results_in_order() -> None:
     provider = MagicMock(spec=EmbeddingProvider)
-    provider.embed_texts.side_effect = [[[1]], [[2]], [[3]], [[4]]]
+    provider.embed_texts_async = AsyncMock(side_effect=[[[1]], [[2]], [[3]], [[4]]])
     batcher = EmbeddingBatcher(provider, max_concurrency=2, initial_batch_size=2)
 
     docs = [

@@ -20,7 +20,7 @@ from .index_manager import IndexManager
 logger = logging.getLogger(__name__)
 
 # TypeAlias for log callback function
-LogCallback: TypeAlias = Callable[[str, str, str], None]
+LogCallback: TypeAlias = Callable[[str, str, str, str | None], None]
 
 
 class CacheManager:
@@ -56,7 +56,7 @@ class CacheManager:
         # Initialize an empty cache metadata dictionary (for compatibility)
         self.cache_metadata: dict[str, dict[str, Any]] = {}
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
@@ -64,7 +64,7 @@ class CacheManager:
             message: The log message
 
         """
-        log_message(level, message, "CacheManager", self.log_callback)
+        log_message(level, message, "CacheManager", self.log_callback, task_id)
 
     def _get_vector_store_file_paths(
         self,

@@ -697,7 +697,7 @@ class TextSplitterFactory:
             f"preserve_headings={self.preserve_headings}, semantic_chunking={self.semantic_chunking}",
         )
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
@@ -705,7 +705,7 @@ class TextSplitterFactory:
             message: The log message
 
         """
-        log_message(level, message, "TextSplitter", self.log_callback)
+        log_message(level, message, "TextSplitter", self.log_callback, task_id)
 
     def create_splitter(self, mime_type: str) -> Any:
         """Create a text splitter appropriate for the content type.

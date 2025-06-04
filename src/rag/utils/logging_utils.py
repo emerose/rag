@@ -36,11 +36,14 @@ class RAGLogger:
         msg: str,
         *args: Any,
         subsystem: str = "RAG",
+        task_id: str | None = None,
         **kwargs: Any,
     ) -> None:
-        """Log a message with optional subsystem context."""
+        """Log a message with optional subsystem and task context."""
         extra = kwargs.pop("extra", {})
         extra["subsystem"] = subsystem
+        if task_id is not None:
+            extra["task_id"] = task_id
         stacklevel = kwargs.pop("stacklevel", 1)
         self._base_logger.log(
             level,
@@ -318,15 +321,22 @@ def log_message(
     level: str,
     message: str,
     subsystem: str = "RAG",
-    callback: Callable[[str, str, str], None] | None = None,
+    callback: Callable[[str, str, str, str | None], None] | None = None,
+    task_id: str | None = None,
 ) -> None:
     """Log a message and optionally send it to a callback."""
     log_level = getattr(logging, level.upper(), logging.INFO)
-    logger.log(log_level, message, subsystem=subsystem, stacklevel=3)
+    logger.log(
+        log_level,
+        message,
+        subsystem=subsystem,
+        task_id=task_id,
+        stacklevel=3,
+    )
 
     if callback:
         try:
-            callback(level, message, subsystem)
+            callback(level, message, subsystem, task_id)
         except TypeError as exc:
             logger.warning(
                 "Failed to send log to callback due to TypeError",

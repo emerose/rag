@@ -53,7 +53,7 @@ class DocumentProcessor:
         self.log_callback = log_callback
         self.progress_tracker = ProgressTracker(progress_callback)
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
@@ -61,7 +61,7 @@ class DocumentProcessor:
             message: The log message
 
         """
-        log_message(level, message, "DocumentProcessor", self.log_callback)
+        log_message(level, message, "DocumentProcessor", self.log_callback, task_id)
 
     def process_file(self, file_path: Path | str) -> list[Document]:
         """Process a single file.

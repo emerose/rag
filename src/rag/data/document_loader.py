@@ -76,7 +76,7 @@ class DocumentLoader:
         self.metadata_extractor = DocumentMetadataExtractor()
         self.last_loader_name: str | None = None
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
@@ -84,7 +84,7 @@ class DocumentLoader:
             message: The log message
 
         """
-        log_message(level, message, "DocumentLoader", self.log_callback)
+        log_message(level, message, "DocumentLoader", self.log_callback, task_id)
 
     def get_loader_for_file(self, file_path: Path | str) -> Any:
         """Get the appropriate loader for a file based on its MIME type.
