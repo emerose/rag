@@ -83,7 +83,9 @@ def test_get_model_info(mock_openai_embeddings: MagicMock) -> None:
 @pytest.mark.asyncio
 @patch("rag.embeddings.embedding_provider.AsyncOpenAI")
 @patch("rag.embeddings.embedding_provider.AsyncRetrying")
-def test_embed_texts_async(mock_retry: MagicMock, mock_async_openai: MagicMock) -> None:
+async def test_embed_texts_async(
+    mock_retry: MagicMock, mock_async_openai: MagicMock
+) -> None:
     """Test async embedding generation using AsyncOpenAI."""
 
     mock_client = MagicMock()
