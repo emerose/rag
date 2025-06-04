@@ -137,6 +137,14 @@ def strip_internal_fields(
     return event_dict
 
 
+def add_thread_id(
+    _logger: logging.Logger, _name: str, event_dict: dict[str, Any]
+) -> dict[str, Any]:
+    """Add thread ID to the event dictionary."""
+    event_dict["thread_id"] = threading.current_thread().name
+    return event_dict
+
+
 def setup_logging(
     log_file: str | None = None,
     log_level: int = logging.INFO,
@@ -218,8 +226,15 @@ def setup_logging(
             return ""
         return f"\033[90m{value}\033[0m"  # Dim gray for location
 
+    def thread_id_formatter(key: str, value: Any) -> str:
+        """Format thread ID with brackets."""
+        if not value:
+            return ""
+        return f"[{value}]"
+
     custom_columns = [
         Column("timestamp", timestamp_formatter),  # Timestamp
+        Column("thread_id", thread_id_formatter),  # [thread_id]
         Column("level", level_formatter),  # [LEVEL] with colors
         Column("logger_name", logger_formatter),  # [logger_name]
         Column("event", plain_formatter),  # Main message
@@ -244,16 +259,16 @@ def setup_logging(
         uppercase_level,
         structlog.stdlib.add_logger_name,
         timestamper,
+        add_thread_id,  # Add thread ID to all logs
         callsite,
         strip_internal_fields,
         insert_logger_name,
         format_location,
     ]
 
-    console_pre_chain = [
-        *pre_chain
-    ]  # Remove colorize_level since ConsoleRenderer handles colors
+    console_pre_chain = [*pre_chain]
 
+    # Configure file handler if a log file is specified
     if log_file:
         file_processor = (
             structlog.processors.JSONRenderer()
@@ -269,26 +284,23 @@ def setup_logging(
         )
         root_logger.addHandler(file_handler)
 
+    # Configure console handler
     console_processor = (
         structlog.processors.JSONRenderer()
         if json_logs
         else structlog.dev.ConsoleRenderer(**console_renderer_kwargs)
     )
 
-    if json_logs and log_file:
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.ERROR)
-    else:
-        console_handler = logging.StreamHandler()
-
+    console_handler = logging.StreamHandler()
     console_handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
             processor=console_processor,
-            foreign_pre_chain=console_pre_chain,
+            foreign_pre_chain=pre_chain,
         ),
     )
     root_logger.addHandler(console_handler)
 
+    # Configure structlog to use the same processors
     structlog.configure(
         processors=[
             structlog.stdlib.filter_by_level,
@@ -296,6 +308,7 @@ def setup_logging(
             structlog.stdlib.add_log_level,
             uppercase_level,
             timestamper,
+            add_thread_id,  # Add thread ID to structlog configuration
             callsite,
             strip_internal_fields,
             insert_logger_name,
@@ -308,6 +321,13 @@ def setup_logging(
         wrapper_class=structlog.make_filtering_bound_logger(log_level),
         cache_logger_on_first_use=True,
     )
+
+    # Configure foreign loggers to use our pre-chain
+    for name in http_loggers + pdf_loggers:
+        logger = logging.getLogger(name)
+        logger.handlers = []  # Remove any existing handlers
+        logger.propagate = True  # Ensure messages propagate to root logger
+        logger.setLevel(log_level)  # Set the same level as root logger
 
 
 def get_logger() -> logging.Logger:

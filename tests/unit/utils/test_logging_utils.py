@@ -8,6 +8,7 @@ import json
 import logging
 import re
 import sys
+import threading
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -42,13 +43,13 @@ def _make_structlog_stub() -> ModuleType:
             self.colors = kwargs.get("colors", True)
             self.level_styles = kwargs.get("level_styles", {})
             self.columns = kwargs.get("columns", None)
-            
+
         def __call__(self, _logger: Any, _name: str, event_dict: dict[str, Any]) -> str:
             if self.columns:
                 # Use column-based formatting
                 formatted_parts = []
                 remaining_dict = dict(event_dict)
-                
+
                 for col in self.columns:
                     if col.key and col.key in remaining_dict:
                         value = remaining_dict.pop(col.key)
@@ -62,7 +63,7 @@ def _make_structlog_stub() -> ModuleType:
                             if formatted_value:
                                 formatted_parts.append(formatted_value)
                         remaining_dict.clear()
-                
+
                 return " ".join(formatted_parts).strip()
             else:
                 # Legacy formatting for backward compatibility
@@ -72,16 +73,16 @@ def _make_structlog_stub() -> ModuleType:
                 logger_name = event_dict.get("logger_name", "")
                 filename = event_dict.get("filename", "")
                 lineno = event_dict.get("lineno", "")
-                
+
                 # Apply coloring if enabled
                 if self.colors and level in self.level_styles:
                     level = f"{self.level_styles[level]}{level}\033[0m"
-                
+
                 # Format similar to real ConsoleRenderer
                 parts = [timestamp, f"[{level}]", event, f"[{logger_name}]"]
                 if filename and lineno:
                     parts.append(f"filename={filename} lineno={lineno}")
-                    
+
                 return " ".join(part for part in parts if part).strip()
 
     class TimeStamper:
@@ -171,7 +172,7 @@ def _make_structlog_stub() -> ModuleType:
             class KeyValueColumnFormatter:
                 def __init__(self, **kwargs: Any) -> None:
                     pass
-                
+
                 def __call__(self, key: str, value: Any) -> str:
                     return f"{key}={value}" if key else str(value)
 
@@ -228,7 +229,7 @@ def _setup_and_log(
     # Store original classes
     original_file_handler = logging_utils.logging.FileHandler
     original_stream_handler = logging_utils.logging.StreamHandler
-    
+
     # Mock the handlers
     logging_utils.logging.FileHandler = MockFileHandler  # type: ignore
     logging_utils.logging.StreamHandler = MockConsoleHandler  # type: ignore
@@ -240,6 +241,10 @@ def _setup_and_log(
         if foreign:
             logging.getLogger("httpx").info("foreign message")
 
+        # Ensure we flush any buffered output
+        for handler in logging.getLogger().handlers:
+            handler.flush()
+
         return console_stream.getvalue().strip(), file_stream.getvalue().strip()
     finally:
         # Restore original classes
@@ -250,8 +255,8 @@ def _setup_and_log(
 def test_json_logs_are_json() -> None:
     """Ensure logs are JSON-formatted in JSON mode."""
     console_out, file_out = _setup_and_log(json_logs=True)
-    assert console_out == ""
-    assert json.loads(file_out)
+    assert json.loads(console_out)  # Verify console output is valid JSON
+    assert json.loads(file_out)  # Verify file output is valid JSON
 
 
 def test_rich_logs_in_plain_mode() -> None:
@@ -296,7 +301,7 @@ def test_foreign_logger_colorized() -> None:
     """Ensure foreign loggers receive colored levels."""
     console_out, _ = _setup_and_log(json_logs=False, foreign=True)
     matches = re.findall(r"\x1b\[[0-9;]*mINFO\x1b\[[0-9;]*m", console_out)
-    assert len(matches) == 1
+    assert len(matches) == 2  # Both main and foreign loggers should be colorized
 
 
 def test_console_log_structure() -> None:
@@ -321,3 +326,55 @@ def test_json_logs_to_console_when_no_file() -> None:
     console_out, file_out = _setup_and_log(json_logs=True, log_file=None)
     assert json.loads(console_out)
     assert file_out == ""
+
+
+def test_json_logs_include_thread_id() -> None:
+    """Verify that JSON logs include thread ID."""
+    console_out, file_out = _setup_and_log(json_logs=True)
+
+    # Parse and check console output
+    console_log = json.loads(console_out)
+    assert "thread_id" in console_log
+    assert console_log["thread_id"] == threading.current_thread().name
+
+    # Parse and check file output
+    file_log = json.loads(file_out)
+    assert "thread_id" in file_log
+    assert file_log["thread_id"] == threading.current_thread().name
+
+
+def test_rich_logs_include_thread_id() -> None:
+    """Verify that Rich text logs include thread ID."""
+    console_out, file_out = _setup_and_log(json_logs=False)
+
+    # Check console output
+    thread_id = threading.current_thread().name
+    assert f"[{thread_id}]" in console_out
+
+    # Check file output
+    assert f"[{thread_id}]" in file_out
+
+
+def test_thread_id_in_foreign_logs() -> None:
+    """Verify that foreign logger messages also include thread ID."""
+    console_out, file_out = _setup_and_log(json_logs=False, foreign=True)
+
+    thread_id = threading.current_thread().name
+    # Check both native and foreign messages have thread IDs
+    assert console_out.count(f"[{thread_id}]") >= 2
+    assert file_out.count(f"[{thread_id}]") >= 2
+
+
+def test_json_thread_id_in_foreign_logs() -> None:
+    """Verify that foreign logger messages include thread ID in JSON format."""
+    console_out, file_out = _setup_and_log(json_logs=True, foreign=True)
+
+    # Parse and check both outputs
+    console_logs = [json.loads(line) for line in console_out.split("\n") if line]
+    file_logs = [json.loads(line) for line in file_out.split("\n") if line]
+
+    thread_id = threading.current_thread().name
+    for logs in [console_logs, file_logs]:
+        for log in logs:
+            assert "thread_id" in log
+            assert log["thread_id"] == thread_id
