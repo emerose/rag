@@ -785,7 +785,9 @@ class RAGEngine:
                 return str(path), {"success": False, "error": error_msg}
 
         results: dict[str, dict[str, Any]] = {}
-        with ThreadPoolExecutor(max_workers=self.runtime.max_workers) as executor:
+        with ThreadPoolExecutor(
+            max_workers=self.runtime.max_workers, thread_name_prefix="index"
+        ) as executor:
             future_to_file = {
                 executor.submit(worker, Path(f)): f for f in files_to_index
             }
