@@ -124,14 +124,15 @@ class EmbeddingBatcher:
                         len(texts),
                     )
                     return embeddings
-                except (
-                    ValueError,
-                    KeyError,
-                    ConnectionError,
-                    TimeoutError,
-                    OSError,
-                ) as e:
-                    self._log("ERROR", f"Error processing batch: {e}")
+                except Exception as e:
+                    logger.error(
+                        "Error processing batch: %s",
+                        str(e),
+                        exc_info=True,
+                        extra={
+                            "exception_type": type(e).__name__,
+                        },
+                    )
                     return [[] for _ in batch]
 
         stream_batches = stream.iterate(batches)
@@ -170,7 +171,7 @@ class EmbeddingBatcher:
         texts = [doc.page_content for doc in documents]
 
         # Set up progress tracking
-        self.progress_tracker.register_task("embedding", len(texts))
+        await self.progress_tracker.register_task("embedding", len(texts))
 
         # Set up batch processor
         async def process_batch(
@@ -191,19 +192,27 @@ class EmbeddingBatcher:
                 embeddings = self.embedding_provider.embed_texts(batch)
 
                 # Update progress
-                self.progress_tracker.update(
+                current = (await self.progress_tracker.get_progress("embedding"))[0]
+                await self.progress_tracker.update(
                     "embedding",
-                    self.progress_tracker.tasks["embedding"]["current"] + len(batch),
+                    current + len(batch),
                     len(texts),
                 )
-            except (ValueError, KeyError, ConnectionError, TimeoutError, OSError) as e:
-                self._log("ERROR", f"Error processing batch: {e}")
+            except Exception as e:
+                logger.error(
+                    "Error processing batch: %s",
+                    str(e),
+                    exc_info=True,
+                    extra={
+                        "exception_type": type(e).__name__,
+                    },
+                )
                 # Return empty embeddings on error
                 return [[] for _ in batch]
             else:
                 return embeddings
 
-        # Create batch processor
+        # Create batch processor with the same concurrency as the embedding batcher
         batch_processor = AsyncBatchProcessor(
             processor_func=process_batch,
             max_concurrency=self.concurrency,
@@ -218,7 +227,7 @@ class EmbeddingBatcher:
 
         finally:
             # Complete progress tracking
-            self.progress_tracker.complete_task("embedding")
+            await self.progress_tracker.complete_task("embedding")
 
     def process_embeddings(self, documents: list[Document]) -> list[list[float]]:
         """Process embeddings for documents synchronously.
@@ -257,8 +266,15 @@ class EmbeddingBatcher:
                 # Update progress
                 self.progress_tracker.update("embedding", i + len(batch), len(texts))
 
-            except (ValueError, KeyError, ConnectionError, TimeoutError, OSError) as e:
-                self._log("ERROR", f"Error processing batch: {e}")
+            except Exception as e:
+                logger.error(
+                    "Error processing batch: %s",
+                    str(e),
+                    exc_info=True,
+                    extra={
+                        "exception_type": type(e).__name__,
+                    },
+                )
                 # Add empty embeddings on error
                 embeddings.extend([[] for _ in batch])
 
