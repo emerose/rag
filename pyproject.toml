@@ -41,6 +41,7 @@ dependencies = [
     "datasets>=2.18.0",
     "pyyaml>=6.0",
     "fastmcp>=2.5.1",
+    "limits>=4.2",
 ]
 requires-python = ">=3.10"
 readme = "README.md"

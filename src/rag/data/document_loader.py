@@ -4,6 +4,7 @@ This module provides functionality for loading documents based on their MIME typ
 extracting text and metadata, and preparing them for processing.
 """
 
+import asyncio
 import logging
 from pathlib import Path
 from typing import Any
@@ -169,7 +170,21 @@ class DocumentLoader:
             loader = self.get_loader_for_file(file_path)
             self.last_loader_name = loader.__class__.__name__
             self._log("DEBUG", f"Loading document: {file_path}")
-            docs = loader.load()
+
+            # Handle both sync and async loaders
+            if hasattr(loader, "aload"):
+                # Create a new event loop if we're not in one
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                # Run the async loader
+                docs = loop.run_until_complete(loader.aload())
+            else:
+                # Use the sync loader
+                docs = loader.load()
 
             # Add file metadata to each document
             self._enhance_document_metadata(docs, file_path)
@@ -198,19 +213,17 @@ class DocumentLoader:
         Args:
             docs: List of documents to enhance
             file_path: Path to the source file
-
         """
         file_path = Path(file_path)
-        file_metadata = self.filesystem_manager.get_file_metadata(file_path)
-
         for doc in docs:
-            # Ensure metadata dictionary exists
-            if not hasattr(doc, "metadata") or doc.metadata is None:
-                doc.metadata = {}
-
-            # Add file metadata
-            doc.metadata["source"] = str(file_path)
-            doc.metadata["source_type"] = file_metadata["source_type"]
-            doc.metadata["file_size"] = file_metadata["size"]
-            doc.metadata["mtime"] = file_metadata["mtime"]
-            doc.metadata["content_hash"] = file_metadata["content_hash"]
+            # Add file metadata if not already present
+            if "source" not in doc.metadata:
+                doc.metadata["source"] = str(file_path)
+            if "file_name" not in doc.metadata:
+                doc.metadata["file_name"] = file_path.name
+            if "file_type" not in doc.metadata:
+                doc.metadata["file_type"] = self.filesystem_manager.get_file_type(
+                    file_path
+                )
+            if "loader_name" not in doc.metadata:
+                doc.metadata["loader_name"] = self.last_loader_name
