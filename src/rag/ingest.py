@@ -4,6 +4,7 @@ This module provides a dedicated layer for document ingestion, handling
 file loading, text extraction, chunking, and metadata enhancement.
 """
 
+import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -17,6 +18,7 @@ from langchain_core.documents import Document
 
 from rag.data.document_loader import DocumentLoader
 from rag.storage.filesystem import FilesystemManager
+from rag.utils.async_utils import get_optimal_concurrency
 from rag.utils.logging_utils import log_message
 
 from .utils.progress_tracker import ProgressTracker
@@ -206,14 +208,14 @@ class IngestManager:
             log_callback,
         )
 
-    def _log(self, level: str, message: str) -> None:
+    def _log(self, level: str, message: str, task_id: str | None = None) -> None:
         """Log a message.
 
         Args:
             level: Log level (INFO, WARNING, ERROR, etc.)
             message: The log message
         """
-        log_message(level, message, "IngestManager", self.log_callback)
+        log_message(level, message, "IngestManager", self.log_callback, task_id)
 
     def _apply_preprocessor(self, documents: list[Document]) -> list[Document]:
         """Apply preprocessor to all documents.
@@ -448,5 +450,38 @@ class IngestManager:
             "INFO",
             f"Processed {successful}/{len(files)} files, generated {total_chunks} chunks",
         )
+
+        return results
+
+    async def ingest_file_async(self, file_path: Path | str) -> IngestResult:
+        """Asynchronously ingest a single file."""
+
+        return await asyncio.to_thread(self.ingest_file, file_path)
+
+    async def ingest_directory_async(
+        self, directory: Path | str
+    ) -> dict[str, IngestResult]:
+        """Asynchronously ingest all files in a directory."""
+
+        directory = Path(directory)
+        if not self.filesystem_manager.validate_documents_dir(directory):
+            self._log("ERROR", f"Invalid documents directory: {directory}")
+            return {}
+
+        files = self.filesystem_manager.scan_directory(directory)
+        if self.file_filter:
+            files = [f for f in files if self.file_filter(f)]
+
+        results: dict[str, IngestResult] = {}
+
+        semaphore = asyncio.Semaphore(get_optimal_concurrency())
+
+        async def process(path: Path) -> None:
+            async with semaphore:
+                result = await self.ingest_file_async(path)
+                results[str(path)] = result
+
+        tasks = [asyncio.create_task(process(f)) for f in files]
+        await asyncio.gather(*tasks)
 
         return results

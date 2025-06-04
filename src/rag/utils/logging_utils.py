@@ -319,10 +319,17 @@ def log_message(
     message: str,
     subsystem: str = "RAG",
     callback: Callable[[str, str, str], None] | None = None,
+    task_id: str | None = None,
 ) -> None:
     """Log a message and optionally send it to a callback."""
     log_level = getattr(logging, level.upper(), logging.INFO)
-    logger.log(log_level, message, subsystem=subsystem, stacklevel=3)
+    logger.log(
+        log_level,
+        message,
+        subsystem=subsystem,
+        stacklevel=3,
+        extra={"task_id": task_id} if task_id else None,
+    )
 
     if callback:
         try:

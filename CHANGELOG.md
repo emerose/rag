@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `summarize`: Table of document summaries
     - `cleanup`: Summary of removed files
 - BEIR dataset uploader script for LangSmith integration
+- Asynchronous batch indexing for multiple files with OpenAI rate limiting
 - Evaluation framework design sketch in docs; updated to use OpenEvals for
   subsystem metrics
 - Initial retrieval evaluator indexing the BEIR Scifact dataset
