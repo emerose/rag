@@ -151,7 +151,13 @@ class RAGEngine:
         config = RAGConfig(documents_dir=documents_dir, cache_dir=cache_dir)
         return cls(config)
 
-    def _log(self, level: str, message: str, subsystem: str = "RAGEngine") -> None:
+    def _log(
+        self,
+        level: str,
+        message: str,
+        subsystem: str = "RAGEngine",
+        task_id: str | None = None,
+    ) -> None:
         """Log a message.
 
         Args:
@@ -160,7 +166,7 @@ class RAGEngine:
             subsystem: The subsystem generating the log
 
         """
-        log_message(level, message, subsystem, self.runtime.log_callback)
+        log_message(level, message, subsystem, self.runtime.log_callback, task_id)
 
     def _validate_api_key(self) -> None:
         """Ensure the OpenAI API key is configured."""
@@ -809,6 +815,44 @@ class RAGEngine:
         # Summary
         success_count = sum(1 for r in results.values() if r.get("success"))
         self._log("DEBUG", f"Indexed {success_count}/{len(results)} files successfully")
+
+        return results
+
+    async def index_directory_async(
+        self,
+        directory: Path | str | None = None,
+        *,
+        progress_callback: Callable[[str, Path, str | None], None] | None = None,
+    ) -> dict[str, dict[str, Any]]:
+        """Asynchronously index all files in a directory."""
+
+        directory = Path(directory).resolve() if directory else self.documents_dir
+        self._log("DEBUG", f"Indexing directory asynchronously: {directory}")
+
+        if not self.filesystem_manager.validate_documents_dir(directory):
+            self._log("ERROR", f"Invalid documents directory: {directory}")
+            return {}
+
+        files = self.filesystem_manager.scan_directory(directory)
+
+        semaphore = asyncio.Semaphore(self.runtime.max_workers)
+        results: dict[str, dict[str, Any]] = {}
+
+        async def process(path: Path) -> None:
+            async with semaphore:
+                success, error = await asyncio.to_thread(
+                    self.index_file,
+                    path,
+                    progress_callback=progress_callback,
+                )
+                results[str(path)] = {"success": success}
+                if error:
+                    results[str(path)]["error"] = error
+
+        tasks = [asyncio.create_task(process(p)) for p in files]
+        await asyncio.gather(*tasks)
+
+        self.cache_manager.cleanup_invalid_caches()
 
         return results
 

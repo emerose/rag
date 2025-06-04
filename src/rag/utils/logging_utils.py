@@ -39,7 +39,9 @@ class RAGLogger:
         **kwargs: Any,
     ) -> None:
         """Log a message with optional subsystem context."""
-        extra = kwargs.pop("extra", {})
+        extra = kwargs.pop("extra", None)
+        if not isinstance(extra, dict):
+            extra = {}
         extra["subsystem"] = subsystem
         stacklevel = kwargs.pop("stacklevel", 1)
         self._base_logger.log(
@@ -47,7 +49,7 @@ class RAGLogger:
             msg,
             *args,
             extra=extra,
-            stacklevel=stacklevel + 1,
+            stacklevel=stacklevel,
             **kwargs,
         )
 
@@ -319,10 +321,18 @@ def log_message(
     message: str,
     subsystem: str = "RAG",
     callback: Callable[[str, str, str], None] | None = None,
+    task_id: str | None = None,
 ) -> None:
     """Log a message and optionally send it to a callback."""
     log_level = getattr(logging, level.upper(), logging.INFO)
-    logger.log(log_level, message, subsystem=subsystem, stacklevel=3)
+    extra = {} if task_id is None else {"task_id": task_id}
+    logger.log(
+        log_level,
+        message,
+        subsystem=subsystem,
+        stacklevel=3,
+        extra=extra,
+    )
 
     if callback:
         try:
