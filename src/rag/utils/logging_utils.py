@@ -20,6 +20,40 @@ from structlog.processors import CallsiteParameter, CallsiteParameterAdder
 logging.getLogger().addHandler(logging.NullHandler())
 
 
+class DemoteFilter(logging.Filter):
+    """Filter to demote noisy logs to DEBUG level."""
+
+    def __init__(self, http_loggers: list[str], pdf_loggers: list[str]) -> None:
+        """Initialize the filter.
+
+        Args:
+            http_loggers: List of HTTP client logger names
+            pdf_loggers: List of PDF processing logger names
+        """
+        super().__init__()
+        self.http_loggers = http_loggers
+        self.pdf_loggers = pdf_loggers
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Demote noisy logs to DEBUG."""
+        name = record.name.split(".")[0]
+        # Demote HTTP client INFO logs to DEBUG
+        if name in self.http_loggers and record.levelno == logging.INFO:
+            record.levelno = logging.DEBUG
+            record.levelname = "DEBUG"
+        # Demote PDFMiner and Unstructured WARNING logs to DEBUG
+        if name in self.pdf_loggers and record.levelno == logging.WARNING:
+            # Demote all PDFMiner warnings
+            if name == "pdfminer":
+                record.levelno = logging.DEBUG
+                record.levelname = "DEBUG"
+            # Demote all Unstructured warnings
+            elif name == "unstructured":
+                record.levelno = logging.DEBUG
+                record.levelname = "DEBUG"
+        return True
+
+
 class RAGLogger:
     """Simple logger adapter that supports structured extras."""
 
@@ -165,24 +199,17 @@ def setup_logging(
     http_loggers = ["httpx", "urllib3", "requests"]
     pdf_loggers = ["pdfminer", "unstructured"]
 
-    for name in http_loggers:
-        logging.getLogger(name).setLevel(logging.WARNING)
-    for name in pdf_loggers:
-        logging.getLogger(name).setLevel(logging.ERROR)
+    # Create and add the demotion filter
+    demote_filter = DemoteFilter(http_loggers, pdf_loggers)
+    root_logger.addFilter(demote_filter)
 
-    class DemoteFilter(logging.Filter):
-        def filter(self, record: logging.LogRecord) -> bool:
-            """Demote noisy logs to DEBUG."""
-            name = record.name.split(".")[0]
-            if name in http_loggers and record.levelno == logging.INFO:
-                record.levelno = logging.DEBUG
-                record.levelname = "DEBUG"
-            if name in pdf_loggers and record.levelno == logging.WARNING:
-                record.levelno = logging.DEBUG
-                record.levelname = "DEBUG"
-            return True
-
-    root_logger.addFilter(DemoteFilter())
+    # Apply filter to specific loggers
+    for name in http_loggers + pdf_loggers:
+        logger = logging.getLogger(name)
+        logger.handlers = []  # Remove any existing handlers
+        logger.propagate = True  # Ensure messages propagate to root logger
+        logger.setLevel(log_level)  # Set the same level as root logger
+        logger.addFilter(demote_filter)  # Add filter directly to the logger
 
     timestamper = structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S")
     callsite = CallsiteParameterAdder(

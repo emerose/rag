@@ -5,11 +5,15 @@ with error handling and retry logic.
 """
 
 import logging
+import time
 from collections.abc import Callable
 from typing import TypeAlias
 
 from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
+from limits import RateLimitItemPerMinute
+from limits.storage import MemoryStorage
+from limits.strategies import MovingWindowRateLimiter
 
 # Update OpenAI error imports for newer OpenAI library versions
 try:
@@ -33,6 +37,66 @@ logger = logging.getLogger(__name__)
 
 # TypeAlias for log callback function
 LogCallback: TypeAlias = Callable[[str, str, str], None]
+
+
+class DynamicRateLimiter:
+    """Rate limiter that adapts to OpenAI's rate limits.
+
+    This class uses OpenAI's rate limit headers to dynamically adjust
+    the rate limiting strategy.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the dynamic rate limiter."""
+        self._limiter = MovingWindowRateLimiter(MemoryStorage())
+        self._rate_limit = RateLimitItemPerMinute(
+            60
+        )  # Default, will be updated from headers
+        self._last_update = 0
+        self._update_interval = 60  # Update limits every minute
+
+    def update_limits(self, headers: dict[str, str]) -> None:
+        """Update rate limits from response headers.
+
+        Args:
+            headers: Response headers from OpenAI API
+        """
+        current_time = time.time()
+        if current_time - self._last_update < self._update_interval:
+            return
+
+        try:
+            # Get rate limits from headers
+            requests_per_minute = int(headers.get("x-ratelimit-limit-requests", "60"))
+            reset_time = int(headers.get("x-ratelimit-reset-requests", "60"))
+
+            # Update the rate limit
+            self._rate_limit = RateLimitItemPerMinute(requests_per_minute)
+            self._last_update = current_time
+            self._update_interval = reset_time
+
+            logger.debug(
+                "Updated rate limits: %d requests/minute, reset in %d seconds",
+                requests_per_minute,
+                reset_time,
+            )
+        except (ValueError, KeyError) as e:
+            logger.warning("Failed to parse rate limit headers: %s", e)
+
+    def hit(self, key: str) -> bool:
+        """Check if we can make a request.
+
+        Args:
+            key: Rate limit key
+
+        Returns:
+            True if we can make a request, False otherwise
+        """
+        return self._limiter.hit(self._rate_limit, key)
+
+    def sleep(self) -> None:
+        """Sleep until we can make another request."""
+        time.sleep(1)  # Simple sleep, the limiter will handle the actual timing
 
 
 class EmbeddingProvider:
@@ -72,6 +136,9 @@ class EmbeddingProvider:
 
         # Store the model's embedding dimension
         self._embedding_dimension = self._get_embedding_dimension()
+
+        # Initialize dynamic rate limiter
+        self._rate_limiter = DynamicRateLimiter()
 
     def _log(self, level: str, message: str) -> None:
         """Log a message.
@@ -151,10 +218,28 @@ class EmbeddingProvider:
 
         self._log("DEBUG", f"Generating embeddings for {len(texts)} texts")
 
+        # Wait for rate limit if needed
+        while not self._rate_limiter.hit("embedding"):
+            self._log("DEBUG", "Rate limit reached, waiting...")
+            self._rate_limiter.sleep()
+
         try:
             embeddings = self.embeddings.embed_documents(texts)
+            # Update rate limits from response headers if available
+            if hasattr(self.embeddings, "_client") and hasattr(
+                self.embeddings._client, "last_response"
+            ):
+                self._rate_limiter.update_limits(
+                    self.embeddings._client.last_response.headers
+                )
             self._log("DEBUG", f"Successfully embedded {len(texts)} texts")
-        except (RateLimitError, APIError, APIConnectionError) as e:
+        except RateLimitError as e:
+            self._log(
+                "WARNING",
+                f"Rate limit hit during embedding generation: {e}. Retrying...",
+            )
+            raise  # Let tenacity retry
+        except (APIError, APIConnectionError) as e:
             self._log(
                 "WARNING",
                 f"API error during embedding generation: {e}. Retrying...",
@@ -188,10 +273,27 @@ class EmbeddingProvider:
         """
         self._log("DEBUG", "Embedding query")
 
+        # Wait for rate limit if needed
+        while not self._rate_limiter.hit("embedding"):
+            self._log("DEBUG", "Rate limit reached, waiting...")
+            self._rate_limiter.sleep()
+
         try:
             embedding = self.embeddings.embed_query(query)
+            # Update rate limits from response headers if available
+            if hasattr(self.embeddings, "_client") and hasattr(
+                self.embeddings._client, "last_response"
+            ):
+                self._rate_limiter.update_limits(
+                    self.embeddings._client.last_response.headers
+                )
             self._log("DEBUG", "Successfully embedded query")
-        except (RateLimitError, APIError, APIConnectionError) as e:
+        except RateLimitError as e:
+            self._log(
+                "WARNING", f"Rate limit hit during query embedding: {e}. Retrying..."
+            )
+            raise  # Let tenacity retry
+        except (APIError, APIConnectionError) as e:
             self._log("WARNING", f"API error during query embedding: {e}. Retrying...")
             raise  # Let tenacity retry
         except (ValueError, TypeError) as e:
