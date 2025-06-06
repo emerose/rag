@@ -19,18 +19,19 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
-from rag.storage.protocols import VectorStoreProtocol
+from rag.storage.protocols import VectorRepositoryProtocol, VectorStoreProtocol
 from rag.utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
 
 
-class VectorStoreManager:
+class VectorStoreManager(VectorRepositoryProtocol):
     """Manages vector stores for the RAG system.
 
     This class provides methods for creating, loading, saving and querying
     vector stores through a pluggable backend implementing
-    :class:`VectorStoreProtocol`.
+    :class:`VectorStoreProtocol`. Implements the VectorRepositoryProtocol
+    for dependency injection compatibility.
     """
 
     def __init__(  # noqa: PLR0913
