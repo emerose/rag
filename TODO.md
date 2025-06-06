@@ -1,7 +1,7 @@
 ## 🚀 Next
 
 ### Testability Refactoring
-- Extract EmbeddingServiceProtocol interface from EmbeddingProvider
+- ✅ Extract EmbeddingServiceProtocol interface from EmbeddingProvider
 - Extract FileSystemProtocol interface and create in-memory implementation
 - Extract CacheRepositoryProtocol interface from IndexManager
 - Extract VectorRepositoryProtocol interface and enhance existing VectorStoreProtocol
