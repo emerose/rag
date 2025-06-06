@@ -16,7 +16,7 @@ from rag.utils.async_utils import AsyncBatchProcessor, get_optimal_concurrency
 from rag.utils.logging_utils import log_message
 from rag.utils.progress_tracker import ProgressTracker
 
-from .embedding_provider import EmbeddingProvider
+from .protocols import EmbeddingServiceProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class EmbeddingBatcher:
 
     def __init__(
         self,
-        embedding_provider: EmbeddingProvider,
+        embedding_provider: EmbeddingServiceProtocol,
         max_concurrency: int | None = None,
         initial_batch_size: int = 20,
         log_callback: Any | None = None,

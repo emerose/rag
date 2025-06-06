@@ -29,16 +29,19 @@ from tenacity import (
 
 from rag.utils.logging_utils import log_message
 
+from .protocols import EmbeddingServiceProtocol
+
 logger = logging.getLogger(__name__)
 
 # TypeAlias for log callback function
 LogCallback: TypeAlias = Callable[[str, str, str], None]
 
 
-class EmbeddingProvider:
+class EmbeddingProvider(EmbeddingServiceProtocol):
     """Provides embedding generation functionality.
 
     This class encapsulates embedding generation with error handling and retry logic.
+    Implements the EmbeddingServiceProtocol for dependency injection compatibility.
     """
 
     def __init__(
