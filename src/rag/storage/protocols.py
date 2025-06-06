@@ -97,3 +97,192 @@ class FileSystemProtocol(Protocol):
         Returns:
             True if the directory is valid, False otherwise
         """
+
+
+@runtime_checkable
+class CacheRepositoryProtocol(Protocol):
+    """Protocol for cache and metadata repository operations in the RAG system.
+
+    This protocol defines the interface for storing and retrieving document metadata,
+    chunk hashes, and global settings. It enables dependency injection and
+    facilitates testing with in-memory implementations.
+    """
+
+    def compute_file_hash(self, file_path: Path) -> str:
+        """Compute the SHA-256 hash of a file.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            SHA-256 hash as a hex string
+        """
+
+    def compute_text_hash(self, text: str) -> str:
+        """Compute the SHA-256 hash of a text string.
+
+        Args:
+            text: Text content
+
+        Returns:
+            SHA-256 hash as a hex string
+        """
+
+    def needs_reindexing(
+        self,
+        file_path: Path,
+        chunk_size: int,
+        chunk_overlap: int,
+        embedding_model: str,
+        embedding_model_version: str,
+    ) -> bool:
+        """Check if a file needs to be reindexed.
+
+        Args:
+            file_path: Path to the file
+            chunk_size: Current chunk size setting
+            chunk_overlap: Current chunk overlap setting
+            embedding_model: Current embedding model name
+            embedding_model_version: Current embedding model version
+
+        Returns:
+            True if the file needs reindexing, False otherwise
+        """
+
+    def update_metadata(
+        self,
+        file_path: Path,
+        file_hash: str,
+        chunk_size: int,
+        chunk_overlap: int,
+        last_modified: float,
+        indexed_at: float,
+        embedding_model: str,
+        embedding_model_version: str,
+        file_type: str,
+        num_chunks: int,
+        file_size: int,
+        document_loader: str | None = None,
+        tokenizer: str | None = None,
+        text_splitter: str | None = None,
+    ) -> None:
+        """Update metadata for a file.
+
+        Args:
+            file_path: Path to the file
+            file_hash: SHA-256 hash of the file
+            chunk_size: Size of text chunks
+            chunk_overlap: Overlap between chunks
+            last_modified: File modification time
+            indexed_at: Time when file was indexed
+            embedding_model: Name of embedding model used
+            embedding_model_version: Version of embedding model
+            file_type: MIME type of the file
+            num_chunks: Number of chunks the file was split into
+            file_size: Size of the file in bytes
+            document_loader: Document loader used (optional)
+            tokenizer: Tokenizer used (optional)
+            text_splitter: Text splitter used (optional)
+        """
+
+    def get_metadata(self, file_path: Path) -> dict[str, Any] | None:
+        """Get metadata for a file.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            Dictionary containing file metadata, or None if not found
+        """
+
+    def remove_metadata(self, file_path: Path) -> None:
+        """Remove metadata for a file.
+
+        Args:
+            file_path: Path to the file
+        """
+
+    def update_chunk_hashes(self, file_path: Path, chunk_hashes: list[str]) -> None:
+        """Update chunk hashes for a file.
+
+        Args:
+            file_path: Path to the file
+            chunk_hashes: List of SHA-256 hashes for each chunk
+        """
+
+    def get_chunk_hashes(self, file_path: Path) -> list[str]:
+        """Get chunk hashes for a file.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            List of SHA-256 hashes for each chunk
+        """
+
+    def update_file_metadata(
+        self,
+        file_path: str,
+        size: int,
+        mtime: float,
+        content_hash: str,
+        source_type: str | None = None,
+        chunks_total: int | None = None,
+        modified_at: float | None = None,
+    ) -> None:
+        """Update file metadata.
+
+        Args:
+            file_path: Path to the file as string
+            size: File size in bytes
+            mtime: File modification time
+            content_hash: SHA-256 hash of file content
+            source_type: MIME type (optional)
+            chunks_total: Total number of chunks (optional)
+            modified_at: When metadata was modified (optional)
+        """
+
+    def get_file_metadata(self, file_path: str | Path) -> dict[str, Any] | None:
+        """Get file metadata.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            Dictionary containing file metadata, or None if not found
+        """
+
+    def get_all_file_metadata(self) -> dict[str, dict[str, Any]]:
+        """Get metadata for all files.
+
+        Returns:
+            Dictionary mapping file paths to their metadata
+        """
+
+    def set_global_setting(self, key: str, value: str) -> None:
+        """Set a global setting.
+
+        Args:
+            key: Setting key
+            value: Setting value
+        """
+
+    def get_global_setting(self, key: str) -> str | None:
+        """Get a global setting.
+
+        Args:
+            key: Setting key
+
+        Returns:
+            Setting value, or None if not found
+        """
+
+    def list_indexed_files(self) -> list[dict[str, Any]]:
+        """List all indexed files.
+
+        Returns:
+            List of dictionaries containing file information
+        """
+
+    def clear_all_file_metadata(self) -> None:
+        """Clear all file metadata."""
