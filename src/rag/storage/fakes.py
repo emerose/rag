@@ -6,7 +6,14 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
-from .protocols import CacheRepositoryProtocol, FileSystemProtocol
+from langchain_core.documents import Document
+
+from .protocols import (
+    CacheRepositoryProtocol,
+    FileSystemProtocol,
+    VectorRepositoryProtocol,
+    VectorStoreProtocol,
+)
 
 
 class InMemoryFileSystem(FileSystemProtocol):
@@ -442,3 +449,230 @@ class InMemoryCacheRepository(CacheRepositoryProtocol):
     def clear_all_file_metadata(self) -> None:
         """Clear all file metadata."""
         self.file_metadata.clear()
+
+
+class InMemoryVectorStore(VectorStoreProtocol):
+    """In-memory vector store implementation for testing.
+
+    This fake implementation provides deterministic vector storage operations
+    without FAISS, enabling fast and reliable unit tests.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the in-memory vector store."""
+        self.documents: list[Document] = []
+        self.embeddings: list[list[float]] = []
+        self._index_to_docstore_id: dict[int, str] = {}
+        self._docstore: dict[str, Document] = {}
+
+    def as_retriever(self, *, search_type: str, search_kwargs: dict[str, Any]) -> Any:
+        """Return a retriever instance."""
+
+        # For testing, return a simple mock retriever
+        class MockRetriever:
+            def __init__(self, vectorstore: InMemoryVectorStore) -> None:
+                self.vectorstore = vectorstore
+
+            def get_relevant_documents(self, query: str) -> list[Document]:
+                return self.vectorstore.similarity_search(query)
+
+        return MockRetriever(self)
+
+    def similarity_search(self, query: str, k: int = 4) -> list[Document]:
+        """Return documents similar to the query."""
+        # For testing, just return the first k documents
+        return self.documents[:k]
+
+    def save_local(self, folder_path: str, index_name: str) -> None:
+        """Persist the vector store to disk."""
+        # For testing, this is a no-op
+        pass
+
+    @property
+    def index(self) -> Any:
+        """Get the underlying index (e.g., FAISS index)."""
+
+        # Return a mock index object for testing
+        class MockIndex:
+            def __init__(self, vectorstore: InMemoryVectorStore) -> None:
+                self.vectorstore = vectorstore
+
+            @property
+            def ntotal(self) -> int:
+                return len(self.vectorstore.documents)
+
+            def add(self, embeddings: Any) -> None:
+                # For testing, just store the count
+                pass
+
+            def reconstruct(self, idx: int) -> list[float]:
+                if idx < len(self.vectorstore.embeddings):
+                    return self.vectorstore.embeddings[idx]
+                return [0.0] * 384  # Default embedding dimension
+
+        return MockIndex(self)
+
+    @property
+    def docstore(self) -> Any:
+        """Get the document store."""
+        return self._docstore
+
+    @property
+    def index_to_docstore_id(self) -> dict[int, str]:
+        """Get mapping from index positions to document store IDs."""
+        return self._index_to_docstore_id
+
+    def add_documents(
+        self, documents: list[Document], embeddings: list[list[float]]
+    ) -> None:
+        """Add documents and embeddings to the store."""
+        start_idx = len(self.documents)
+        self.documents.extend(documents)
+        self.embeddings.extend(embeddings)
+
+        for i, doc in enumerate(documents):
+            doc_id = str(start_idx + i)
+            self._docstore[doc_id] = doc
+            self._index_to_docstore_id[start_idx + i] = doc_id
+
+
+class InMemoryVectorRepository(VectorRepositoryProtocol):
+    """In-memory vector repository implementation for testing.
+
+    This fake implementation provides deterministic vector repository operations
+    without file I/O or FAISS, enabling fast and reliable unit tests.
+    """
+
+    def __init__(self) -> None:
+        """Initialize the in-memory vector repository."""
+        self.stored_vectorstores: dict[str, InMemoryVectorStore] = {}
+
+    def get_cache_path(self, file_path: str) -> Path:
+        """Get the cache path for a file.
+
+        Args:
+            file_path: Path to the source file
+
+        Returns:
+            Path to the cache directory for the file
+        """
+        return Path(f"/fake/cache/{file_path}")
+
+    def load_vectorstore(self, file_path: str) -> VectorStoreProtocol | None:
+        """Load a vector store from cache.
+
+        Args:
+            file_path: Path to the source file
+
+        Returns:
+            Vector store if found and loaded successfully, None otherwise
+        """
+        return self.stored_vectorstores.get(file_path)
+
+    def save_vectorstore(
+        self, file_path: str, vectorstore: VectorStoreProtocol
+    ) -> bool:
+        """Save a vector store to cache.
+
+        Args:
+            file_path: Path to the source file
+            vectorstore: Vector store to save
+
+        Returns:
+            True if successful, False otherwise
+        """
+        # For testing, we can only store our fake vector stores
+        if isinstance(vectorstore, InMemoryVectorStore):
+            self.stored_vectorstores[file_path] = vectorstore
+            return True
+        return False
+
+    def create_vectorstore(self, documents: list[Document]) -> VectorStoreProtocol:
+        """Create a new vector store from documents.
+
+        Args:
+            documents: List of documents to add to the vector store
+
+        Returns:
+            Vector store containing the documents
+        """
+        vectorstore = InMemoryVectorStore()
+        if documents:
+            # Create dummy embeddings for testing
+            embeddings = [[0.1, 0.2, 0.3] for _ in documents]
+            vectorstore.add_documents(documents, embeddings)
+        return vectorstore
+
+    def create_empty_vectorstore(self) -> VectorStoreProtocol:
+        """Create an empty vector store.
+
+        Returns:
+            Empty vector store
+        """
+        return InMemoryVectorStore()
+
+    def add_documents_to_vectorstore(
+        self,
+        vectorstore: VectorStoreProtocol | None,
+        documents: list[Document],
+        embeddings: list[list[float]],
+    ) -> VectorStoreProtocol:
+        """Add documents to a vector store.
+
+        Args:
+            vectorstore: Existing vector store or None to create a new one
+            documents: Documents to add
+            embeddings: Pre-computed embeddings for the documents
+
+        Returns:
+            Updated vector store
+        """
+        if vectorstore is None:
+            vectorstore = self.create_empty_vectorstore()
+
+        if isinstance(vectorstore, InMemoryVectorStore) and documents:
+            vectorstore.add_documents(documents, embeddings)
+
+        return vectorstore
+
+    def merge_vectorstores(
+        self, vectorstores: list[VectorStoreProtocol]
+    ) -> VectorStoreProtocol:
+        """Merge multiple vector stores into one.
+
+        Args:
+            vectorstores: List of vector stores to merge
+
+        Returns:
+            Merged vector store containing all documents
+        """
+        merged = InMemoryVectorStore()
+
+        for vs in vectorstores:
+            if isinstance(vs, InMemoryVectorStore):
+                merged.documents.extend(vs.documents)
+                merged.embeddings.extend(vs.embeddings)
+
+                # Update mappings
+                start_idx = len(merged._index_to_docstore_id)
+                for i, doc in enumerate(vs.documents):
+                    doc_id = str(start_idx + i)
+                    merged._docstore[doc_id] = doc
+                    merged._index_to_docstore_id[start_idx + i] = doc_id
+
+        return merged
+
+    def similarity_search(
+        self, vectorstore: VectorStoreProtocol, query: str, k: int = 4
+    ) -> list[Document]:
+        """Search for similar documents in a vector store.
+
+        Args:
+            vectorstore: Vector store to search
+            query: Query text
+            k: Number of results to return
+
+        Returns:
+            List of similar documents
+        """
+        return vectorstore.similarity_search(query, k)

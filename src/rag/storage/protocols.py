@@ -10,7 +10,12 @@ from langchain_core.documents import Document
 
 @runtime_checkable
 class VectorStoreProtocol(Protocol):
-    """Minimal protocol for vector store implementations."""
+    """Protocol for vector store implementations.
+
+    This protocol defines the interface that vector stores must implement
+    to be used within the RAG system. It enables dependency injection and
+    facilitates testing with fake implementations.
+    """
 
     def as_retriever(self, *, search_type: str, search_kwargs: dict[str, Any]) -> Any:
         """Return a retriever instance."""
@@ -20,6 +25,122 @@ class VectorStoreProtocol(Protocol):
 
     def save_local(self, folder_path: str, index_name: str) -> None:
         """Persist the vector store to disk."""
+
+    # Enhanced interface for better compatibility
+    @property
+    def index(self) -> Any:
+        """Get the underlying index (e.g., FAISS index)."""
+
+    @property
+    def docstore(self) -> Any:
+        """Get the document store."""
+
+    @property
+    def index_to_docstore_id(self) -> dict[int, str]:
+        """Get mapping from index positions to document store IDs."""
+
+
+@runtime_checkable
+class VectorRepositoryProtocol(Protocol):
+    """Protocol for vector repository operations in the RAG system.
+
+    This protocol defines the interface for managing vector stores including
+    creation, loading, saving, and querying operations. It enables dependency
+    injection and facilitates testing with fake implementations.
+    """
+
+    def get_cache_path(self, file_path: str) -> Path:
+        """Get the cache path for a file.
+
+        Args:
+            file_path: Path to the source file
+
+        Returns:
+            Path to the cache directory for the file
+        """
+
+    def load_vectorstore(self, file_path: str) -> VectorStoreProtocol | None:
+        """Load a vector store from cache.
+
+        Args:
+            file_path: Path to the source file
+
+        Returns:
+            Vector store if found and loaded successfully, None otherwise
+        """
+
+    def save_vectorstore(
+        self, file_path: str, vectorstore: VectorStoreProtocol
+    ) -> bool:
+        """Save a vector store to cache.
+
+        Args:
+            file_path: Path to the source file
+            vectorstore: Vector store to save
+
+        Returns:
+            True if successful, False otherwise
+        """
+
+    def create_vectorstore(self, documents: list[Document]) -> VectorStoreProtocol:
+        """Create a new vector store from documents.
+
+        Args:
+            documents: List of documents to add to the vector store
+
+        Returns:
+            Vector store containing the documents
+        """
+
+    def create_empty_vectorstore(self) -> VectorStoreProtocol:
+        """Create an empty vector store.
+
+        Returns:
+            Empty vector store
+        """
+
+    def add_documents_to_vectorstore(
+        self,
+        vectorstore: VectorStoreProtocol | None,
+        documents: list[Document],
+        embeddings: list[list[float]],
+    ) -> VectorStoreProtocol:
+        """Add documents to a vector store.
+
+        Args:
+            vectorstore: Existing vector store or None to create a new one
+            documents: Documents to add
+            embeddings: Pre-computed embeddings for the documents
+
+        Returns:
+            Updated vector store
+        """
+
+    def merge_vectorstores(
+        self, vectorstores: list[VectorStoreProtocol]
+    ) -> VectorStoreProtocol:
+        """Merge multiple vector stores into one.
+
+        Args:
+            vectorstores: List of vector stores to merge
+
+        Returns:
+            Merged vector store containing all documents
+        """
+
+    def similarity_search(
+        self, vectorstore: VectorStoreProtocol, query: str, k: int = 4
+    ) -> list[Document]:
+        """Search for similar documents in a vector store.
+
+        Args:
+            vectorstore: Vector store to search
+            query: Query text
+            k: Number of results to return
+
+        Returns:
+            List of similar documents
+        """
 
 
 @runtime_checkable
