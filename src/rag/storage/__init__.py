@@ -4,13 +4,17 @@ This module contains components for cache management, index management,
 vectorstore operations, and filesystem utilities.
 """
 
-from .fakes import InMemoryFileSystem
+from .fakes import InMemoryCacheRepository, InMemoryFileSystem
 from .filesystem import FilesystemManager
-from .protocols import FileSystemProtocol, VectorStoreProtocol
+from .index_manager import IndexManager
+from .protocols import CacheRepositoryProtocol, FileSystemProtocol, VectorStoreProtocol
 
 __all__ = [
+    "CacheRepositoryProtocol",
     "FileSystemProtocol",
     "FilesystemManager",
+    "InMemoryCacheRepository",
     "InMemoryFileSystem",
+    "IndexManager",
     "VectorStoreProtocol",
 ]

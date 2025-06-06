@@ -13,17 +13,20 @@ from typing import Any, TypeAlias
 
 from rag.utils.logging_utils import log_message
 
+from .protocols import CacheRepositoryProtocol
+
 logger = logging.getLogger(__name__)
 
 # TypeAlias for log callback function
 LogCallback: TypeAlias = Callable[[str, str, str], None]
 
 
-class IndexManager:
+class IndexManager(CacheRepositoryProtocol):
     """Manages document index metadata using SQLite.
 
     This class handles storing and retrieving document hashes and metadata
     to enable incremental indexing and vector store management.
+    Implements the CacheRepositoryProtocol for dependency injection compatibility.
     """
 
     def __init__(
