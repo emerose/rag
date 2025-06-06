@@ -11,14 +11,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from langchain_core.documents import Document
 
 # Update LangChain imports to use community packages
 from langchain_openai import ChatOpenAI
 
-from rag.chains.rag_chain import build_rag_chain
+from rag.indexing.document_indexer import DocumentIndexer
+from rag.querying.query_engine import QueryEngine
 from rag.retrieval import KeywordReranker
-from rag.utils.answer_utils import enhance_result
 
 from .config import RAGConfig, RuntimeOptions
 from .data.chunking import SemanticChunkingStrategy
@@ -26,14 +25,13 @@ from .data.document_loader import DocumentLoader
 from .data.text_splitter import TextSplitterFactory
 from .embeddings.batching import EmbeddingBatcher
 from .embeddings.embedding_provider import EmbeddingProvider
-from .embeddings.model_map import get_model_for_path, load_model_map
+from .embeddings.model_map import load_model_map
 from .ingest import BasicPreprocessor, IngestManager
 from .storage.cache_manager import CacheManager
 from .storage.filesystem import FilesystemManager
 from .storage.index_manager import IndexManager
 from .storage.protocols import VectorStoreProtocol
 from .storage.vectorstore import VectorStoreManager
-from .utils.async_utils import run_coro_sync
 from .utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
@@ -167,7 +165,8 @@ class RAGEngine:
 
         if not self.config.openai_api_key:
             raise ValueError(
-                "OpenAI API key is missing. Set the OPENAI_API_KEY environment variable."
+                "OpenAI API key is missing. Set the OPENAI_API_KEY "
+                "environment variable."
             )
 
     def _create_default_config(self) -> RAGConfig:
@@ -206,6 +205,12 @@ class RAGEngine:
 
         # Initialize retrieval components
         self._initialize_retrieval()
+
+        # Initialize document indexing component
+        self._initialize_document_indexer()
+
+        # Initialize query execution component
+        self._initialize_query_engine()
 
         # Initialize vectorstores for already processed files
         self._initialize_vectorstores()
@@ -246,7 +251,8 @@ class RAGEngine:
         # Load cache metadata
         self.cache_metadata = self.cache_manager.load_cache_metadata()
 
-        # Initialize vectorstore manager with safe_deserialization=False since we trust our own cache files
+        # Initialize vectorstore manager with safe_deserialization=False since we trust
+        # our own cache files
         self.vectorstore_manager = VectorStoreManager(
             cache_dir=self.cache_dir,
             embeddings=self.embedding_provider.embeddings,
@@ -282,7 +288,8 @@ class RAGEngine:
 
         self._log(
             "DEBUG",
-            f"Using embedding model: {self.config.embedding_model} (version: {self.embedding_model_version})",
+            f"Using embedding model: {self.config.embedding_model} "
+            f"(version: {self.embedding_model_version})",
         )
 
     def _load_embedding_model_map(self) -> None:
@@ -298,32 +305,6 @@ class RAGEngine:
             self.embedding_model_map = {}
             self._log("WARNING", f"Failed to load embedding model map: {exc}")
 
-    def _embedding_model_for_file(self, file_path: Path) -> str:
-        """Return embedding model for *file_path* based on the loaded map."""
-        return get_model_for_path(
-            file_path, self.embedding_model_map, self.config.embedding_model
-        )
-
-    def _get_embedding_tools(
-        self, model_name: str
-    ) -> tuple[EmbeddingProvider, EmbeddingBatcher]:
-        """Return embedding provider and batcher for *model_name*."""
-        provider = getattr(self, "embedding_provider", None)
-        batcher = getattr(self, "embedding_batcher", None)
-
-        if model_name != self.config.embedding_model or batcher is None:
-            provider = EmbeddingProvider(
-                model_name=model_name,
-                openai_api_key=self.config.openai_api_key,
-                log_callback=self.runtime.log_callback,
-            )
-            batcher = EmbeddingBatcher(
-                embedding_provider=provider,
-                log_callback=self.runtime.log_callback,
-                progress_callback=self.runtime.progress_callback,
-            )
-
-        return provider, batcher
 
     def _initialize_document_processing(self) -> None:
         """Initialize document processing components."""
@@ -372,10 +353,36 @@ class RAGEngine:
         # Optional reranker for retrieval results
         self.reranker = KeywordReranker() if self.runtime.rerank else None
 
-        # Lazy-initialised RAG chain cache
-        self._rag_chain_cache: dict[tuple[int, str], Any] = {}
-
         self._log("DEBUG", f"Using chat model: {self.config.chat_model}")
+
+    def _initialize_document_indexer(self) -> None:
+        """Initialize document indexing component."""
+        self.document_indexer = DocumentIndexer(
+            config=self.config,
+            runtime_options=self.runtime,
+            filesystem_manager=self.filesystem_manager,
+            cache_repository=self.index_manager,
+            vector_repository=self.vectorstore_manager,
+            document_loader=self.document_loader,
+            ingest_manager=self.ingest_manager,
+            embedding_provider=self.embedding_provider,
+            embedding_batcher=self.embedding_batcher,
+            embedding_model_map=self.embedding_model_map,
+            embedding_model_version=self.embedding_model_version,
+            log_callback=self.runtime.log_callback,
+        )
+
+    def _initialize_query_engine(self) -> None:
+        """Initialize query execution component."""
+        self.query_engine = QueryEngine(
+            config=self.config,
+            runtime_options=self.runtime,
+            chat_model=self.chat_model,
+            document_loader=self.document_loader,
+            reranker=self.reranker,
+            default_prompt_id=self.default_prompt_id,
+            log_callback=self.runtime.log_callback,
+        )
 
     def _initialize_vectorstores(self) -> None:
         """Initialize vectorstores for already processed files."""
@@ -397,7 +404,7 @@ class RAGEngine:
 
         self._log("DEBUG", f"Loaded {len(self.vectorstores)} vectorstores")
 
-    def index_file(  # noqa: PLR0912, PLR0915, PLR0911
+    def index_file(
         self,
         file_path: Path | str,
         *,
@@ -413,270 +420,13 @@ class RAGEngine:
         Returns:
             Tuple of ``(success, error_message)``. ``error_message`` will be
             ``None`` when indexing succeeds.
-
         """
-        file_path = Path(file_path).resolve()
-        self._log("INFO", f"Indexing file: {file_path}")
+        return self.document_indexer.index_file(
+            file_path, self.vectorstores, progress_callback=progress_callback
+        )
 
-        # Disallow indexing outside the configured documents directory
-        try:
-            file_path.relative_to(self.documents_dir)
-        except ValueError:
-            self._log(
-                "ERROR",
-                f"File path {file_path} is outside the allowed directory"
-                f" {self.documents_dir}",
-            )
-            if progress_callback:
-                progress_callback(
-                    "error", file_path, "File path outside allowed directory"
-                )
-            return False, "File path outside allowed directory"
-        error_message: str | None = None
 
-        try:
-            # Check if file exists
-            if not file_path.exists():
-                self._log("ERROR", f"File does not exist: {file_path}")
-                if progress_callback:
-                    progress_callback("error", file_path, "File does not exist")
-                return False, "File does not exist"
-
-            # Skip re-indexing if cached and unchanged
-            model_name = self._embedding_model_for_file(file_path)
-            if not self.index_manager.needs_reindexing(
-                file_path,
-                self.config.chunk_size,
-                self.config.chunk_overlap,
-                model_name,
-                self.embedding_model_version,
-            ):
-                self._log(
-                    "INFO", f"Skipping {file_path}; already indexed and unchanged"
-                )
-                # Ensure vectorstore is loaded into memory if available
-                if str(file_path) not in self.vectorstores:
-                    vectorstore = self.vectorstore_manager.load_vectorstore(
-                        str(file_path)
-                    )
-                    if vectorstore:
-                        self.vectorstores[str(file_path)] = vectorstore
-                if progress_callback:
-                    progress_callback("cached", file_path, None)
-                return True, None
-
-            self._log("DEBUG", f"Starting document ingestion for: {file_path}")
-            # Ingest the file
-            ingest_result = self.ingest_manager.ingest_file(file_path)
-            self._log(
-                "DEBUG", f"Ingestion result successful: {ingest_result.successful}"
-            )
-            if not ingest_result.successful:
-                error_message = ingest_result.error_message or "Unknown error"
-                self._log(
-                    "ERROR",
-                    f"Failed to process {file_path}: {error_message}",
-                )
-                if progress_callback:
-                    progress_callback("error", file_path, error_message)
-                return False, error_message
-
-            # Get documents from ingestion result
-            documents = ingest_result.documents
-            self._log("DEBUG", f"Extracted {len(documents)} documents from {file_path}")
-            if not documents:
-                self._log("WARNING", f"No documents extracted from {file_path}")
-                if progress_callback:
-                    progress_callback("error", file_path, "No documents extracted")
-                return False, "No documents extracted"
-
-            # Debug: Check first document content
-            if documents:
-                first_doc = documents[0]
-                content_preview = (
-                    first_doc.page_content[:100] + "..."
-                    if len(first_doc.page_content) > 100
-                    else first_doc.page_content
-                )
-                self._log("DEBUG", f"First document content preview: {content_preview}")
-                self._log("DEBUG", f"First document metadata: {first_doc.metadata}")
-
-            # Generate embeddings and create vectorstore
-            success = self._create_vectorstore_from_documents(
-                file_path=file_path,
-                documents=documents,
-                file_type=ingest_result.source.mime_type or "text/plain",
-                embedding_model=model_name,
-                loader_name=ingest_result.source.loader_name,
-                tokenizer_name=ingest_result.source.tokenizer_name,
-                text_splitter_name=ingest_result.source.text_splitter_name,
-            )
-            if progress_callback:
-                event = "indexed" if success else "error"
-                progress_callback(
-                    event, file_path, None if success else "Vectorstore creation failed"
-                )
-            return success, None
-        except ENGINE_EXCEPTIONS as e:
-            error_message = str(e)
-            self._log("ERROR", f"Failed to index {file_path}: {error_message}")
-            if progress_callback:
-                progress_callback("error", file_path, error_message)
-            return False, error_message
-
-    def _create_vectorstore_from_documents(  # noqa: PLR0915, PLR0913, PLR0912
-        self,
-        file_path: Path,
-        documents: list[Document],
-        file_type: str,
-        embedding_model: str | None = None,
-        loader_name: str | None = None,
-        tokenizer_name: str | None = None,
-        text_splitter_name: str | None = None,
-    ) -> bool:
-        """Create or update a vectorstore from documents.
-
-        Args:
-            file_path: Path to the file
-            documents: List of documents to add to the vectorstore
-            file_type: MIME type of the file
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            # Load existing vectorstore if available
-            existing_vectorstore = self.vectorstores.get(str(file_path))
-            if not existing_vectorstore:
-                self._log(
-                    "DEBUG",
-                    f"No existing vectorstore for {file_path}, loading from cache if available",
-                )
-                existing_vectorstore = self.vectorstore_manager.load_vectorstore(
-                    str(file_path)
-                )
-                if existing_vectorstore:
-                    self._log("DEBUG", "Loaded existing vectorstore from cache")
-
-            old_hashes = self.index_manager.get_chunk_hashes(file_path)
-            new_hashes: list[str] = []
-
-            # Create a new vectorstore and process chunks sequentially
-            vectorstore = self.vectorstore_manager.create_empty_vectorstore()
-
-            provider, batcher = self._get_embedding_tools(
-                embedding_model or self.config.embedding_model
-            )
-
-            docs_to_embed: list[Document] = []
-            embed_indices: list[int] = []
-
-            for idx, doc in enumerate(documents):
-                chunk_hash = self.index_manager.compute_text_hash(doc.page_content)
-                new_hashes.append(chunk_hash)
-
-                if (
-                    existing_vectorstore
-                    and idx < len(old_hashes)
-                    and chunk_hash == old_hashes[idx]
-                ):
-                    try:
-                        emb = existing_vectorstore.index.reconstruct(idx)
-                        self.vectorstore_manager.add_documents_to_vectorstore(
-                            vectorstore,
-                            [doc],
-                            [emb],
-                        )
-                        continue
-                    except Exception:
-                        pass
-
-                docs_to_embed.append(doc)
-                embed_indices.append(idx)
-
-            if docs_to_embed:
-                self._log(
-                    "DEBUG",
-                    f"Generating embeddings for {len(docs_to_embed)} new/changed documents",
-                )
-                if self.runtime.async_batching:
-                    embeddings = run_coro_sync(
-                        batcher.process_embeddings_async(docs_to_embed)
-                    )
-                else:
-                    embeddings = batcher.process_embeddings(docs_to_embed)
-                self._log("DEBUG", f"Generated {len(embeddings)} embeddings")
-
-                for pos, idx in enumerate(embed_indices):
-                    if pos >= len(embeddings):
-                        break
-                    doc = documents[idx]
-                    self.vectorstore_manager.add_documents_to_vectorstore(
-                        vectorstore,
-                        [doc],
-                        [embeddings[pos]],
-                    )
-
-            # Save vectorstore
-            self._log("DEBUG", "Saving vectorstore to cache")
-            save_result = self.vectorstore_manager.save_vectorstore(
-                str(file_path), vectorstore
-            )
-            self._log("DEBUG", f"Vectorstore save result: {save_result}")
-
-            # Update metadata
-            self._log("DEBUG", "Updating index metadata")
-            used_model = embedding_model or self.config.embedding_model
-            if file_path.exists():
-                self.index_manager.update_metadata(
-                    file_path=file_path,
-                    chunk_size=self.config.chunk_size,
-                    chunk_overlap=self.config.chunk_overlap,
-                    embedding_model=used_model,
-                    embedding_model_version=self.embedding_model_version,
-                    file_type=file_type,
-                    num_chunks=len(documents),
-                    document_loader=loader_name,
-                    tokenizer=tokenizer_name,
-                    text_splitter=text_splitter_name,
-                )
-            else:
-                self._log(
-                    "DEBUG",
-                    f"File {file_path} does not exist, skipping metadata update",
-                )
-
-            # Store chunk hashes for incremental indexing
-            self.index_manager.update_chunk_hashes(file_path, new_hashes)
-
-            # Update cache metadata
-            if file_path.exists():
-                self._log("DEBUG", "Getting file metadata")
-                file_metadata = self.filesystem_manager.get_file_metadata(file_path)
-                file_metadata["chunks"] = {"total": len(documents)}
-                self._log("DEBUG", "Updating cache metadata")
-                self.cache_manager.update_cache_metadata(str(file_path), file_metadata)
-            else:
-                self._log(
-                    "DEBUG",
-                    f"File {file_path} does not exist, skipping cache metadata update",
-                )
-
-            # Add vectorstore to memory cache
-            self._log("DEBUG", "Adding vectorstore to memory cache")
-            self.vectorstores[str(file_path)] = vectorstore
-
-            self._log(
-                "INFO",
-                f"Successfully indexed {file_path} with {len(documents)} chunks",
-            )
-
-            return True
-        except ENGINE_EXCEPTIONS as e:
-            self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
-            return False
-
-    def index_directory(  # noqa: PLR0912, PLR0915
+    def index_directory(
         self,
         directory: Path | str | None = None,
         *,
@@ -693,240 +443,55 @@ class RAGEngine:
         Returns:
             Dictionary mapping file paths to a result dict with ``success`` and
             optional ``error`` message
-
         """
-        directory = Path(directory).resolve() if directory else self.documents_dir
-        self._log("DEBUG", f"Indexing directory: {directory}")
-
-        # Disallow indexing directories outside the configured documents directory
-        try:
-            directory.relative_to(self.documents_dir)
-        except ValueError:
-            self._log(
-                "ERROR",
-                f"Directory {directory} is outside the allowed directory"
-                f" {self.documents_dir}",
-            )
-            if progress_callback:
-                progress_callback(
-                    "error", directory, "Directory outside allowed directory"
-                )
-            return {}
-
-        # Validate directory
-        if not self.filesystem_manager.validate_documents_dir(directory):
-            self._log("ERROR", f"Invalid documents directory: {directory}")
-            if progress_callback:
-                progress_callback("error", directory, "Invalid documents directory")
-            return {}
-
-        # Determine which files need indexing
-        all_files = self.filesystem_manager.scan_directory(directory)
-        files_to_index = [
-            f
-            for f in all_files
-            if self.index_manager.needs_reindexing(
-                f,
-                self.config.chunk_size,
-                self.config.chunk_overlap,
-                self._embedding_model_for_file(f),
-                self.embedding_model_version,
-            )
-        ]
-        cached_files = [f for f in all_files if f not in files_to_index]
-        for f in cached_files:
-            if progress_callback:
-                progress_callback("cached", f, None)
-
-        if not files_to_index:
-            self._log("INFO", f"No files require indexing in {directory}")
-            return {}
-
-        # Use the ingest manager for directory processing when all files need indexing
-        if len(files_to_index) == len(all_files):
-            ingest_results = self.ingest_manager.ingest_directory(directory)
-        else:
-            ingest_results = {}
-            for file_path in files_to_index:
-                ingest_results[str(file_path)] = self.ingest_manager.ingest_file(
-                    file_path
-                )
-
-        # Index each file that was successfully processed
-        results: dict[str, dict[str, Any]] = {}
-        for file_path, result in ingest_results.items():
-            if not result.successful:
-                self._log(
-                    "WARNING", f"Failed to process {file_path}: {result.error_message}"
-                )
-                results[file_path] = {"success": False, "error": result.error_message}
-                if progress_callback:
-                    progress_callback("error", Path(file_path), result.error_message)
-                continue
-
-            documents = result.documents
-            if not documents:
-                self._log("WARNING", f"No documents extracted from {file_path}")
-                results[file_path] = {
-                    "success": False,
-                    "error": "No documents extracted",
-                }
-                if progress_callback:
-                    progress_callback(
-                        "error", Path(file_path), "No documents extracted"
-                    )
-                continue
-
-            try:
-                model_name = self._embedding_model_for_file(Path(file_path))
-                success = self._create_vectorstore_from_documents(
-                    file_path=Path(file_path),
-                    documents=documents,
-                    file_type=result.source.mime_type or "text/plain",
-                    embedding_model=model_name,
-                    loader_name=result.source.loader_name,
-                    tokenizer_name=result.source.tokenizer_name,
-                    text_splitter_name=result.source.text_splitter_name,
-                )
-                results[file_path] = {"success": success}
-                if progress_callback:
-                    event = "indexed" if success else "error"
-                    progress_callback(
-                        event,
-                        Path(file_path),
-                        None if success else "Vectorstore creation failed",
-                    )
-            except ENGINE_EXCEPTIONS as e:
-                error_msg = str(e)
-                self._log("ERROR", f"Error indexing {file_path}: {error_msg}")
-                if progress_callback:
-                    progress_callback("error", Path(file_path), error_msg)
-                results[file_path] = {"success": False, "error": error_msg}
+        results = self.document_indexer.index_directory(
+            directory, self.vectorstores, progress_callback=progress_callback
+        )
 
         # Clean up invalid caches
         self.cache_manager.cleanup_invalid_caches()
 
-        # Summary
-        success_count = sum(1 for r in results.values() if r.get("success"))
-        self._log("DEBUG", f"Indexed {success_count}/{len(results)} files successfully")
-
         return results
 
-    def _get_rag_chain(self, k: int = 4, prompt_id: str = "default"):
-        """Return cached or newly-built LCEL RAG chain."""
-        # Use the engine's default prompt ID if 'default' is passed
-        if prompt_id == "default":
-            prompt_id = self.default_prompt_id
-
-        key = (k, prompt_id)
-        if key not in self._rag_chain_cache:
-            self._rag_chain_cache[key] = build_rag_chain(
-                self, k=k, prompt_id=prompt_id, reranker=self.reranker
-            )
-        return self._rag_chain_cache[key]
 
     def answer(self, question: str, k: int = 4) -> dict[str, Any]:
-        """Answer *question* using the LCEL pipeline.
+        """Answer question using the LCEL pipeline.
 
-        Returns the same payload format as the legacy implementation so that
-        CLI and downstream callers remain unchanged.
+        Args:
+            question: Question to answer
+            k: Number of documents to retrieve
+
+        Returns:
+            Dictionary with answer, sources, and metadata. Same payload format
+            as the legacy implementation for backward compatibility.
         """
-        self._log("INFO", f"Answering question: {question}")
-
-        if not self.vectorstores:
-            self._log(
-                "ERROR", "No indexed documents found. Please index documents first."
-            )
-            return {
-                "question": question,
-                "answer": "I don't have any indexed documents to search through. Please index some documents first.",
-                "sources": [],
-                "num_documents_retrieved": 0,
-            }
-
-        try:
-            chain = self._get_rag_chain(k=k)
-            chain_output = chain.invoke(question)  # type: ignore[arg-type]
-            answer_text: str = chain_output["answer"]
-            documents = chain_output["documents"]
-
-            if not documents:
-                self._log("WARNING", "No relevant documents found")
-                return {
-                    "question": question,
-                    "answer": "I couldn't find any relevant information in the indexed documents.",
-                    "sources": [],
-                    "num_documents_retrieved": 0,
-                }
-
-            result = enhance_result(question, answer_text, documents)
-            result["num_documents_retrieved"] = len(documents)
-            self._log("INFO", "Successfully generated answer (LCEL)")
-        except ENGINE_EXCEPTIONS as e:
-            self._log("ERROR", f"Failed to answer question: {e}")
-            return {
-                "question": question,
-                "answer": f"I encountered an error while trying to answer your question: {e!s}",
-                "sources": [],
-                "num_documents_retrieved": 0,
-            }
-        else:
-            return result
+        return self.query_engine.answer(question, self.vectorstores, k)
 
     def query(self, query: str, k: int = 4) -> str:
-        """Return only the answer text for *query* (legacy helper)."""
-        return self.answer(query, k).get("answer", "")
+        """Return only the answer text for query (legacy helper).
+        
+        Args:
+            query: Query string
+            k: Number of documents to retrieve
+            
+        Returns:
+            Answer text
+        """
+        return self.query_engine.query(query, self.vectorstores, k)
 
     def get_document_summaries(self, k: int = 5) -> list[dict[str, Any]]:
-        """Generate short summaries of the *k* largest documents."""
-        self._log("INFO", f"Generating summaries for top {k} documents (LCEL path)")
-
-        if not self.vectorstores:
-            self._log("WARNING", "No indexed documents found")
-            return []
-
-        try:
-            indexed_files = self.list_indexed_files()
-            if not indexed_files:
-                return []
-
-            indexed_files.sort(key=lambda x: x.get("num_chunks", 0), reverse=True)
-            indexed_files = indexed_files[:k]
-
-            summaries: list[dict[str, Any]] = []
-
-            for file_info in indexed_files:
-                file_path = file_info["file_path"]
-                file_type = file_info["file_type"]
-                try:
-                    docs = self.document_loader.load_document(file_path)
-                    if not docs:
-                        continue
-
-                    first_paragraphs = docs[0].page_content.split("\n\n", 3)[:3]
-                    doc_content = "\n\n".join(first_paragraphs)
-
-                    # Use the LCEL RAG chain to summarize it
-                    chain = self._get_rag_chain(k=1, prompt_id="summary")
-                    chain_output = chain.invoke(
-                        f"Generate a 1-2 sentence summary of this document: {doc_content[:5000]}"
-                    )
-
-                    summaries.append(
-                        {
-                            "file_path": file_path,
-                            "file_type": file_type,
-                            "summary": chain_output["answer"],
-                            "num_chunks": file_info.get("num_chunks", 0),
-                        }
-                    )
-                except ENGINE_EXCEPTIONS as e:
-                    self._log("ERROR", f"Failed to summarize {file_path}: {e}")
-        except ENGINE_EXCEPTIONS as e:
-            self._log("ERROR", f"Failed to generate document summaries: {e}")
-            return []
-        else:
-            return summaries
+        """Generate short summaries of the k largest documents.
+        
+        Args:
+            k: Number of documents to summarize
+            
+        Returns:
+            List of dictionaries with file summaries
+        """
+        indexed_files = self.list_indexed_files()
+        return self.query_engine.get_document_summaries(
+            self.vectorstores, indexed_files, k
+        )
 
     def cleanup_orphaned_chunks(self) -> dict[str, Any]:
         """Delete cached vector stores whose source files were removed.
@@ -947,7 +512,8 @@ class RAGEngine:
         removed_files = self.cache_manager.cleanup_invalid_caches()
         self._log(
             "INFO",
-            f"Removed {len(removed_files)} invalid cache entries for non-existent files",
+            f"Removed {len(removed_files)} invalid cache entries for "
+            "non-existent files",
         )
 
         # Clean up orphaned chunks (vector store files without metadata)
