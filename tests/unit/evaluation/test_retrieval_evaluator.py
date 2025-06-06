@@ -19,8 +19,8 @@ def test_retrieval_evaluator_uses_beir() -> None:
         mock_engine = MagicMock()
         mock_index.return_value = mock_engine
         mock_load.side_effect = [
-            {"queries": [{"query_id": "q1", "query": "test"}]},
-            [{"query_id": "q1", "doc_id": "d1", "score": 1}],
+            {"queries": [{"_id": "1", "query": "test"}]},
+            [{"query_id": "1", "doc_id": "1", "score": 1}],
         ]
         eval_instance = mock_eval.return_value
         eval_instance.evaluate.return_value = {"ndcg@10": {10: 0.5}}
