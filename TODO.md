@@ -2,7 +2,7 @@
 
 ### Testability Refactoring
 - ✅ Extract EmbeddingServiceProtocol interface from EmbeddingProvider
-- Extract FileSystemProtocol interface and create in-memory implementation
+- ✅ Extract FileSystemProtocol interface and create in-memory implementation
 - Extract CacheRepositoryProtocol interface from IndexManager
 - Extract VectorRepositoryProtocol interface and enhance existing VectorStoreProtocol
 - Break RAGEngine into DocumentIndexer component (handles file indexing)
@@ -10,7 +10,7 @@
 - Break RAGEngine into CacheOrchestrator component (manages cache lifecycle)
 - Create RAGComponentsFactory for dependency injection and wiring
 - Implement FakeEmbeddingService with deterministic outputs for testing
-- Implement InMemoryFileSystem fake for testing file operations
+- ✅ Implement InMemoryFileSystem fake for testing file operations
 - Implement InMemoryCacheRepository fake for testing cache operations
 - Implement InMemoryVectorStore fake for fast unit testing
 - Refactor CLI commands to use RAGComponentsFactory instead of direct RAGEngine instantiation

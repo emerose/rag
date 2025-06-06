@@ -15,6 +15,8 @@ from typing import Any, TypeAlias
 from rag.utils.exceptions import RAGFileNotFoundError
 from rag.utils.logging_utils import log_message
 
+from .protocols import FileSystemProtocol
+
 logger = logging.getLogger(__name__)
 
 # TypeAlias for log callback function
@@ -48,11 +50,12 @@ SUPPORTED_EXTENSIONS = {
 }
 
 
-class FilesystemManager:
+class FilesystemManager(FileSystemProtocol):
     """Manages filesystem operations for the RAG system.
 
     This class provides functionality for scanning directories, validating files,
-    and extracting file metadata.
+    and extracting file metadata. Implements the FileSystemProtocol for
+    dependency injection compatibility.
     """
 
     def __init__(self, log_callback: LogCallback | None = None) -> None:
