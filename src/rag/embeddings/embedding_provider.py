@@ -1,35 +1,21 @@
 """Embedding provider module for the RAG system.
 
-This module provides functionality for generating embeddings from text,
-with error handling and retry logic.
+This module provides a high-level embedding provider that wraps the core
+EmbeddingService with additional functionality and maintains backward compatibility.
 """
 
 import logging
 from collections.abc import Callable
-from typing import TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 from langchain_core.embeddings import Embeddings
-from langchain_openai import OpenAIEmbeddings
-
-# Update OpenAI error imports for newer OpenAI library versions
-try:
-    # Try importing from older OpenAI versions (< 1.0.0)
-    from openai.error import APIConnectionError, APIError, RateLimitError
-except ImportError:
-    # Use newer OpenAI imports (>= 1.0.0)
-    from openai import APIConnectionError, APIError, RateLimitError
-
-from tenacity import (
-    before_sleep_log,
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
 
 from rag.utils.logging_utils import log_message
 
 from .protocols import EmbeddingServiceProtocol
+
+if TYPE_CHECKING:
+    from .embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +24,10 @@ LogCallback: TypeAlias = Callable[[str, str, str], None]
 
 
 class EmbeddingProvider(EmbeddingServiceProtocol):
-    """Provides embedding generation functionality.
+    """High-level embedding provider that wraps EmbeddingService.
 
-    This class encapsulates embedding generation with error handling and retry logic.
+    This class provides backward compatibility and additional functionality
+    while delegating core embedding operations to the focused EmbeddingService.
     Implements the EmbeddingServiceProtocol for dependency injection compatibility.
     """
 
@@ -51,6 +38,7 @@ class EmbeddingProvider(EmbeddingServiceProtocol):
         *,  # Force keyword arguments for bool parameters
         show_progress_bar: bool = False,
         log_callback: LogCallback | None = None,
+        embedding_service: "EmbeddingService | None" = None,
     ) -> None:
         """Initialize the embedding provider.
 
@@ -59,6 +47,7 @@ class EmbeddingProvider(EmbeddingServiceProtocol):
             openai_api_key: OpenAI API key (optional if set in environment)
             show_progress_bar: Whether to show a progress bar for batch operations
             log_callback: Optional callback for logging
+            embedding_service: Optional pre-configured EmbeddingService instance
 
         """
         self.model_name = model_name
@@ -66,15 +55,18 @@ class EmbeddingProvider(EmbeddingServiceProtocol):
         self.show_progress_bar = show_progress_bar
         self.log_callback = log_callback
 
-        # Initialize the embeddings model
-        self.embeddings = OpenAIEmbeddings(
-            model=model_name,
-            openai_api_key=openai_api_key,
-            show_progress_bar=show_progress_bar,
-        )
+        # Initialize or use provided embedding service
+        if embedding_service is not None:
+            self._embedding_service = embedding_service
+        else:
+            from .embedding_service import EmbeddingService
 
-        # Store the model's embedding dimension
-        self._embedding_dimension = self._get_embedding_dimension()
+            self._embedding_service = EmbeddingService(
+                model_name=model_name,
+                openai_api_key=openai_api_key,
+                show_progress_bar=show_progress_bar,
+                log_callback=log_callback,
+            )
 
     def _log(self, level: str, message: str) -> None:
         """Log a message.
@@ -84,30 +76,7 @@ class EmbeddingProvider(EmbeddingServiceProtocol):
             message: The log message
 
         """
-        log_message(level, message, "Embeddings", self.log_callback)
-
-    def _get_embedding_dimension(self) -> int:
-        """Get the dimension of embeddings.
-
-        Returns:
-            Dimension of embeddings
-
-        """
-        try:
-            # Generate a sample embedding to get the dimension
-            self._log("DEBUG", "Getting embedding dimension from provider")
-            embedding = self.embeddings.embed_query("sample text")
-            self._log("DEBUG", f"Embedding dimension: {len(embedding)}")
-        except (APIError, APIConnectionError, ValueError) as e:
-            self._log("ERROR", f"Failed to determine embedding dimension: {e}")
-            # Default dimensions for known models
-            if "text-embedding-3" in self.model_name:
-                return 1536  # Default for text-embedding-3-small/large
-            if "text-embedding-ada-002" in self.model_name:
-                return 1536  # Default for ada-002
-            return 1024  # Fallback default
-        else:
-            return len(embedding)
+        log_message(level, message, "EmbeddingProvider", self.log_callback)
 
     @property
     def embedding_dimension(self) -> int:
@@ -117,7 +86,7 @@ class EmbeddingProvider(EmbeddingServiceProtocol):
             Dimension of the embeddings
 
         """
-        return self._embedding_dimension
+        return self._embedding_service.embedding_dimension
 
     @property
     def get_embeddings_model(self) -> Embeddings:
@@ -127,14 +96,8 @@ class EmbeddingProvider(EmbeddingServiceProtocol):
             The langchain embeddings model
 
         """
-        return self.embeddings
+        return self._embedding_service.underlying_model
 
-    @retry(
-        retry=retry_if_exception_type((RateLimitError, APIError, APIConnectionError)),
-        wait=wait_exponential(multiplier=1, min=1, max=60),
-        stop=stop_after_attempt(8),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-    )
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for a list of texts.
 
@@ -149,30 +112,9 @@ class EmbeddingProvider(EmbeddingServiceProtocol):
             RateLimitError, APIError, APIConnectionError: API errors that will be retried
 
         """
-        # Do not return early; let the embedding service handle empty input and raise if needed
-        self._log("DEBUG", f"Generating embeddings for {len(texts)} texts")
+        self._log("DEBUG", f"Delegating embedding of {len(texts)} texts to service")
+        return self._embedding_service.embed_texts(texts)
 
-        try:
-            embeddings = self.embeddings.embed_documents(texts)
-            self._log("DEBUG", f"Successfully embedded {len(texts)} texts")
-        except (RateLimitError, APIError, APIConnectionError) as e:
-            self._log(
-                "WARNING",
-                f"API error during embedding generation: {e}. Retrying...",
-            )
-            raise  # Let tenacity retry
-        except (ValueError, TypeError) as e:
-            self._log("ERROR", f"Failed to generate embeddings: {e}")
-            raise
-        else:
-            return embeddings
-
-    @retry(
-        retry=retry_if_exception_type((RateLimitError, APIError, APIConnectionError)),
-        wait=wait_exponential(multiplier=1, min=1, max=60),
-        stop=stop_after_attempt(8),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
-    )
     def embed_query(self, query: str) -> list[float]:
         """Generate embedding for a query.
 
@@ -187,19 +129,8 @@ class EmbeddingProvider(EmbeddingServiceProtocol):
             RateLimitError, APIError, APIConnectionError: API errors that will be retried
 
         """
-        self._log("DEBUG", "Embedding query")
-
-        try:
-            embedding = self.embeddings.embed_query(query)
-            self._log("DEBUG", "Successfully embedded query")
-        except (RateLimitError, APIError, APIConnectionError) as e:
-            self._log("WARNING", f"API error during query embedding: {e}. Retrying...")
-            raise  # Let tenacity retry
-        except (ValueError, TypeError) as e:
-            self._log("ERROR", f"Failed to embed query: {e}")
-            raise
-        else:
-            return embedding
+        self._log("DEBUG", "Delegating query embedding to service")
+        return self._embedding_service.embed_query(query)
 
     def get_model_info(self) -> dict[str, str]:
         """Get information about the embeddings model.
