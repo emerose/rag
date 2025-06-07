@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from rag.config import RAGConfig, RuntimeOptions
+from rag.engine import RAGEngine
 from rag.factory import RAGComponentsFactory, ComponentOverrides
 from rag.storage.fakes import (
     InMemoryCacheRepository,
@@ -112,3 +113,34 @@ def test_factory_create_all_components(temp_dir: Path) -> None:
     
     assert set(components.keys()) == expected_keys
     assert all(components[key] is not None or key == "reranker" for key in expected_keys)
+
+
+def test_factory_creates_rag_engine(temp_dir: Path) -> None:
+    """Test that factory can create a complete RAGEngine instance."""
+    config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")
+    runtime = RuntimeOptions()
+    
+    factory = RAGComponentsFactory(config, runtime)
+    
+    # Create RAGEngine via factory
+    engine = factory.create_rag_engine()
+    
+    # Verify it's a proper RAGEngine instance
+    assert isinstance(engine, RAGEngine)
+    
+    # Verify key attributes are set
+    assert engine.config == config
+    assert engine.runtime == runtime
+    assert hasattr(engine, "vectorstores")
+    assert hasattr(engine, "index_directory")
+    assert hasattr(engine, "answer")
+    
+    # Verify components are injected
+    assert engine.filesystem_manager is not None
+    assert engine.index_manager is not None
+    assert engine.cache_manager is not None
+    assert engine.embedding_provider is not None
+    assert engine.vectorstore_manager is not None
+    assert engine.document_indexer is not None
+    assert engine.query_engine is not None
+    assert engine.cache_orchestrator is not None

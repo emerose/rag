@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from rag.auth import APIKeyAuthMiddleware
 from rag.config import RAGConfig, RuntimeOptions
 from rag.engine import RAGEngine
+from rag.factory import RAGComponentsFactory
 from rag.utils.logging_utils import logger
 
 
@@ -266,7 +267,8 @@ def create_http_app(server: RAGMCPServer, api_key: str | None = None) -> FastAPI
 def build_server(
     config: RAGConfig, runtime: RuntimeOptions, **settings: Any
 ) -> RAGMCPServer:
-    engine = RAGEngine(config, runtime)
+    factory = RAGComponentsFactory(config, runtime)
+    engine = factory.create_rag_engine()
     return RAGMCPServer(engine=engine, **settings)
 
 

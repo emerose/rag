@@ -13,7 +13,7 @@
 - ✅ Implement InMemoryFileSystem fake for testing file operations
 - ✅ Implement InMemoryCacheRepository fake for testing cache operations
 - ✅ Implement InMemoryVectorStore fake for fast unit testing
-- Refactor CLI commands to use RAGComponentsFactory instead of direct RAGEngine instantiation
+- ✅ Refactor CLI commands to use RAGComponentsFactory instead of direct RAGEngine instantiation
 - Create TestRAGComponentsFactory that wires fake implementations
 - Refactor VectorStoreManager to reduce FAISS coupling and improve testability
 - Replace heavy mocking in test_engine.py with fake component implementations
