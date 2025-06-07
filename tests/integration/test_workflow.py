@@ -155,7 +155,12 @@ class TestRAGWorkflow:
         # Mock filesystem methods to make indexing work - key for test robustness
         with patch('rag.storage.filesystem.FilesystemManager.get_file_type', return_value="text/plain"), \
              patch('rag.storage.filesystem.FilesystemManager.validate_documents_dir', return_value=True), \
-             patch('rag.storage.filesystem.FilesystemManager.get_file_metadata', return_value={"size": 1024}):
+             patch('rag.storage.filesystem.FilesystemManager.get_file_metadata', return_value={
+                 "size": 1024,
+                 "mtime": 1640995200.0,  # Mock timestamp
+                 "content_hash": "mock_hash_123",
+                 "source_type": "text/plain"
+             }):
             
             result = self.run_rag_command(
                 runner, [
