@@ -8,6 +8,7 @@ deterministic by avoiding real file I/O, network calls, and heavy computations.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
@@ -189,10 +190,17 @@ class TestRAGComponentsFactory(RAGComponentsFactory):
         """Add a test document to the fake filesystem.
 
         Args:
-            path: Path to the document
+            path: Path to the document (can be absolute or relative)
             content: Content of the document
         """
-        self.filesystem_manager.add_file(path, content)
+        # Convert to Path object and resolve to handle both absolute and relative paths
+        path_obj = Path(path)
+        if not path_obj.is_absolute():
+            # If relative, make it relative to the documents directory
+            path_obj = Path(self.config.documents_dir) / path_obj
+
+        # Add the file to the fake filesystem
+        self.filesystem_manager.add_file(str(path_obj), content)
 
     def add_test_metadata(self, file_path: str, metadata: dict) -> None:
         """Add test metadata to the fake cache repository.

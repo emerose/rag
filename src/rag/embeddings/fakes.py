@@ -45,6 +45,30 @@ class FakeEmbeddingService(EmbeddingServiceProtocol):
         """Generate embeddings for a list of texts.
 
         Args:
+            texts: List of text strings to embed
+
+        Returns:
+            List of embedding vectors
+
+        Raises:
+            ValueError: If texts is empty or contains invalid entries
+        """
+        if not texts:
+            raise ValueError("Cannot embed empty text list")
+
+        if not all(isinstance(text, str) for text in texts):
+            raise ValueError("Text must be a string")
+
+        if not all(text.strip() for text in texts):
+            raise ValueError("Texts cannot be empty or whitespace-only")
+
+        # Generate embeddings for each text
+        return [self.embed_query(text) for text in texts]
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Alias for embed_texts to match OpenAIEmbeddings interface.
+
+        Args:
             texts: List of texts to embed
 
         Returns:
@@ -53,17 +77,7 @@ class FakeEmbeddingService(EmbeddingServiceProtocol):
         Raises:
             ValueError: If texts list is empty or contains invalid content
         """
-        if not texts:
-            raise ValueError("Cannot embed empty text list")
-
-        embeddings = []
-        for text in texts:
-            if not isinstance(text, str):
-                raise ValueError(f"Text must be a string, got {type(text)}")
-            embedding = self._generate_deterministic_embedding(text)
-            embeddings.append(embedding)
-
-        return embeddings
+        return self.embed_texts(texts)
 
     def embed_query(self, query: str) -> list[float]:
         """Generate embedding for a query.
@@ -181,6 +195,20 @@ class DeterministicEmbeddingService(EmbeddingServiceProtocol):
             embeddings.append(embedding)
 
         return embeddings
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Alias for embed_texts to match OpenAIEmbeddings interface.
+
+        Args:
+            texts: List of texts to embed
+
+        Returns:
+            List of embeddings, using predefined ones when available
+
+        Raises:
+            ValueError: If texts list is empty or contains invalid content
+        """
+        return self.embed_texts(texts)
 
     def embed_query(self, query: str) -> list[float]:
         """Generate embedding for a query."""

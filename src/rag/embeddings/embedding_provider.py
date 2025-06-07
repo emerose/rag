@@ -149,9 +149,7 @@ class EmbeddingProvider(EmbeddingServiceProtocol):
             RateLimitError, APIError, APIConnectionError: API errors that will be retried
 
         """
-        if not texts:
-            return []
-
+        # Do not return early; let the embedding service handle empty input and raise if needed
         self._log("DEBUG", f"Generating embeddings for {len(texts)} texts")
 
         try:
