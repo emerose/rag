@@ -49,7 +49,7 @@ def test_index_file_progress(tmp_path: Path) -> None:
 
     with patch.object(engine.index_manager, "needs_reindexing", return_value=True), \
          patch.object(engine.ingest_manager, "ingest_file", return_value=make_ingest_result(file_path)), \
-         patch.object(engine, "_create_vectorstore_from_documents", return_value=True):
+         patch.object(engine.document_indexer, "_create_vectorstore_from_documents", return_value=True):
         success, error = engine.index_file(file_path, progress_callback=cb)
 
     assert success
@@ -89,7 +89,7 @@ def test_index_directory_progress(tmp_path: Path) -> None:
 
     with patch.object(engine.index_manager, "needs_reindexing", side_effect=needs_reindexing), \
          patch.object(engine.ingest_manager, "ingest_file", return_value=make_ingest_result(file2)), \
-         patch.object(engine, "_create_vectorstore_from_documents", return_value=True):
+         patch.object(engine.document_indexer, "_create_vectorstore_from_documents", return_value=True):
         results = engine.index_directory(docs_dir, progress_callback=cb)
 
     assert results[str(file2)]["success"]
