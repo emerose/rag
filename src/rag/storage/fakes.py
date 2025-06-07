@@ -56,7 +56,7 @@ class InMemoryFileSystem(FileSystemProtocol):
             mime_type: MIME type of the file
             mtime: Modification time (Unix timestamp)
         """
-        path_str = str(path)
+        path_str = str(Path(path).resolve())
         if isinstance(content, str):
             content = content.encode("utf-8")
 
@@ -76,15 +76,19 @@ class InMemoryFileSystem(FileSystemProtocol):
         Returns:
             List of paths to supported files
         """
-        directory_str = str(directory)
+        directory_str = str(Path(directory).resolve())
         found_files = []
 
         for file_path in self.files:
             path_obj = Path(file_path)
             # Check if file is in the directory (or subdirectory)
             try:
-                path_obj.relative_to(directory_str)
-                if self.is_supported_file(path_obj):
+                # Convert both paths to absolute paths for comparison
+                abs_dir = Path(directory_str)
+                abs_file = path_obj
+                if str(abs_file).startswith(str(abs_dir)) and self.is_supported_file(
+                    path_obj
+                ):
                     found_files.append(path_obj)
             except ValueError:
                 # File is not in this directory
@@ -101,8 +105,8 @@ class InMemoryFileSystem(FileSystemProtocol):
         Returns:
             True if supported, False otherwise
         """
-        path_obj = Path(file_path)
-        path_str = str(file_path)
+        path_obj = Path(file_path).resolve()
+        path_str = str(path_obj)
 
         # Check if file exists in our in-memory filesystem
         if path_str not in self.files:
@@ -128,7 +132,7 @@ class InMemoryFileSystem(FileSystemProtocol):
             FileNotFoundError: If the file does not exist
             ValueError: If mime type cannot be determined
         """
-        path_str = str(file_path)
+        path_str = str(Path(file_path).resolve())
 
         if path_str not in self.files:
             raise FileNotFoundError(f"File not found: {file_path}")
@@ -147,7 +151,7 @@ class InMemoryFileSystem(FileSystemProtocol):
         Raises:
             FileNotFoundError: If the file does not exist
         """
-        path_str = str(file_path)
+        path_str = str(Path(file_path).resolve())
 
         if path_str not in self.files:
             raise FileNotFoundError(f"File not found: {file_path}")
@@ -164,7 +168,7 @@ class InMemoryFileSystem(FileSystemProtocol):
         Returns:
             Dictionary containing file metadata
         """
-        path_str = str(file_path)
+        path_str = str(Path(file_path).resolve())
 
         if path_str not in self.files:
             raise FileNotFoundError(f"File not found: {file_path}")

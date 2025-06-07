@@ -105,7 +105,7 @@ def test_initialize_paths(tmp_path: Path) -> None:
     # Create config with test directories
     docs_dir = tmp_path / "test_documents"
     cache_dir = tmp_path / "test_cache"
-    
+
     config = RAGConfig(
         documents_dir=str(docs_dir),
         cache_dir=str(cache_dir),
@@ -141,7 +141,7 @@ def test_load_cached_vectorstore_none(tmp_path: Path) -> None:
 
     # Try to load non-existent vectorstore
     result = engine.load_cached_vectorstore("missing.txt")
-    
+
     # Should return None since file doesn't exist
     assert result is None
 
@@ -151,7 +151,7 @@ def test_index_file_workflow(tmp_path: Path) -> None:
     # Create config
     docs_dir = tmp_path / "docs"
     test_file = docs_dir / "test.txt"
-    
+
     config = RAGConfig(
         documents_dir=str(docs_dir),
         cache_dir=str(tmp_path / "cache"),
@@ -170,11 +170,11 @@ def test_index_file_workflow(tmp_path: Path) -> None:
 
     # Index the file
     success, error = engine.index_file(test_file)
-    
+
     # Verify indexing succeeded
     assert success is True
     assert error is None
-    
+
     # Verify the file is now in the index
     indexed_files = engine.list_indexed_files()
     file_paths = [f["file_path"] for f in indexed_files]
@@ -187,7 +187,7 @@ def test_index_directory_workflow(tmp_path: Path) -> None:
     docs_dir = tmp_path / "docs"
     file1 = docs_dir / "doc1.txt"
     file2 = docs_dir / "doc2.txt"
-    
+
     config = RAGConfig(
         documents_dir=str(docs_dir),
         cache_dir=str(tmp_path / "cache"),
@@ -205,12 +205,12 @@ def test_index_directory_workflow(tmp_path: Path) -> None:
 
     # Index the directory
     results = engine.index_directory(docs_dir)
-    
+
     # Verify both files were indexed successfully
     assert len(results) == 2
     for file_path, result in results.items():
         assert result["success"] is True
-    
+
     # Verify files are in the index
     indexed_files = engine.list_indexed_files()
     file_paths = [f["file_path"] for f in indexed_files]
@@ -223,13 +223,14 @@ def test_query_workflow(tmp_path: Path) -> None:
     # Create config
     docs_dir = tmp_path / "docs"
     test_file = docs_dir / "test.txt"
-    
+
     config = RAGConfig(
         documents_dir=str(docs_dir),
         cache_dir=str(tmp_path / "cache"),
         openai_api_key="test-key",
         vectorstore_backend="fake",
         chunk_size=50,
+        chunk_overlap=10,
     )
 
     # Create engine using test factory
@@ -237,12 +238,14 @@ def test_query_workflow(tmp_path: Path) -> None:
     engine = factory.create_rag_engine()
 
     # Add test file to the fake filesystem and index it
-    factory.add_test_document(str(test_file), "The RAG system is great for question answering.")
+    factory.add_test_document(
+        str(test_file), "The RAG system is great for question answering."
+    )
     engine.index_file(test_file)
-    
+
     # Perform a query
     result = engine.answer("What is RAG good for?")
-    
+
     # Verify we get a proper response structure
     assert isinstance(result, dict)
     assert "answer" in result
@@ -255,7 +258,7 @@ def test_cache_invalidation(tmp_path: Path) -> None:
     # Create config
     docs_dir = tmp_path / "docs"
     test_file = docs_dir / "test.txt"
-    
+
     config = RAGConfig(
         documents_dir=str(docs_dir),
         cache_dir=str(tmp_path / "cache"),
@@ -270,14 +273,14 @@ def test_cache_invalidation(tmp_path: Path) -> None:
     # Add test file to the fake filesystem and index it
     factory.add_test_document(str(test_file), "Original content")
     engine.index_file(test_file)
-    
+
     # Verify file is indexed
     indexed_files = engine.list_indexed_files()
     assert len(indexed_files) == 1
-    
+
     # Invalidate cache for the file
     engine.invalidate_cache(test_file)
-    
+
     # Load cached vectorstore should return None after invalidation
     vectorstore = engine.load_cached_vectorstore(str(test_file))
     assert vectorstore is None
@@ -308,7 +311,7 @@ def test_cleanup_orphaned_chunks(tmp_path: Path) -> None:
     # Create config
     docs_dir = tmp_path / "docs"
     test_file = docs_dir / "test.txt"
-    
+
     config = RAGConfig(
         documents_dir=str(docs_dir),
         cache_dir=str(tmp_path / "cache"),
@@ -323,14 +326,14 @@ def test_cleanup_orphaned_chunks(tmp_path: Path) -> None:
     # Add test file to the fake filesystem and index it
     factory.add_test_document(str(test_file), "Test content")
     engine.index_file(test_file)
-    
+
     # Now remove the file from the fake filesystem to create orphaned chunks
     # (In the real filesystem this would be unlink(), but for the fake we need to remove from the fake)
     # Since InMemoryFileSystem doesn't have a remove method, we'll simulate orphaning by calling cleanup
-    
+
     # Run cleanup
     result = engine.cleanup_orphaned_chunks()
-    
+
     # Verify cleanup result structure
     assert isinstance(result, dict)
     assert "orphaned_files_removed" in result or "removed" in result
@@ -341,7 +344,7 @@ def test_document_summaries(tmp_path: Path) -> None:
     # Create config
     docs_dir = tmp_path / "docs"
     test_file = docs_dir / "test.txt"
-    
+
     config = RAGConfig(
         documents_dir=str(docs_dir),
         cache_dir=str(tmp_path / "cache"),
@@ -354,12 +357,14 @@ def test_document_summaries(tmp_path: Path) -> None:
     engine = factory.create_rag_engine()
 
     # Add test file to the fake filesystem and index it
-    factory.add_test_document(str(test_file), "This is a test document with some content for summarization.")
+    factory.add_test_document(
+        str(test_file), "This is a test document with some content for summarization."
+    )
     engine.index_file(test_file)
-    
+
     # Get document summaries
     summaries = engine.get_document_summaries(k=1)
-    
+
     # Verify summaries structure
     assert isinstance(summaries, list)
     # Note: With fake implementations, summaries might be empty or have fake data
