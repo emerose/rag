@@ -74,7 +74,7 @@ class CacheOrchestrator:
         """Initialize vectorstores for already processed files."""
         self.vectorstores = {}
         cache_metadata = self.cache_manager.load_cache_metadata()
-        
+
         if not cache_metadata:
             self._log("INFO", "No cached files found")
             return
@@ -99,7 +99,7 @@ class CacheOrchestrator:
             file_path: Path to the file to invalidate
         """
         from pathlib import Path
-        
+
         file_path = str(Path(file_path).absolute())
         self._log("INFO", f"Invalidating cache for {file_path}")
 
@@ -202,7 +202,9 @@ class CacheOrchestrator:
         """
         return self.vectorstores
 
-    def register_vectorstore(self, file_path: str, vectorstore: VectorStoreProtocol) -> None:
+    def register_vectorstore(
+        self, file_path: str, vectorstore: VectorStoreProtocol
+    ) -> None:
         """Register a vectorstore in the cache.
 
         Args:

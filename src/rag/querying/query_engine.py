@@ -1,7 +1,7 @@
 """Query execution component for the RAG system.
 
 This module provides the QueryEngine class that handles question answering,
-document summarization, and RAG chain management, extracting this responsibility 
+document summarization, and RAG chain management, extracting this responsibility
 from the RAGEngine.
 """
 
@@ -76,9 +76,7 @@ class QueryEngine:
         # Lazy-initialised RAG chain cache
         self._rag_chain_cache: dict[tuple[int, str], Any] = {}
 
-    def _log(
-        self, level: str, message: str, subsystem: str = "QueryEngine"
-    ) -> None:
+    def _log(self, level: str, message: str, subsystem: str = "QueryEngine") -> None:
         """Log a message.
 
         Args:

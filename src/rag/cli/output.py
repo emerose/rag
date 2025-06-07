@@ -5,17 +5,15 @@ and machine-readable (JSON) formats.
 """
 
 import json
-import logging
 import sys
-
-import structlog
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
-from rag.utils.logging_utils import get_logger
-
+import structlog
 from rich.console import Console
 from rich.table import Table
+
+from rag.utils.logging_utils import get_logger
 
 # Create two consoles - one for stdout and one for stderr
 stdout_console = Console()
