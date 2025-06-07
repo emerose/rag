@@ -8,6 +8,7 @@ from typing import Any
 
 from langchain_core.documents import Document
 
+from .metadata import DocumentMetadata, FileMetadata
 from .protocols import (
     CacheRepositoryProtocol,
     FileSystemProtocol,
@@ -266,56 +267,27 @@ class InMemoryCacheRepository(CacheRepositoryProtocol):
             or metadata.get("embedding_model_version") != embedding_model_version
         )
 
-    def update_metadata(
-        self,
-        file_path: Path,
-        file_hash: str,
-        chunk_size: int,
-        chunk_overlap: int,
-        last_modified: float,
-        indexed_at: float,
-        embedding_model: str,
-        embedding_model_version: str,
-        file_type: str,
-        num_chunks: int,
-        file_size: int,
-        document_loader: str | None = None,
-        tokenizer: str | None = None,
-        text_splitter: str | None = None,
-    ) -> None:
+    def update_metadata(self, metadata: DocumentMetadata) -> None:
         """Update metadata for a file.
 
         Args:
-            file_path: Path to the file
-            file_hash: SHA-256 hash of the file
-            chunk_size: Size of text chunks
-            chunk_overlap: Overlap between chunks
-            last_modified: File modification time
-            indexed_at: Time when file was indexed
-            embedding_model: Name of embedding model used
-            embedding_model_version: Version of embedding model
-            file_type: MIME type of the file
-            num_chunks: Number of chunks the file was split into
-            file_size: Size of the file in bytes
-            document_loader: Document loader used (optional)
-            tokenizer: Tokenizer used (optional)
-            text_splitter: Text splitter used (optional)
+            metadata: Document metadata containing all indexing information
         """
-        path_str = str(file_path)
+        path_str = str(metadata.file_path)
         self.document_metadata[path_str] = {
-            "file_hash": file_hash,
-            "chunk_size": chunk_size,
-            "chunk_overlap": chunk_overlap,
-            "last_modified": last_modified,
-            "indexed_at": indexed_at,
-            "embedding_model": embedding_model,
-            "embedding_model_version": embedding_model_version,
-            "file_type": file_type,
-            "num_chunks": num_chunks,
-            "file_size": file_size,
-            "document_loader": document_loader,
-            "tokenizer": tokenizer,
-            "text_splitter": text_splitter,
+            "file_hash": metadata.file_hash,
+            "chunk_size": metadata.chunk_size,
+            "chunk_overlap": metadata.chunk_overlap,
+            "last_modified": metadata.last_modified,
+            "indexed_at": metadata.indexed_at,
+            "embedding_model": metadata.embedding_model,
+            "embedding_model_version": metadata.embedding_model_version,
+            "file_type": metadata.file_type,
+            "num_chunks": metadata.num_chunks,
+            "file_size": metadata.file_size,
+            "document_loader": metadata.document_loader,
+            "tokenizer": metadata.tokenizer,
+            "text_splitter": metadata.text_splitter,
         }
 
     def get_metadata(self, file_path: Path) -> dict[str, Any] | None:
@@ -363,34 +335,19 @@ class InMemoryCacheRepository(CacheRepositoryProtocol):
         path_str = str(file_path)
         return self.chunk_hashes.get(path_str, [])
 
-    def update_file_metadata(
-        self,
-        file_path: str,
-        size: int,
-        mtime: float,
-        content_hash: str,
-        source_type: str | None = None,
-        chunks_total: int | None = None,
-        modified_at: float | None = None,
-    ) -> None:
+    def update_file_metadata(self, metadata: FileMetadata) -> None:
         """Update file metadata.
 
         Args:
-            file_path: Path to the file as string
-            size: File size in bytes
-            mtime: File modification time
-            content_hash: SHA-256 hash of file content
-            source_type: MIME type (optional)
-            chunks_total: Total number of chunks (optional)
-            modified_at: When metadata was modified (optional)
+            metadata: File metadata containing basic file information
         """
-        self.file_metadata[file_path] = {
-            "size": size,
-            "mtime": mtime,
-            "content_hash": content_hash,
-            "source_type": source_type,
-            "chunks_total": chunks_total,
-            "modified_at": modified_at,
+        self.file_metadata[metadata.file_path] = {
+            "size": metadata.size,
+            "mtime": metadata.mtime,
+            "content_hash": metadata.content_hash,
+            "source_type": metadata.source_type,
+            "chunks_total": metadata.chunks_total,
+            "modified_at": metadata.modified_at,
         }
 
     def get_file_metadata(self, file_path: str | Path) -> dict[str, Any] | None:

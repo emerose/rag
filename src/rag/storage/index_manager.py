@@ -13,6 +13,7 @@ from typing import Any, TypeAlias
 
 from rag.utils.logging_utils import log_message
 
+from .metadata import DocumentMetadata, FileMetadata
 from .protocols import CacheRepositoryProtocol
 
 logger = logging.getLogger(__name__)
@@ -221,37 +222,15 @@ class IndexManager(CacheRepositoryProtocol):
             self._log("ERROR", f"Error checking if file needs reindexing: {e}")
             return True
 
-    def update_metadata(  # noqa: PLR0913
-        self,
-        file_path: Path,
-        chunk_size: int,
-        chunk_overlap: int,
-        embedding_model: str,
-        embedding_model_version: str,
-        file_type: str,
-        num_chunks: int,
-        document_loader: str | None = None,
-        tokenizer: str | None = None,
-        text_splitter: str | None = None,
-    ) -> None:
+    def update_metadata(self, metadata: DocumentMetadata) -> None:
         """Update the metadata for an indexed file.
 
         Args:
-            file_path: Path to the indexed file
-            chunk_size: Chunk size used for indexing
-            chunk_overlap: Chunk overlap used for indexing
-            embedding_model: Name of the embedding model used
-            embedding_model_version: Version of the embedding model
-            file_type: MIME type of the file
-            num_chunks: Number of chunks created from the file
-            document_loader: Name of the loader class used
-            tokenizer: Name of the tokenizer
-            text_splitter: Name of the text splitter
-
+            metadata: Document metadata containing all indexing information
         """
-        file_hash = self.compute_file_hash(file_path)
-        last_modified = file_path.stat().st_mtime
-        file_size = file_path.stat().st_size
+        file_hash = self.compute_file_hash(metadata.file_path)
+        last_modified = metadata.file_path.stat().st_mtime
+        file_size = metadata.file_path.stat().st_size
 
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -279,23 +258,23 @@ class IndexManager(CacheRepositoryProtocol):
                     )
                     """,
                     (
-                        str(file_path),
+                        str(metadata.file_path),
                         file_hash,
-                        chunk_size,
-                        chunk_overlap,
+                        metadata.chunk_size,
+                        metadata.chunk_overlap,
                         last_modified,
-                        embedding_model,
-                        embedding_model_version,
-                        file_type,
-                        num_chunks,
+                        metadata.embedding_model,
+                        metadata.embedding_model_version,
+                        metadata.file_type,
+                        metadata.num_chunks,
                         file_size,
-                        document_loader,
-                        tokenizer,
-                        text_splitter,
+                        metadata.document_loader,
+                        metadata.tokenizer,
+                        metadata.text_splitter,
                     ),
                 )
                 conn.commit()
-                self._log("DEBUG", f"Updated metadata for {file_path}")
+                self._log("DEBUG", f"Updated metadata for {metadata.file_path}")
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to update metadata: {e}")
             raise
@@ -347,25 +326,11 @@ class IndexManager(CacheRepositoryProtocol):
             self._log("ERROR", f"Failed to get chunk hashes: {e}")
             return []
 
-    def update_file_metadata(  # noqa: PLR0913
-        self,
-        file_path: str,
-        size: int,
-        mtime: float,
-        content_hash: str,
-        source_type: str | None = None,
-        chunks_total: int | None = None,
-    ) -> None:
+    def update_file_metadata(self, metadata: FileMetadata) -> None:
         """Update the file-specific metadata.
 
         Args:
-            file_path: Path to the file
-            size: File size in bytes
-            mtime: File modification time (timestamp)
-            content_hash: SHA-256 hash of file contents
-            source_type: MIME type of the file
-            chunks_total: Total number of chunks in the file
-
+            metadata: File metadata containing basic file information
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -375,10 +340,17 @@ class IndexManager(CacheRepositoryProtocol):
                     (file_path, size, mtime, content_hash, source_type, chunks_total, modified_at)
                     VALUES (?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
                     """,
-                    (file_path, size, mtime, content_hash, source_type, chunks_total),
+                    (
+                        metadata.file_path,
+                        metadata.size,
+                        metadata.mtime,
+                        metadata.content_hash,
+                        metadata.source_type,
+                        metadata.chunks_total,
+                    ),
                 )
                 conn.commit()
-                self._log("DEBUG", f"Updated file metadata for {file_path}")
+                self._log("DEBUG", f"Updated file metadata for {metadata.file_path}")
         except sqlite3.Error as e:
             self._log("ERROR", f"Failed to update file metadata: {e}")
             raise

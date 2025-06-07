@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, mock_open, patch
 
 from rag.storage.index_manager import IndexManager
+from rag.storage.metadata import DocumentMetadata
 
 
 @patch("sqlite3.connect")
@@ -339,18 +340,23 @@ def test_update_metadata(
     # Test update_metadata
     file_path = Path(temp_dir) / "test_file.txt"
     with patch.object(manager, "compute_file_hash", return_value="test_hash"):
-        manager.update_metadata(
+        metadata = DocumentMetadata(
             file_path=file_path,
+            file_hash="test_hash",
             chunk_size=1000,
             chunk_overlap=200,
+            last_modified=1234567890.0,
+            indexed_at=1234567890.0,
             embedding_model="test-model",
             embedding_model_version="test-version",
             file_type="text/plain",
             num_chunks=10,
+            file_size=12345,
             document_loader="TextLoader",
             tokenizer="cl100k_base",
             text_splitter="semantic_splitter",
         )
+        manager.update_metadata(metadata)
 
     # Verify update_file_metadata was called with the right arguments
     assert mock_conn.execute.called

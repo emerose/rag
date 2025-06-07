@@ -16,6 +16,7 @@ from typing import Any, TypeAlias
 from rag.utils.logging_utils import log_message
 
 from .index_manager import IndexManager
+from .metadata import FileMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +142,7 @@ class CacheManager:
                     chunks_total = metadata.get("chunks", {}).get("total")
                     source_type = metadata.get("source_type")
 
-                    self.index_manager.update_file_metadata(
+                    file_metadata = FileMetadata(
                         file_path=file_path,
                         size=metadata["size"],
                         mtime=metadata["mtime"],
@@ -149,6 +150,7 @@ class CacheManager:
                         source_type=source_type,
                         chunks_total=chunks_total,
                     )
+                    self.index_manager.update_file_metadata(file_metadata)
 
             # Mark migration as complete by renaming the JSON file
             shutil.move(self.cache_metadata_path, self.migrated_marker)
@@ -199,7 +201,7 @@ class CacheManager:
             chunks_total = metadata.get("chunks", {}).get("total")
             source_type = metadata.get("source_type")
 
-            self.index_manager.update_file_metadata(
+            file_metadata = FileMetadata(
                 file_path=file_path_str,
                 size=metadata["size"],
                 mtime=metadata["mtime"],
@@ -207,6 +209,7 @@ class CacheManager:
                 source_type=source_type,
                 chunks_total=chunks_total,
             )
+            self.index_manager.update_file_metadata(file_metadata)
 
     def get_cache_metadata(self, file_path: str) -> dict[str, Any] | None:
         """Get cache metadata for a specific file.

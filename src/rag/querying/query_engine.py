@@ -44,7 +44,7 @@ class QueryEngine:
     on query execution concerns.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         config: RAGConfig,
         runtime_options: RuntimeOptions,

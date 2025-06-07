@@ -7,6 +7,8 @@ from typing import Any, Protocol, runtime_checkable
 
 from langchain_core.documents import Document
 
+from .metadata import DocumentMetadata, FileMetadata
+
 
 @runtime_checkable
 class VectorStoreProtocol(Protocol):
@@ -270,40 +272,11 @@ class CacheRepositoryProtocol(Protocol):
             True if the file needs reindexing, False otherwise
         """
 
-    def update_metadata(
-        self,
-        file_path: Path,
-        file_hash: str,
-        chunk_size: int,
-        chunk_overlap: int,
-        last_modified: float,
-        indexed_at: float,
-        embedding_model: str,
-        embedding_model_version: str,
-        file_type: str,
-        num_chunks: int,
-        file_size: int,
-        document_loader: str | None = None,
-        tokenizer: str | None = None,
-        text_splitter: str | None = None,
-    ) -> None:
+    def update_metadata(self, metadata: DocumentMetadata) -> None:
         """Update metadata for a file.
 
         Args:
-            file_path: Path to the file
-            file_hash: SHA-256 hash of the file
-            chunk_size: Size of text chunks
-            chunk_overlap: Overlap between chunks
-            last_modified: File modification time
-            indexed_at: Time when file was indexed
-            embedding_model: Name of embedding model used
-            embedding_model_version: Version of embedding model
-            file_type: MIME type of the file
-            num_chunks: Number of chunks the file was split into
-            file_size: Size of the file in bytes
-            document_loader: Document loader used (optional)
-            tokenizer: Tokenizer used (optional)
-            text_splitter: Text splitter used (optional)
+            metadata: Document metadata containing all indexing information
         """
 
     def get_metadata(self, file_path: Path) -> dict[str, Any] | None:
@@ -341,26 +314,11 @@ class CacheRepositoryProtocol(Protocol):
             List of SHA-256 hashes for each chunk
         """
 
-    def update_file_metadata(
-        self,
-        file_path: str,
-        size: int,
-        mtime: float,
-        content_hash: str,
-        source_type: str | None = None,
-        chunks_total: int | None = None,
-        modified_at: float | None = None,
-    ) -> None:
+    def update_file_metadata(self, metadata: FileMetadata) -> None:
         """Update file metadata.
 
         Args:
-            file_path: Path to the file as string
-            size: File size in bytes
-            mtime: File modification time
-            content_hash: SHA-256 hash of file content
-            source_type: MIME type (optional)
-            chunks_total: Total number of chunks (optional)
-            modified_at: When metadata was modified (optional)
+            metadata: File metadata containing basic file information
         """
 
     def get_file_metadata(self, file_path: str | Path) -> dict[str, Any] | None:
