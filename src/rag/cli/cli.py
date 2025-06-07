@@ -42,6 +42,7 @@ try:
     from ..prompts import list_prompts
     from .config import RAGConfig, RuntimeOptions
     from .engine import RAGEngine
+    from .factory import RAGComponentsFactory
     from .mcp import build_server, run_http_server, run_stdio_server
     from .output import Error, TableData, set_json_mode, write
     from .utils import exceptions
@@ -51,6 +52,7 @@ except ImportError:
     from rag.config import RAGConfig, RuntimeOptions
     from rag.engine import RAGEngine
     from rag.evaluation import Evaluation, run_evaluations
+    from rag.factory import RAGComponentsFactory
     from rag.mcp import build_server, run_http_server, run_stdio_server
     from rag.prompts import list_prompts
     from rag.utils import exceptions
@@ -554,7 +556,7 @@ def index(  # noqa: PLR0913
 
         config, runtime_options = _create_rag_config_and_runtime(params)
 
-        rag_engine = RAGEngine(config, runtime_options)
+        rag_engine = create_rag_engine(config, runtime_options)
         cached_before = set(rag_engine.cache_manager.list_cached_files().keys())
         path_obj = Path(path)
 
@@ -654,7 +656,7 @@ def invalidate(
             max_workers=state.max_workers,
         )
 
-        rag_engine = RAGEngine(config, runtime_options)
+        rag_engine = create_rag_engine(config, runtime_options)
 
         if all_caches:
             if not typer.confirm(
@@ -766,7 +768,7 @@ def query(  # noqa: PLR0913
             max_workers=state.max_workers,
         )
 
-        rag_engine = RAGEngine(config, runtime_options)
+        rag_engine = create_rag_engine(config, runtime_options)
 
         # Set the chosen prompt template
         rag_engine.default_prompt_id = prompt
@@ -876,7 +878,7 @@ def summarize(
             vectorstore_backend=state.vectorstore_backend,
         )
         runtime_options = RuntimeOptions(max_workers=state.max_workers)
-        rag_engine = RAGEngine(config, runtime_options)
+        rag_engine = create_rag_engine(config, runtime_options)
 
         # Load cache metadata to check if we have any documents
         cache_metadata = rag_engine.load_cache_metadata()
@@ -985,7 +987,7 @@ def list(
             vectorstore_backend=state.vectorstore_backend,
         )
         runtime_options = RuntimeOptions(max_workers=state.max_workers)
-        rag_engine = RAGEngine(config, runtime_options)
+        rag_engine = create_rag_engine(config, runtime_options)
 
         # Get metadata directly from SQLite
         index_metadata = rag_engine.index_meta
@@ -1064,7 +1066,7 @@ def chunks(
             cache_dir=cache_dir or state.cache_dir,
             vectorstore_backend=state.vectorstore_backend,
         )
-        rag_engine = RAGEngine(config)
+        rag_engine = create_rag_engine(config)
 
         vectorstore = rag_engine.load_cached_vectorstore(str(path))
         if vectorstore is None:
@@ -1099,8 +1101,35 @@ def prompt_list(json_output: bool = JSON_OUTPUT_OPTION) -> None:
     write(table_data)
 
 
+# Global factory provider - can be overridden for testing
+_engine_factory_provider = RAGComponentsFactory
+
+
+def set_engine_factory_provider(factory_class):
+    """Set the factory provider for creating RAG engines (used for testing)."""
+    global _engine_factory_provider  # noqa: PLW0603
+    _engine_factory_provider = factory_class
+
+
+def create_rag_engine(
+    config: RAGConfig, runtime_options: RuntimeOptions | None = None
+) -> RAGEngine:
+    """Create a RAGEngine instance using the configured factory provider.
+
+    Args:
+        config: RAG configuration
+        runtime_options: Optional runtime options (defaults from state if None)
+
+    Returns:
+        RAGEngine instance with factory-injected dependencies
+    """
+    runtime_opts = runtime_options or RuntimeOptions(max_workers=state.max_workers)
+    factory = _engine_factory_provider(config, runtime_opts)
+    return factory.create_rag_engine()
+
+
 def _initialize_rag_engine(runtime_options: RuntimeOptions | None = None) -> RAGEngine:
-    """Initialize and return a RAGEngine instance."""
+    """Initialize and return a RAGEngine instance using the factory pattern."""
     config = RAGConfig(
         documents_dir=".",  # Not used for querying
         embedding_model=state.embedding_model,
@@ -1109,8 +1138,7 @@ def _initialize_rag_engine(runtime_options: RuntimeOptions | None = None) -> RAG
         cache_dir=state.cache_dir,
         vectorstore_backend=state.vectorstore_backend,
     )
-    runtime_opts = runtime_options or RuntimeOptions(max_workers=state.max_workers)
-    return RAGEngine(config, runtime_opts)
+    return create_rag_engine(config, runtime_options)
 
 
 def _load_vectorstores(rag_engine: RAGEngine) -> None:
@@ -1405,7 +1433,7 @@ def cleanup(
         )
 
         # Initialize the RAG engine
-        rag_engine = RAGEngine(config)
+        rag_engine = create_rag_engine(config)
 
         # Execute the cleanup
         result = rag_engine.cleanup_orphaned_chunks()

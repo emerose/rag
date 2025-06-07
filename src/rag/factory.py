@@ -10,7 +10,11 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from rag.data.text_splitter import TextSplitterFactory
+    from rag.engine import RAGEngine
 
 from langchain_openai import ChatOpenAI
 
@@ -298,3 +302,76 @@ class RAGComponentsFactory:
             "query_engine": self.create_query_engine(),
             "cache_orchestrator": self.create_cache_orchestrator(),
         }
+
+    def create_rag_engine(self) -> RAGEngine:
+        """Create a RAGEngine with all dependencies injected from the factory.
+
+        This method creates a RAGEngine instance but bypasses its normal
+        component initialization, instead injecting pre-built components
+        from this factory.
+
+        Returns:
+            RAGEngine instance with factory-injected dependencies
+        """
+        # Import here to avoid circular imports
+        from rag.engine import RAGEngine
+
+        # Create RAGEngine instance without component initialization
+        engine = object.__new__(RAGEngine)
+
+        # Set up configuration - same as normal RAGEngine.__init__
+        engine.config = self.config
+        engine.runtime = self.runtime
+        engine.embedding_model_map = self.embedding_model_map
+        engine.default_prompt_id = "default"
+        engine.system_prompt = ""
+
+        # Inject pre-built components from factory instead of creating new ones
+        engine.documents_dir = Path(self.config.documents_dir).resolve()
+        engine.cache_dir = Path(self.config.cache_dir).absolute()
+
+        # Ensure cache directory exists
+        engine.cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # Inject components from factory
+        engine.filesystem_manager = self.filesystem_manager
+        engine.index_manager = (
+            self.cache_repository
+        )  # IndexManager implements CacheRepositoryProtocol
+        engine.cache_manager = self.cache_manager
+        engine.embedding_provider = (
+            self.embedding_service
+        )  # Keep as EmbeddingServiceProtocol interface
+        engine.vectorstore_manager = (
+            self.vector_repository
+        )  # VectorStoreManager implements VectorRepositoryProtocol
+        engine.text_splitter_factory = self._create_text_splitter_factory()
+        engine.document_loader = self.document_loader
+        engine.ingest_manager = self.ingest_manager
+        engine.reranker = self.reranker
+        engine.chat_model = self.chat_model
+
+        # Create high-level components
+        engine.document_indexer = self.create_document_indexer()
+        engine.query_engine = self.create_query_engine()
+        engine.cache_orchestrator = self.create_cache_orchestrator()
+
+        # Backward compatibility
+        engine.index_meta = engine.index_manager
+
+        # Initialize vectorstores for already processed files
+        engine.cache_orchestrator.initialize_vectorstores()
+
+        return engine
+
+    def _create_text_splitter_factory(self) -> TextSplitterFactory:
+        """Create TextSplitterFactory for RAGEngine compatibility."""
+        from rag.data.text_splitter import TextSplitterFactory
+
+        return TextSplitterFactory(
+            chunk_size=self.config.chunk_size,
+            chunk_overlap=self.config.chunk_overlap,
+            model_name=self.config.embedding_model,
+            log_callback=self.runtime.log_callback,
+            preserve_headings=self.runtime.preserve_headings,
+        )
