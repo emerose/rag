@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 LogCallback: TypeAlias = Callable[[str, str, str], None]
 
 
-class EmbeddingProvider(EmbeddingServiceProtocol):
+class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
     """High-level embedding provider that wraps EmbeddingService.
 
     This class provides backward compatibility and additional functionality
@@ -131,6 +131,23 @@ class EmbeddingProvider(EmbeddingServiceProtocol):
         """
         self._log("DEBUG", "Delegating query embedding to service")
         return self._embedding_service.embed_query(query)
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings for a list of documents.
+
+        Args:
+            texts: List of texts to embed
+
+        Returns:
+            List of embeddings for the texts
+
+        Raises:
+            ValueError, TypeError: If embedding generation fails
+            RateLimitError, APIError, APIConnectionError: API errors that will be retried
+
+        """
+        self._log("DEBUG", f"Delegating embedding of {len(texts)} documents to service")
+        return self._embedding_service.embed_texts(texts)
 
     def get_model_info(self) -> dict[str, str]:
         """Get information about the embeddings model.
