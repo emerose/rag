@@ -15,8 +15,8 @@ from typing import Any, TypeAlias
 
 from rag.utils.logging_utils import log_message
 
-from .index_manager import IndexManager
 from .metadata import FileMetadata
+from .protocols import CacheRepositoryProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +34,16 @@ class CacheManager:
     def __init__(
         self,
         cache_dir: Path | str,
-        index_manager: IndexManager,
+        index_manager: CacheRepositoryProtocol,
         log_callback: LogCallback | None = None,
+        filesystem_manager: Any | None = None,
+        vector_repository: Any | None = None,
     ) -> None:
         """Initialize the cache manager.
 
         Args:
             cache_dir: Directory where cache files are stored
-            index_manager: IndexManager instance for accessing the metadata database
+            index_manager: CacheRepositoryProtocol instance for accessing the metadata database
             log_callback: Optional callback for logging
 
         """
@@ -49,6 +51,8 @@ class CacheManager:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.index_manager = index_manager
         self.log_callback = log_callback
+        self.filesystem_manager = filesystem_manager
+        self.vector_repository = vector_repository
 
         # Legacy JSON cache paths (for migration)
         self.cache_metadata_path = self.cache_dir / "cache_metadata.json"
@@ -245,6 +249,10 @@ class CacheManager:
         # Remove from database (IndexManager uses absolute paths)
         self.index_manager.remove_metadata(Path(str_file_path))
 
+        # Remove from vector repository cache if available
+        if self.vector_repository:
+            self.vector_repository.remove_vectorstore(str_file_path)
+
         # Delete vector store files
         faiss_file, pkl_file = self._get_vector_store_file_paths(str_file_path)
 
@@ -331,8 +339,14 @@ class CacheManager:
         # Convert all paths to absolute paths for consistent checking
         files_to_remove = []
         for file_path in list(self.cache_metadata):
-            path_obj = Path(file_path).resolve()
-            if not path_obj.exists():
+            # Use filesystem manager if available, otherwise fall back to direct Path check
+            if self.filesystem_manager:
+                file_exists = self.filesystem_manager.exists(file_path)
+            else:
+                path_obj = Path(file_path).resolve()
+                file_exists = path_obj.exists()
+
+            if not file_exists:
                 self._log(
                     "INFO",
                     f"File no longer exists and will be removed from cache: {file_path}",

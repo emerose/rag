@@ -31,6 +31,7 @@ class RAGConfig:
         vectorstore_backend: Backend to use for vector storage
         embedding_model_map_file: Optional path to embeddings.yaml for per-doc
             model selection
+        batch_size: Number of documents to embed per batch (default: 64)
 
     """
 
@@ -45,6 +46,7 @@ class RAGConfig:
     openai_api_key: str = ""  # Will be set in __post_init__
     vectorstore_backend: str = "faiss"
     embedding_model_map_file: str | None = None
+    batch_size: int = 64
 
     def __post_init__(self):
         """Initialize derived attributes after instance creation."""

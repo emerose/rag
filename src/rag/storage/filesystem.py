@@ -227,6 +227,17 @@ class FilesystemManager(FileSystemProtocol):
             "source_type": self.get_file_type(file_path),
         }
 
+    def exists(self, file_path: Path | str) -> bool:
+        """Check if a file exists.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            True if the file exists, False otherwise
+        """
+        return Path(file_path).exists()
+
     def validate_documents_dir(self, directory: Path | str) -> bool:
         """Validate that a directory exists and contains supported files.
 

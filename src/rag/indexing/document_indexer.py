@@ -194,7 +194,7 @@ class DocumentIndexer:
 
         try:
             # Check if file exists
-            if not file_path.exists():
+            if not self.filesystem_manager.exists(file_path):
                 self._log("ERROR", f"File does not exist: {file_path}")
                 if progress_callback:
                     progress_callback("error", file_path, "File does not exist")
@@ -400,19 +400,20 @@ class DocumentIndexer:
             # Update metadata
             self._log("DEBUG", "Updating index metadata")
             used_model = embedding_model or self.config.embedding_model
-            if file_path.exists():
+            if self.filesystem_manager.exists(file_path):
+                file_metadata = self.filesystem_manager.get_file_metadata(file_path)
                 document_metadata = DocumentMetadata(
                     file_path=file_path,
                     file_hash=self.cache_repository.compute_file_hash(file_path),
                     chunk_size=self.config.chunk_size,
                     chunk_overlap=self.config.chunk_overlap,
-                    last_modified=file_path.stat().st_mtime,
+                    last_modified=file_metadata.get("mtime", 0.0),
                     indexed_at=time.time(),
                     embedding_model=used_model,
                     embedding_model_version=self.embedding_model_version,
                     file_type=file_type,
                     num_chunks=len(documents),
-                    file_size=file_path.stat().st_size,
+                    file_size=file_metadata.get("size", 0),
                     document_loader=loader_name,
                     tokenizer=tokenizer_name,
                     text_splitter=text_splitter_name,
@@ -428,7 +429,7 @@ class DocumentIndexer:
             self.cache_repository.update_chunk_hashes(file_path, new_hashes)
 
             # Update file metadata
-            if file_path.exists():
+            if self.filesystem_manager.exists(file_path):
                 self._log("DEBUG", "Getting file metadata")
                 raw_file_metadata = self.filesystem_manager.get_file_metadata(file_path)
                 self._log("DEBUG", "Updating file metadata")

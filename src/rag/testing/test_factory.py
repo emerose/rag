@@ -135,11 +135,20 @@ class TestRAGComponentsFactory(RAGComponentsFactory):
                 embedding_dimension=self.test_options.embedding_dimension
             )
 
+        # Create fake document loader
+        from rag.data.fakes import FakeDocumentLoader
+
+        document_loader = FakeDocumentLoader(
+            filesystem_manager=filesystem,
+            log_callback=self._create_test_runtime_options().log_callback,
+        )
+
         return ComponentOverrides(
             filesystem_manager=filesystem,
             cache_repository=cache_repo,
             vector_repository=vector_repo,
             embedding_service=embedding_service,
+            document_loader=document_loader,
         )
 
     @classmethod

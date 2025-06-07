@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 from rag.storage.filesystem import FilesystemManager
 from rag.utils import timestamp_now
@@ -17,12 +17,13 @@ from rag.utils.logging_utils import log_message
 from rag.utils.progress_tracker import ProgressTracker
 
 from .document_loader import DocumentLoader
+from .protocols import DocumentProcessorProtocol
 from .text_splitter import TextSplitterFactory
 
 logger = logging.getLogger(__name__)
 
 
-class DocumentProcessor:
+class DocumentProcessor(DocumentProcessorProtocol):
     """Orchestrates document processing workflow.
 
     This class provides methods for loading, splitting, and enhancing documents,
@@ -45,7 +46,6 @@ class DocumentProcessor:
             text_splitter_factory: Factory for creating text splitters
             log_callback: Optional callback for logging
             progress_callback: Optional callback for progress updates
-
         """
         self.filesystem_manager = filesystem_manager
         self.document_loader = document_loader
@@ -59,37 +59,29 @@ class DocumentProcessor:
         Args:
             level: Log level (INFO, WARNING, ERROR, etc.)
             message: The log message
-
         """
         log_message(level, message, "DocumentProcessor", self.log_callback)
 
     def process_file(self, file_path: Path | str) -> list[Document]:
         """Process a single file.
 
-        This method loads, splits, and enhances documents from a file.
-
         Args:
-            file_path: Path to the file
+            file_path: Path to the file to process
 
         Returns:
             List of processed document chunks
 
         Raises:
-            UnsupportedFileError: If the file is not supported or doesn't exist
-            DocumentProcessingError: If the file could not be processed
-
+            DocumentProcessingError: If document processing fails
+            UnsupportedFileError: If the file type is not supported
         """
         file_path = Path(file_path)
 
-        # Check if file exists and is supported
+        # Check if file is supported
         if not self.filesystem_manager.is_supported_file(file_path):
-            error_msg = f"Unsupported or non-existent file: {file_path}"
-            self._log("ERROR", error_msg)
-            raise UnsupportedFileError(file_path)
+            raise UnsupportedFileError(f"Unsupported file type: {file_path}")
 
-        self._log("INFO", f"Processing file: {file_path}")
-
-        # Get file mime type
+        # Get MIME type
         mime_type = self.filesystem_manager.get_file_type(file_path)
 
         try:
@@ -131,7 +123,6 @@ class DocumentProcessor:
 
         Returns:
             Dictionary mapping file paths to their processed document chunks
-
         """
         directory = Path(directory)
 
@@ -180,37 +171,42 @@ class DocumentProcessor:
         return results
 
     def enhance_documents(
-        self,
-        documents: list[Document],
-        _file_path: Path | str,
-        mime_type: str,
+        self, documents: list[Document], file_path: Path, mime_type: str
     ) -> list[Document]:
-        """Enhance document metadata.
+        """Enhance document metadata with additional information.
 
         Args:
             documents: List of documents to enhance
-            _file_path: Path to the source file (unused)
-            mime_type: MIME type of the source file
+            file_path: Path to the source file
+            mime_type: MIME type of the file
 
         Returns:
             List of enhanced documents
-
         """
-        enhanced_docs = []
-
         for i, doc in enumerate(documents):
-            # Add chunk-specific metadata
+            # Ensure metadata dictionary exists
+            if not hasattr(doc, "metadata") or doc.metadata is None:
+                doc.metadata = {}
+
+            # Add processing metadata
+            doc.metadata["processed_at"] = timestamp_now()
+            doc.metadata["mime_type"] = mime_type
+            doc.metadata["text_splitter"] = (
+                self.text_splitter_factory.last_splitter_name
+            )
+            doc.metadata["tokenizer"] = self.text_splitter_factory.tokenizer_name
+
+            # Add chunk metadata
             doc.metadata["chunk_index"] = i
             doc.metadata["chunk_total"] = len(documents)
-            doc.metadata["mime_type"] = mime_type
 
-            # Add timestamp for when the document was processed
-            doc.metadata["processed_at"] = timestamp_now()
+            # Add token count if available
+            try:
+                doc.metadata["token_count"] = self.text_splitter_factory._token_length(
+                    doc.page_content
+                )
+            except (AttributeError, ValueError, TypeError):
+                # If token counting fails, set to 0
+                doc.metadata["token_count"] = 0
 
-            # Add token count
-            token_count = self.text_splitter_factory._token_length(doc.page_content)
-            doc.metadata["token_count"] = token_count
-
-            enhanced_docs.append(doc)
-
-        return enhanced_docs
+        return documents

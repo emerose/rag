@@ -179,6 +179,18 @@ class InMemoryFileSystem(FileSystemProtocol):
 
         return meta
 
+    def exists(self, file_path: Path | str) -> bool:
+        """Check if a file exists.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            True if the file exists, False otherwise
+        """
+        path_str = str(Path(file_path).resolve())
+        return path_str in self.files
+
     def validate_documents_dir(self, directory: Path | str) -> bool:
         """Validate that a directory exists and contains supported files.
 
@@ -637,3 +649,12 @@ class InMemoryVectorRepository(VectorRepositoryProtocol):
             List of similar documents
         """
         return vectorstore.similarity_search(query, k)
+
+    def remove_vectorstore(self, file_path: str) -> None:
+        """Remove a cached vectorstore.
+
+        Args:
+            file_path: Path to the source file
+        """
+        if file_path in self.stored_vectorstores:
+            del self.stored_vectorstores[file_path]
