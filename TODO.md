@@ -1,5 +1,19 @@
 ## 🚀 Next Priorities
 
+### Test Suite Restructuring (P1 - Critical)
+- [#244] [P1] **✅ Move miscategorized tests** – COMPLETED: Moved `test_mcp_server.py` to integration, `test_lightweight_integration.py` to unit, separated FAISS integration tests
+- [#245] [P1] **✅ Replace heavy mocking with fakes** – COMPLETED: Refactored `test_cache_logic.py` to use `FakeRAGComponentsFactory`, eliminated 25+ lines of complex mocking
+- [#246] [P1] **✅ Split oversized unit tests** – COMPLETED: Split `test_index_manager.py` (515 lines) into 4 focused files (50-150 lines each)
+- [#247] [P1] **Create business logic unit tests** – Add focused tests for cache decisions, chunking logic, embedding batching, query processing
+- [#248] [P1] **Add proper integration tests** – Create workflow tests for indexing, querying, incremental updates, error recovery
+- [#249] [P1] **Create comprehensive e2e tests** – Add CLI workflows, MCP workflows, large document sets, concurrent access tests
+- [#250] [P1] **Update test configuration** – Configure pytest markers, test discovery, and execution commands
+
+### Code Testability Improvements (P2 - High Impact)
+- [#251] [P2] **Extract business logic classes** – Create `DocumentIndexer`, `QueryProcessor`, `CacheLogic` classes with pure business logic
+- [#252] [P2] **Improve configuration management** – Create `ChunkingConfig`, `EmbeddingConfig`, `CacheConfig` dataclasses
+- [#253] [P2] **Create protocol interfaces** – Define `DocumentIndexerProtocol`, `QueryProcessorProtocol`, `CacheLogicProtocol`
+- [#254] [P2] **Improve error handling** – Create custom exception hierarchy and error recovery logic
 
 ---
 

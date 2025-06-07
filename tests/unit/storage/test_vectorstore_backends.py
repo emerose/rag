@@ -277,23 +277,11 @@ class TestFAISSBackend:
         dimension2 = backend.get_embedding_dimension()
         assert dimension2 == 256
 
-    @pytest.mark.integration
-    def test_create_empty_vectorstore(self) -> None:
-        """Test creating empty FAISS vector store."""
+    def test_faiss_backend_unit_operations(self) -> None:
+        """Test FAISS backend operations that don't require actual FAISS."""
         embeddings = FakeEmbeddingService()
         backend = FAISSBackend(embeddings)
-
-        vectorstore = backend.create_empty_vectorstore()
-        # Would need FAISS to test this properly
-        assert vectorstore is not None
-
-    @pytest.mark.integration
-    def test_create_vectorstore_from_documents(self) -> None:
-        """Test creating FAISS vector store from documents."""
-        embeddings = FakeEmbeddingService()
-        backend = FAISSBackend(embeddings)
-
-        documents = [Document(page_content="Test content")]
-        vectorstore = backend.create_vectorstore(documents)
-        # Would need FAISS to test this properly
-        assert vectorstore is not None
+        
+        # These operations should work without FAISS
+        assert backend.get_cache_file_extensions() == [".faiss", ".pkl"]
+        assert backend.get_embedding_dimension() == embeddings.embedding_dimension
