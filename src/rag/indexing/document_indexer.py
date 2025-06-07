@@ -18,6 +18,7 @@ from rag.embeddings.batching import EmbeddingBatcher
 from rag.embeddings.embedding_provider import EmbeddingProvider
 from rag.embeddings.model_map import get_model_for_path
 from rag.ingest import IngestManager
+from rag.storage.metadata import DocumentMetadata, FileMetadata
 from rag.storage.protocols import (
     CacheRepositoryProtocol,
     FileSystemProtocol,
@@ -52,7 +53,7 @@ class DocumentIndexer:
     It implements single responsibility principle by focusing solely on indexing.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         config: RAGConfig,
         runtime_options: RuntimeOptions,
@@ -149,7 +150,7 @@ class DocumentIndexer:
             return provider, batcher
         return self.embedding_provider, self.embedding_batcher
 
-    def index_file(
+    def index_file(  # noqa: PLR0911, PLR0912, PLR0915
         self,
         file_path: Path | str,
         vectorstores: dict[str, VectorStoreProtocol],
@@ -286,7 +287,7 @@ class DocumentIndexer:
                 progress_callback("error", file_path, error_message)
             return False, error_message
 
-    def _create_vectorstore_from_documents(
+    def _create_vectorstore_from_documents(  # noqa: PLR0913, PLR0912, PLR0915
         self,
         file_path: Path,
         documents: list[Document],
@@ -400,7 +401,7 @@ class DocumentIndexer:
             self._log("DEBUG", "Updating index metadata")
             used_model = embedding_model or self.config.embedding_model
             if file_path.exists():
-                self.cache_repository.update_metadata(
+                document_metadata = DocumentMetadata(
                     file_path=file_path,
                     file_hash=self.cache_repository.compute_file_hash(file_path),
                     chunk_size=self.config.chunk_size,
@@ -416,6 +417,7 @@ class DocumentIndexer:
                     tokenizer=tokenizer_name,
                     text_splitter=text_splitter_name,
                 )
+                self.cache_repository.update_metadata(document_metadata)
             else:
                 self._log(
                     "DEBUG",
@@ -428,17 +430,17 @@ class DocumentIndexer:
             # Update file metadata
             if file_path.exists():
                 self._log("DEBUG", "Getting file metadata")
-                file_metadata = self.filesystem_manager.get_file_metadata(file_path)
-                file_metadata["chunks"] = {"total": len(documents)}
+                raw_file_metadata = self.filesystem_manager.get_file_metadata(file_path)
                 self._log("DEBUG", "Updating file metadata")
-                self.cache_repository.update_file_metadata(
+                file_metadata = FileMetadata(
                     file_path=str(file_path),
-                    size=file_metadata.get("size", 0),
-                    mtime=file_metadata.get("mtime", 0.0),
-                    content_hash=file_metadata.get("content_hash", ""),
-                    source_type=file_metadata.get("source_type"),
+                    size=raw_file_metadata.get("size", 0),
+                    mtime=raw_file_metadata.get("mtime", 0.0),
+                    content_hash=raw_file_metadata.get("content_hash", ""),
+                    source_type=raw_file_metadata.get("source_type"),
                     chunks_total=len(documents),
                 )
+                self.cache_repository.update_file_metadata(file_metadata)
             else:
                 self._log(
                     "DEBUG",
@@ -462,7 +464,7 @@ class DocumentIndexer:
             self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
             return False
 
-    def index_directory(
+    def index_directory(  # noqa: PLR0912, PLR0915
         self,
         directory: Path | str | None = None,
         vectorstores: dict[str, VectorStoreProtocol] | None = None,
