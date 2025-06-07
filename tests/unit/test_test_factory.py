@@ -1,4 +1,4 @@
-"""Tests for the TestRAGComponentsFactory."""
+"""Tests for the FakeRAGComponentsFactory."""
 
 from pathlib import Path
 
@@ -11,16 +11,16 @@ from rag.storage.fakes import (
     InMemoryFileSystem,
     InMemoryVectorRepository,
 )
-from rag.testing import TestRAGComponentsFactory
-from rag.testing.test_factory import TestComponentOptions
+from rag.testing import FakeRAGComponentsFactory
+from rag.testing.test_factory import FakeComponentOptions
 
 
-class TestTestRAGComponentsFactory:
-    """Test the TestRAGComponentsFactory."""
+class TestFakeRAGComponentsFactory:
+    """Test the FakeRAGComponentsFactory."""
 
     def test_factory_creates_fake_components(self) -> None:
         """Test that factory creates fake implementations of all components."""
-        factory = TestRAGComponentsFactory.create_minimal()
+        factory = FakeRAGComponentsFactory.create_minimal()
 
         # Check that all components are fake implementations
         assert isinstance(factory.filesystem_manager, InMemoryFileSystem)
@@ -52,21 +52,21 @@ class TestTestRAGComponentsFactory:
             async_batching=True,
         )
 
-        factory = TestRAGComponentsFactory(config=config, runtime_options=runtime)
+        factory = FakeRAGComponentsFactory(config=config, runtime_options=runtime)
 
         assert factory.config == config
         assert factory.runtime == runtime
 
     def test_factory_with_test_options(self) -> None:
         """Test factory with custom test options."""
-        test_options = TestComponentOptions(
+        test_options = FakeComponentOptions(
             embedding_dimension=512,
             use_deterministic_embeddings=False,
             initial_files={"/test/file.txt": "test content"},
             initial_metadata={"/test/file.txt": {"test": "metadata"}},
         )
 
-        factory = TestRAGComponentsFactory(test_options=test_options)
+        factory = FakeRAGComponentsFactory(test_options=test_options)
 
         # Check embedding service
         assert isinstance(factory.embedding_service, FakeEmbeddingService)
@@ -88,12 +88,12 @@ class TestTestRAGComponentsFactory:
             "another query": [0.5, 0.6, 0.7, 0.8] + [0.0] * 380,
         }
 
-        test_options = TestComponentOptions(
+        test_options = FakeComponentOptions(
             use_deterministic_embeddings=True,
             predefined_embeddings=predefined,
         )
 
-        factory = TestRAGComponentsFactory(test_options=test_options)
+        factory = FakeRAGComponentsFactory(test_options=test_options)
 
         # Check that we get deterministic embedding service
         assert isinstance(factory.embedding_service, DeterministicEmbeddingService)
@@ -104,7 +104,7 @@ class TestTestRAGComponentsFactory:
 
     def test_create_with_sample_data(self) -> None:
         """Test the create_with_sample_data convenience method."""
-        factory = TestRAGComponentsFactory.create_with_sample_data()
+        factory = FakeRAGComponentsFactory.create_with_sample_data()
 
         # Check that sample files exist
         files = factory.get_test_files()
@@ -129,7 +129,7 @@ class TestTestRAGComponentsFactory:
 
     def test_create_minimal(self) -> None:
         """Test the create_minimal convenience method."""
-        factory = TestRAGComponentsFactory.create_minimal()
+        factory = FakeRAGComponentsFactory.create_minimal()
 
         # Check that no initial data exists
         files = factory.get_test_files()
@@ -140,7 +140,7 @@ class TestTestRAGComponentsFactory:
 
     def test_add_test_document(self) -> None:
         """Test adding documents to the test factory."""
-        factory = TestRAGComponentsFactory.create_minimal()
+        factory = FakeRAGComponentsFactory.create_minimal()
 
         # Add a test document
         factory.add_test_document("/test/new_doc.txt", "New test content")
@@ -152,7 +152,7 @@ class TestTestRAGComponentsFactory:
 
     def test_add_test_metadata(self) -> None:
         """Test adding metadata to the test factory."""
-        factory = TestRAGComponentsFactory.create_minimal()
+        factory = FakeRAGComponentsFactory.create_minimal()
 
         # Add test metadata
         test_metadata = {
@@ -169,7 +169,7 @@ class TestTestRAGComponentsFactory:
 
     def test_create_rag_engine_with_fakes(self) -> None:
         """Test that the factory can create a RAGEngine with fake components."""
-        factory = TestRAGComponentsFactory.create_with_sample_data()
+        factory = FakeRAGComponentsFactory.create_with_sample_data()
 
         # Create a RAGEngine using the factory
         engine = factory.create_rag_engine()
@@ -189,7 +189,7 @@ class TestTestRAGComponentsFactory:
 
     def test_error_handling_for_non_fake_components(self) -> None:
         """Test error handling when trying to access fake-specific methods on real components."""
-        # Create a TestRAGComponentsFactory but inject real components
+        # Create a FakeRAGComponentsFactory but inject real components
         # (this is a bit contrived but tests the error handling)
         from rag.storage.filesystem import FilesystemManager
         from rag.storage.index_manager import IndexManager
@@ -206,8 +206,8 @@ class TestTestRAGComponentsFactory:
         config = RAGConfig(documents_dir="/tmp/test", cache_dir="/tmp/cache")
         runtime = RuntimeOptions()
 
-        # Create TestRAGComponentsFactory with real component overrides
-        factory = TestRAGComponentsFactory.__new__(TestRAGComponentsFactory)
+        # Create FakeRAGComponentsFactory with real component overrides
+        factory = FakeRAGComponentsFactory.__new__(FakeRAGComponentsFactory)
         RAGComponentsFactory.__init__(factory, config, runtime, overrides)
 
         # This should raise an error since we're not using fake components

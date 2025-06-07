@@ -13,7 +13,7 @@ from langchain_core.documents import Document
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.engine import RAGEngine
-from rag.testing.test_factory import TestRAGComponentsFactory
+from rag.testing.test_factory import FakeRAGComponentsFactory
 
 
 def test_engine_init_with_config(tmp_path: Path) -> None:
@@ -36,7 +36,7 @@ def test_engine_init_with_config(tmp_path: Path) -> None:
     runtime = RuntimeOptions(progress_callback=None, log_callback=None)
 
     # Create engine using test factory with fake implementations
-    factory = TestRAGComponentsFactory(config, runtime)
+    factory = FakeRAGComponentsFactory(config, runtime)
     engine = factory.create_rag_engine()
 
     # Verify the engine has the config and runtime
@@ -67,7 +67,7 @@ def test_engine_with_factory(tmp_path: Path) -> None:
     )
 
     # Create engine through factory
-    factory = TestRAGComponentsFactory(config, RuntimeOptions())
+    factory = FakeRAGComponentsFactory(config, RuntimeOptions())
     engine = factory.create_rag_engine()
 
     # Verify config was set correctly
@@ -113,7 +113,7 @@ def test_initialize_paths(tmp_path: Path) -> None:
     )
 
     # Create engine using test factory
-    factory = TestRAGComponentsFactory(config, RuntimeOptions())
+    factory = FakeRAGComponentsFactory(config, RuntimeOptions())
     engine = factory.create_rag_engine()
 
     # Verify paths were set correctly
@@ -135,7 +135,7 @@ def test_load_cached_vectorstore_none(tmp_path: Path) -> None:
     )
 
     # Create engine using test factory
-    factory = TestRAGComponentsFactory(config, RuntimeOptions())
+    factory = FakeRAGComponentsFactory(config, RuntimeOptions())
     engine = factory.create_rag_engine()
 
     # Try to load non-existent vectorstore
@@ -161,7 +161,7 @@ def test_index_file_workflow(tmp_path: Path) -> None:
     )
 
     # Create engine using test factory
-    factory = TestRAGComponentsFactory(config, RuntimeOptions())
+    factory = FakeRAGComponentsFactory(config, RuntimeOptions())
     engine = factory.create_rag_engine()
 
     # Add test file to the fake filesystem
@@ -195,7 +195,7 @@ def test_index_directory_workflow(tmp_path: Path) -> None:
     )
 
     # Create engine using test factory
-    factory = TestRAGComponentsFactory(config, RuntimeOptions())
+    factory = FakeRAGComponentsFactory(config, RuntimeOptions())
     engine = factory.create_rag_engine()
 
     # Add test files to the fake filesystem
@@ -233,7 +233,7 @@ def test_query_workflow(tmp_path: Path) -> None:
     )
 
     # Create engine using test factory
-    factory = TestRAGComponentsFactory(config, RuntimeOptions())
+    factory = FakeRAGComponentsFactory(config, RuntimeOptions())
     engine = factory.create_rag_engine()
 
     # Add test file to the fake filesystem and index it
@@ -266,7 +266,7 @@ def test_cache_invalidation(tmp_path: Path) -> None:
     )
 
     # Create engine using test factory
-    factory = TestRAGComponentsFactory(config, RuntimeOptions())
+    factory = FakeRAGComponentsFactory(config, RuntimeOptions())
     engine = factory.create_rag_engine()
 
     # Add test file to the fake filesystem and index it
@@ -296,7 +296,7 @@ def test_vectorstore_property(tmp_path: Path) -> None:
     )
 
     # Create engine using test factory
-    factory = TestRAGComponentsFactory(config, RuntimeOptions())
+    factory = FakeRAGComponentsFactory(config, RuntimeOptions())
     engine = factory.create_rag_engine()
 
     # Get vectorstores (should be empty initially)
@@ -319,7 +319,7 @@ def test_cleanup_orphaned_chunks(tmp_path: Path) -> None:
     )
 
     # Create engine using test factory
-    factory = TestRAGComponentsFactory(config, RuntimeOptions())
+    factory = FakeRAGComponentsFactory(config, RuntimeOptions())
     engine = factory.create_rag_engine()
 
     # Add test file to the fake filesystem and index it
@@ -352,7 +352,7 @@ def test_document_summaries(tmp_path: Path) -> None:
     )
 
     # Create engine using test factory
-    factory = TestRAGComponentsFactory(config, RuntimeOptions())
+    factory = FakeRAGComponentsFactory(config, RuntimeOptions())
     engine = factory.create_rag_engine()
 
     # Add test file to the fake filesystem and index it

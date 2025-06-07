@@ -1,6 +1,6 @@
 """Test factory that provides fake implementations for fast, deterministic testing.
 
-This module contains TestRAGComponentsFactory which extends RAGComponentsFactory
+This module contains FakeRAGComponentsFactory which extends RAGComponentsFactory
 to provide fake implementations of all components, making tests faster and more
 deterministic by avoiding real file I/O, network calls, and heavy computations.
 """
@@ -21,7 +21,7 @@ from rag.storage.fakes import (
 
 
 @dataclass
-class TestComponentOptions:
+class FakeComponentOptions:
     """Configuration options for test components.
 
     This allows tests to customize the behavior of fake components
@@ -43,7 +43,7 @@ class TestComponentOptions:
     initial_vectors: dict[str, list] | None = None
 
 
-class TestRAGComponentsFactory(RAGComponentsFactory):
+class FakeRAGComponentsFactory(RAGComponentsFactory):
     """Factory that wires fake implementations for testing.
 
     This factory extends RAGComponentsFactory to provide lightweight fake
@@ -55,7 +55,7 @@ class TestRAGComponentsFactory(RAGComponentsFactory):
         self,
         config: RAGConfig | None = None,
         runtime_options: RuntimeOptions | None = None,
-        test_options: TestComponentOptions | None = None,
+        test_options: FakeComponentOptions | None = None,
     ) -> None:
         """Initialize the test factory with fake components.
 
@@ -71,7 +71,7 @@ class TestRAGComponentsFactory(RAGComponentsFactory):
         if runtime_options is None:
             runtime_options = self._create_test_runtime_options()
 
-        self.test_options = test_options or TestComponentOptions()
+        self.test_options = test_options or FakeComponentOptions()
 
         # Create fake component overrides
         overrides = self._create_fake_overrides()
@@ -158,13 +158,13 @@ class TestRAGComponentsFactory(RAGComponentsFactory):
         )
 
     @classmethod
-    def create_with_sample_data(cls) -> TestRAGComponentsFactory:
+    def create_with_sample_data(cls) -> FakeRAGComponentsFactory:
         """Create a test factory pre-populated with sample data.
 
         This is a convenience method for tests that need some initial data
         to work with.
         """
-        test_options = TestComponentOptions(
+        test_options = FakeComponentOptions(
             initial_files={
                 "/tmp/test_docs/doc1.txt": "Sample document content for testing.",
                 "/tmp/test_docs/doc2.md": "# Sample Markdown\n\nThis is a test document.",
@@ -193,13 +193,13 @@ class TestRAGComponentsFactory(RAGComponentsFactory):
         return cls(test_options=test_options)
 
     @classmethod
-    def create_minimal(cls) -> TestRAGComponentsFactory:
+    def create_minimal(cls) -> FakeRAGComponentsFactory:
         """Create a minimal test factory with no initial data.
 
         This is useful for tests that want to start with a clean slate
         and add data as needed during the test.
         """
-        return cls(test_options=TestComponentOptions())
+        return cls(test_options=FakeComponentOptions())
 
     def add_test_document(self, path: str, content: str) -> None:
         """Add a test document to the fake filesystem.

@@ -441,11 +441,21 @@ Content for section 1.
                     assert all("level" in h for h in headings)
                     assert all("path" in h for h in headings)
 
-                    # Now test factory redirect approach
+                    # Test that the deprecated factory method still works but issues a warning
                     from rag.data.text_splitter import TextSplitterFactory
+                    import warnings
 
                     factory = TextSplitterFactory()
-                    factory_headings = factory.extract_pdf_headings("mock_pdf.pdf")
 
-                    # Verify factory approach also works (deprecated but should still function)
+                    # Expect a deprecation warning when using the old method
+                    with warnings.catch_warnings(record=True) as w:
+                        warnings.simplefilter("always")
+                        factory_headings = factory.extract_pdf_headings("mock_pdf.pdf")
+
+                        # Verify deprecation warning was issued
+                        assert len(w) == 1
+                        assert issubclass(w[0].category, DeprecationWarning)
+                        assert "deprecated" in str(w[0].message).lower()
+
+                    # Verify factory approach still works (deprecated but should still function)
                     assert len(factory_headings) > 0
