@@ -18,6 +18,7 @@ from .protocols import (
     VectorRepositoryProtocol,
     VectorStoreProtocol,
 )
+from .vector_repository import VectorRepository
 from .vectorstore import VectorStoreManager
 
 __all__ = [
@@ -29,6 +30,7 @@ __all__ = [
     "InMemoryVectorRepository",
     "InMemoryVectorStore",
     "IndexManager",
+    "VectorRepository",
     "VectorRepositoryProtocol",
     "VectorStoreManager",
     "VectorStoreProtocol",
