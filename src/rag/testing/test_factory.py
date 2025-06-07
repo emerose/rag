@@ -143,12 +143,18 @@ class TestRAGComponentsFactory(RAGComponentsFactory):
             log_callback=self._create_test_runtime_options().log_callback,
         )
 
+        # Create fake chat model
+        from rag.data.fakes import FakeChatModel
+
+        chat_model = FakeChatModel()
+
         return ComponentOverrides(
             filesystem_manager=filesystem,
             cache_repository=cache_repo,
             vector_repository=vector_repo,
             embedding_service=embedding_service,
             document_loader=document_loader,
+            chat_model=chat_model,
         )
 
     @classmethod

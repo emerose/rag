@@ -1,9 +1,15 @@
 """Fake implementations for testing."""
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any
 
+from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.documents import Document
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
 
 from rag.data.protocols import DocumentProcessorProtocol
 from rag.utils.logging_utils import log_message
@@ -177,3 +183,61 @@ class FakeDocumentLoader:
         except Exception as e:
             self._log("ERROR", f"Failed to load document {file_path}: {e}")
             raise ValueError(f"Error loading {file_path}") from e
+
+
+class FakeChatModel(BaseChatModel):
+    """A fake chat model for testing purposes.
+
+    This chat model returns predictable responses that can be used in tests
+    without making actual API calls.
+    """
+
+    model_name: str = "fake-chat-model"
+
+    def __init__(self, **kwargs):
+        """Initialize the fake chat model."""
+        super().__init__(**kwargs)
+
+    @property
+    def _llm_type(self) -> str:
+        """Return identifier of llm type."""
+        return "fake-chat"
+
+    def _generate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        """Generate a fake response based on the input messages."""
+        # Create a simple deterministic response based on the last message
+        last_message = messages[-1] if messages else None
+        if last_message:
+            content = last_message.content.lower()
+
+            # Provide specific responses for common test scenarios
+            if "rag" in content or "retrieval" in content:
+                response = "RAG (Retrieval-Augmented Generation) is a technique that combines retrieval of relevant documents with language model generation to provide more accurate and contextual responses."
+            elif "summary" in content or "summarize" in content:
+                response = "This document discusses important topics related to the query. The main points include relevant information that addresses the user's question."
+            elif "question" in content:
+                response = "Based on the provided context, here is a relevant answer to your question."
+            else:
+                response = f"This is a fake response to: {content}"
+        else:
+            response = "This is a default fake response."
+
+        message = AIMessage(content=response)
+        generation = ChatGeneration(message=message)
+        return ChatResult(generations=[generation])
+
+    async def _agenerate(
+        self,
+        messages: list[BaseMessage],
+        stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None,
+        **kwargs: Any,
+    ) -> ChatResult:
+        """Async version of _generate."""
+        return self._generate(messages, stop, run_manager, **kwargs)

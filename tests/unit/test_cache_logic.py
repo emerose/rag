@@ -12,7 +12,6 @@ from rag.config import RAGConfig, RuntimeOptions
 from rag.engine import RAGEngine
 
 
-@pytest.mark.skip(reason="Temporarily disabled during component refactoring")
 class TestCacheLogic:
     """Tests that verify files are not reindexed when already cached."""
 
@@ -22,7 +21,7 @@ class TestCacheLogic:
         with tempfile.TemporaryDirectory() as temp_dir:
             yield Path(temp_dir)
 
-    @pytest.fixture  
+    @pytest.fixture
     def sample_text_file(self, temp_dir):
         """Create a sample text file for testing."""
         docs_dir = temp_dir / "docs"
@@ -38,7 +37,7 @@ class TestCacheLogic:
         docs_dir.mkdir()
         cache_dir = temp_dir / "cache"
         cache_dir.mkdir()
-        
+
         config = RAGConfig(
             documents_dir=str(docs_dir),
             cache_dir=str(cache_dir),
@@ -46,21 +45,28 @@ class TestCacheLogic:
             chunk_overlap=20,
             embedding_model="text-embedding-3-small",
             openai_api_key="test-key",
+            vectorstore_backend="fake",  # Use fake backend to avoid API calls
         )
         runtime_options = RuntimeOptions()
-        
-        with patch('rag.engine.EmbeddingProvider') as mock_embed_provider, \
-             patch('rag.embeddings.embedding_provider.EmbeddingProvider'), \
-             patch('rag.engine.ChatOpenAI'):
-            # Mock embedding provider
-            mock_embeddings = MagicMock()
-            mock_embeddings.embed_documents.return_value = [[0.1, 0.2, 0.3]] * 2  # Mock embeddings
-            mock_embeddings.embed_query.return_value = [0.1, 0.2, 0.3]
-            mock_embed_provider.return_value.embeddings = mock_embeddings
-            mock_embed_provider.return_value.embed_texts.return_value = [[0.1, 0.2, 0.3]] * 2
-            mock_embed_provider.return_value.get_model_info.return_value = {
+
+        with (
+            patch("rag.engine.ChatOpenAI") as mock_chat,
+            patch(
+                "rag.embeddings.embedding_service.EmbeddingService"
+            ) as mock_embedding_service,
+        ):
+            # Mock the chat model
+            mock_chat.return_value = MagicMock()
+
+            # Mock the embedding service to return fake embeddings
+            mock_service_instance = MagicMock()
+            mock_service_instance.embed_texts.return_value = [
+                [0.1, 0.2, 0.3]
+            ] * 10  # Return fake embeddings
+            mock_service_instance.get_model_info.return_value = {
                 "model_version": "test"
             }
+            mock_embedding_service.return_value = mock_service_instance
 
             engine = RAGEngine(config, runtime_options)
             return engine
@@ -70,67 +76,73 @@ class TestCacheLogic:
         # Mock the ingest_file method to track how many times it's called
         original_ingest_file = rag_engine.ingest_manager.ingest_file
         ingest_call_count = 0
-        
+
         def counting_ingest_file(file_path):
             nonlocal ingest_call_count
             ingest_call_count += 1
             # Return a successful result with mock documents
             from rag.ingest import IngestResult, IngestStatus, DocumentSource
+
             source = DocumentSource(file_path)
             result = IngestResult(source, IngestStatus.SUCCESS)
             result.documents = [
                 Document(
                     page_content="This is a sample document for testing cache logic.",
-                    metadata={"source": str(file_path)}
+                    metadata={"source": str(file_path)},
                 )
             ]
             return result
-        
+
         rag_engine.ingest_manager.ingest_file = counting_ingest_file
-        
+
         # First indexing - should process the file
         success, error = rag_engine.index_file(sample_text_file)
         assert success, f"First indexing failed: {error}"
         assert ingest_call_count == 1, "File should be processed on first indexing"
-        
+
         # Second indexing of the same unchanged file - should NOT process the file
         ingest_call_count = 0  # Reset counter
         success, error = rag_engine.index_file(sample_text_file)
         assert success, f"Second indexing failed: {error}"
-        assert ingest_call_count == 0, "File should NOT be processed when already cached and unchanged"
+        assert ingest_call_count == 0, (
+            "File should NOT be processed when already cached and unchanged"
+        )
 
     def test_file_reindexed_when_content_changes(self, rag_engine, sample_text_file):
         """Test that a file is reindexed when its content changes."""
         # Mock the ingest_file method to track how many times it's called
         original_ingest_file = rag_engine.ingest_manager.ingest_file
         ingest_call_count = 0
-        
+
         def counting_ingest_file(file_path):
             nonlocal ingest_call_count
             ingest_call_count += 1
             # Return a successful result with mock documents
             from rag.ingest import IngestResult, IngestStatus, DocumentSource
+
             source = DocumentSource(file_path)
             result = IngestResult(source, IngestStatus.SUCCESS)
             result.documents = [
                 Document(
                     page_content=Path(file_path).read_text(),
-                    metadata={"source": str(file_path)}
+                    metadata={"source": str(file_path)},
                 )
             ]
             return result
-        
+
         rag_engine.ingest_manager.ingest_file = counting_ingest_file
-        
+
         # First indexing - should process the file
         success, error = rag_engine.index_file(sample_text_file)
         assert success, f"First indexing failed: {error}"
         assert ingest_call_count == 1, "File should be processed on first indexing"
-        
+
         # Modify the file content
         time.sleep(0.1)  # Ensure mtime changes
-        sample_text_file.write_text("This is modified content that should trigger reindexing.")
-        
+        sample_text_file.write_text(
+            "This is modified content that should trigger reindexing."
+        )
+
         # Second indexing after content change - should process the file
         ingest_call_count = 0  # Reset counter
         success, error = rag_engine.index_file(sample_text_file)
@@ -146,23 +158,40 @@ class TestCacheLogic:
         file1.write_text("Content of file 1")
         file2 = docs_dir / "file2.txt"
         file2.write_text("Content of file 2")
-        
+
         # Mock the ingest_file method to track which files are processed
         processed_files = []
         original_ingest_file = rag_engine.ingest_manager.ingest_file
-        
+
         def tracking_ingest_file(file_path):
             processed_files.append(str(file_path))
-            return original_ingest_file(file_path)
-        
+            # Return a successful result with mock documents
+            from rag.ingest import IngestResult, IngestStatus, DocumentSource
+
+            source = DocumentSource(file_path)
+            result = IngestResult(source, IngestStatus.SUCCESS)
+            result.documents = [
+                Document(
+                    page_content=Path(file_path).read_text(),
+                    metadata={"source": str(file_path)},
+                )
+            ]
+            return result
+
         rag_engine.ingest_manager.ingest_file = tracking_ingest_file
-        
+
         # First directory indexing - should process both files
         results = rag_engine.index_directory(docs_dir)
-        assert len(processed_files) == 2, "Both files should be processed on first indexing"
-        assert all(r.get("success") for r in results.values()), "All files should be successfully indexed"
-        
+        assert len(processed_files) == 2, (
+            "Both files should be processed on first indexing"
+        )
+        assert all(r.get("success") for r in results.values()), (
+            "All files should be successfully indexed"
+        )
+
         # Second directory indexing - should process NO files (they're cached)
         processed_files.clear()
         results = rag_engine.index_directory(docs_dir)
-        assert len(processed_files) == 0, "No files should be processed when all are cached and unchanged" 
+        assert len(processed_files) == 0, (
+            "No files should be processed when all are cached and unchanged"
+        )

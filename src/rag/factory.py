@@ -58,6 +58,7 @@ class ComponentOverrides:
     vector_repository: VectorRepositoryProtocol | None = None
     embedding_service: EmbeddingServiceProtocol | None = None
     document_loader: Any | None = None
+    chat_model: Any | None = None  # Any LangChain chat model interface
 
 
 class RAGComponentsFactory:
@@ -92,9 +93,9 @@ class RAGComponentsFactory:
         self._vector_repository = self.overrides.vector_repository
         self._embedding_service = self.overrides.embedding_service
         self._document_loader = self.overrides.document_loader
+        self._chat_model = self.overrides.chat_model
 
-        # Initialize core dependencies first
-        self._chat_model: ChatOpenAI | None = None
+        # Initialize core dependencies first (that aren't overridden)
         self._ingest_manager: IngestManager | None = None
         self._cache_manager: CacheManager | None = None
         self._reranker: BaseReranker | None = None

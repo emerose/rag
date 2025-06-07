@@ -15,8 +15,8 @@ from rag.chains.rag_chain import build_rag_chain
 from rag.config import RAGConfig, RuntimeOptions
 from rag.data.document_loader import DocumentLoader
 from rag.retrieval import BaseReranker
-from rag.storage.protocols import VectorStoreProtocol
 from rag.storage.backends.factory import create_vectorstore_backend
+from rag.storage.protocols import VectorStoreProtocol
 from rag.utils.answer_utils import enhance_result
 from rag.utils.logging_utils import log_message
 
@@ -270,10 +270,14 @@ class QueryEngine:
 
 class SimpleVectorStoreManager:
     """Simple vectorstore manager for QueryEngineProxy compatibility."""
-    
-    def __init__(self, log_callback: Callable[[str, str, str], None] | None = None, embeddings = None) -> None:
+
+    def __init__(
+        self,
+        log_callback: Callable[[str, str, str], None] | None = None,
+        embeddings=None,
+    ) -> None:
         """Initialize the simple manager.
-        
+
         Args:
             log_callback: Optional logging callback
             embeddings: Embeddings instance to use, defaults to FakeEmbeddings
@@ -282,15 +286,18 @@ class SimpleVectorStoreManager:
         # Use provided embeddings or default to fake embeddings
         if embeddings is None:
             from langchain_core.embeddings import FakeEmbeddings
+
             embeddings = FakeEmbeddings(size=384)
         self._backend = create_vectorstore_backend("fake", embeddings)
-    
-    def merge_vectorstores(self, vectorstores: list[VectorStoreProtocol]) -> VectorStoreProtocol:
+
+    def merge_vectorstores(
+        self, vectorstores: list[VectorStoreProtocol]
+    ) -> VectorStoreProtocol:
         """Merge multiple vector stores into a single vector store.
-        
+
         Args:
             vectorstores: List of vector stores to merge
-            
+
         Returns:
             Merged vector store
         """
@@ -326,18 +333,19 @@ class QueryEngineProxy:
         self.reranker = reranker
         self.log_callback = log_callback
         self.vectorstore_manager = SimpleVectorStoreManager(log_callback)
-        
+
         # Additional attributes expected by build_rag_chain
         self.system_prompt = ""  # Default empty system prompt
         self.runtime = runtime_options or self._create_default_runtime()
 
     def _create_default_runtime(self):
         """Create a default runtime options object for compatibility."""
+
         class DefaultRuntime:
             def __init__(self):
                 self.stream = False
                 self.stream_callback = None
-        
+
         return DefaultRuntime()
 
     def _log(

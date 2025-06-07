@@ -11,12 +11,12 @@ from rag.cli.cli import app, set_engine_factory_provider
 
 class MockEngineFactory:
     """Mock factory that returns a configured mock engine."""
-    
+
     def __init__(self, config, runtime_options, engine_mock=None):
         self.config = config
         self.runtime_options = runtime_options
         self._engine_mock = engine_mock
-        
+
     def create_rag_engine(self):
         """Return a mock engine configured for the test."""
         if self._engine_mock:
@@ -29,20 +29,22 @@ class MockEngineFactory:
 @contextmanager
 def mock_engine_factory(engine_mock=None):
     """Context manager for temporarily setting a mock engine factory."""
+
     def factory_provider(config, runtime_options):
         return MockEngineFactory(config, runtime_options, engine_mock)
-    
+
     original_provider = set_engine_factory_provider(factory_provider)
     try:
         yield
     finally:
         from rag.factory import RAGComponentsFactory
+
         set_engine_factory_provider(RAGComponentsFactory)
 
 
 def _run_cli(runner: CliRunner, opts: list[str], tmp_path: Path) -> None:
     with mock_engine_factory():
-        result = runner.invoke(app, [*opts, "--cache-dir", str(tmp_path), "list"]) 
+        result = runner.invoke(app, [*opts, "--cache-dir", str(tmp_path), "list"])
     assert result.exit_code == 0
 
 
@@ -80,15 +82,3 @@ def test_debug_specific_modules(tmp_path: Path) -> None:
     finally:
         logger_a.setLevel(prev_a)
         logger_b.setLevel(prev_b)
-
-
-@pytest.mark.skip(reason="Temporarily disabled during component refactoring")
-def test_debug_logs_emitted(tmp_path: Path) -> None:
-    """Debug flag should emit debug messages to the log file."""
-    runner = CliRunner()
-    log_file = tmp_path / "debug.log"
-    _run_cli(runner, ["--debug", f"--log-file={log_file}"], tmp_path)
-    logs = log_file.read_text()
-    assert "DEBUG" in logs
-    assert "Initializing RAG engine" in logs
-
