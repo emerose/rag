@@ -18,7 +18,8 @@ def test_create_vectorstore_from_documents_incremental() -> None:
     engine._log = MagicMock()
     engine.embedding_model_version = "v1"
 
-    engine.vectorstores = {}
+    engine.cache_orchestrator = MagicMock()
+    engine.cache_orchestrator.get_vectorstores.return_value = {}
     engine.vectorstore_manager = MagicMock()
     engine.vectorstore_manager.create_empty_vectorstore.return_value = MagicMock()
     engine.vectorstore_manager.load_vectorstore.return_value = MagicMock(index=MagicMock())
@@ -39,7 +40,22 @@ def test_create_vectorstore_from_documents_incremental() -> None:
 
     docs = [Document(page_content="a"), Document(page_content="b")]
 
-    engine._create_vectorstore_from_documents(Path("f.txt"), docs, "text/plain")
+    # Test the actual method (now in DocumentIndexer)
+    from rag.indexing.document_indexer import DocumentIndexer
+    indexer = DocumentIndexer.__new__(DocumentIndexer)
+    indexer.config = engine.config
+    indexer.runtime = engine.runtime
+    indexer._log = engine._log
+    indexer.embedding_model_version = engine.embedding_model_version
+    indexer.vector_repository = engine.vectorstore_manager
+    indexer.cache_repository = engine.index_manager
+    indexer.embedding_batcher = engine.embedding_batcher
+    indexer.filesystem_manager = engine.filesystem_manager
+    indexer._get_embedding_tools = MagicMock(return_value=(MagicMock(), engine.embedding_batcher))
+    
+    indexer._create_vectorstore_from_documents(
+        Path("f.txt"), docs, "text/plain", engine.cache_orchestrator.get_vectorstores()
+    )
 
     # first chunk reused existing embedding, second embedded anew
     engine.embedding_batcher.process_embeddings.assert_called_once_with([docs[1]])
@@ -56,7 +72,8 @@ def test_async_batching_uses_async_method() -> None:
     engine._log = MagicMock()
     engine.embedding_model_version = "v1"
 
-    engine.vectorstores = {}
+    engine.cache_orchestrator = MagicMock()
+    engine.cache_orchestrator.get_vectorstores.return_value = {}
     engine.vectorstore_manager = MagicMock()
     engine.vectorstore_manager.create_empty_vectorstore.return_value = MagicMock()
     engine.vectorstore_manager.load_vectorstore.return_value = MagicMock(index=MagicMock())
@@ -77,6 +94,21 @@ def test_async_batching_uses_async_method() -> None:
 
     docs = [Document(page_content="a")]
 
-    engine._create_vectorstore_from_documents(Path("f.txt"), docs, "text/plain")
+    # Test the actual method (now in DocumentIndexer)
+    from rag.indexing.document_indexer import DocumentIndexer
+    indexer = DocumentIndexer.__new__(DocumentIndexer)
+    indexer.config = engine.config
+    indexer.runtime = engine.runtime
+    indexer._log = engine._log
+    indexer.embedding_model_version = engine.embedding_model_version
+    indexer.vector_repository = engine.vectorstore_manager
+    indexer.cache_repository = engine.index_manager
+    indexer.embedding_batcher = engine.embedding_batcher
+    indexer.filesystem_manager = engine.filesystem_manager
+    indexer._get_embedding_tools = MagicMock(return_value=(MagicMock(), engine.embedding_batcher))
+    
+    indexer._create_vectorstore_from_documents(
+        Path("f.txt"), docs, "text/plain", engine.cache_orchestrator.get_vectorstores()
+    )
 
     engine.embedding_batcher.process_embeddings_async.assert_called_once_with(docs)
