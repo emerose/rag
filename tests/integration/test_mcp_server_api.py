@@ -18,10 +18,10 @@ pytestmark = pytest.mark.integration
 def _build_test_server(tmp_path: Path):
     with (
         patch(
-            "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+            "rag.embeddings.embedding_service.OpenAIEmbeddings",
             return_value=FakeEmbeddings(size=32),
         ),
-        patch.object(EmbeddingProvider, "_get_embedding_dimension", return_value=32),
+        patch.object(EmbeddingProvider, "embedding_dimension", 32),
     ):
         config = RAGConfig(
             documents_dir=str(tmp_path / "docs"),
