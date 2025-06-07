@@ -67,6 +67,16 @@ class InMemoryFileSystem(FileSystemProtocol):
             "size": len(content),
         }
 
+    def delete_file(self, path: Path | str) -> None:
+        """Delete a file from the in-memory filesystem.
+
+        Args:
+            path: Path to the file to delete
+        """
+        path_str = str(Path(path).resolve())
+        self.files.pop(path_str, None)
+        self.metadata.pop(path_str, None)
+
     def scan_directory(self, directory: Path | str) -> list[Path]:
         """Scan a directory for supported files.
 

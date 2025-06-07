@@ -8,6 +8,7 @@ RAG Documentation
    project_overview
    getting_started
    conceptual_overview
+   architecture
    cli_reference
    api_http
    mcp_server
