@@ -155,6 +155,7 @@ class DocumentIndexer:
         vectorstores: dict[str, VectorStoreProtocol],
         *,
         progress_callback: Callable[[str, Path, str | None], None] | None = None,
+        vectorstore_register_callback: Callable[[str, VectorStoreProtocol], None] | None = None,
     ) -> tuple[bool, str | None]:
         """Index a file.
 
@@ -163,6 +164,7 @@ class DocumentIndexer:
             vectorstores: Dictionary mapping file paths to vectorstores
             progress_callback: Optional callback invoked with
                 ``(event, path, error)`` when progress is made
+            vectorstore_register_callback: Optional callback to register new vectorstores
 
         Returns:
             Tuple of ``(success, error_message)``. ``error_message`` will be
@@ -214,7 +216,10 @@ class DocumentIndexer:
                         str(file_path)
                     )
                     if vectorstore:
-                        vectorstores[str(file_path)] = vectorstore
+                        if vectorstore_register_callback:
+                            vectorstore_register_callback(str(file_path), vectorstore)
+                        else:
+                            vectorstores[str(file_path)] = vectorstore
                 if progress_callback:
                     progress_callback("cached", file_path, None)
                 return True, None
@@ -265,6 +270,7 @@ class DocumentIndexer:
                 tokenizer_name=ingest_result.source.tokenizer_name,
                 text_splitter_name=ingest_result.source.text_splitter_name,
                 vectorstores=vectorstores,
+                vectorstore_register_callback=vectorstore_register_callback,
             )
             if progress_callback:
                 event = "indexed" if success else "error"
@@ -289,6 +295,7 @@ class DocumentIndexer:
         loader_name: str | None = None,
         tokenizer_name: str | None = None,
         text_splitter_name: str | None = None,
+        vectorstore_register_callback: Callable[[str, VectorStoreProtocol], None] | None = None,
     ) -> bool:
         """Create or update a vectorstore from documents.
 
@@ -438,7 +445,10 @@ class DocumentIndexer:
 
             # Add vectorstore to memory cache
             self._log("DEBUG", "Adding vectorstore to memory cache")
-            vectorstores[str(file_path)] = vectorstore
+            if vectorstore_register_callback:
+                vectorstore_register_callback(str(file_path), vectorstore)
+            else:
+                vectorstores[str(file_path)] = vectorstore
 
             self._log(
                 "INFO",
@@ -456,6 +466,7 @@ class DocumentIndexer:
         vectorstores: dict[str, VectorStoreProtocol] | None = None,
         *,
         progress_callback: Callable[[str, Path, str | None], None] | None = None,
+        vectorstore_register_callback: Callable[[str, VectorStoreProtocol], None] | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Index all files in a directory.
 
@@ -465,6 +476,7 @@ class DocumentIndexer:
             vectorstores: Dictionary mapping file paths to vectorstores
             progress_callback: Optional callback invoked with
                 ``(event, path, error)`` for each file processed
+            vectorstore_register_callback: Optional callback to register new vectorstores
 
         Returns:
             Dictionary mapping file paths to a result dict with ``success`` and
@@ -566,6 +578,7 @@ class DocumentIndexer:
                     tokenizer_name=result.source.tokenizer_name,
                     text_splitter_name=result.source.text_splitter_name,
                     vectorstores=vectorstores,
+                    vectorstore_register_callback=vectorstore_register_callback,
                 )
                 results[file_path] = {"success": success}
                 if progress_callback:

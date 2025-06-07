@@ -11,10 +11,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-
 # Update LangChain imports to use community packages
 from langchain_openai import ChatOpenAI
 
+from rag.caching.cache_orchestrator import CacheOrchestrator
 from rag.indexing.document_indexer import DocumentIndexer
 from rag.querying.query_engine import QueryEngine
 from rag.retrieval import KeywordReranker
@@ -212,8 +212,11 @@ class RAGEngine:
         # Initialize query execution component
         self._initialize_query_engine()
 
+        # Initialize cache orchestration component
+        self._initialize_cache_orchestrator()
+
         # Initialize vectorstores for already processed files
-        self._initialize_vectorstores()
+        self.cache_orchestrator.initialize_vectorstores()
 
     def _initialize_paths(self) -> None:
         """Initialize paths from configuration."""
@@ -384,25 +387,18 @@ class RAGEngine:
             log_callback=self.runtime.log_callback,
         )
 
-    def _initialize_vectorstores(self) -> None:
-        """Initialize vectorstores for already processed files."""
-        self.vectorstores = {}
-        if not self.cache_metadata:
-            self._log("INFO", "No cached files found")
-            return
+    def _initialize_cache_orchestrator(self) -> None:
+        """Initialize cache orchestration component."""
+        self.cache_orchestrator = CacheOrchestrator(
+            cache_manager=self.cache_manager,
+            vector_repository=self.vectorstore_manager,
+            log_callback=self.runtime.log_callback,
+        )
 
-        # Load vectorstores for all cached files
-        self._log("DEBUG", f"Loading {len(self.cache_metadata)} cached files")
-        for file_path in self.cache_metadata:
-            try:
-                vectorstore = self.vectorstore_manager.load_vectorstore(file_path)
-                if vectorstore:
-                    self.vectorstores[file_path] = vectorstore
-
-            except ENGINE_EXCEPTIONS as e:
-                self._log("ERROR", f"Failed to load vectorstore for {file_path}: {e}")
-
-        self._log("DEBUG", f"Loaded {len(self.vectorstores)} vectorstores")
+    @property
+    def vectorstores(self) -> dict[str, VectorStoreProtocol]:
+        """Get vectorstores from cache orchestrator."""
+        return self.cache_orchestrator.get_vectorstores()
 
     def index_file(
         self,
@@ -422,7 +418,10 @@ class RAGEngine:
             ``None`` when indexing succeeds.
         """
         return self.document_indexer.index_file(
-            file_path, self.vectorstores, progress_callback=progress_callback
+            file_path, 
+            self.cache_orchestrator.get_vectorstores(), 
+            progress_callback=progress_callback,
+            vectorstore_register_callback=self.cache_orchestrator.register_vectorstore,
         )
 
 
@@ -445,11 +444,14 @@ class RAGEngine:
             optional ``error`` message
         """
         results = self.document_indexer.index_directory(
-            directory, self.vectorstores, progress_callback=progress_callback
+            directory, 
+            self.cache_orchestrator.get_vectorstores(), 
+            progress_callback=progress_callback,
+            vectorstore_register_callback=self.cache_orchestrator.register_vectorstore,
         )
 
         # Clean up invalid caches
-        self.cache_manager.cleanup_invalid_caches()
+        self.cache_orchestrator.cleanup_invalid_caches()
 
         return results
 
@@ -465,7 +467,7 @@ class RAGEngine:
             Dictionary with answer, sources, and metadata. Same payload format
             as the legacy implementation for backward compatibility.
         """
-        return self.query_engine.answer(question, self.vectorstores, k)
+        return self.query_engine.answer(question, self.cache_orchestrator.get_vectorstores(), k)
 
     def query(self, query: str, k: int = 4) -> str:
         """Return only the answer text for query (legacy helper).
@@ -477,7 +479,7 @@ class RAGEngine:
         Returns:
             Answer text
         """
-        return self.query_engine.query(query, self.vectorstores, k)
+        return self.query_engine.query(query, self.cache_orchestrator.get_vectorstores(), k)
 
     def get_document_summaries(self, k: int = 5) -> list[dict[str, Any]]:
         """Generate short summaries of the k largest documents.
@@ -490,7 +492,7 @@ class RAGEngine:
         """
         indexed_files = self.list_indexed_files()
         return self.query_engine.get_document_summaries(
-            self.vectorstores, indexed_files, k
+            self.cache_orchestrator.get_vectorstores(), indexed_files, k
         )
 
     def cleanup_orphaned_chunks(self) -> dict[str, Any]:
@@ -503,39 +505,7 @@ class RAGEngine:
             Dictionary with number of orphaned chunks cleaned up and total bytes freed
 
         """
-        self._log("INFO", "Cleaning up orphaned chunks")
-
-        # Make sure cache metadata is loaded
-        self.cache_manager.load_cache_metadata()
-
-        # Clean up invalid caches first (files that no longer exist)
-        removed_files = self.cache_manager.cleanup_invalid_caches()
-        self._log(
-            "INFO",
-            f"Removed {len(removed_files)} invalid cache entries for "
-            "non-existent files",
-        )
-
-        # Clean up orphaned chunks (vector store files without metadata)
-        orphaned_result = self.cache_manager.cleanup_orphaned_chunks()
-
-        # Combine results
-        total_removed = len(removed_files) + orphaned_result.get(
-            "orphaned_files_removed", 0
-        )
-        removed_paths = orphaned_result.get("removed_paths", []) + removed_files
-
-        # Create the combined result
-        result = {
-            "orphaned_files_removed": total_removed,
-            "bytes_freed": orphaned_result.get("bytes_freed", 0),
-            "removed_paths": removed_paths,
-        }
-
-        # Reload vectorstores to ensure consistency
-        self._initialize_vectorstores()
-
-        return result
+        return self.cache_orchestrator.cleanup_orphaned_chunks()
 
     def invalidate_cache(self, file_path: Path | str) -> None:
         """Invalidate cache for a specific file.
@@ -544,25 +514,11 @@ class RAGEngine:
             file_path: Path to the file to invalidate
 
         """
-        file_path = str(Path(file_path).absolute())
-        self._log("INFO", f"Invalidating cache for {file_path}")
-
-        # Remove from vectorstores
-        if file_path in self.vectorstores:
-            del self.vectorstores[file_path]
-
-        # Invalidate in cache manager
-        self.cache_manager.invalidate_cache(file_path)
+        self.cache_orchestrator.invalidate_cache(str(file_path))
 
     def invalidate_all_caches(self) -> None:
         """Invalidate all caches."""
-        self._log("INFO", "Invalidating all caches")
-
-        # Clear vectorstores
-        self.vectorstores = {}
-
-        # Invalidate in cache manager
-        self.cache_manager.invalidate_all_caches()
+        self.cache_orchestrator.invalidate_all_caches()
 
     def list_indexed_files(self) -> list[dict[str, Any]]:
         """List all indexed files.
@@ -571,7 +527,7 @@ class RAGEngine:
             List of dictionaries with file metadata
 
         """
-        return list(self.cache_manager.list_cached_files().values())
+        return self.cache_orchestrator.list_indexed_files()
 
     def load_cache_metadata(self) -> dict[str, dict[str, Any]]:
         """Load cache metadata.
@@ -580,7 +536,7 @@ class RAGEngine:
             Dictionary mapping file paths to metadata
 
         """
-        return self._load_cache_metadata()
+        return self.cache_orchestrator.load_cache_metadata()
 
     def load_cached_vectorstore(self, file_path: str) -> VectorStoreProtocol | None:
         """Load a cached vectorstore.
@@ -592,7 +548,7 @@ class RAGEngine:
             Loaded vector store or ``None`` if not found
 
         """
-        return self._load_cached_vectorstore(file_path)
+        return self.cache_orchestrator.load_cached_vectorstore(file_path)
 
     def _load_cache_metadata(self) -> dict[str, dict[str, Any]]:
         """Backward compatibility: Load cache metadata.
@@ -601,7 +557,7 @@ class RAGEngine:
             Cache metadata
 
         """
-        return self.cache_manager.load_cache_metadata()
+        return self.cache_orchestrator.load_cache_metadata()
 
     def _load_cached_vectorstore(self, file_path: str) -> VectorStoreProtocol | None:
         """Backward compatibility: Load vectorstore from cache.
@@ -613,7 +569,7 @@ class RAGEngine:
             Loaded vector store or ``None`` if not found
 
         """
-        return self.vectorstore_manager.load_vectorstore(file_path)
+        return self.cache_orchestrator.load_cached_vectorstore(file_path)
 
     def _invalidate_cache(self, file_path: str) -> None:
         """Backward compatibility: Invalidate cache for a specific file.
