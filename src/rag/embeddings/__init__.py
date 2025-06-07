@@ -5,6 +5,12 @@ and embedding model management.
 """
 
 from .embedding_provider import EmbeddingProvider
+from .embedding_service import EmbeddingService, RetryConfig
 from .protocols import EmbeddingServiceProtocol
 
-__all__ = ["EmbeddingProvider", "EmbeddingServiceProtocol"]
+__all__ = [
+    "EmbeddingProvider",
+    "EmbeddingService",
+    "EmbeddingServiceProtocol",
+    "RetryConfig",
+]

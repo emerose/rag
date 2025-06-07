@@ -14,14 +14,14 @@ def test_embedding_provider_init() -> None:
     """Test initializing the EmbeddingProvider with basic parameters."""
     # Create the provider with a fake embedding service
     with patch(
-        "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+        "rag.embeddings.embedding_service.OpenAIEmbeddings",
         return_value=FakeEmbeddingService(),
     ):
         provider = EmbeddingProvider(
             model_name="test-model",
             openai_api_key="test-key",
             show_progress_bar=True,
-            log_callback=lambda _level, _msg: None,
+            log_callback=lambda _level, _msg, _subsystem: None,
         )
 
         # Verify basic properties were set
@@ -30,7 +30,7 @@ def test_embedding_provider_init() -> None:
         assert provider.show_progress_bar is True
         assert provider.log_callback is not None
         assert (
-            provider._embedding_dimension == 384
+            provider.embedding_dimension == 384
         )  # Default dimension for FakeEmbeddingService
 
 
@@ -47,7 +47,7 @@ def test_get_model_info() -> None:
     for model_name, expected_version in test_cases:
         # Create provider with the test model using a fake embedding service
         with patch(
-            "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+            "rag.embeddings.embedding_service.OpenAIEmbeddings",
             return_value=FakeEmbeddingService(),
         ):
             provider = EmbeddingProvider(
@@ -77,7 +77,7 @@ def test_embed_query() -> None:
     )
 
     with patch(
-        "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+        "rag.embeddings.embedding_service.OpenAIEmbeddings",
         return_value=fake_embeddings,
     ):
         provider = EmbeddingProvider(
@@ -108,7 +108,7 @@ def test_embed_texts() -> None:
     )
 
     with patch(
-        "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+        "rag.embeddings.embedding_service.OpenAIEmbeddings",
         return_value=fake_embeddings,
     ):
         provider = EmbeddingProvider(
@@ -132,7 +132,7 @@ def test_error_handling() -> None:
     fake_embeddings = FakeEmbeddingService()
 
     with patch(
-        "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+        "rag.embeddings.embedding_service.OpenAIEmbeddings",
         return_value=fake_embeddings,
     ):
         provider = EmbeddingProvider(
@@ -145,7 +145,7 @@ def test_error_handling() -> None:
             provider.embed_query(123)  # type: ignore
 
         # Test empty query
-        with pytest.raises(ValueError, match="Query cannot be empty"):
+        with pytest.raises(ValueError, match="Cannot embed empty query"):
             provider.embed_query("")
 
         # Test invalid text list
@@ -153,5 +153,5 @@ def test_error_handling() -> None:
             provider.embed_texts([])
 
         # Test non-string in text list
-        with pytest.raises(ValueError, match="Text must be a string"):
+        with pytest.raises(ValueError, match="Text at index 1 must be a string"):
             provider.embed_texts(["valid text", 123])  # type: ignore
