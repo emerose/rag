@@ -155,7 +155,8 @@ class DocumentIndexer:
         vectorstores: dict[str, VectorStoreProtocol],
         *,
         progress_callback: Callable[[str, Path, str | None], None] | None = None,
-        vectorstore_register_callback: Callable[[str, VectorStoreProtocol], None] | None = None,
+        vectorstore_register_callback: Callable[[str, VectorStoreProtocol], None]
+        | None = None,
     ) -> tuple[bool, str | None]:
         """Index a file.
 
@@ -295,7 +296,8 @@ class DocumentIndexer:
         loader_name: str | None = None,
         tokenizer_name: str | None = None,
         text_splitter_name: str | None = None,
-        vectorstore_register_callback: Callable[[str, VectorStoreProtocol], None] | None = None,
+        vectorstore_register_callback: Callable[[str, VectorStoreProtocol], None]
+        | None = None,
     ) -> bool:
         """Create or update a vectorstore from documents.
 
@@ -466,7 +468,8 @@ class DocumentIndexer:
         vectorstores: dict[str, VectorStoreProtocol] | None = None,
         *,
         progress_callback: Callable[[str, Path, str | None], None] | None = None,
-        vectorstore_register_callback: Callable[[str, VectorStoreProtocol], None] | None = None,
+        vectorstore_register_callback: Callable[[str, VectorStoreProtocol], None]
+        | None = None,
     ) -> dict[str, dict[str, Any]]:
         """Index all files in a directory.
 

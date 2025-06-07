@@ -308,7 +308,6 @@ class RAGEngine:
             self.embedding_model_map = {}
             self._log("WARNING", f"Failed to load embedding model map: {exc}")
 
-
     def _initialize_document_processing(self) -> None:
         """Initialize document processing components."""
         # Initialize document loader and text splitter
@@ -418,12 +417,11 @@ class RAGEngine:
             ``None`` when indexing succeeds.
         """
         return self.document_indexer.index_file(
-            file_path, 
-            self.cache_orchestrator.get_vectorstores(), 
+            file_path,
+            self.cache_orchestrator.get_vectorstores(),
             progress_callback=progress_callback,
             vectorstore_register_callback=self.cache_orchestrator.register_vectorstore,
         )
-
 
     def index_directory(
         self,
@@ -444,8 +442,8 @@ class RAGEngine:
             optional ``error`` message
         """
         results = self.document_indexer.index_directory(
-            directory, 
-            self.cache_orchestrator.get_vectorstores(), 
+            directory,
+            self.cache_orchestrator.get_vectorstores(),
             progress_callback=progress_callback,
             vectorstore_register_callback=self.cache_orchestrator.register_vectorstore,
         )
@@ -454,7 +452,6 @@ class RAGEngine:
         self.cache_orchestrator.cleanup_invalid_caches()
 
         return results
-
 
     def answer(self, question: str, k: int = 4) -> dict[str, Any]:
         """Answer question using the LCEL pipeline.
@@ -467,26 +464,30 @@ class RAGEngine:
             Dictionary with answer, sources, and metadata. Same payload format
             as the legacy implementation for backward compatibility.
         """
-        return self.query_engine.answer(question, self.cache_orchestrator.get_vectorstores(), k)
+        return self.query_engine.answer(
+            question, self.cache_orchestrator.get_vectorstores(), k
+        )
 
     def query(self, query: str, k: int = 4) -> str:
         """Return only the answer text for query (legacy helper).
-        
+
         Args:
             query: Query string
             k: Number of documents to retrieve
-            
+
         Returns:
             Answer text
         """
-        return self.query_engine.query(query, self.cache_orchestrator.get_vectorstores(), k)
+        return self.query_engine.query(
+            query, self.cache_orchestrator.get_vectorstores(), k
+        )
 
     def get_document_summaries(self, k: int = 5) -> list[dict[str, Any]]:
         """Generate short summaries of the k largest documents.
-        
+
         Args:
             k: Number of documents to summarize
-            
+
         Returns:
             List of dictionaries with file summaries
         """
