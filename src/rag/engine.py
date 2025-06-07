@@ -6,7 +6,6 @@ RAG system through dependency injection pattern.
 
 import asyncio
 import logging
-import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -20,17 +19,17 @@ from rag.querying.query_engine import QueryEngine
 from rag.retrieval import KeywordReranker
 
 from .config import RAGConfig, RuntimeOptions
-from .data.chunking import SemanticChunkingStrategy
 from .data.document_loader import DocumentLoader
+from .data.document_processor import DocumentProcessor
 from .data.text_splitter import TextSplitterFactory
 from .embeddings.batching import EmbeddingBatcher
 from .embeddings.embedding_provider import EmbeddingProvider
 from .embeddings.model_map import load_model_map
-from .ingest import BasicPreprocessor, IngestManager
+from .ingest import IngestManager
 from .storage.cache_manager import CacheManager
 from .storage.filesystem import FilesystemManager
 from .storage.index_manager import IndexManager
-from .storage.protocols import VectorStoreProtocol
+from .storage.protocols import CacheRepositoryProtocol, VectorStoreProtocol
 from .storage.vectorstore import VectorStoreManager
 from .utils.logging_utils import log_message
 
@@ -52,277 +51,118 @@ ENGINE_EXCEPTIONS = (
 
 
 class RAGEngine:
-    """Main RAG Engine class.
+    """Main RAG engine class.
 
-    This class orchestrates the entire RAG system, coordinating document processing,
-    embedding generation, vectorstore management, and query execution.
+    This class orchestrates the entire RAG system, providing a high-level
+    interface for document ingestion, indexing, and querying.
     """
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
-        config: RAGConfig | None = None,
-        runtime_options: RuntimeOptions | None = None,
-        **kwargs,
+        config: RAGConfig,
+        runtime: RuntimeOptions,
+        *,
+        filesystem_manager: FilesystemManager | None = None,
+        document_loader: DocumentLoader | None = None,
+        document_processor: DocumentProcessor | None = None,
+        text_splitter_factory: TextSplitterFactory | None = None,
+        embedding_provider: EmbeddingProvider | None = None,
+        embedding_batcher: EmbeddingBatcher | None = None,
+        cache_manager: CacheManager | None = None,
+        index_manager: CacheRepositoryProtocol | None = None,
+        vectorstore_manager: VectorStoreManager | None = None,
+        reranker: KeywordReranker | None = None,
+        chat_model: ChatOpenAI | None = None,
     ) -> None:
-        """Initialize the RAG Engine.
+        """Initialize the RAG engine.
 
         Args:
-            config: Configuration for the RAG engine
-            runtime_options: Runtime options
-            **kwargs: Backward compatibility for old API
-
+            config: RAG configuration
+            runtime: Runtime options
+            filesystem_manager: Optional filesystem manager
+            document_loader: Optional document loader
+            document_processor: Optional document processor
+            text_splitter_factory: Optional text splitter factory
+            embedding_provider: Optional embedding provider
+            embedding_batcher: Optional embedding batcher
+            cache_manager: Optional cache manager
+            index_manager: Optional index manager implementing CacheRepositoryProtocol
+            vectorstore_manager: Optional vectorstore manager
+            reranker: Optional reranker
+            chat_model: Optional chat model
         """
-        # Handle backward compatibility
-        if not config and "documents_dir" in kwargs:
-            config = RAGConfig(
-                documents_dir=kwargs["documents_dir"],
-                embedding_model=kwargs.get("embedding_model", "text-embedding-3-small"),
-                chat_model=kwargs.get("chat_model", "gpt-4"),
-                temperature=kwargs.get("temperature", 0.0),
-                cache_dir=kwargs.get("cache_dir", ".cache"),
-                lock_timeout=kwargs.get("lock_timeout", 30),
-                chunk_size=kwargs.get("chunk_size", 1000),
-                chunk_overlap=kwargs.get("chunk_overlap", 200),
-                openai_api_key=kwargs.get(
-                    "openai_api_key",
-                    os.getenv("OPENAI_API_KEY", ""),
-                ),
+        self.config = config
+        self.runtime = runtime
+
+        # Initialize model map and version (needed by document indexer)
+        if self.config.embedding_model_map_file:
+            self.embedding_model_map = load_model_map(
+                self.config.embedding_model_map_file
             )
+        else:
+            self.embedding_model_map = {}
+        self._embedding_model_version = "1.0"
 
-        # Set up configuration
-        self.config = config or self._create_default_config()
-        self.runtime = runtime_options or RuntimeOptions()
-        self.embedding_model_map: dict[str, str] = {}
-        self.default_prompt_id: str = "default"
-        self.system_prompt: str = os.getenv("RAG_SYSTEM_PROMPT", "")
+        # Initialize paths
+        self.documents_dir = Path(config.documents_dir).resolve()
 
-        # For backward compatibility
-        if self.runtime.progress_callback and not callable(
-            self.runtime.progress_callback,
-        ):
-            self.runtime.progress_callback = None
-
-        # Fail fast if the API key is missing
-        self._validate_api_key()
+        # Initialize missing components needed by indexer
+        self.ingest_manager: IngestManager | None = None  # Will be initialized later
 
         # Initialize components
-        self._initialize_from_config()
+        self._initialize_filesystem(filesystem_manager)
+        self._initialize_document_processing(
+            document_loader, document_processor, text_splitter_factory
+        )
+        self._initialize_embeddings(embedding_provider, embedding_batcher)
+        self._initialize_storage(cache_manager, index_manager, vectorstore_manager)
+        self._initialize_retrieval(reranker, chat_model)
 
-        # Backward compatibility
-        self.index_meta = self.index_manager
+        # Initialize orchestrators
+        self._initialize_orchestrators()
 
-    # Factory methods for better initialization
-    @classmethod
-    def create(
-        cls,
-        config: RAGConfig,
-        runtime_options: RuntimeOptions | None = None,
-    ) -> "RAGEngine":
-        """Create a new RAGEngine instance with given configuration.
-
-        Args:
-            config: Configuration for the RAG engine
-            runtime_options: Runtime options
-
-        Returns:
-            New RAGEngine instance
-
-        """
-        return cls(config, runtime_options)
-
-    @classmethod
-    def create_with_defaults(
-        cls,
-        documents_dir: str,
-        cache_dir: str = ".cache",
-    ) -> "RAGEngine":
-        """Create a new RAGEngine instance with default configuration.
-
-        Args:
-            documents_dir: Directory containing documents to index
-            cache_dir: Directory for caching
-
-        Returns:
-            New RAGEngine instance
-
-        """
-        config = RAGConfig(documents_dir=documents_dir, cache_dir=cache_dir)
-        return cls(config)
-
-    def _log(self, level: str, message: str, subsystem: str = "RAGEngine") -> None:
+    def _log(self, level: str, message: str) -> None:
         """Log a message.
 
         Args:
             level: Log level (INFO, WARNING, ERROR, etc.)
             message: The log message
-            subsystem: The subsystem generating the log
-
         """
-        log_message(level, message, subsystem, self.runtime.log_callback)
+        log_message(level, message, "RAGEngine", self.runtime.log_callback)
 
-    def _validate_api_key(self) -> None:
-        """Ensure the OpenAI API key is configured."""
+    def _initialize_filesystem(
+        self, filesystem_manager: FilesystemManager | None
+    ) -> None:
+        """Initialize filesystem components.
 
-        if not self.config.openai_api_key:
-            raise ValueError(
-                "OpenAI API key is missing. Set the OPENAI_API_KEY "
-                "environment variable."
-            )
-
-    def _create_default_config(self) -> RAGConfig:
-        """Create default configuration.
-
-        Returns:
-            Default RAGConfig
-
+        Args:
+            filesystem_manager: Optional filesystem manager
         """
-        return RAGConfig(
-            documents_dir="documents",
-            embedding_model="text-embedding-3-small",
-            chat_model="gpt-4",
-            temperature=0.0,
-            cache_dir=".cache",
-            lock_timeout=30,
-            chunk_size=1000,
-            chunk_overlap=200,
-            openai_api_key=os.getenv("OPENAI_API_KEY", ""),
-            vectorstore_backend="faiss",
+        self.filesystem_manager = filesystem_manager or FilesystemManager(
+            log_callback=self.runtime.log_callback
         )
 
-    def _initialize_from_config(self) -> None:
-        """Initialize all components from configuration."""
-        # Initialize paths and common utilities
-        self._initialize_paths()
+    def _initialize_document_processing(
+        self,
+        document_loader: DocumentLoader | None,
+        document_processor: DocumentProcessor | None,
+        text_splitter_factory: TextSplitterFactory | None,
+    ) -> None:
+        """Initialize document processing components.
 
-        # Initialize embedding components first since other components depend on it
-        self._initialize_embeddings()
-
-        # Initialize storage components
-        self._initialize_storage()
-
-        # Initialize document processing components
-        self._initialize_document_processing()
-
-        # Initialize retrieval components
-        self._initialize_retrieval()
-
-        # Initialize document indexing component
-        self._initialize_document_indexer()
-
-        # Initialize query execution component
-        self._initialize_query_engine()
-
-        # Initialize cache orchestration component
-        self._initialize_cache_orchestrator()
-
-        # Initialize vectorstores for already processed files
-        self.cache_orchestrator.initialize_vectorstores()
-
-    def _initialize_paths(self) -> None:
-        """Initialize paths from configuration."""
-        # Set up paths
-        self.documents_dir = Path(self.config.documents_dir).resolve()
-        self.cache_dir = Path(self.config.cache_dir).absolute()
-
-        # Ensure cache directory exists
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-        self._log("DEBUG", f"Documents directory: {self.documents_dir}")
-        self._log("DEBUG", f"Cache directory: {self.cache_dir}")
-
-    def _initialize_storage(self) -> None:
-        """Initialize storage components."""
-        # Initialize filesystem, index, and cache managers
-        self.filesystem_manager = FilesystemManager(
-            log_callback=self.runtime.log_callback,
-        )
-
-        self.index_manager = IndexManager(
-            cache_dir=self.cache_dir,
-            log_callback=self.runtime.log_callback,
-        )
-
-        self.cache_manager = CacheManager(
-            cache_dir=self.cache_dir,
-            index_manager=self.index_manager,
-            log_callback=self.runtime.log_callback,
-        )
-
-        # Check if we need to migrate from JSON to SQLite
-        self.cache_manager.migrate_json_to_sqlite()
-
-        # Load cache metadata
-        self.cache_metadata = self.cache_manager.load_cache_metadata()
-
-        # Initialize vectorstore manager with safe_deserialization=False since we trust
-        # our own cache files
-        backend_config = {}
-        if self.config.vectorstore_backend == "faiss":
-            backend_config["safe_deserialization"] = (
-                False  # We trust our own cache files
-            )
-
-        self.vectorstore_manager = VectorStoreManager(
-            cache_dir=self.cache_dir,
-            embeddings=self.embedding_provider.embeddings,
-            log_callback=self.runtime.log_callback,
-            lock_timeout=self.config.lock_timeout,
-            backend=self.config.vectorstore_backend,
-            backend_config=backend_config,
-        )
-
-    def _initialize_embeddings(self) -> None:
-        """Initialize embedding components."""
-        # Initialize embedding provider
-        self.embedding_provider = EmbeddingProvider(
-            model_name=self.config.embedding_model,
-            openai_api_key=self.config.openai_api_key,
-            log_callback=self.runtime.log_callback,
-        )
-
-        # Get model info
-        model_info = self.embedding_provider.get_model_info()
-        self.embedding_model_version = model_info["model_version"]
-
-        # Initialize embedding batcher
-        self.embedding_batcher = EmbeddingBatcher(
-            embedding_provider=self.embedding_provider,
-            max_concurrency=self.runtime.max_workers,
-            log_callback=self.runtime.log_callback,
-            progress_callback=self.runtime.progress_callback,
-        )
-
-        # Load per-document embedding model map
-        self._load_embedding_model_map()
-
-        self._log(
-            "DEBUG",
-            f"Using embedding model: {self.config.embedding_model} "
-            f"(version: {self.embedding_model_version})",
-        )
-
-    def _load_embedding_model_map(self) -> None:
-        """Load embedding model mapping from YAML file."""
-        map_file = self.config.embedding_model_map_file
-        if map_file is None:
-            map_file = self.documents_dir / "embeddings.yaml"
-        try:
-            self.embedding_model_map = load_model_map(map_file)
-            if self.embedding_model_map:
-                self._log("DEBUG", f"Loaded embedding model map from {map_file}")
-        except ValueError as exc:
-            self.embedding_model_map = {}
-            self._log("WARNING", f"Failed to load embedding model map: {exc}")
-
-    def _initialize_document_processing(self) -> None:
-        """Initialize document processing components."""
-        # Initialize document loader and text splitter
-        self.document_loader = DocumentLoader(
+        Args:
+            document_loader: Optional document loader
+            document_processor: Optional document processor
+            text_splitter_factory: Optional text splitter factory
+        """
+        # Initialize document loader
+        self.document_loader = document_loader or DocumentLoader(
             filesystem_manager=self.filesystem_manager,
             log_callback=self.runtime.log_callback,
         )
 
-        self.text_splitter_factory = TextSplitterFactory(
+        # Initialize text splitter factory
+        self.text_splitter_factory = text_splitter_factory or TextSplitterFactory(
             chunk_size=self.config.chunk_size,
             chunk_overlap=self.config.chunk_overlap,
             model_name=self.config.embedding_model,
@@ -331,27 +171,106 @@ class RAGEngine:
             semantic_chunking=self.runtime.semantic_chunking,
         )
 
-        # Initialize ingest manager
-        self.chunking_strategy = SemanticChunkingStrategy(
+        # Initialize document processor
+        self.document_processor = document_processor or DocumentProcessor(
+            filesystem_manager=self.filesystem_manager,
+            document_loader=self.document_loader,
+            text_splitter_factory=self.text_splitter_factory,
+            log_callback=self.runtime.log_callback,
+            progress_callback=self.runtime.progress_callback,
+        )
+
+        # Initialize ingest manager (needed by document indexer)
+        from rag.data.chunking import DefaultChunkingStrategy
+
+        chunking_strategy = DefaultChunkingStrategy(
             chunk_size=self.config.chunk_size,
             chunk_overlap=self.config.chunk_overlap,
             model_name=self.config.embedding_model,
             log_callback=self.runtime.log_callback,
         )
-
         self.ingest_manager = IngestManager(
             filesystem_manager=self.filesystem_manager,
-            chunking_strategy=self.chunking_strategy,
-            preprocessor=BasicPreprocessor(),
+            chunking_strategy=chunking_strategy,
             document_loader=self.document_loader,
             log_callback=self.runtime.log_callback,
             progress_callback=self.runtime.progress_callback,
         )
 
-    def _initialize_retrieval(self) -> None:
-        """Initialize retrieval components."""
+    def _initialize_embeddings(
+        self,
+        embedding_provider: EmbeddingProvider | None,
+        embedding_batcher: EmbeddingBatcher | None,
+    ) -> None:
+        """Initialize embedding components.
+
+        Args:
+            embedding_provider: Optional embedding provider
+            embedding_batcher: Optional embedding batcher
+        """
+        # Initialize embedding provider
+        if embedding_provider is None:
+            embedding_provider = EmbeddingProvider(
+                model_name=self.config.embedding_model,
+                openai_api_key=self.config.openai_api_key,
+                log_callback=self.runtime.log_callback,
+            )
+        self.embedding_provider = embedding_provider
+
+        # Initialize embedding batcher
+        self.embedding_batcher = embedding_batcher or EmbeddingBatcher(
+            embedding_provider=self.embedding_provider,
+            initial_batch_size=self.config.batch_size,
+            log_callback=self.runtime.log_callback,
+        )
+
+    def _initialize_storage(
+        self,
+        cache_manager: CacheManager | None,
+        index_manager: CacheRepositoryProtocol | None,
+        vectorstore_manager: VectorStoreManager | None,
+    ) -> None:
+        """Initialize storage components.
+
+        Args:
+            cache_manager: Optional cache manager
+            index_manager: Optional index manager implementing CacheRepositoryProtocol
+            vectorstore_manager: Optional vectorstore manager
+        """
+        # Initialize index manager first (needed by cache manager)
+        self.index_manager = index_manager or IndexManager(
+            cache_dir=Path(self.config.cache_dir),
+            log_callback=self.runtime.log_callback,
+        )
+
+        # Initialize vectorstore manager (needed by cache manager)
+        self.vectorstore_manager = vectorstore_manager or VectorStoreManager(
+            cache_dir=Path(self.config.cache_dir),
+            embeddings=self.embedding_provider.embeddings,
+            log_callback=self.runtime.log_callback,
+            backend=self.config.vectorstore_backend,
+        )
+
+        # Initialize cache manager
+        self.cache_manager = cache_manager or CacheManager(
+            cache_dir=Path(self.config.cache_dir),
+            index_manager=self.index_manager,
+            log_callback=self.runtime.log_callback,
+            filesystem_manager=self.filesystem_manager,
+            vector_repository=self.vectorstore_manager,
+        )
+
+    def _initialize_retrieval(
+        self, reranker: KeywordReranker | None, chat_model: ChatOpenAI | None
+    ) -> None:
+        """Initialize retrieval components.
+
+        Args:
+            reranker: Optional reranker
+            chat_model: Optional chat model
+        """
         # Initialize chat model
-        self.chat_model = ChatOpenAI(
+        self.chat_model = chat_model or ChatOpenAI(
             model=self.config.chat_model,
             openai_api_key=self.config.openai_api_key,
             temperature=self.config.temperature,
@@ -359,12 +278,20 @@ class RAGEngine:
         )
 
         # Optional reranker for retrieval results
-        self.reranker = KeywordReranker() if self.runtime.rerank else None
+        self.reranker = reranker or (KeywordReranker() if self.runtime.rerank else None)
 
         self._log("DEBUG", f"Using chat model: {self.config.chat_model}")
 
-    def _initialize_document_indexer(self) -> None:
-        """Initialize document indexing component."""
+    def _initialize_orchestrators(self) -> None:
+        """Initialize orchestrator components."""
+        # Initialize cache orchestrator
+        self.cache_orchestrator = CacheOrchestrator(
+            cache_manager=self.cache_manager,
+            vector_repository=self.vectorstore_manager,
+            log_callback=self.runtime.log_callback,
+        )
+
+        # Initialize document indexer
         self.document_indexer = DocumentIndexer(
             config=self.config,
             runtime_options=self.runtime,
@@ -376,27 +303,17 @@ class RAGEngine:
             embedding_provider=self.embedding_provider,
             embedding_batcher=self.embedding_batcher,
             embedding_model_map=self.embedding_model_map,
-            embedding_model_version=self.embedding_model_version,
+            embedding_model_version=self._embedding_model_version,
             log_callback=self.runtime.log_callback,
         )
 
-    def _initialize_query_engine(self) -> None:
-        """Initialize query execution component."""
+        # Initialize query engine
         self.query_engine = QueryEngine(
             config=self.config,
             runtime_options=self.runtime,
             chat_model=self.chat_model,
             document_loader=self.document_loader,
             reranker=self.reranker,
-            default_prompt_id=self.default_prompt_id,
-            log_callback=self.runtime.log_callback,
-        )
-
-    def _initialize_cache_orchestrator(self) -> None:
-        """Initialize cache orchestration component."""
-        self.cache_orchestrator = CacheOrchestrator(
-            cache_manager=self.cache_manager,
-            vector_repository=self.vectorstore_manager,
             log_callback=self.runtime.log_callback,
         )
 

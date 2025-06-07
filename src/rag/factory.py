@@ -8,6 +8,7 @@ patterns to improve testability and modularity.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -41,6 +42,9 @@ from rag.storage.vectorstore import VectorStoreManager
 
 logger = logging.getLogger(__name__)
 
+# TypeAlias for log callback function
+LogCallback: Callable[[str, str, str], None]
+
 
 @dataclass
 class ComponentOverrides:
@@ -53,6 +57,7 @@ class ComponentOverrides:
     cache_repository: CacheRepositoryProtocol | None = None
     vector_repository: VectorRepositoryProtocol | None = None
     embedding_service: EmbeddingServiceProtocol | None = None
+    document_loader: Any | None = None
 
 
 class RAGComponentsFactory:
@@ -86,10 +91,10 @@ class RAGComponentsFactory:
         self._cache_repository = self.overrides.cache_repository
         self._vector_repository = self.overrides.vector_repository
         self._embedding_service = self.overrides.embedding_service
+        self._document_loader = self.overrides.document_loader
 
         # Initialize core dependencies first
         self._chat_model: ChatOpenAI | None = None
-        self._document_loader: DocumentLoader | None = None
         self._ingest_manager: IngestManager | None = None
         self._cache_manager: CacheManager | None = None
         self._reranker: BaseReranker | None = None
@@ -114,9 +119,8 @@ class RAGComponentsFactory:
     def cache_repository(self) -> CacheRepositoryProtocol:
         """Get or create cache repository."""
         if self._cache_repository is None:
-            cache_dir = Path(self.config.cache_dir)
             self._cache_repository = IndexManager(
-                cache_dir=cache_dir,
+                cache_dir=Path(self.config.cache_dir),
                 log_callback=self.runtime.log_callback,
             )
         return self._cache_repository
@@ -191,24 +195,12 @@ class RAGComponentsFactory:
     def cache_manager(self) -> CacheManager:
         """Get or create cache manager."""
         if self._cache_manager is None:
-            cache_dir = Path(self.config.cache_dir)
-            # CacheManager expects an IndexManager specifically, not the protocol
-            # This is a known limitation - CacheManager is tightly coupled to IndexManager
-            from rag.storage.index_manager import IndexManager
-
-            if isinstance(self.cache_repository, IndexManager):
-                index_manager = self.cache_repository
-            else:
-                # Fallback to creating a new IndexManager if using a fake
-                index_manager = IndexManager(
-                    cache_dir=cache_dir,
-                    log_callback=self.runtime.log_callback,
-                )
-
             self._cache_manager = CacheManager(
-                cache_dir=cache_dir,
-                index_manager=index_manager,
+                cache_dir=Path(self.config.cache_dir),
+                index_manager=self.cache_repository,
                 log_callback=self.runtime.log_callback,
+                filesystem_manager=self.filesystem_manager,
+                vector_repository=self.vector_repository,
             )
         return self._cache_manager
 

@@ -286,6 +286,16 @@ class VectorStoreManager(VectorRepositoryProtocol):
             self._log("ERROR", f"Failed to perform similarity search: {e}")
             return []
 
+    def remove_vectorstore(self, file_path: str) -> None:
+        """Remove a cached vectorstore.
+
+        Args:
+            file_path: Path to the source file
+        """
+        # For the real implementation, we don't maintain an in-memory cache
+        # The cache files are managed by the backend, so this is a no-op
+        pass
+
     def _get_docstore_items(self, docstore: Any) -> list[tuple[str, Document]]:
         """Get items from a docstore in a safe way.
 

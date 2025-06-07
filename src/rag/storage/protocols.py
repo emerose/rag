@@ -144,6 +144,13 @@ class VectorRepositoryProtocol(Protocol):
             List of similar documents
         """
 
+    def remove_vectorstore(self, file_path: str) -> None:
+        """Remove a cached vectorstore.
+
+        Args:
+            file_path: Path to the source file
+        """
+
 
 @runtime_checkable
 class FileSystemProtocol(Protocol):
@@ -209,6 +216,16 @@ class FileSystemProtocol(Protocol):
 
         Returns:
             Dictionary containing file metadata
+        """
+
+    def exists(self, file_path: Path | str) -> bool:
+        """Check if a file exists.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            True if the file exists, False otherwise
         """
 
     def validate_documents_dir(self, directory: Path | str) -> bool:

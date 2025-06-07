@@ -250,7 +250,7 @@ class IngestManager:
         path = Path(file_path)
 
         # Check if file exists
-        if not path.exists():
+        if not self.filesystem_manager.exists(path):
             return source
 
         # Populate metadata
@@ -289,7 +289,7 @@ class IngestManager:
         result = None
 
         # Check if file exists first
-        if not file_path.exists():
+        if not self.filesystem_manager.exists(file_path):
             result = IngestResult(
                 DocumentSource(file_path),
                 IngestStatus.FILE_NOT_FOUND,

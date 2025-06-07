@@ -27,7 +27,8 @@ class TestTestRAGComponentsFactory:
         assert isinstance(factory.cache_repository, InMemoryCacheRepository)
         assert isinstance(factory.vector_repository, InMemoryVectorRepository)
         assert isinstance(
-            factory.embedding_service, (FakeEmbeddingService, DeterministicEmbeddingService)
+            factory.embedding_service,
+            (FakeEmbeddingService, DeterministicEmbeddingService),
         )
 
     def test_factory_with_custom_config(self) -> None:
@@ -107,9 +108,14 @@ class TestTestRAGComponentsFactory:
 
         # Check that sample files exist
         files = factory.get_test_files()
-        assert "/tmp/test_docs/doc1.txt" in files
-        assert "/tmp/test_docs/doc2.md" in files
-        assert "/tmp/test_docs/subdir/doc3.txt" in files
+        # Use Path.resolve() to handle platform-specific paths (e.g., /tmp vs /private/tmp on macOS)
+        resolved_path = str(Path("/tmp/test_docs/doc1.txt").resolve())
+        assert any(Path(f).resolve() == Path(resolved_path) for f in files)
+        # Check other files using the same approach
+        doc2_resolved = str(Path("/tmp/test_docs/doc2.md").resolve())
+        doc3_resolved = str(Path("/tmp/test_docs/subdir/doc3.txt").resolve())
+        assert any(Path(f).resolve() == Path(doc2_resolved) for f in files)
+        assert any(Path(f).resolve() == Path(doc3_resolved) for f in files)
 
         # Check that sample metadata exists
         metadata = factory.get_test_metadata()
@@ -173,7 +179,8 @@ class TestTestRAGComponentsFactory:
         assert isinstance(engine.index_manager, InMemoryCacheRepository)
         assert isinstance(engine.vectorstore_manager, InMemoryVectorRepository)
         assert isinstance(
-            engine.embedding_provider, (FakeEmbeddingService, DeterministicEmbeddingService)
+            engine.embedding_provider,
+            (FakeEmbeddingService, DeterministicEmbeddingService),
         )
 
         # Check that the engine has the right configuration
@@ -187,23 +194,29 @@ class TestTestRAGComponentsFactory:
         from rag.storage.filesystem import FilesystemManager
         from rag.storage.index_manager import IndexManager
         from rag.factory import ComponentOverrides, RAGComponentsFactory
-        
+
         # Create overrides with real components
         overrides = ComponentOverrides(
             filesystem_manager=FilesystemManager(),
-            cache_repository=IndexManager(cache_dir=Path("/tmp/test"), log_callback=None),
+            cache_repository=IndexManager(
+                cache_dir=Path("/tmp/test"), log_callback=None
+            ),
         )
-        
+
         config = RAGConfig(documents_dir="/tmp/test", cache_dir="/tmp/cache")
         runtime = RuntimeOptions()
-        
+
         # Create TestRAGComponentsFactory with real component overrides
         factory = TestRAGComponentsFactory.__new__(TestRAGComponentsFactory)
         RAGComponentsFactory.__init__(factory, config, runtime, overrides)
 
         # This should raise an error since we're not using fake components
-        with pytest.raises(ValueError, match="Can only get test files from InMemoryFileSystem"):
+        with pytest.raises(
+            ValueError, match="Can only get test files from InMemoryFileSystem"
+        ):
             factory.get_test_files()
 
-        with pytest.raises(ValueError, match="Can only get test metadata from InMemoryCacheRepository"):
+        with pytest.raises(
+            ValueError, match="Can only get test metadata from InMemoryCacheRepository"
+        ):
             factory.get_test_metadata()

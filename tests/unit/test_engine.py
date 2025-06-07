@@ -51,53 +51,52 @@ def test_engine_init_with_config(tmp_path: Path) -> None:
     assert engine.config.openai_api_key == "test-key"
 
 
-def test_engine_backward_compatibility(tmp_path: Path) -> None:
-    """Test backward compatibility with kwargs initialization."""
-    with patch("rag.engine.ChatOpenAI"):
-        # Create engine with old-style kwargs (using fake backend for testing)
-        engine = RAGEngine(
-            documents_dir=str(tmp_path / "docs"),
-            embedding_model="text-embedding-3-small",
-            chat_model="gpt-4",
-            temperature=0.7,
-            cache_dir=str(tmp_path / "cache"),
-            lock_timeout=60,
-            chunk_size=500,
-            chunk_overlap=100,
-            openai_api_key="test-key",
-            vectorstore_backend="fake",
-        )
+def test_engine_with_factory(tmp_path: Path) -> None:
+    """Test engine creation through factory."""
+    config = RAGConfig(
+        documents_dir=str(tmp_path / "docs"),
+        embedding_model="text-embedding-3-small",
+        chat_model="gpt-4",
+        temperature=0.7,
+        cache_dir=str(tmp_path / "cache"),
+        lock_timeout=60,
+        chunk_size=500,
+        chunk_overlap=100,
+        openai_api_key="test-key",
+        vectorstore_backend="fake",
+    )
 
-        # Verify config was created from kwargs
-        assert engine.config.documents_dir == str(tmp_path / "docs")
-        assert engine.config.embedding_model == "text-embedding-3-small"
-        assert engine.config.chat_model == "gpt-4"
-        assert engine.config.temperature == 0.7
-        assert engine.config.cache_dir == str(tmp_path / "cache")
-        assert engine.config.lock_timeout == 60
-        assert engine.config.chunk_size == 500
-        assert engine.config.chunk_overlap == 100
-        assert engine.config.openai_api_key == "test-key"
+    # Create engine through factory
+    factory = TestRAGComponentsFactory(config, RuntimeOptions())
+    engine = factory.create_rag_engine()
+
+    # Verify config was set correctly
+    assert engine.config.documents_dir == str(tmp_path / "docs")
+    assert engine.config.embedding_model == "text-embedding-3-small"
+    assert engine.config.chat_model == "gpt-4"
+    assert engine.config.temperature == 0.7
+    assert engine.config.cache_dir == str(tmp_path / "cache")
+    assert engine.config.lock_timeout == 60
+    assert engine.config.chunk_size == 500
+    assert engine.config.chunk_overlap == 100
+    assert engine.config.openai_api_key == "test-key"
 
 
 @patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=True)
 def test_create_default_config() -> None:
     """Test creating default configuration."""
-    with patch("rag.engine.ChatOpenAI"):
-        engine = RAGEngine(vectorstore_backend="fake")
+    # Test default config creation with minimal required parameters
+    config = RAGConfig(documents_dir="documents")
 
-        # Get default config
-        config = engine._create_default_config()
-
-        # Verify default values
-        assert config.documents_dir == "documents"
-        assert config.embedding_model == "text-embedding-3-small"
-        assert config.chat_model == "gpt-4"
-        assert config.temperature == 0.0
-        assert config.cache_dir == ".cache"
-        assert config.lock_timeout == 30
-        assert config.chunk_size == 1000
-        assert config.chunk_overlap == 200
+    # Verify default values
+    assert config.documents_dir == "documents"
+    assert config.embedding_model == "text-embedding-3-small"
+    assert config.chat_model == "gpt-4"
+    assert config.temperature == 0.0
+    assert config.cache_dir == ".cache"
+    assert config.lock_timeout == 30
+    assert config.chunk_size == 1000
+    assert config.chunk_overlap == 200
 
 
 def test_initialize_paths(tmp_path: Path) -> None:
