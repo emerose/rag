@@ -35,10 +35,10 @@ def test_golden_set_retrieval(tmp_path: Path) -> None:
 
     with (
         patch(
-            "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+            "rag.embeddings.embedding_service.OpenAIEmbeddings",
             return_value=FakeEmbeddings(size=32),
         ),
-        patch.object(EmbeddingProvider, "_get_embedding_dimension", return_value=32),
+        patch.object(EmbeddingProvider, "embedding_dimension", 32),
     ):
         engine = RAGEngine(config, runtime)
         success, error = engine.index_file(target_file)

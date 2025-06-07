@@ -246,7 +246,7 @@ class RAGEngine:
         # Initialize vectorstore manager (needed by cache manager)
         self.vectorstore_manager = vectorstore_manager or VectorStoreManager(
             cache_dir=Path(self.config.cache_dir),
-            embeddings=self.embedding_provider.embeddings,
+            embeddings=self.embedding_provider.get_embeddings_model,
             log_callback=self.runtime.log_callback,
             backend=self.config.vectorstore_backend,
         )

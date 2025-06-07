@@ -29,10 +29,10 @@ pytestmark = pytest.mark.integration
 def _build_test_server(tmp_path: Path):
     with (
         patch(
-            "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+            "rag.embeddings.embedding_service.OpenAIEmbeddings",
             return_value=FakeEmbeddings(size=32),
         ),
-        patch.object(EmbeddingProvider, "_get_embedding_dimension", return_value=32),
+        patch.object(EmbeddingProvider, "embedding_dimension", 32),
     ):
         config = RAGConfig(
             documents_dir=str(tmp_path / "docs"),
@@ -72,10 +72,10 @@ def _build_test_server(tmp_path: Path):
 def test_incremental_indexing_workflow(tmp_path: Path) -> None:
     with (
         patch(
-            "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+            "rag.embeddings.embedding_service.OpenAIEmbeddings",
             return_value=FakeEmbeddings(size=8),
         ),
-        patch.object(EmbeddingProvider, "_get_embedding_dimension", return_value=8),
+        patch.object(EmbeddingProvider, "embedding_dimension", 8),
     ):
         cache_dir = tmp_path / "cache"
         cache_dir.mkdir()
@@ -107,10 +107,10 @@ def test_incremental_indexing_workflow(tmp_path: Path) -> None:
 def test_directory_indexing_and_cleanup(tmp_path: Path) -> None:
     with (
         patch(
-            "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+            "rag.embeddings.embedding_service.OpenAIEmbeddings",
             return_value=FakeEmbeddings(size=8),
         ),
-        patch.object(EmbeddingProvider, "_get_embedding_dimension", return_value=8),
+        patch.object(EmbeddingProvider, "embedding_dimension", 8),
     ):
         docs_dir = tmp_path / "docs"
         docs_dir.mkdir()
@@ -210,10 +210,10 @@ def test_json_output_piping(tmp_path: Path) -> None:
 
     with (
         patch(
-            "rag.embeddings.embedding_provider.OpenAIEmbeddings",
+            "rag.embeddings.embedding_service.OpenAIEmbeddings",
             return_value=FakeEmbeddings(size=8),
         ),
-        patch.object(EmbeddingProvider, "_get_embedding_dimension", return_value=8),
+        patch.object(EmbeddingProvider, "embedding_dimension", 8),
         patch("rag.engine.ChatOpenAI"),
     ):
         result_index = runner.invoke(
