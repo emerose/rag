@@ -256,13 +256,19 @@ class RAGEngine:
 
         # Initialize vectorstore manager with safe_deserialization=False since we trust
         # our own cache files
+        backend_config = {}
+        if self.config.vectorstore_backend == "faiss":
+            backend_config["safe_deserialization"] = (
+                False  # We trust our own cache files
+            )
+
         self.vectorstore_manager = VectorStoreManager(
             cache_dir=self.cache_dir,
             embeddings=self.embedding_provider.embeddings,
             log_callback=self.runtime.log_callback,
             lock_timeout=self.config.lock_timeout,
-            safe_deserialization=False,  # We trust our own cache files
             backend=self.config.vectorstore_backend,
+            backend_config=backend_config,
         )
 
     def _initialize_embeddings(self) -> None:

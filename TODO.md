@@ -15,7 +15,7 @@
 - ✅ Implement InMemoryVectorStore fake for fast unit testing
 - ✅ Refactor CLI commands to use RAGComponentsFactory instead of direct RAGEngine instantiation
 - ✅ Create TestRAGComponentsFactory that wires fake implementations
-- Refactor VectorStoreManager to reduce FAISS coupling and improve testability
+- ✅ Refactor VectorStoreManager to reduce FAISS coupling and improve testability
 - Replace heavy mocking in test_engine.py with fake component implementations
 - Replace heavy mocking in test_vectorstore.py with fake implementations
 - Replace heavy mocking in test_embedding_provider.py with fake HTTP client

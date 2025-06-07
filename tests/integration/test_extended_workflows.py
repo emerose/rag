@@ -43,7 +43,8 @@ def _build_test_server(tmp_path: Path):
         server = build_server(config, runtime)
     engine = server.engine
     engine.answer = lambda q, k=4: {"answer": "ok"}
-    engine.vectorstores = {"vs": object()}
+    # Mock the cache orchestrator's get_vectorstores method instead of setting vectorstores directly
+    engine.cache_orchestrator.get_vectorstores = lambda: {"vs": object()}
     engine.vectorstore_manager.merge_vectorstores = lambda stores: None
     engine.vectorstore_manager.similarity_search = lambda merged, q, k=4: [
         Document(page_content="doc", metadata={})
@@ -87,8 +88,8 @@ def test_incremental_indexing_workflow(tmp_path: Path) -> None:
         )
         engine = RAGEngine(config, RuntimeOptions(async_batching=False))
         docs1 = [Document(page_content="alpha"), Document(page_content="bravo")]
-        assert engine._create_vectorstore_from_documents(
-            tmp_path / "doc.txt", docs1, "text/plain"
+        assert engine.document_indexer._create_vectorstore_from_documents(
+            tmp_path / "doc.txt", docs1, "text/plain", {}
         )
         docs2 = [Document(page_content="alpha changed"), Document(page_content="bravo")]
         with patch.object(
@@ -96,8 +97,8 @@ def test_incremental_indexing_workflow(tmp_path: Path) -> None:
             "process_embeddings",
             wraps=engine.embedding_batcher.process_embeddings,
         ) as mock_embed:
-            assert engine._create_vectorstore_from_documents(
-                tmp_path / "doc.txt", docs2, "text/plain"
+            assert engine.document_indexer._create_vectorstore_from_documents(
+                tmp_path / "doc.txt", docs2, "text/plain", {}
             )
             mock_embed.assert_called_once()
             assert len(mock_embed.call_args[0][0]) == 1

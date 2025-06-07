@@ -1,29 +1,26 @@
 """Tests for the VectorStoreManager class.
 
-Focus on testing our wrapper logic, not FAISS itself.
+Test the refactored VectorStoreManager that uses pluggable backends.
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, patch
 
+import pytest
 from langchain_core.documents import Document
 
 from rag.storage.vectorstore import VectorStoreManager
 
 
-@patch("rag.storage.vectorstore.FAISS")
 def test_vectorstore_manager_init(
-    _mock_faiss: MagicMock,
     temp_dir: Path,
     mock_embedding_provider: MagicMock,
 ) -> None:
-    """Test initializing the VectorStoreManager."""
-    # Mock _get_embedding_dimension to avoid API calls
-    with patch.object(
-        VectorStoreManager,
-        "_get_embedding_dimension",
-        return_value=1536,
-    ):
+    """Test initializing the VectorStoreManager with default FAISS backend."""
+    with patch("rag.storage.vectorstore.create_vectorstore_backend") as mock_factory:
+        mock_backend = MagicMock()
+        mock_factory.return_value = mock_backend
+        
         manager = VectorStoreManager(
             cache_dir=temp_dir,
             embeddings=mock_embedding_provider.embeddings,
@@ -33,21 +30,47 @@ def test_vectorstore_manager_init(
         assert manager.cache_dir == temp_dir
         assert manager.embeddings == mock_embedding_provider.embeddings
         assert manager.log_callback is None
+        assert manager.backend_name == "faiss"
+        assert manager.backend == mock_backend
+        
+        # Verify factory was called with correct parameters
+        mock_factory.assert_called_once_with("faiss", mock_embedding_provider.embeddings)
 
 
-@patch("rag.storage.vectorstore.FAISS")
+def test_vectorstore_manager_init_with_fake_backend(
+    temp_dir: Path,
+    mock_embedding_provider: MagicMock,
+) -> None:
+    """Test initializing the VectorStoreManager with fake backend."""
+    with patch("rag.storage.vectorstore.create_vectorstore_backend") as mock_factory:
+        mock_backend = MagicMock()
+        mock_factory.return_value = mock_backend
+        
+        manager = VectorStoreManager(
+            cache_dir=temp_dir,
+            embeddings=mock_embedding_provider.embeddings,
+            backend="fake",
+            backend_config={"embedding_dimension": 512}
+        )
+
+        # Verify backend configuration
+        assert manager.backend_name == "fake"
+        assert manager.backend == mock_backend
+        
+        # Verify factory was called with correct parameters
+        mock_factory.assert_called_once_with(
+            "fake", 
+            mock_embedding_provider.embeddings,
+            embedding_dimension=512
+        )
+
+
 def test_get_cache_path(
-    _mock_faiss: MagicMock,
     temp_dir: Path,
     mock_embedding_provider: MagicMock,
 ) -> None:
     """Test getting the cache path for a file."""
-    # Mock _get_embedding_dimension to avoid API calls
-    with patch.object(
-        VectorStoreManager,
-        "_get_embedding_dimension",
-        return_value=1536,
-    ):
+    with patch("rag.storage.vectorstore.create_vectorstore_backend"):
         manager = VectorStoreManager(
             cache_dir=temp_dir,
             embeddings=mock_embedding_provider.embeddings,
@@ -59,9 +82,8 @@ def test_get_cache_path(
         # Verify the path is in the cache directory
         assert cache_path.parent == temp_dir
 
-        # Verify the filename uses a hash and has the right extension
-        assert cache_path.suffix == ".faiss"
-        assert len(cache_path.stem) == 64  # SHA-256 hash length
+        # Verify the filename uses a hash (no extension yet)
+        assert len(cache_path.name) == 64  # SHA-256 hash length
 
         # Verify different files get different cache paths
         file_path2 = "/path/to/test/different_file.txt"
@@ -69,24 +91,18 @@ def test_get_cache_path(
         assert cache_path != cache_path2
 
 
-@patch("rag.storage.vectorstore.FAISS")
 def test_create_vectorstore_with_documents(
-    _mock_faiss: MagicMock,
     temp_dir: Path,
     mock_embedding_provider: MagicMock,
     sample_documents: list[Document],
 ) -> None:
     """Test creating a vector store from documents."""
-    # Setup mock
-    mock_instance = MagicMock()
-    _mock_faiss.from_documents.return_value = mock_instance
-
-    # Patch embedding provider to avoid API calls
-    with patch.object(
-        VectorStoreManager,
-        "_get_embedding_dimension",
-        return_value=1536,
-    ):
+    with patch("rag.storage.vectorstore.create_vectorstore_backend") as mock_factory:
+        mock_backend = MagicMock()
+        mock_vectorstore = MagicMock()
+        mock_backend.create_vectorstore.return_value = mock_vectorstore
+        mock_factory.return_value = mock_backend
+        
         manager = VectorStoreManager(
             cache_dir=temp_dir,
             embeddings=mock_embedding_provider.embeddings,
@@ -95,43 +111,24 @@ def test_create_vectorstore_with_documents(
         # Create vectorstore from documents
         vectorstore = manager.create_vectorstore(sample_documents)
 
-    # Verify FAISS.from_documents was called with the right arguments
-    _mock_faiss.from_documents.assert_called_once_with(
-        sample_documents,
-        mock_embedding_provider.embeddings,
-    )
+        # Verify backend method was called with the right arguments
+        mock_backend.create_vectorstore.assert_called_once_with(sample_documents)
 
-    # Verify the returned vectorstore is the mock instance
-    assert vectorstore == mock_instance
+        # Verify the returned vectorstore is the mock instance
+        assert vectorstore == mock_vectorstore
 
 
-@patch("rag.storage.vectorstore.FAISS")
-@patch("rag.storage.vectorstore.faiss")
-@patch("rag.storage.vectorstore.InMemoryDocstore")
 def test_create_empty_vectorstore(
-    mock_docstore: MagicMock,
-    mock_faiss_lib: MagicMock,
-    mock_faiss_cls: MagicMock,
     temp_dir: Path,
     mock_embedding_provider: MagicMock,
 ) -> None:
     """Test creating an empty vector store."""
-    # Setup mocks
-    mock_instance = MagicMock()
-    mock_faiss_cls.return_value = mock_instance
-
-    mock_index = MagicMock()
-    mock_faiss_lib.IndexFlatL2.return_value = mock_index
-
-    mock_docstore_instance = MagicMock()
-    mock_docstore.return_value = mock_docstore_instance
-
-    # Patch embedding provider to avoid API calls
-    with patch.object(
-        VectorStoreManager,
-        "_get_embedding_dimension",
-        return_value=1536,
-    ):
+    with patch("rag.storage.vectorstore.create_vectorstore_backend") as mock_factory:
+        mock_backend = MagicMock()
+        mock_vectorstore = MagicMock()
+        mock_backend.create_empty_vectorstore.return_value = mock_vectorstore
+        mock_factory.return_value = mock_backend
+        
         manager = VectorStoreManager(
             cache_dir=temp_dir,
             embeddings=mock_embedding_provider.embeddings,
@@ -140,36 +137,25 @@ def test_create_empty_vectorstore(
         # Create empty vectorstore
         vectorstore = manager.create_empty_vectorstore()
 
-    # Verify faiss.IndexFlatL2 was called with the right dimension
-    mock_faiss_lib.IndexFlatL2.assert_called_once_with(1536)
+        # Verify backend method was called
+        mock_backend.create_empty_vectorstore.assert_called_once()
 
-    # Verify FAISS constructor was called with the right parameters
-    mock_faiss_cls.assert_called_once_with(
-        embedding_function=mock_embedding_provider.embeddings,
-        index=mock_index,
-        docstore=mock_docstore_instance,
-        index_to_docstore_id={},
-    )
-
-    # Verify the returned vectorstore is the mock instance
-    assert vectorstore == mock_instance
+        # Verify the returned vectorstore is the mock instance
+        assert vectorstore == mock_vectorstore
 
 
 @patch("rag.storage.vectorstore.FileLock")
-@patch("rag.storage.vectorstore.FAISS")
 def test_save_vectorstore(
-    _mock_faiss: MagicMock,
     mock_filelock: MagicMock,
     temp_dir: Path,
     mock_embedding_provider: MagicMock,
 ) -> None:
     """Test saving a vector store."""
-    # Patch embedding provider to avoid API calls
-    with patch.object(
-        VectorStoreManager,
-        "_get_embedding_dimension",
-        return_value=1536,
-    ):
+    with patch("rag.storage.vectorstore.create_vectorstore_backend") as mock_factory:
+        mock_backend = MagicMock()
+        mock_backend.save_vectorstore.return_value = True
+        mock_factory.return_value = mock_backend
+        
         manager = VectorStoreManager(
             cache_dir=temp_dir,
             embeddings=mock_embedding_provider.embeddings,
@@ -177,98 +163,68 @@ def test_save_vectorstore(
 
         # Create mock vectorstore
         mock_vectorstore = MagicMock()
-        # Make save_local available on the instance, not just the class
-        mock_vectorstore.save_local = MagicMock()
 
         # Save the vectorstore
         file_path = "/path/to/test/file.txt"
         success = manager.save_vectorstore(file_path, mock_vectorstore)
 
-    # Verify FileLock was used
-    mock_filelock.assert_called()
+        # Verify FileLock was used
+        mock_filelock.assert_called()
 
-    # Verify the result
-    assert success is True
+        # Verify the result
+        assert success is True
 
-    # Verify save_local was called with the right arguments
-    base_name = manager._get_cache_base_name(file_path)
-    mock_vectorstore.save_local.assert_called_once_with(
-        str(temp_dir),
-        base_name,
-    )
+        # Verify backend method was called with the right arguments
+        cache_path = manager.get_cache_path(file_path)
+        mock_backend.save_vectorstore.assert_called_once_with(mock_vectorstore, cache_path)
 
 
 @patch("rag.storage.vectorstore.FileLock")
-@patch("rag.storage.vectorstore.FAISS")
-@patch("rag.storage.vectorstore.faiss")
-@patch("rag.storage.vectorstore.pickle")
 def test_load_vectorstore(
-    mock_pickle: MagicMock,
-    mock_faiss_lib: MagicMock,
-    _mock_faiss_cls: MagicMock,
     mock_filelock: MagicMock,
     temp_dir: Path,
     mock_embedding_provider: MagicMock,
 ) -> None:
     """Test loading a vector store."""
-    # Setup mocks
-    mock_index = MagicMock()
-    mock_faiss_lib.read_index.return_value = mock_index
-
-    # Create mock docstore with index_to_docstore_id attribute
-    mock_docstore = MagicMock()
-    mock_docstore._dict = {"doc1": "content"}
-    mock_docstore.index_to_docstore_id = {"0": "doc1"}
-    mock_pickle.load.return_value = mock_docstore
-
-    mock_instance = MagicMock()
-    _mock_faiss_cls.return_value = mock_instance
-
-    # Patch embedding provider to avoid API calls
-    with patch.object(
-        VectorStoreManager,
-        "_get_embedding_dimension",
-        return_value=1536,
-    ):
+    with patch("rag.storage.vectorstore.create_vectorstore_backend") as mock_factory:
+        mock_backend = MagicMock()
+        mock_vectorstore = MagicMock()
+        mock_backend.get_cache_file_extensions.return_value = [".faiss", ".pkl"]
+        mock_backend.load_vectorstore.return_value = mock_vectorstore
+        mock_factory.return_value = mock_backend
+        
         manager = VectorStoreManager(
             cache_dir=temp_dir,
             embeddings=mock_embedding_provider.embeddings,
         )
 
         # Create mock files that "exist"
-        with (
-            patch.object(Path, "exists", return_value=True),
-            patch("builtins.open", mock_open()),
-        ):
+        with patch.object(Path, "exists", return_value=True):
             # Load the vectorstore
             file_path = "/path/to/test/file.txt"
             vectorstore = manager.load_vectorstore(file_path)
 
-        # Verify faiss.read_index was called with the right path
-        mock_faiss_lib.read_index.assert_called_once()
+            # Verify backend method was called with the right path
+            cache_path = manager.get_cache_path(file_path)
+            mock_backend.load_vectorstore.assert_called_once_with(cache_path)
 
-        # Don't strictly check the parameters since they depend on implementation details
-        # Just verify that FAISS constructor was called and returned our mock
-        assert _mock_faiss_cls.called
-        assert vectorstore == mock_instance
+            # Verify the returned vectorstore is the mock instance
+            assert vectorstore == mock_vectorstore
 
-        # Verify FileLock was used
-        mock_filelock.assert_called()
+            # Verify FileLock was used
+            mock_filelock.assert_called()
 
 
-@patch("rag.storage.vectorstore.FAISS")
 def test_load_nonexistent_vectorstore(
-    _mock_faiss: MagicMock,
     temp_dir: Path,
     mock_embedding_provider: MagicMock,
 ) -> None:
     """Test loading a nonexistent vector store."""
-    # Patch embedding provider to avoid API calls
-    with patch.object(
-        VectorStoreManager,
-        "_get_embedding_dimension",
-        return_value=1536,
-    ):
+    with patch("rag.storage.vectorstore.create_vectorstore_backend") as mock_factory:
+        mock_backend = MagicMock()
+        mock_backend.get_cache_file_extensions.return_value = [".faiss", ".pkl"]
+        mock_factory.return_value = mock_backend
+        
         manager = VectorStoreManager(
             cache_dir=temp_dir,
             embeddings=mock_embedding_provider.embeddings,
@@ -280,7 +236,89 @@ def test_load_nonexistent_vectorstore(
             file_path = "/path/to/test/file.txt"
             vectorstore = manager.load_vectorstore(file_path)
 
-        # Verify the result
-        assert vectorstore is None
-        # Verify FAISS.load_local was not called since we checked file existence first
-        assert not _mock_faiss.load_local.called
+            # Verify the result
+            assert vectorstore is None
+            
+            # Verify backend load method was not called since files don't exist
+            mock_backend.load_vectorstore.assert_not_called()
+
+
+def test_add_documents_to_vectorstore(
+    temp_dir: Path,
+    mock_embedding_provider: MagicMock,
+) -> None:
+    """Test adding documents to existing vector store."""
+    with patch("rag.storage.vectorstore.create_vectorstore_backend") as mock_factory:
+        mock_backend = MagicMock()
+        mock_backend.add_documents_to_vectorstore.return_value = True
+        mock_factory.return_value = mock_backend
+        
+        manager = VectorStoreManager(
+            cache_dir=temp_dir,
+            embeddings=mock_embedding_provider.embeddings,
+        )
+
+        # Create mock data
+        mock_vectorstore = MagicMock()
+        documents = [Document(page_content="test")]
+        embeddings = [[0.1, 0.2, 0.3]]
+
+        # Add documents
+        success = manager.add_documents_to_vectorstore(mock_vectorstore, documents, embeddings)
+
+        # Verify backend method was called
+        mock_backend.add_documents_to_vectorstore.assert_called_once_with(
+            mock_vectorstore, documents, embeddings
+        )
+        assert success is True
+
+
+def test_merge_vectorstores(
+    temp_dir: Path,
+    mock_embedding_provider: MagicMock,
+) -> None:
+    """Test merging multiple vector stores."""
+    with patch("rag.storage.vectorstore.create_vectorstore_backend") as mock_factory:
+        mock_backend = MagicMock()
+        mock_merged_vectorstore = MagicMock()
+        mock_backend.merge_vectorstores.return_value = mock_merged_vectorstore
+        mock_factory.return_value = mock_backend
+        
+        manager = VectorStoreManager(
+            cache_dir=temp_dir,
+            embeddings=mock_embedding_provider.embeddings,
+        )
+
+        # Create mock vectorstores
+        vectorstores = [MagicMock(), MagicMock()]
+
+        # Merge vectorstores
+        merged = manager.merge_vectorstores(vectorstores)
+
+        # Verify backend method was called
+        mock_backend.merge_vectorstores.assert_called_once_with(vectorstores)
+        assert merged == mock_merged_vectorstore
+
+
+def test_similarity_search(
+    temp_dir: Path,
+    mock_embedding_provider: MagicMock,
+) -> None:
+    """Test performing similarity search."""
+    with patch("rag.storage.vectorstore.create_vectorstore_backend"):
+        manager = VectorStoreManager(
+            cache_dir=temp_dir,
+            embeddings=mock_embedding_provider.embeddings,
+        )
+
+        # Create mock vectorstore and results
+        mock_vectorstore = MagicMock()
+        mock_results = [Document(page_content="result1"), Document(page_content="result2")]
+        mock_vectorstore.similarity_search.return_value = mock_results
+
+        # Perform search
+        results = manager.similarity_search(mock_vectorstore, "test query", k=2)
+
+        # Verify vectorstore method was called
+        mock_vectorstore.similarity_search.assert_called_once_with("test query", k=2)
+        assert results == mock_results
