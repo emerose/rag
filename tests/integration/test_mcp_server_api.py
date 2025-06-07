@@ -33,7 +33,8 @@ def _build_test_server(tmp_path: Path):
 
     engine = server.engine
     engine.answer = lambda q, k=4: {"answer": "ok"}
-    engine.vectorstores = {"vs": object()}
+    # Mock the cache orchestrator's get_vectorstores method instead of setting vectorstores directly
+    engine.cache_orchestrator.get_vectorstores = lambda: {"vs": object()}
     engine.vectorstore_manager.merge_vectorstores = lambda stores: None
     engine.vectorstore_manager.similarity_search = lambda merged, q, k=4: [
         Document(page_content="doc", metadata={})
