@@ -94,12 +94,12 @@ class VectorRepository(VectorRepositoryProtocol):
         try:
             self._log("DEBUG", f"Loading vector store for file: {file_path}")
             vectorstore = self._manager.load_vectorstore(file_path)
-            
+
             if vectorstore is not None:
                 self._log("INFO", f"Successfully loaded vector store for: {file_path}")
             else:
                 self._log("DEBUG", f"No cached vector store found for: {file_path}")
-            
+
             return vectorstore
 
         except Exception as e:
@@ -121,12 +121,12 @@ class VectorRepository(VectorRepositoryProtocol):
         try:
             self._log("DEBUG", f"Saving vector store for file: {file_path}")
             success = self._manager.save_vectorstore(file_path, vectorstore)
-            
+
             if success:
                 self._log("INFO", f"Successfully saved vector store for: {file_path}")
             else:
                 self._log("WARNING", f"Failed to save vector store for: {file_path}")
-            
+
             return success
 
         except Exception as e:
@@ -211,7 +211,9 @@ class VectorRepository(VectorRepositoryProtocol):
                 return self.create_vectorstore(documents)
 
             # Add documents to existing vector store
-            self._log("DEBUG", f"Adding {len(documents)} documents to existing vector store")
+            self._log(
+                "DEBUG", f"Adding {len(documents)} documents to existing vector store"
+            )
             success = self._manager.add_documents_to_vectorstore(
                 vectorstore, documents, embeddings
             )
@@ -273,12 +275,15 @@ class VectorRepository(VectorRepositoryProtocol):
         """
         if k < 1:
             raise ValueError("k must be at least 1")
-        
+
         if not query.strip():
             raise ValueError("Query cannot be empty")
 
         try:
-            self._log("DEBUG", f"Performing similarity search with query: '{query[:50]}...' (k={k})")
+            self._log(
+                "DEBUG",
+                f"Performing similarity search with query: '{query[:50]}...' (k={k})",
+            )
             results = self._manager.similarity_search(vectorstore, query, k=k)
             self._log("DEBUG", f"Found {len(results)} similar documents")
             return results
@@ -296,10 +301,14 @@ class VectorRepository(VectorRepositoryProtocol):
         try:
             self._log("DEBUG", f"Removing cached vector store for: {file_path}")
             self._manager.remove_vectorstore(file_path)
-            self._log("INFO", f"Successfully removed cached vector store for: {file_path}")
+            self._log(
+                "INFO", f"Successfully removed cached vector store for: {file_path}"
+            )
 
         except Exception as e:
-            self._log("ERROR", f"Failed to remove cached vector store for {file_path}: {e}")
+            self._log(
+                "ERROR", f"Failed to remove cached vector store for {file_path}: {e}"
+            )
 
     def get_backend_info(self) -> dict[str, Any]:
         """Get information about the current backend configuration.
@@ -324,7 +333,7 @@ class VectorRepository(VectorRepositoryProtocol):
             test_docs = [Document(page_content="test document")]
             test_store = self.create_vectorstore(test_docs)
             search_results = self.similarity_search(test_store, "test", k=1)
-            
+
             return {
                 "status": "healthy",
                 "backend": self._manager.backend_name,
