@@ -17,7 +17,7 @@
 - ✅ Create TestRAGComponentsFactory that wires fake implementations
 - ✅ Refactor VectorStoreManager to reduce FAISS coupling and improve testability
 - ✅ Replace heavy mocking in test_engine.py with fake component implementations
-- Replace heavy mocking in test_vectorstore.py with fake implementations
+- ✅ Replace heavy mocking in test_vectorstore.py with fake implementations
 - Replace heavy mocking in test_embedding_provider.py with fake HTTP client
 - Create DocumentProcessor component focused on loading and chunking
 - Create EmbeddingService component focused on embedding generation with retries
