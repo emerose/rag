@@ -140,8 +140,11 @@ def test_initialize_paths(_mock_mkdir: MagicMock) -> None:
         patch.object(RAGEngine, "_initialize_embeddings"),
         patch.object(RAGEngine, "_initialize_document_processing"),
         patch.object(RAGEngine, "_initialize_retrieval"),
-        patch.object(RAGEngine, "_initialize_vectorstores"),
+        patch.object(RAGEngine, "_initialize_document_indexer"),
+        patch.object(RAGEngine, "_initialize_query_engine"),
+        patch.object(RAGEngine, "_initialize_cache_orchestrator"),
         patch.object(RAGEngine, "index_manager", create=True, new=MagicMock()),
+        patch.object(RAGEngine, "cache_orchestrator", create=True),
     ):
         # Create the engine with minimal initialization
         engine = RAGEngine(config)
@@ -163,13 +166,13 @@ def test_load_cached_vectorstore_none(_mock_initialize: MagicMock) -> None:
     """Return ``None`` when no cached vectorstore is found."""
 
     with (
-        patch.object(RAGEngine, "vectorstore_manager", create=True) as mock_vs,
+        patch.object(RAGEngine, "cache_orchestrator", create=True) as mock_cache,
         patch.object(RAGEngine, "index_manager", create=True, new=MagicMock()),
     ):
-        mock_vs.load_vectorstore.return_value = None
+        mock_cache.load_cached_vectorstore.return_value = None
 
         engine = RAGEngine()
         result = engine.load_cached_vectorstore("missing.txt")
 
         assert result is None
-        mock_vs.load_vectorstore.assert_called_once_with("missing.txt")
+        mock_cache.load_cached_vectorstore.assert_called_once_with("missing.txt")
