@@ -71,10 +71,10 @@ Use the CLI to index documents and ask questions.
             
             # Run CLI index command
             result = subprocess.run([
-                "python", "-m", "rag", "index",
-                str(docs_dir),
+                "python", "-m", "rag",
+                "--vectorstore-backend", "fake",
                 "--cache-dir", str(cache_dir),
-                "--vectorstore-backend", "fake"
+                "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
             # Verify command succeeded
@@ -105,19 +105,19 @@ Use the CLI to index documents and ask questions.
             
             # First index documents
             index_result = subprocess.run([
-                "python", "-m", "rag", "index",
-                str(docs_dir),
+                "python", "-m", "rag",
+                "--vectorstore-backend", "fake",
                 "--cache-dir", str(cache_dir),
-                "--vectorstore-backend", "fake"
+                "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
             assert index_result.returncode == 0, f"Index failed: {index_result.stderr}"
             
             # Then list indexed documents
             list_result = subprocess.run([
-                "python", "-m", "rag", "list",
+                "python", "-m", "rag",
                 "--cache-dir", str(cache_dir),
---json
+                "list", "--json"
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
             assert list_result.returncode == 0, f"List command failed: {list_result.stderr}"
@@ -164,19 +164,19 @@ Use the CLI to index documents and ask questions.
             
             # First index documents
             index_result = subprocess.run([
-                "python", "-m", "rag", "index",
-                str(docs_dir),
+                "python", "-m", "rag",
+                "--vectorstore-backend", "fake",
                 "--cache-dir", str(cache_dir),
-                "--vectorstore-backend", "fake"
+                "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
             assert index_result.returncode == 0, f"Index failed: {index_result.stderr}"
             
             # Then ask a question
             answer_result = subprocess.run([
-                "python", "-m", "rag", "query",
-                "What is important for software quality?",
+                "python", "-m", "rag",
                 "--cache-dir", str(cache_dir),
+                "query", "What is important for software quality?",
                 "--json"
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
@@ -215,19 +215,19 @@ Use the CLI to index documents and ask questions.
             
             # First index documents
             index_result = subprocess.run([
-                "python", "-m", "rag", "index",
-                str(docs_dir),
+                "python", "-m", "rag",
+                "--vectorstore-backend", "fake",
                 "--cache-dir", str(cache_dir),
-                "--vectorstore-backend", "fake"
+                "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
             assert index_result.returncode == 0, f"Index failed: {index_result.stderr}"
             
             # Verify documents are indexed
             list_result = subprocess.run([
-                "python", "-m", "rag", "list",
+                "python", "-m", "rag",
                 "--cache-dir", str(cache_dir),
---json
+                "list", "--json"
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
             assert list_result.returncode == 0
@@ -236,18 +236,18 @@ Use the CLI to index documents and ask questions.
             
             # Invalidate specific file
             invalidate_result = subprocess.run([
-                "python", "-m", "rag", "invalidate",
-                str(documents["text"]),
-                "--cache-dir", str(cache_dir)
+                "python", "-m", "rag",
+                "--cache-dir", str(cache_dir),
+                "invalidate", str(documents["text"])
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
             assert invalidate_result.returncode == 0, f"Invalidate failed: {invalidate_result.stderr}"
             
             # Verify file was removed from index
             list_result2 = subprocess.run([
-                "python", "-m", "rag", "list",
+                "python", "-m", "rag",
                 "--cache-dir", str(cache_dir),
---json
+                "list", "--json"
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
             assert list_result2.returncode == 0
@@ -275,10 +275,10 @@ Use the CLI to index documents and ask questions.
             # Test indexing non-existent directory
             non_existent_dir = temp_path / "missing"
             result = subprocess.run([
-                "python", "-m", "rag", "index",
-                str(non_existent_dir),
+                "python", "-m", "rag",
+                "--vectorstore-backend", "fake",
                 "--cache-dir", str(cache_dir),
-                "--vectorstore-backend", "fake"
+                "index", str(non_existent_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
             # Should fail gracefully (non-zero exit code)
@@ -286,9 +286,9 @@ Use the CLI to index documents and ask questions.
             
             # Test querying with empty cache
             answer_result = subprocess.run([
-                "python", "-m", "rag", "query",
-                "What is testing?",
+                "python", "-m", "rag",
                 "--cache-dir", str(cache_dir),
+                "query", "What is testing?",
                 "--json"
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
@@ -318,10 +318,10 @@ Use the CLI to index documents and ask questions.
             
             # Initial indexing
             result1 = subprocess.run([
-                "python", "-m", "rag", "index",
-                str(docs_dir),
+                "python", "-m", "rag",
+                "--vectorstore-backend", "fake",
                 "--cache-dir", str(cache_dir),
-                "--vectorstore-backend", "fake"
+                "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
             assert result1.returncode == 0
@@ -332,19 +332,19 @@ Use the CLI to index documents and ask questions.
             
             # Incremental indexing
             result2 = subprocess.run([
-                "python", "-m", "rag", "index",
-                str(docs_dir),
+                "python", "-m", "rag",
+                "--vectorstore-backend", "fake",
                 "--cache-dir", str(cache_dir),
-                "--vectorstore-backend", "fake"
+                "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
             assert result2.returncode == 0
             
             # Verify both documents are indexed
             list_result = subprocess.run([
-                "python", "-m", "rag", "list",
+                "python", "-m", "rag",
                 "--cache-dir", str(cache_dir),
---json
+                "list", "--json"
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
             assert list_result.returncode == 0
