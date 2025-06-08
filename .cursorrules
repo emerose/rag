@@ -80,12 +80,20 @@
 - **Reusable Components**: Develop reusable functions and classes, favoring composition over inheritance.
 - **Package Structure**: Organize code into logical packages and modules.
 - **Balanced Modularity**: Favor modularity for maintainability, but avoid over-modularization that creates unnecessary abstraction.
+- **Configuration Objects**: Use dataclasses for component configuration instead of parameter proliferation. Group related parameters into typed configuration objects.
 
 ## 3. Code Quality
 
 - **Comprehensive Type Annotations**: All functions, methods, and class members must have type annotations, using the most specific types possible.
 - **Detailed Docstrings**: All functions, methods, and classes must have Google-style docstrings, thoroughly explaining their purpose, parameters, return values, and any exceptions raised. Include usage examples where helpful.
-- **Robust Exception Handling**: Use specific exception types, provide informative error messages, and handle exceptions gracefully. Implement custom exception classes when needed. Avoid bare `except` clauses.
+- **Domain-Specific Exception Handling**: ALWAYS use the custom exception hierarchy from `src/rag/utils/exceptions.py`:
+  - `VectorstoreError` for vector storage operations
+  - `EmbeddingGenerationError` for embedding generation failures
+  - `InvalidConfigurationError` for configuration validation
+  - `ConfigurationError` for test factory issues
+  - `DocumentError` for document processing failures
+  - Include error codes, context dictionaries, and proper exception chaining
+  - NEVER use generic `ValueError` or `RuntimeError` in new code
 - **Logging**: Employ the `logging` module judiciously to log important events, warnings, and errors.
 - **Security Awareness**: Always consider security implications, especially when handling user inputs and external data.
 
@@ -98,15 +106,64 @@
 - **LLM Prompt Engineering**: Use the prompt registry (`src/rag/prompts/`) for managing prompt templates with version control.
 - **Context Handling**: Implement efficient context management for conversations, using suitable data structures like deques.
 
-## 5. Testing
+## 5. Testing Standards
 
-- **Unit Tests**: Write unit tests using `pytest` for individual components.
-- **Write Tests for Changes**: Add tests for all code changes whenever feasible, especially when fixing bugs or regressions.
-- **Integration Tests**: Include a small number of integration tests focused on common end-user use cases.
-- **Test Coverage**: Aim for high test coverage of business logic, but don't test third-party code.
-- **Test Speed**: Keep tests focused and fast; individual unit tests should take less than 0.5 seconds.
-- **Test Independence**: Avoid tests that call remote APIs or have external dependencies.
+Follow the established three-tier testing architecture with strict performance and quality requirements:
+
+### Test Architecture Requirements
+- **Unit Tests** (`tests/unit/`): <100ms per test, <1s total execution time
+  - Use `FakeRAGComponentsFactory.create_minimal()` exclusively
+  - Test business logic in isolation with no external dependencies
+  - No filesystem, network calls, or external APIs
+- **Integration Tests** (`tests/integration/`): <5s total execution time
+  - Use `FakeRAGComponentsFactory.create_for_integration_tests()` with real filesystem
+  - Test component workflows with mocked external APIs
+  - Real temporary directories for persistence testing
+- **E2E Tests** (`tests/e2e/`): Real CLI scenarios with cost-controlled external API mocks
+
+### Testing Principles
+- **Dependency Injection over Mocking**: NEVER use complex `@patch` decorators. Use `FakeRAGComponentsFactory` instead.
+- **Domain-Specific Exception Testing**: Test custom exceptions (`VectorstoreError`, `EmbeddingGenerationError`, etc.) with error codes and context validation
+- **Performance Requirements**: All tests must meet speed targets. Unit tests failing speed requirements indicate architecture problems.
 - **Test Value**: Only write tests that cover meaningful business logic; avoid tests that just exercise mocks or simple getters/setters.
+
+### Exception Testing Requirements
+```python
+# ✅ Required pattern for exception testing
+def test_embedding_error_handling():
+    """Test domain-specific exception with proper context."""
+    service = EmbeddingService()
+    
+    with pytest.raises(EmbeddingGenerationError) as exc_info:
+        service.embed_texts([])
+    
+    assert exc_info.value.error_code == "EMBEDDING_GENERATION_ERROR"
+    assert "Cannot embed empty text list" in str(exc_info.value)
+    assert exc_info.value.context is not None
+
+# ❌ Forbidden - generic exception testing
+with pytest.raises(ValueError):
+    service.process_invalid_input()
+```
+
+### Forbidden Testing Patterns
+```python
+# ❌ NEVER use heavy mocking - fragile and slow
+with (
+    patch("rag.embeddings.OpenAI") as mock_openai,
+    patch("rag.storage.FAISS") as mock_faiss,
+):
+    # Complex mock setup
+
+# ❌ NEVER test implementation details
+def test_internal_method_calls():
+    with patch.object(component, '_internal_method') as mock:
+        component.public_method()
+        mock.assert_called_once()  # Fragile
+```
+
+### Testing Documentation
+- **Comprehensive Standards**: See `docs/source/testing.md` for complete testing guidelines, patterns, and infrastructure
 
 # Development Workflow
 
