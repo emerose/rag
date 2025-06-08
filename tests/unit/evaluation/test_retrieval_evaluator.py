@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, patch
+from pathlib import Path
 
 import pytest
 
@@ -19,6 +20,7 @@ def test_retrieval_evaluator_uses_beir() -> None:
         patch.object(RetrievalEvaluator, "_load_qrels") as mock_load_qrels,
         patch.object(RetrievalEvaluator, "_run_retrieval") as mock_run_retrieval,
         patch("beir.retrieval.evaluation.EvaluateRetrieval") as mock_eval,
+        patch("pathlib.Path.mkdir") as mock_mkdir,
     ):
         # Set up mocks
         mock_engine = MagicMock()

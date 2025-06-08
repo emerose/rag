@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from rag.embeddings.embedding_service import EmbeddingService, RetryConfig
+from rag.utils.exceptions import EmbeddingGenerationError
 
 
 class TestEmbeddingService:
@@ -98,7 +99,7 @@ class TestEmbeddingService:
             mock_model.embed_documents.assert_called_once_with(texts)
 
     def test_embed_texts_empty_list(self):
-        """Test embedding empty list of texts raises ValueError."""
+        """Test embedding empty list of texts raises EmbeddingGenerationError."""
         with patch("rag.embeddings.embedding_service.OpenAIEmbeddings") as mock_openai:
             mock_model = MagicMock()
             mock_model.embed_query.return_value = [0.1] * 1536
@@ -106,7 +107,7 @@ class TestEmbeddingService:
 
             service = EmbeddingService()
 
-            with pytest.raises(ValueError, match="Cannot embed empty text list"):
+            with pytest.raises(EmbeddingGenerationError, match="Cannot embed empty text list"):
                 service.embed_texts([])
 
     def test_embed_query_success(self):
@@ -126,7 +127,7 @@ class TestEmbeddingService:
             assert mock_model.embed_query.call_count >= 1
 
     def test_embed_query_empty_string(self):
-        """Test embedding empty query raises ValueError."""
+        """Test embedding empty query raises EmbeddingGenerationError."""
         with patch("rag.embeddings.embedding_service.OpenAIEmbeddings") as mock_openai:
             mock_model = MagicMock()
             mock_model.embed_query.return_value = [0.1] * 1536
@@ -134,10 +135,10 @@ class TestEmbeddingService:
 
             service = EmbeddingService()
 
-            with pytest.raises(ValueError, match="Cannot embed empty query"):
+            with pytest.raises(EmbeddingGenerationError, match="Cannot embed empty query"):
                 service.embed_query("")
 
-            with pytest.raises(ValueError, match="Cannot embed empty query"):
+            with pytest.raises(EmbeddingGenerationError, match="Cannot embed empty query"):
                 service.embed_query("   ")
 
     def test_model_info(self):

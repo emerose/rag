@@ -8,6 +8,7 @@ from unittest.mock import patch
 
 from rag.embeddings.embedding_provider import EmbeddingProvider
 from rag.embeddings.fakes import FakeEmbeddingService, DeterministicEmbeddingService
+from rag.utils.exceptions import EmbeddingGenerationError
 
 
 def test_embedding_provider_init() -> None:
@@ -141,17 +142,17 @@ def test_error_handling() -> None:
         )
 
         # Test invalid query
-        with pytest.raises(ValueError, match="Query must be a string"):
+        with pytest.raises(EmbeddingGenerationError, match="Query must be a string"):
             provider.embed_query(123)  # type: ignore
 
         # Test empty query
-        with pytest.raises(ValueError, match="Cannot embed empty query"):
+        with pytest.raises(EmbeddingGenerationError, match="Cannot embed empty query"):
             provider.embed_query("")
 
         # Test invalid text list
-        with pytest.raises(ValueError, match="Cannot embed empty text list"):
+        with pytest.raises(EmbeddingGenerationError, match="Cannot embed empty text list"):
             provider.embed_texts([])
 
         # Test non-string in text list
-        with pytest.raises(ValueError, match="Text at index 1 must be a string"):
+        with pytest.raises(EmbeddingGenerationError, match="Text at index 1 must be a string"):
             provider.embed_texts(["valid text", 123])  # type: ignore

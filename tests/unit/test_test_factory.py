@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from rag.config import RAGConfig, RuntimeOptions
+from rag.utils.exceptions import ConfigurationError
 from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
 from rag.storage.fakes import (
     InMemoryCacheRepository,
@@ -212,11 +213,11 @@ class TestFakeRAGComponentsFactory:
 
         # This should raise an error since we're not using fake components
         with pytest.raises(
-            ValueError, match="Can only get test files from InMemoryFileSystem"
+            ConfigurationError, match="Can only get test files from InMemoryFileSystem"
         ):
             factory.get_test_files()
 
         with pytest.raises(
-            ValueError, match="Can only get test metadata from InMemoryCacheRepository"
+            ConfigurationError, match="Can only get test metadata from InMemoryCacheRepository"
         ):
             factory.get_test_metadata()

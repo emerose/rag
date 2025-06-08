@@ -13,6 +13,7 @@ from rag.storage.backends.factory import (
     get_supported_backends,
 )
 from rag.storage.fakes import InMemoryVectorStore
+from rag.utils.exceptions import InvalidConfigurationError
 
 
 class TestVectorStoreBackendFactory:
@@ -45,7 +46,7 @@ class TestVectorStoreBackendFactory:
     def test_create_unsupported_backend(self) -> None:
         """Test creating unsupported backend raises error."""
         embeddings = FakeEmbeddingService()
-        with pytest.raises(ValueError, match="Unsupported vector store backend"):
+        with pytest.raises(InvalidConfigurationError):
             create_vectorstore_backend("unsupported", embeddings)
 
     def test_backend_with_config(self) -> None:

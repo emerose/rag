@@ -13,6 +13,7 @@ from langchain_core.documents import Document
 from langchain_core.embeddings import FakeEmbeddings
 
 from rag.storage.vector_repository import VectorRepository
+from rag.utils.exceptions import VectorstoreError
 
 
 def test_vector_repository_init(tmp_path: Path) -> None:
@@ -91,19 +92,19 @@ def test_vector_repository_error_handling(tmp_path: Path) -> None:
     )
 
     # Test with empty documents list
-    with pytest.raises(ValueError, match="Cannot create vector store from empty document list"):
+    with pytest.raises(VectorstoreError, match="Cannot create vector store from empty document list"):
         repository.create_vectorstore([])
 
     # Test search with invalid k
     vectorstore = repository.create_empty_vectorstore()
-    with pytest.raises(ValueError, match="k must be at least 1"):
+    with pytest.raises(VectorstoreError, match="k must be at least 1"):
         repository.similarity_search(vectorstore, "test", k=0)
 
     # Test search with empty query
-    with pytest.raises(ValueError, match="Query cannot be empty"):
+    with pytest.raises(VectorstoreError, match="Query cannot be empty"):
         repository.similarity_search(vectorstore, "", k=1)
 
-    with pytest.raises(ValueError, match="Query cannot be empty"):
+    with pytest.raises(VectorstoreError, match="Query cannot be empty"):
         repository.similarity_search(vectorstore, "   ", k=1)
 
 
@@ -133,7 +134,7 @@ def test_vector_repository_add_documents(tmp_path: Path) -> None:
     assert updated_vectorstore is vectorstore  # Should be the same instance
 
     # Test mismatched documents and embeddings
-    with pytest.raises(ValueError, match="Documents count .* doesn't match embeddings count"):
+    with pytest.raises(VectorstoreError, match="Documents count .* doesn't match embeddings count"):
         repository.add_documents_to_vectorstore(
             vectorstore, documents, [fake_embeddings[0], fake_embeddings[0]]
         )
@@ -160,7 +161,7 @@ def test_vector_repository_merge_vectorstores(tmp_path: Path) -> None:
     assert merged is not None
 
     # Test with empty list
-    with pytest.raises(ValueError, match="Cannot merge empty list of vector stores"):
+    with pytest.raises(VectorstoreError, match="Cannot merge empty list of vector stores"):
         repository.merge_vectorstores([])
 
 
