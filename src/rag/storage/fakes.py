@@ -215,6 +215,20 @@ class InMemoryFileSystem(FileSystemProtocol):
         supported_files = self.scan_directory(directory)
         return len(supported_files) > 0
 
+    def validate_and_scan_documents_dir(self, directory: Path | str) -> tuple[bool, list[Path]]:
+        """Validate directory and return supported files in one operation.
+
+        Args:
+            directory: Directory to validate and scan
+
+        Returns:
+            Tuple of (is_valid, supported_files). If invalid, supported_files will be empty.
+        """
+        # In our in-memory system, scan once and check if there are any supported files
+        supported_files = self.scan_directory(directory)
+        is_valid = len(supported_files) > 0
+        return is_valid, supported_files
+
 
 class InMemoryCacheRepository(CacheRepositoryProtocol):
     """In-memory cache repository implementation for testing.
@@ -286,12 +300,25 @@ class InMemoryCacheRepository(CacheRepositoryProtocol):
         metadata = self.document_metadata[path_str]
 
         # Check if parameters have changed
-        return (
+        params_changed = (
             metadata.get("chunk_size") != chunk_size
             or metadata.get("chunk_overlap") != chunk_overlap
             or metadata.get("embedding_model") != embedding_model
             or metadata.get("embedding_model_version") != embedding_model_version
         )
+
+        # Check if file has been modified since last indexing
+        file_modified = False
+        try:
+            # Get current file modification time
+            current_mtime = file_path.stat().st_mtime
+            stored_mtime = metadata.get("last_modified", 0.0)
+            file_modified = current_mtime > stored_mtime
+        except (OSError, FileNotFoundError):
+            # If file doesn't exist or can't be accessed, assume it needs reindexing
+            file_modified = True
+
+        return params_changed or file_modified
 
     def update_metadata(self, metadata: DocumentMetadata) -> None:
         """Update metadata for a file.

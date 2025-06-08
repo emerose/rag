@@ -267,3 +267,33 @@ class FilesystemManager(FileSystemProtocol):
             return False
 
         return True
+
+    def validate_and_scan_documents_dir(self, directory: Path | str) -> tuple[bool, list[Path]]:
+        """Validate directory and return supported files in one operation.
+
+        Args:
+            directory: Directory to validate and scan
+
+        Returns:
+            Tuple of (is_valid, supported_files). If invalid, supported_files will be empty.
+
+        """
+        directory = Path(directory)
+
+        # Check if directory exists
+        if not directory.exists():
+            self._log("ERROR", f"Directory does not exist: {directory}")
+            return False, []
+
+        # Check if it's a directory
+        if not directory.is_dir():
+            self._log("ERROR", f"Not a directory: {directory}")
+            return False, []
+
+        # Scan for supported files
+        supported_files = self.scan_directory(directory)
+        if not supported_files:
+            self._log("WARNING", f"No supported files found in {directory}")
+            return False, []
+
+        return True, supported_files

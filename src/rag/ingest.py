@@ -383,24 +383,27 @@ class IngestManager:
 
         return result
 
-    def ingest_directory(self, directory: Path | str) -> dict[str, IngestResult]:
+    def ingest_directory(self, directory: Path | str, files: list[Path] | None = None) -> dict[str, IngestResult]:
         """Ingest all files in a directory.
 
         Args:
             directory: Directory containing files to ingest
+            files: Optional pre-scanned list of files to avoid redundant directory scanning
 
         Returns:
             Dictionary mapping file paths to ingestion results
         """
         directory = Path(directory)
 
-        # Check if directory exists
-        if not self.filesystem_manager.validate_documents_dir(directory):
-            self._log("ERROR", f"Invalid documents directory: {directory}")
-            return {}
-
-        # Get list of files
-        files = self.filesystem_manager.scan_directory(directory)
+        # Use pre-scanned files if provided, otherwise scan directory
+        if files is not None:
+            self._log("DEBUG", f"Using pre-scanned file list with {len(files)} files")
+        else:
+            # Check if directory exists and get list of files
+            if not self.filesystem_manager.validate_documents_dir(directory):
+                self._log("ERROR", f"Invalid documents directory: {directory}")
+                return {}
+            files = self.filesystem_manager.scan_directory(directory)
 
         # Apply custom file filter if provided
         if self.file_filter:

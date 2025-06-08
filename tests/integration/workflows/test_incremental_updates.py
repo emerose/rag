@@ -277,20 +277,21 @@ class TestIncrementalUpdates:
         success, _ = engine.index_file(doc)
         assert success is True
         
-        # Verify cache files exist
-        cache_files_before = list(Path(config.cache_dir).glob("**/*"))
-        cache_files_before = [f for f in cache_files_before if f.is_file()]
-        assert len(cache_files_before) > 0
+        # Verify document is properly cached (check via indexed files list)
+        indexed_files_before = engine.list_indexed_files()
+        assert len(indexed_files_before) == 1
+        original_indexed_at = indexed_files_before[0]["indexed_at"]
         
         # Modify file and re-index with a later modification time
         self.modify_document(doc, "Modified content.", mtime=1001.0)
         success, _ = engine.index_file(doc)
         assert success is True
         
-        # Verify cache files are updated (may be same count but different content)
-        cache_files_after = list(Path(config.cache_dir).glob("**/*"))
-        cache_files_after = [f for f in cache_files_after if f.is_file()]
-        assert len(cache_files_after) >= len(cache_files_before)
+        # Verify cache is updated (indexed_at should be newer)
+        indexed_files_after = engine.list_indexed_files()
+        assert len(indexed_files_after) == 1
+        new_indexed_at = indexed_files_after[0]["indexed_at"]
+        assert new_indexed_at > original_indexed_at
         
         # Verify file is still properly indexed
         indexed_files = engine.list_indexed_files()

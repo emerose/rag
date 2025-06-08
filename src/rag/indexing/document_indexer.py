@@ -509,15 +509,13 @@ class DocumentIndexer:
                 )
             return {}
 
-        # Validate directory
-        if not self.filesystem_manager.validate_documents_dir(directory):
+        # Validate directory and get files in one operation to avoid redundant scans
+        directory_valid, all_files = self.filesystem_manager.validate_and_scan_documents_dir(directory)
+        if not directory_valid:
             self._log("ERROR", f"Invalid documents directory: {directory}")
             if progress_callback:
                 progress_callback("error", directory, "Invalid documents directory")
             return {}
-
-        # Determine which files need indexing
-        all_files = self.filesystem_manager.scan_directory(directory)
         files_to_index = [
             f
             for f in all_files
@@ -540,7 +538,8 @@ class DocumentIndexer:
 
         # Use the ingest manager for directory processing when all files need indexing
         if len(files_to_index) == len(all_files):
-            ingest_results = self.ingest_manager.ingest_directory(directory)
+            # Pass pre-scanned files to avoid redundant directory scanning
+            ingest_results = self.ingest_manager.ingest_directory(directory, all_files)
         else:
             ingest_results = {}
             for file_path in files_to_index:
