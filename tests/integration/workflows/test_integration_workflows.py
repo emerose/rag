@@ -7,10 +7,11 @@ Uses real file system but fake embedding services.
 import pytest
 import time
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.embeddings.fakes import FakeEmbeddingService
+from rag.embeddings.fake_openai import FakeOpenAI
 from rag.engine import RAGEngine
 
 
@@ -39,7 +40,7 @@ class TestIntegrationWorkflows:
         doc_path.write_text(content)
         return doc_path
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingService')
+    @patch('openai.OpenAI')
     def test_basic_indexing_workflow(self, mock_embedding_service, tmp_path):
         """Test basic document indexing workflow."""
         # Setup with fake embedding service
@@ -70,7 +71,7 @@ class TestIntegrationWorkflows:
         assert len(indexed_files) == 1
         assert indexed_files[0]["file_path"] == str(doc_path)
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingService')
+    @patch('openai.OpenAI')
     def test_incremental_indexing_workflow(self, mock_embedding_service, tmp_path):
         """Test incremental indexing behavior."""
         config = self.create_test_config(tmp_path)
@@ -106,7 +107,7 @@ class TestIntegrationWorkflows:
         indexed_files = engine.list_indexed_files()
         assert len(indexed_files) == 3
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingService')
+    @patch('openai.OpenAI')
     def test_file_modification_workflow(self, mock_embedding_service, tmp_path):
         """Test file modification and re-indexing."""
         config = self.create_test_config(tmp_path)
@@ -136,7 +137,7 @@ class TestIntegrationWorkflows:
         indexed_files = engine.list_indexed_files()
         assert len(indexed_files) == 1
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingService')
+    @patch('openai.OpenAI')
     def test_cache_persistence_workflow(self, mock_embedding_service, tmp_path):
         """Test cache persistence across engine restarts."""
         config = self.create_test_config(tmp_path)
@@ -170,7 +171,7 @@ class TestIntegrationWorkflows:
         assert len(indexed_files) == 1
         assert indexed_files[0]["file_path"] == str(doc_path)
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingService')
+    @patch('openai.OpenAI')
     def test_error_handling_workflow(self, mock_embedding_service, tmp_path):
         """Test error handling during workflows."""
         config = self.create_test_config(tmp_path)
@@ -190,7 +191,7 @@ class TestIntegrationWorkflows:
         assert success is False
         assert error is not None
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingService')
+    @patch('openai.OpenAI')
     def test_directory_workflow_with_mixed_files(self, mock_embedding_service, tmp_path):
         """Test directory indexing with different file types."""
         config = self.create_test_config(tmp_path)
@@ -220,8 +221,7 @@ class TestIntegrationWorkflows:
         assert "text/plain" in file_types
         assert "text/markdown" in file_types
 
-    @patch('langchain_openai.ChatOpenAI')
-    @patch('rag.embeddings.embedding_provider.EmbeddingService')
+    @patch('openai.OpenAI')
     def test_query_workflow_with_mocked_llm(self, mock_embedding_service, mock_chat_openai, tmp_path):
         """Test query workflow with mocked LLM."""
         config = self.create_test_config(tmp_path)
@@ -255,7 +255,7 @@ class TestIntegrationWorkflows:
         assert "sources" in response
         assert response["answer"] == "This is a test answer."
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingService')
+    @patch('openai.OpenAI')
     def test_cache_invalidation_workflow(self, mock_embedding_service, tmp_path):
         """Test cache invalidation workflow."""
         config = self.create_test_config(tmp_path)
