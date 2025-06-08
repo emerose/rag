@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 
+from rag.utils.exceptions import InvalidConfigurationError
 from rag.utils.logging_utils import get_logger
 
 from .retrieval import RetrievalEvaluator
@@ -22,7 +23,12 @@ def run_evaluations(evaluations: Sequence[Evaluation]) -> list[EvaluationResult]
 
         evaluator_cls = _EVALUATORS.get(evaluation.category)
         if evaluator_cls is None:
-            raise ValueError(f"No evaluator for category: {evaluation.category}")
+            available_categories = list(_EVALUATORS.keys())
+            raise InvalidConfigurationError(
+                config_key="evaluation.category",
+                value=evaluation.category,
+                expected=f"one of {available_categories}"
+            )
         evaluator = evaluator_cls(evaluation)
         result = evaluator.evaluate()
         logger.debug(f"Completed evaluation: {evaluation.category} - {evaluation.test}")

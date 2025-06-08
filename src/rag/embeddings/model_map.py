@@ -7,6 +7,8 @@ from pathlib import Path
 
 import yaml
 
+from ..utils.exceptions import InvalidConfigurationError
+
 
 def load_model_map(path: str | Path) -> dict[str, str]:
     """Load a YAML embedding model map."""
@@ -17,7 +19,11 @@ def load_model_map(path: str | Path) -> dict[str, str]:
     except FileNotFoundError:
         return {}
     if not isinstance(data, dict):
-        raise ValueError("Embedding model map must be a mapping")
+        raise InvalidConfigurationError(
+            config_key="embedding_model_map",
+            value=type(data).__name__,
+            expected="dictionary/mapping"
+        )
     return {str(k): str(v) for k, v in data.items()}
 
 

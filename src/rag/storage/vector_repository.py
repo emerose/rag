@@ -17,6 +17,7 @@ from langchain_core.embeddings import Embeddings
 
 from rag.storage.protocols import VectorRepositoryProtocol, VectorStoreProtocol
 from rag.storage.vectorstore import VectorStoreManager
+from rag.utils.exceptions import VectorstoreError, VectorstoreNotInitializedError
 from rag.utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
@@ -143,11 +144,14 @@ class VectorRepository(VectorRepositoryProtocol):
             Vector store containing the documents
 
         Raises:
-            ValueError: If documents list is empty
-            RuntimeError: If vector store creation fails
+            VectorstoreError: If documents list is empty or vector store creation fails
         """
         if not documents:
-            raise ValueError("Cannot create vector store from empty document list")
+            raise VectorstoreError(
+                "Cannot create vector store from empty document list",
+                operation="create",
+                backend=self._manager.backend if hasattr(self._manager, 'backend') else None
+            )
 
         try:
             self._log("INFO", f"Creating vector store with {len(documents)} documents")
@@ -157,7 +161,12 @@ class VectorRepository(VectorRepositoryProtocol):
 
         except Exception as e:
             self._log("ERROR", f"Failed to create vector store: {e}")
-            raise RuntimeError(f"Vector store creation failed: {e}") from e
+            raise VectorstoreError(
+                "Vector store creation failed",
+                operation="create",
+                backend=self._manager.backend if hasattr(self._manager, 'backend') else None,
+                original_error=e
+            ) from e
 
     def create_empty_vectorstore(self) -> VectorStoreProtocol:
         """Create an empty vector store.
@@ -166,7 +175,7 @@ class VectorRepository(VectorRepositoryProtocol):
             Empty vector store
 
         Raises:
-            RuntimeError: If vector store creation fails
+            VectorstoreError: If vector store creation fails
         """
         try:
             self._log("DEBUG", "Creating empty vector store")
@@ -176,7 +185,12 @@ class VectorRepository(VectorRepositoryProtocol):
 
         except Exception as e:
             self._log("ERROR", f"Failed to create empty vector store: {e}")
-            raise RuntimeError(f"Empty vector store creation failed: {e}") from e
+            raise VectorstoreError(
+                "Empty vector store creation failed",
+                operation="create_empty",
+                backend=self._manager.backend if hasattr(self._manager, 'backend') else None,
+                original_error=e
+            ) from e
 
     def add_documents_to_vectorstore(
         self,
@@ -195,13 +209,14 @@ class VectorRepository(VectorRepositoryProtocol):
             Updated vector store
 
         Raises:
-            ValueError: If documents and embeddings lists have different lengths
-            RuntimeError: If adding documents fails
+            VectorstoreError: If documents and embeddings lists have different lengths or adding documents fails
         """
         if len(documents) != len(embeddings):
-            raise ValueError(
+            raise VectorstoreError(
                 f"Documents count ({len(documents)}) doesn't match "
-                f"embeddings count ({len(embeddings)})"
+                f"embeddings count ({len(embeddings)})",
+                operation="add_documents",
+                backend=self._manager.backend if hasattr(self._manager, 'backend') else None
             )
 
         try:
@@ -219,14 +234,26 @@ class VectorRepository(VectorRepositoryProtocol):
             )
 
             if not success:
-                raise RuntimeError("Failed to add documents to vector store")
+                raise VectorstoreError(
+                    "Failed to add documents to vector store",
+                    operation="add_documents",
+                    backend=self._manager.backend if hasattr(self._manager, 'backend') else None
+                )
 
             self._log("INFO", f"Successfully added {len(documents)} documents")
             return vectorstore
 
+        except VectorstoreError:
+            # Re-raise VectorstoreError as-is
+            raise
         except Exception as e:
             self._log("ERROR", f"Failed to add documents to vector store: {e}")
-            raise RuntimeError(f"Adding documents failed: {e}") from e
+            raise VectorstoreError(
+                "Adding documents failed",
+                operation="add_documents",
+                backend=self._manager.backend if hasattr(self._manager, 'backend') else None,
+                original_error=e
+            ) from e
 
     def merge_vectorstores(
         self, vectorstores: list[VectorStoreProtocol]
@@ -240,11 +267,14 @@ class VectorRepository(VectorRepositoryProtocol):
             Merged vector store containing all documents
 
         Raises:
-            ValueError: If vectorstores list is empty
-            RuntimeError: If merging fails
+            VectorstoreError: If vectorstores list is empty or merging fails
         """
         if not vectorstores:
-            raise ValueError("Cannot merge empty list of vector stores")
+            raise VectorstoreError(
+                "Cannot merge empty list of vector stores",
+                operation="merge",
+                backend=self._manager.backend if hasattr(self._manager, 'backend') else None
+            )
 
         try:
             self._log("INFO", f"Merging {len(vectorstores)} vector stores")
@@ -254,7 +284,12 @@ class VectorRepository(VectorRepositoryProtocol):
 
         except Exception as e:
             self._log("ERROR", f"Failed to merge vector stores: {e}")
-            raise RuntimeError(f"Vector store merging failed: {e}") from e
+            raise VectorstoreError(
+                "Vector store merging failed",
+                operation="merge",
+                backend=self._manager.backend if hasattr(self._manager, 'backend') else None,
+                original_error=e
+            ) from e
 
     def similarity_search(
         self, vectorstore: VectorStoreProtocol, query: str, k: int = 4
@@ -270,14 +305,21 @@ class VectorRepository(VectorRepositoryProtocol):
             List of similar documents
 
         Raises:
-            ValueError: If k is less than 1 or query is empty
-            RuntimeError: If search fails
+            VectorstoreError: If k is less than 1, query is empty, or search fails
         """
         if k < 1:
-            raise ValueError("k must be at least 1")
+            raise VectorstoreError(
+                "k must be at least 1",
+                operation="similarity_search",
+                backend=self._manager.backend if hasattr(self._manager, 'backend') else None
+            )
 
         if not query.strip():
-            raise ValueError("Query cannot be empty")
+            raise VectorstoreError(
+                "Query cannot be empty",
+                operation="similarity_search",
+                backend=self._manager.backend if hasattr(self._manager, 'backend') else None
+            )
 
         try:
             self._log(
@@ -290,7 +332,12 @@ class VectorRepository(VectorRepositoryProtocol):
 
         except Exception as e:
             self._log("ERROR", f"Failed to perform similarity search: {e}")
-            raise RuntimeError(f"Similarity search failed: {e}") from e
+            raise VectorstoreError(
+                "Similarity search failed",
+                operation="similarity_search",
+                backend=self._manager.backend if hasattr(self._manager, 'backend') else None,
+                original_error=e
+            ) from e
 
     def remove_vectorstore(self, file_path: str) -> None:
         """Remove a cached vectorstore.

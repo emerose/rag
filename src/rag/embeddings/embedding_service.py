@@ -29,6 +29,7 @@ from tenacity import (
     wait_exponential,
 )
 
+from rag.utils.exceptions import EmbeddingGenerationError
 from rag.utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
@@ -169,16 +170,21 @@ class EmbeddingService:
             List of embeddings (each embedding is a list of floats)
 
         Raises:
-            ValueError: If texts is empty or embedding generation fails
+            EmbeddingGenerationError: If texts is empty or embedding generation fails
             RateLimitError, APIError, APIConnectionError: After max retries exceeded
         """
         if not texts:
-            raise ValueError("Cannot embed empty text list")
+            raise EmbeddingGenerationError(
+                message="Cannot embed empty text list"
+            )
 
         # Validate all texts are strings
         for i, text in enumerate(texts):
             if not isinstance(text, str):
-                raise ValueError(f"Text at index {i} must be a string")
+                raise EmbeddingGenerationError(
+                    text=str(text) if text else None,
+                    message=f"Text at index {i} must be a string, got {type(text).__name__}"
+                )
 
         # Create and apply retry decorator
         retry_decorator = self._create_retry_decorator()
@@ -224,13 +230,19 @@ class EmbeddingService:
             Embedding for the query (list of floats)
 
         Raises:
-            ValueError: If query is empty or embedding generation fails
+            EmbeddingGenerationError: If query is empty or embedding generation fails
             RateLimitError, APIError, APIConnectionError: After max retries exceeded
         """
         if not isinstance(query, str):
-            raise ValueError("Query must be a string")
+            raise EmbeddingGenerationError(
+                text=str(query) if query else None,
+                message=f"Query must be a string, got {type(query).__name__}"
+            )
         if not query.strip():
-            raise ValueError("Cannot embed empty query")
+            raise EmbeddingGenerationError(
+                text=query,
+                message="Cannot embed empty query"
+            )
 
         # Create and apply retry decorator
         retry_decorator = self._create_retry_decorator()

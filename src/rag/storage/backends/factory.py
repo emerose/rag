@@ -14,6 +14,7 @@ from langchain_core.embeddings import Embeddings
 from rag.storage.backends.base import VectorStoreBackend
 from rag.storage.backends.faiss_backend import FAISSBackend
 from rag.storage.backends.fake_backend import FakeVectorStoreBackend
+from rag.utils.exceptions import InvalidConfigurationError
 
 
 def create_vectorstore_backend(
@@ -30,7 +31,7 @@ def create_vectorstore_backend(
         Vector store backend instance
 
     Raises:
-        ValueError: If backend_name is not supported
+        InvalidConfigurationError: If backend_name is not supported
     """
     backend_name = backend_name.lower()
 
@@ -39,9 +40,11 @@ def create_vectorstore_backend(
     elif backend_name == "fake":
         return FakeVectorStoreBackend(embeddings, **backend_kwargs)
     else:
-        raise ValueError(
-            f"Unsupported vector store backend: {backend_name}. "
-            f"Supported backends: faiss, fake"
+        supported_backends = get_supported_backends()
+        raise InvalidConfigurationError(
+            config_key="backend_name",
+            value=backend_name,
+            expected=f"one of {supported_backends}"
         )
 
 

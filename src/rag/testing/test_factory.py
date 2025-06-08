@@ -19,6 +19,7 @@ from rag.config.components import (
     QueryConfig,
     StorageConfig,
 )
+from rag.utils.exceptions import ConfigurationError
 from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
 from rag.embeddings.fake_openai import FakeOpenAI
 from rag.factory import ComponentOverrides, RAGComponentsFactory
@@ -386,7 +387,10 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         if isinstance(self.cache_repository, InMemoryCacheRepository):
             self.cache_repository.document_metadata[file_path] = metadata
         else:
-            raise ValueError("Can only add test metadata to InMemoryCacheRepository")
+            raise ConfigurationError(
+                "Can only add test metadata to InMemoryCacheRepository, "
+                f"got {type(self.cache_repository).__name__}"
+            )
 
     def get_test_files(self) -> dict[str, str]:
         """Get all files in the fake filesystem.
@@ -395,7 +399,10 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             Dictionary mapping file paths to their content
         """
         if not isinstance(self.filesystem_manager, InMemoryFileSystem):
-            raise ValueError("Can only get test files from InMemoryFileSystem")
+            raise ConfigurationError(
+                "Can only get test files from InMemoryFileSystem, "
+                f"got {type(self.filesystem_manager).__name__}"
+            )
 
         return {
             path: content.decode("utf-8") if isinstance(content, bytes) else content
@@ -409,7 +416,10 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             Dictionary mapping file paths to their metadata
         """
         if not isinstance(self.cache_repository, InMemoryCacheRepository):
-            raise ValueError("Can only get test metadata from InMemoryCacheRepository")
+            raise ConfigurationError(
+                "Can only get test metadata from InMemoryCacheRepository, "
+                f"got {type(self.cache_repository).__name__}"
+            )
 
         return dict(self.cache_repository.document_metadata)
 
