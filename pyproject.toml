@@ -146,7 +146,10 @@ markers = [
 # For unit/integration only: pytest -m "not e2e" --disable-socket
 filterwarnings = [
     "ignore::DeprecationWarning",
-    "ignore::pytest.PytestUnknownMarkWarning"
+    "ignore::pytest.PytestUnknownMarkWarning",
+    # Suppress numpy deprecation warnings from FAISS
+    "ignore:numpy\\.core.*is deprecated:DeprecationWarning",
+    "ignore:numpy\\.core\\._multiarray_umath is deprecated:DeprecationWarning"
 ]
 
 [tool.setuptools]
