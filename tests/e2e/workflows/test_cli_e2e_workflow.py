@@ -134,10 +134,8 @@ Use the CLI to index documents and ask questions.
             except json.JSONDecodeError as e:
                 pytest.fail(f"List command output is not valid JSON: {e}\nOutput: {list_result.stdout}")
 
-    @patch('langchain_openai.ChatOpenAI')
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_cli_answer_command_workflow(self, mock_embedding_provider, mock_chat_openai):
-        """Test CLI answer command workflow."""
+    def test_cli_answer_command_workflow(self):
+        """Test CLI answer command workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
@@ -147,22 +145,10 @@ Use the CLI to index documents and ask questions.
             # Create test documents
             documents = self.create_test_documents(docs_dir)
             
-            # Mock embedding provider
-            mock_provider = MagicMock()
-            mock_provider.embed_texts.return_value = [[0.1, 0.2, 0.3] * 128]
-            mock_provider.embed_query.return_value = [0.1, 0.2, 0.3] * 128
-            mock_provider.get_model_info.return_value = {"model_version": "test-v1"}
-            mock_embedding_provider.return_value = mock_provider
-            
-            # Mock LLM
-            mock_llm = MagicMock()
-            mock_llm.invoke.return_value.content = "Testing is important for software quality."
-            mock_chat_openai.return_value = mock_llm
-            
             # First index documents
             index_result = subprocess.run([
                 "python", "-m", "rag",
-                "--vectorstore-backend", "fake",
+                "--vectorstore-backend", "faiss",
                 "--cache-dir", str(cache_dir),
                 "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
@@ -173,7 +159,7 @@ Use the CLI to index documents and ask questions.
             answer_result = subprocess.run([
                 "python", "-m", "rag",
                 "--cache-dir", str(cache_dir),
-                "query", "What is important for software quality?",
+                "query", "What is important for software?",
                 "--json"
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
@@ -185,16 +171,16 @@ Use the CLI to index documents and ask questions.
                 assert "question" in output_data
                 assert "answer" in output_data
                 assert "sources" in output_data
-                assert output_data["question"] == "What is important for software quality?"
-                assert output_data["answer"] == "Testing is important for software quality."
+                assert output_data["question"] == "What is important for software?"
+                # Should contain some relevant answer based on test documents
+                assert len(output_data["answer"]) > 0
                 assert len(output_data["sources"]) > 0
                 
             except json.JSONDecodeError as e:
                 pytest.fail(f"Answer command output is not valid JSON: {e}\nOutput: {answer_result.stdout}")
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_cli_invalidate_command_workflow(self, mock_embedding_provider):
-        """Test CLI invalidate command workflow."""
+    def test_cli_invalidate_command_workflow(self):
+        """Test CLI invalidate command workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
@@ -204,16 +190,10 @@ Use the CLI to index documents and ask questions.
             # Create test document
             documents = self.create_test_documents(docs_dir)
             
-            # Mock embedding provider
-            mock_provider = MagicMock()
-            mock_provider.embed_texts.return_value = [[0.1, 0.2, 0.3] * 128]
-            mock_provider.get_model_info.return_value = {"model_version": "test-v1"}
-            mock_embedding_provider.return_value = mock_provider
-            
             # First index documents
             index_result = subprocess.run([
                 "python", "-m", "rag",
-                "--vectorstore-backend", "fake",
+                "--vectorstore-backend", "faiss",
                 "--cache-dir", str(cache_dir),
                 "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
@@ -255,25 +235,18 @@ Use the CLI to index documents and ask questions.
             remaining_file = output_data2["indexed_files"][0]
             assert remaining_file["file_path"] == str(documents["markdown"])
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_cli_error_handling_workflow(self, mock_embedding_provider):
-        """Test CLI error handling in real scenarios."""
+    def test_cli_error_handling_workflow(self):
+        """Test CLI error handling in real scenarios using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             cache_dir = temp_path / "cache"
             cache_dir.mkdir()
             
-            # Mock embedding provider
-            mock_provider = MagicMock()
-            mock_provider.embed_texts.return_value = [[0.1, 0.2, 0.3] * 128]
-            mock_provider.get_model_info.return_value = {"model_version": "test-v1"}
-            mock_embedding_provider.return_value = mock_provider
-            
             # Test indexing non-existent directory
             non_existent_dir = temp_path / "missing"
             result = subprocess.run([
                 "python", "-m", "rag",
-                "--vectorstore-backend", "fake",
+                "--vectorstore-backend", "faiss",
                 "--cache-dir", str(cache_dir),
                 "index", str(non_existent_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
@@ -293,20 +266,13 @@ Use the CLI to index documents and ask questions.
             # The exact behavior depends on implementation
             assert answer_result.returncode in [0, 1]  # Either success or graceful failure
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_cli_incremental_indexing_workflow(self, mock_embedding_provider):
-        """Test CLI incremental indexing workflow."""
+    def test_cli_incremental_indexing_workflow(self):
+        """Test CLI incremental indexing workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
             cache_dir = temp_path / "cache"
             cache_dir.mkdir()
-            
-            # Mock embedding provider
-            mock_provider = MagicMock()
-            mock_provider.embed_texts.return_value = [[0.1, 0.2, 0.3] * 128]
-            mock_provider.get_model_info.return_value = {"model_version": "test-v1"}
-            mock_embedding_provider.return_value = mock_provider
             
             # Create initial document
             docs_dir.mkdir()
@@ -316,7 +282,7 @@ Use the CLI to index documents and ask questions.
             # Initial indexing
             result1 = subprocess.run([
                 "python", "-m", "rag",
-                "--vectorstore-backend", "fake",
+                "--vectorstore-backend", "faiss",
                 "--cache-dir", str(cache_dir),
                 "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
@@ -330,7 +296,7 @@ Use the CLI to index documents and ask questions.
             # Incremental indexing
             result2 = subprocess.run([
                 "python", "-m", "rag",
-                "--vectorstore-backend", "fake",
+                "--vectorstore-backend", "faiss",
                 "--cache-dir", str(cache_dir),
                 "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
