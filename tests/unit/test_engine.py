@@ -11,6 +11,8 @@ from unittest.mock import patch
 import pytest
 from langchain_core.documents import Document
 
+pytestmark = pytest.mark.unit
+
 from rag.config import RAGConfig, RuntimeOptions
 from rag.engine import RAGEngine
 from rag.testing.test_factory import FakeRAGComponentsFactory

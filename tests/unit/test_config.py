@@ -6,6 +6,10 @@ Focus on testing our configuration logic, without any external API calls.
 import os
 from unittest.mock import patch
 
+import pytest
+
+pytestmark = pytest.mark.unit
+
 from rag.config import RAGConfig, RuntimeOptions
 
 

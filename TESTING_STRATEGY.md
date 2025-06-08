@@ -267,21 +267,46 @@ def chunk_text(self, text: str, config: ChunkingConfig) -> List[Chunk]:
 
 ## Testing Commands
 
+### Using the Test Runner Script (Recommended)
+
+```bash
+# Fast unit tests only (for development)
+python scripts/run_tests.py unit
+
+# Quick unit tests with fail-fast (for TDD)
+python scripts/run_tests.py quick
+
+# Integration tests (component interactions)
+python scripts/run_tests.py integration
+
+# End-to-end tests (complete workflows) 
+python scripts/run_tests.py e2e
+
+# All tests
+python scripts/run_tests.py all
+
+# Coverage reporting
+python scripts/run_tests.py coverage
+```
+
+### Using pytest directly
+
 ```bash
 # Fast unit tests only (default)
 pytest tests/unit/
 
-# Integration tests (requires setup)
-pytest tests/integration/ -m integration
+# Integration tests (component interactions)
+pytest -m integration
 
-# E2E tests (requires full environment)
-pytest tests/e2e/ -m e2e
+# E2E tests (complete workflows)
+pytest -m e2e
 
 # All tests
-pytest tests/ -m "not e2e"
+pytest
 
-# Performance tests
-pytest tests/e2e/performance/ --benchmark-only
+# Specific test types
+pytest -m "unit or integration"  # Unit + Integration only
+pytest -m "not e2e"             # Everything except E2E
 ```
 
 This strategy will result in a comprehensive, maintainable test suite that provides confidence in the system while keeping tests fast and reliable.

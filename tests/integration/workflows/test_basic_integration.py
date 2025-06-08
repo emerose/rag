@@ -61,7 +61,7 @@ class TestBasicIntegration:
     def test_persistence_across_restarts(self, tmp_path):
         """Test that cache data persists across manager restarts."""
         from rag.storage.index_manager import IndexManager
-        from rag.storage.metadata import DocumentMetadata
+        from rag.storage.metadata import DocumentMetadata, FileMetadata
         
         cache_dir = tmp_path / "cache"
         cache_dir.mkdir()
@@ -75,7 +75,9 @@ class TestBasicIntegration:
         # First manager - add metadata
         manager1 = IndexManager(cache_dir)
         current_time = time.time()
-        metadata = DocumentMetadata(
+        
+        # Add document metadata
+        doc_metadata = DocumentMetadata(
             file_path=test_file,
             file_type="text/plain",
             file_hash="dummy-hash",  # Will be recomputed
@@ -88,7 +90,18 @@ class TestBasicIntegration:
             num_chunks=1,
             file_size=test_file.stat().st_size
         )
-        manager1.update_metadata(metadata)
+        manager1.update_metadata(doc_metadata)
+        
+        # Add file metadata (required for list_indexed_files JOIN)
+        file_metadata = FileMetadata(
+            file_path=str(test_file),
+            size=test_file.stat().st_size,
+            mtime=current_time,
+            content_hash="dummy-content-hash",
+            source_type="text",
+            chunks_total=1
+        )
+        manager1.update_file_metadata(file_metadata)
         
         # Verify it's there
         files1 = manager1.list_indexed_files()

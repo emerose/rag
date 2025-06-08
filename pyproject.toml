@@ -132,7 +132,20 @@ known-first-party = ["rag"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-addopts = "-v --cov=rag --cov-report=term-missing"
+addopts = "-v --cov=rag --cov-report=term-missing --tb=short"
+markers = [
+    "unit: Unit tests - fast, isolated, no external dependencies",
+    "integration: Integration tests - component interactions with controlled dependencies", 
+    "e2e: End-to-end tests - complete workflows with real environment"
+]
+# Default to running only unit tests for speed
+# Run integration tests with: pytest -m integration
+# Run e2e tests with: pytest -m e2e  
+# Run all tests with: pytest -m "unit or integration or e2e"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::pytest.PytestUnknownMarkWarning"
+]
 
 [tool.setuptools]
 packages = ["rag"]
