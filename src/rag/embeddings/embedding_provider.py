@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, TypeAlias
 
 from langchain_core.embeddings import Embeddings
 
+from rag.config.components import EmbeddingConfig
 from rag.utils.logging_utils import log_message
 
 from .protocols import EmbeddingServiceProtocol
@@ -33,9 +34,10 @@ class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
 
     def __init__(
         self,
-        model_name: str = "text-embedding-3-small",
+        config: EmbeddingConfig | None = None,
+        *,
+        model_name: str | None = None,
         openai_api_key: str | None = None,
-        *,  # Force keyword arguments for bool parameters
         show_progress_bar: bool = False,
         log_callback: LogCallback | None = None,
         embedding_service: "EmbeddingService | None" = None,
@@ -43,15 +45,31 @@ class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
         """Initialize the embedding provider.
 
         Args:
-            model_name: Name of the embedding model to use
+            config: Embedding configuration (preferred way to configure)
+            model_name: [DEPRECATED] Name of the embedding model to use
             openai_api_key: OpenAI API key (optional if set in environment)
             show_progress_bar: Whether to show a progress bar for batch operations
             log_callback: Optional callback for logging
             embedding_service: Optional pre-configured EmbeddingService instance
 
+        Note:
+            If config is provided, it takes precedence over individual parameters.
+            Individual parameters are maintained for backward compatibility.
         """
-        self.model_name = model_name
-        self.openai_api_key = openai_api_key
+        # Use config if provided, otherwise use individual parameters
+        if config is not None:
+            self.config = config
+            self.model_name = config.model
+            self.openai_api_key = openai_api_key  # Keep API key separate for security
+        else:
+            # Backward compatibility: create config from individual parameters
+            self.config = EmbeddingConfig(
+                model=model_name or "text-embedding-3-small",
+                # Note: Other config parameters use defaults from EmbeddingConfig
+            )
+            self.model_name = self.config.model
+            self.openai_api_key = openai_api_key
+
         self.show_progress_bar = show_progress_bar
         self.log_callback = log_callback
 
@@ -59,13 +77,20 @@ class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
         if embedding_service is not None:
             self._embedding_service = embedding_service
         else:
-            from .embedding_service import EmbeddingService
+            from .embedding_service import EmbeddingService, RetryConfig
+
+            # Create retry config from embedding config
+            retry_config = RetryConfig(
+                max_retries=self.config.max_retries,
+                # Keep other retry settings as defaults for now
+            )
 
             self._embedding_service = EmbeddingService(
-                model_name=model_name,
+                model_name=self.model_name,
                 openai_api_key=openai_api_key,
                 show_progress_bar=show_progress_bar,
                 log_callback=log_callback,
+                retry_config=retry_config,
             )
 
     def _log(self, level: str, message: str) -> None:

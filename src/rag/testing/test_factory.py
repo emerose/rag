@@ -11,6 +11,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from rag.config import RAGConfig, RuntimeOptions
+from rag.config.components import (
+    CacheConfig,
+    ChunkingConfig,
+    EmbeddingConfig,
+    IndexingConfig,
+    QueryConfig,
+    StorageConfig,
+)
 from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
 from rag.embeddings.fake_openai import FakeOpenAI
 from rag.factory import ComponentOverrides, RAGComponentsFactory
@@ -266,6 +274,90 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             
         return factory
 
+    @classmethod
+    def create_test_indexing_config(cls) -> IndexingConfig:
+        """Create an IndexingConfig optimized for testing.
+        
+        This configuration uses small batch sizes, minimal workers,
+        and settings optimized for fast, deterministic tests.
+        
+        Returns:
+            An IndexingConfig suitable for testing.
+        """
+        return IndexingConfig(
+            chunking=ChunkingConfig(
+                chunk_size=100,  # Small chunks for fast tests
+                chunk_overlap=20,
+                max_chunks_per_document=10,  # Limit for fast tests
+                strategy="fixed",  # Simpler strategy for deterministic tests
+                semantic_chunking=False,  # Faster without semantic analysis
+            ),
+            embedding=EmbeddingConfig(
+                model="text-embedding-test",
+                batch_size=2,  # Small batches for fast tests
+                max_workers=1,  # Single-threaded for deterministic tests
+                async_batching=False,  # Simpler synchronous processing
+                max_retries=1,  # Fewer retries for faster test failures
+                timeout_seconds=5,  # Short timeout for fast test failures
+            ),
+            cache=CacheConfig(
+                enabled=False,  # Disable caching for tests to avoid side effects
+                cache_dir="/tmp/test_cache",
+                ttl_hours=1,  # Short TTL for tests
+                max_cache_size_mb=10,  # Small cache for tests
+                cleanup_on_startup=True,
+            ),
+            storage=StorageConfig(
+                backend="fake",  # Use fake storage for tests
+                persist_data=False,  # Don't persist test data
+                concurrent_access=False,  # Simpler single-threaded access
+            ),
+        )
+
+    @classmethod
+    def create_production_indexing_config(cls) -> IndexingConfig:
+        """Create an IndexingConfig optimized for production.
+        
+        This configuration uses larger batch sizes, more workers,
+        and settings optimized for performance and quality.
+        
+        Returns:
+            An IndexingConfig suitable for production use.
+        """
+        return IndexingConfig(
+            chunking=ChunkingConfig(
+                chunk_size=1500,  # Larger chunks for better context
+                chunk_overlap=300,
+                max_chunks_per_document=1000,
+                strategy="semantic",  # Better chunking strategy
+                semantic_chunking=True,  # Enable semantic analysis
+                preserve_headers=True,
+            ),
+            embedding=EmbeddingConfig(
+                model="text-embedding-3-small",
+                batch_size=128,  # Large batches for efficiency
+                max_workers=8,  # More workers for parallelism
+                async_batching=True,  # Async for better performance
+                max_retries=3,  # Standard retry count
+                timeout_seconds=30,  # Standard timeout
+                rate_limit_rpm=3000,
+            ),
+            cache=CacheConfig(
+                enabled=True,
+                cache_dir=".cache",
+                ttl_hours=24 * 7,  # 1 week
+                max_cache_size_mb=5000,  # Large cache for production
+                compression_enabled=True,
+                cleanup_on_startup=True,
+            ),
+            storage=StorageConfig(
+                backend="faiss",
+                index_type="ivf",  # More efficient for large datasets
+                persist_data=True,
+                memory_map=True,  # Memory mapping for large indices
+                concurrent_access=True,
+            ),
+        )
 
     def add_test_document(self, path: str, content: str) -> None:
         """Add a test document to the fake filesystem.

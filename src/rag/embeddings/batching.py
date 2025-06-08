@@ -12,6 +12,7 @@ from typing import Any, TypeVar
 from langchain.schema import Document
 
 from aiostream import stream
+from rag.config.components import EmbeddingConfig
 from rag.utils.async_utils import AsyncBatchProcessor, get_optimal_concurrency
 from rag.utils.logging_utils import log_message
 from rag.utils.progress_tracker import ProgressTracker
@@ -33,8 +34,10 @@ class EmbeddingBatcher:
     def __init__(
         self,
         embedding_provider: EmbeddingServiceProtocol,
+        config: EmbeddingConfig | None = None,
+        *,
         max_concurrency: int | None = None,
-        initial_batch_size: int = 20,
+        initial_batch_size: int | None = None,
         log_callback: Any | None = None,
         progress_callback: Any | None = None,
     ) -> None:
@@ -42,15 +45,32 @@ class EmbeddingBatcher:
 
         Args:
             embedding_provider: Provider for embedding generation
-            max_concurrency: Maximum number of concurrent batch operations
-            initial_batch_size: Initial size of batches
+            config: Embedding configuration (preferred way to configure)
+            max_concurrency: [DEPRECATED] Maximum number of concurrent batch operations
+            initial_batch_size: [DEPRECATED] Initial size of batches
             log_callback: Optional callback for logging
             progress_callback: Optional callback for progress updates
 
+        Note:
+            If config is provided, it takes precedence over individual parameters.
+            Individual parameters are maintained for backward compatibility.
         """
         self.embedding_provider = embedding_provider
-        self.concurrency = get_optimal_concurrency(max_concurrency)
-        self.batch_size = initial_batch_size
+        
+        # Use config if provided, otherwise use individual parameters
+        if config is not None:
+            self.config = config
+            self.concurrency = get_optimal_concurrency(config.max_workers)
+            self.batch_size = config.batch_size
+        else:
+            # Backward compatibility: create config from individual parameters or defaults
+            self.config = EmbeddingConfig(
+                batch_size=initial_batch_size or 20,
+                max_workers=max_concurrency or 4,
+            )
+            self.concurrency = get_optimal_concurrency(max_concurrency)
+            self.batch_size = initial_batch_size or 20
+
         self.log_callback = log_callback
         self.progress_tracker = ProgressTracker(progress_callback)
 
