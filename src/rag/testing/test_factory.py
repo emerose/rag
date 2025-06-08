@@ -112,7 +112,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 filesystem.add_file(path, content)
 
         # Create fake cache repository with initial metadata if provided
-        cache_repo = InMemoryCacheRepository()
+        cache_repo = InMemoryCacheRepository(filesystem_manager=filesystem)
         if self.test_options.initial_metadata:
             # Directly populate the internal storage for testing
             for file_path, metadata in self.test_options.initial_metadata.items():
@@ -244,11 +244,17 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             # Create the factory
             factory = cls(config=config, runtime_options=runtime, test_options=test_options)
             
-            # Override filesystem and document loader for real file operations
+            # Override filesystem, cache repository, and document loader for real file operations
+            from pathlib import Path
             from rag.storage.filesystem import FilesystemManager
+            from rag.storage.index_manager import IndexManager
             from rag.data.document_loader import DocumentLoader
             
             factory._filesystem_manager = FilesystemManager()
+            factory._cache_repository = IndexManager(
+                cache_dir=Path(config.cache_dir),
+                log_callback=runtime.log_callback,
+            )
             factory._document_loader = DocumentLoader(
                 filesystem_manager=factory._filesystem_manager,
                 log_callback=runtime.log_callback,

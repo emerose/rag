@@ -273,7 +273,9 @@ class TestIncrementalUpdates:
         docs_dir = Path(config.documents_dir)
         
         # Initial indexing with specific modification time
-        doc = self.create_test_document(docs_dir, "doc.txt", "Original content.", mtime=1000.0)
+        import time
+        current_time = time.time()
+        doc = self.create_test_document(docs_dir, "doc.txt", "Original content.", mtime=current_time - 10)
         success, _ = engine.index_file(doc)
         assert success is True
         
@@ -283,7 +285,11 @@ class TestIncrementalUpdates:
         original_indexed_at = indexed_files_before[0]["indexed_at"]
         
         # Modify file and re-index with a later modification time
-        self.modify_document(doc, "Modified content.", mtime=1001.0)
+        self.modify_document(doc, "Modified content.", mtime=current_time)
+        
+        # Small delay to ensure different indexed_at timestamp
+        time.sleep(0.01)
+        
         success, _ = engine.index_file(doc)
         assert success is True
         

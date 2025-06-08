@@ -237,8 +237,12 @@ class InMemoryCacheRepository(CacheRepositoryProtocol):
     without SQLite, enabling fast and reliable unit tests.
     """
 
-    def __init__(self) -> None:
-        """Initialize the in-memory cache repository."""
+    def __init__(self, filesystem_manager: FileSystemProtocol | None = None) -> None:
+        """Initialize the in-memory cache repository.
+        
+        Args:
+            filesystem_manager: Optional filesystem manager for file modification time access
+        """
         # Store document metadata
         self.document_metadata: dict[str, dict[str, Any]] = {}
         # Store chunk hashes
@@ -247,6 +251,8 @@ class InMemoryCacheRepository(CacheRepositoryProtocol):
         self.file_metadata: dict[str, dict[str, Any]] = {}
         # Store global settings
         self.global_settings: dict[str, str] = {}
+        # Filesystem manager for accessing file modification times
+        self.filesystem_manager = filesystem_manager
 
     def compute_file_hash(self, file_path: Path) -> str:
         """Compute the SHA-256 hash of a file.
@@ -309,14 +315,25 @@ class InMemoryCacheRepository(CacheRepositoryProtocol):
 
         # Check if file has been modified since last indexing
         file_modified = False
-        try:
-            # Get current file modification time
-            current_mtime = file_path.stat().st_mtime
-            stored_mtime = metadata.get("last_modified", 0.0)
-            file_modified = current_mtime > stored_mtime
-        except (OSError, FileNotFoundError):
-            # If file doesn't exist or can't be accessed, assume it needs reindexing
-            file_modified = True
+        if self.filesystem_manager:
+            # Use filesystem manager to get file metadata (works with both real and fake filesystems)
+            try:
+                file_metadata = self.filesystem_manager.get_file_metadata(file_path)
+                current_mtime = file_metadata.get("mtime", 0.0)
+                stored_mtime = metadata.get("last_modified", 0.0)
+                file_modified = current_mtime > stored_mtime
+            except (OSError, FileNotFoundError):
+                # If file doesn't exist, assume it needs reindexing
+                file_modified = True
+        else:
+            # Fallback to direct filesystem access for backward compatibility
+            try:
+                current_mtime = file_path.stat().st_mtime
+                stored_mtime = metadata.get("last_modified", 0.0)
+                file_modified = current_mtime > stored_mtime
+            except (OSError, FileNotFoundError):
+                # If file doesn't exist or can't be accessed, assume it needs reindexing
+                file_modified = True
 
         return params_changed or file_modified
 
