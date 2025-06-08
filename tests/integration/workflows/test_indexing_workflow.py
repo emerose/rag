@@ -1,16 +1,14 @@
 """Integration tests for indexing workflows.
 
 Tests component interactions during document indexing with real file persistence
-but mocked external services (OpenAI, etc.).
+but fake external services.
 """
 
 import pytest
 from pathlib import Path
-from unittest.mock import patch
 
 from rag.config import RAGConfig, RuntimeOptions
-from rag.engine import RAGEngine
-from rag.embeddings.fake_openai import FakeOpenAI
+from rag.testing.test_factory import FakeRAGComponentsFactory
 
 
 @pytest.mark.integration
@@ -37,18 +35,19 @@ class TestIndexingWorkflow:
         doc_path.write_text(content)
         return doc_path
 
-    @patch('openai.OpenAI')
-    def test_single_file_indexing_workflow(self, mock_openai_class, tmp_path):
+    def test_single_file_indexing_workflow(self, tmp_path):
         """Test indexing a single file with persistence."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         
         # Create test document
         doc_path = self.create_test_document(
@@ -75,18 +74,19 @@ class TestIndexingWorkflow:
         assert indexed_files[0]["file_path"] == str(doc_path)
         assert indexed_files[0]["file_type"] == "text/plain"
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_directory_indexing_workflow(self, mock_embedding_provider, tmp_path):
+    def test_directory_indexing_workflow(self, tmp_path):
         """Test indexing multiple files in a directory."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_embedding_provider.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         
         # Create multiple test documents
         docs_dir = Path(config.documents_dir)
@@ -110,18 +110,19 @@ class TestIndexingWorkflow:
         assert str(doc2) in indexed_paths
         assert str(doc3) in indexed_paths
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_incremental_indexing_workflow(self, mock_embedding_provider, tmp_path):
+    def test_incremental_indexing_workflow(self, tmp_path):
         """Test incremental indexing behavior."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_embedding_provider.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Initial indexing
@@ -147,18 +148,19 @@ class TestIndexingWorkflow:
         indexed_files = engine.list_indexed_files()
         assert len(indexed_files) == 3
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_file_modification_reindexing(self, mock_embedding_provider, tmp_path):
+    def test_file_modification_reindexing(self, tmp_path):
         """Test that modified files are re-indexed."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_embedding_provider.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Initial indexing
@@ -167,26 +169,30 @@ class TestIndexingWorkflow:
         assert success is True
         
         # Modify the file
+        import os
         import time
-        time.sleep(0.1)  # Ensure different modification time
+        current_time = time.time()
         doc_path.write_text("Modified content with different text.")
+        # Set explicit modification time to ensure detection
+        os.utime(doc_path, (current_time + 1, current_time + 1))
         
         # Re-index the file
         success, _ = engine.index_file(doc_path)
         assert success is True
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_error_recovery_workflow(self, mock_embedding_provider, tmp_path):
+    def test_error_recovery_workflow(self, tmp_path):
         """Test error recovery during indexing."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_embedding_provider.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create test document
@@ -201,18 +207,19 @@ class TestIndexingWorkflow:
         indexed_files = engine.list_indexed_files()
         assert len(indexed_files) == 1
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_cache_invalidation_workflow(self, mock_embedding_provider, tmp_path):
+    def test_cache_invalidation_workflow(self, tmp_path):
         """Test cache invalidation and re-indexing workflow."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_embedding_provider.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Initial indexing
@@ -238,18 +245,19 @@ class TestIndexingWorkflow:
         indexed_files = engine.list_indexed_files()
         assert len(indexed_files) == 1
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_different_file_types_workflow(self, mock_embedding_provider, tmp_path):
+    def test_different_file_types_workflow(self, tmp_path):
         """Test indexing workflow with different file types."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_embedding_provider.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create different file types

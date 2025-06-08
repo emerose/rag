@@ -252,8 +252,7 @@ class IndexManager(CacheRepositoryProtocol):
                         tokenizer,
                         text_splitter
                     ) VALUES (
-                        ?, ?, ?, ?, ?,
-                        strftime('%s', 'now'),
+                        ?, ?, ?, ?, ?, ?,
                         ?, ?, ?, ?, ?, ?, ?, ?
                     )
                     """,
@@ -263,6 +262,7 @@ class IndexManager(CacheRepositoryProtocol):
                         metadata.chunk_size,
                         metadata.chunk_overlap,
                         last_modified,
+                        metadata.indexed_at,
                         metadata.embedding_model,
                         metadata.embedding_model_version,
                         metadata.file_type,
