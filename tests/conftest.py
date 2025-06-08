@@ -28,8 +28,8 @@ def pytest_configure(config: pytest.Config) -> None:
 
 @pytest.fixture(autouse=True)
 def disable_network(request: pytest.FixtureRequest) -> Generator[None, None, None]:
-    """Disable network access for tests unless marked as integration."""
-    if "integration" not in request.keywords:
+    """Disable network access for tests unless marked as integration or e2e."""
+    if "integration" not in request.keywords and "e2e" not in request.keywords:
         disable_socket(allow_unix_socket=True)
         yield
         enable_socket()

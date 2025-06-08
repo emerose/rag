@@ -142,6 +142,8 @@ markers = [
 # Run integration tests with: pytest -m integration
 # Run e2e tests with: pytest -m e2e  
 # Run all tests with: pytest -m "unit or integration or e2e"
+# For development (block external calls): add --disable-socket
+# For unit/integration only: pytest -m "not e2e" --disable-socket
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::pytest.PytestUnknownMarkWarning"
