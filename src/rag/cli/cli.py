@@ -334,7 +334,7 @@ def main(  # noqa: PLR0913
     state.logger = configure_logging(
         verbose,
         log_level,
-        json_mode,
+        False,  # Never use JSON logs for CLI - we want console logs to stderr
         log_file,
         modules or None,
     )
