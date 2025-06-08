@@ -1,23 +1,31 @@
 """End-to-end tests for complete RAG workflows.
 
-Tests complete user scenarios with real environment and minimal mocking.
-Only mocks expensive external API calls (OpenAI).
+Tests complete user scenarios with real environment and real APIs.
+Requires OPENAI_API_KEY to be set in environment or .env file.
 """
 
+import os
 import pytest
-import subprocess
 import tempfile
-import time
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from dotenv import load_dotenv
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.engine import RAGEngine
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 @pytest.mark.e2e
 class TestCompleteRAGWorkflow:
     """End-to-end tests for complete RAG workflows."""
+    
+    @pytest.fixture(autouse=True)
+    def check_openai_key(self):
+        """Skip tests if OpenAI API key is not available."""
+        if not os.getenv("OPENAI_API_KEY"):
+            pytest.skip("OPENAI_API_KEY not found - skipping e2e tests")
 
     def create_test_documents(self, docs_dir: Path) -> dict[str, Path]:
         """Create test documents for e2e testing."""
@@ -84,10 +92,8 @@ NLP focuses on the interaction between computers and human language.
         
         return documents
 
-    @patch('langchain_openai.ChatOpenAI')
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_complete_index_and_query_workflow(self, mock_embedding_provider, mock_chat_openai):
-        """Test complete workflow from document indexing to query answering."""
+    def test_complete_index_and_query_workflow(self):
+        """Test complete workflow from document indexing to query answering using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
@@ -96,24 +102,12 @@ NLP focuses on the interaction between computers and human language.
             # Create test documents
             documents = self.create_test_documents(docs_dir)
             
-            # Mock embedding provider
-            mock_provider = MagicMock()
-            mock_provider.embed_texts.return_value = [[0.1, 0.2, 0.3] * 128]
-            mock_provider.embed_query.return_value = [0.1, 0.2, 0.3] * 128
-            mock_provider.get_model_info.return_value = {"model_version": "test-v1"}
-            mock_embedding_provider.return_value = mock_provider
-            
-            # Mock LLM
-            mock_llm = MagicMock()
-            mock_llm.invoke.return_value.content = "Python is a programming language created by Guido van Rossum in 1991."
-            mock_chat_openai.return_value = mock_llm
-            
             # Create RAG engine with real configuration
             config = RAGConfig(
                 documents_dir=str(docs_dir),
                 cache_dir=str(cache_dir),
-                vectorstore_backend="fake",  # Use fake to avoid external dependencies
-                openai_api_key="sk-test"
+                vectorstore_backend="faiss",  # Use real FAISS backend
+                openai_api_key=os.getenv("OPENAI_API_KEY")
             )
             runtime = RuntimeOptions()
             engine = RAGEngine(config, runtime)
@@ -136,45 +130,28 @@ NLP focuses on the interaction between computers and human language.
             
             # Step 2: Test various query types
             
-            # Query about Python
-            response1 = engine.answer("Who created Python and when?")
+            # Query about Python - should find relevant information from documents
+            response1 = engine.answer("Who created Python?")
             assert "question" in response1
             assert "answer" in response1
             assert "sources" in response1
-            assert response1["question"] == "Who created Python and when?"
-            assert response1["answer"] == "Python is a programming language created by Guido van Rossum in 1991."
+            assert response1["question"] == "Who created Python?"
+            # The answer should mention Guido van Rossum based on our test documents
+            assert "Guido" in response1["answer"] or "van Rossum" in response1["answer"]
             assert len(response1["sources"]) > 0
-            
-            # Verify provider was called for embedding the query
-            assert mock_provider.embed_query.called
-            assert mock_llm.invoke.called
 
-    @patch('langchain_openai.ChatOpenAI')
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_incremental_indexing_e2e_workflow(self, mock_embedding_provider, mock_chat_openai):
-        """Test end-to-end incremental indexing workflow."""
+    def test_incremental_indexing_e2e_workflow(self):
+        """Test end-to-end incremental indexing workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
             cache_dir = temp_path / "cache"
             
-            # Mock embedding provider
-            mock_provider = MagicMock()
-            mock_provider.embed_texts.return_value = [[0.1, 0.2, 0.3] * 128]
-            mock_provider.embed_query.return_value = [0.1, 0.2, 0.3] * 128
-            mock_provider.get_model_info.return_value = {"model_version": "test-v1"}
-            mock_embedding_provider.return_value = mock_provider
-            
-            # Mock LLM
-            mock_llm = MagicMock()
-            mock_llm.invoke.return_value.content = "Test answer"
-            mock_chat_openai.return_value = mock_llm
-            
             config = RAGConfig(
                 documents_dir=str(docs_dir),
                 cache_dir=str(cache_dir),
-                vectorstore_backend="fake",
-                openai_api_key="sk-test"
+                vectorstore_backend="faiss",
+                openai_api_key=os.getenv("OPENAI_API_KEY")
             )
             runtime = RuntimeOptions()
             engine = RAGEngine(config, runtime)
@@ -182,52 +159,37 @@ NLP focuses on the interaction between computers and human language.
             # Initial setup - create and index first document
             docs_dir.mkdir()
             doc1 = docs_dir / "doc1.txt"
-            doc1.write_text("First document content.")
+            doc1.write_text("The first document contains information about Python programming.")
             
             results = engine.index_directory(docs_dir)
             assert len(results) == 1
-            initial_call_count = mock_provider.embed_texts.call_count
+            assert results[str(doc1)]["success"] is True
             
             # Add second document - should only index the new one
             doc2 = docs_dir / "doc2.txt"
-            doc2.write_text("Second document content.")
+            doc2.write_text("The second document discusses JavaScript development.")
             
             results = engine.index_directory(docs_dir)
             assert len(results) == 1  # Only new document processed
             assert str(doc2) in results
-            
-            # Verify incremental indexing (more calls but not 2x)
-            final_call_count = mock_provider.embed_texts.call_count
-            assert final_call_count > initial_call_count
+            assert results[str(doc2)]["success"] is True
             
             # Verify both documents are indexed
             indexed_files = engine.list_indexed_files()
             assert len(indexed_files) == 2
 
-    @patch('langchain_openai.ChatOpenAI')
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_cache_invalidation_e2e_workflow(self, mock_embedding_provider, mock_chat_openai):
-        """Test end-to-end cache invalidation workflow."""
+    def test_cache_invalidation_e2e_workflow(self):
+        """Test end-to-end cache invalidation workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
             cache_dir = temp_path / "cache"
             
-            # Setup mocks
-            mock_provider = MagicMock()
-            mock_provider.embed_texts.return_value = [[0.1, 0.2, 0.3] * 128]
-            mock_provider.get_model_info.return_value = {"model_version": "test-v1"}
-            mock_embedding_provider.return_value = mock_provider
-            
-            mock_llm = MagicMock()
-            mock_llm.invoke.return_value.content = "Test answer"
-            mock_chat_openai.return_value = mock_llm
-            
             config = RAGConfig(
                 documents_dir=str(docs_dir),
                 cache_dir=str(cache_dir),
-                vectorstore_backend="fake",
-                openai_api_key="sk-test"
+                vectorstore_backend="faiss",
+                openai_api_key=os.getenv("OPENAI_API_KEY")
             )
             runtime = RuntimeOptions()
             engine = RAGEngine(config, runtime)
@@ -235,7 +197,7 @@ NLP focuses on the interaction between computers and human language.
             # Create and index document
             docs_dir.mkdir()
             doc = docs_dir / "test.txt"
-            doc.write_text("Original content")
+            doc.write_text("This document contains test content for cache invalidation testing.")
             
             success, _ = engine.index_file(doc)
             assert success is True
@@ -258,10 +220,8 @@ NLP focuses on the interaction between computers and human language.
             indexed_files = engine.list_indexed_files()
             assert len(indexed_files) == 1
 
-    @patch('langchain_openai.ChatOpenAI')
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')  
-    def test_multi_document_query_e2e_workflow(self, mock_embedding_provider, mock_chat_openai):
-        """Test end-to-end multi-document query workflow."""
+    def test_multi_document_query_e2e_workflow(self):
+        """Test end-to-end multi-document query workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
@@ -270,22 +230,11 @@ NLP focuses on the interaction between computers and human language.
             # Create test documents with different topics
             documents = self.create_test_documents(docs_dir)
             
-            # Setup mocks
-            mock_provider = MagicMock()
-            mock_provider.embed_texts.return_value = [[0.1, 0.2, 0.3] * 128]
-            mock_provider.embed_query.return_value = [0.1, 0.2, 0.3] * 128
-            mock_provider.get_model_info.return_value = {"model_version": "test-v1"}
-            mock_embedding_provider.return_value = mock_provider
-            
-            mock_llm = MagicMock()
-            mock_llm.invoke.return_value.content = "Programming languages include Python and JavaScript."
-            mock_chat_openai.return_value = mock_llm
-            
             config = RAGConfig(
                 documents_dir=str(docs_dir),
                 cache_dir=str(cache_dir),
-                vectorstore_backend="fake",
-                openai_api_key="sk-test"
+                vectorstore_backend="faiss",
+                openai_api_key=os.getenv("OPENAI_API_KEY")
             )
             runtime = RuntimeOptions()
             engine = RAGEngine(config, runtime)
@@ -293,6 +242,7 @@ NLP focuses on the interaction between computers and human language.
             # Index all documents
             results = engine.index_directory(docs_dir)
             assert len(results) == 3
+            assert all(result["success"] for result in results.values())
             
             # Query for information that spans multiple documents
             response = engine.answer("What programming languages are mentioned?", k=3)
@@ -301,11 +251,12 @@ NLP focuses on the interaction between computers and human language.
             assert "question" in response
             assert "answer" in response
             assert "sources" in response
-            assert response["answer"] == "Programming languages include Python and JavaScript."
+            # Should mention Python and/or JavaScript based on our test documents
+            answer_lower = response["answer"].lower()
+            assert "python" in answer_lower or "javascript" in answer_lower
             
-            # Should retrieve from multiple documents
-            assert response["num_documents_retrieved"] <= 3
-            assert len(response["sources"]) <= 3
+            # Should retrieve from documents
+            assert len(response["sources"]) > 0
 
     def test_error_recovery_e2e_workflow(self):
         """Test end-to-end error recovery workflow."""
@@ -339,10 +290,8 @@ NLP focuses on the interaction between computers and human language.
             assert isinstance(results, dict)
             assert len(results) == 0
 
-    @patch('langchain_openai.ChatOpenAI')
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_persistence_across_engine_restarts_e2e(self, mock_embedding_provider, mock_chat_openai):
-        """Test that data persists across engine restarts in e2e scenario."""
+    def test_persistence_across_engine_restarts_e2e(self):
+        """Test that data persists across engine restarts in e2e scenario using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
@@ -351,24 +300,13 @@ NLP focuses on the interaction between computers and human language.
             # Create test document
             docs_dir.mkdir()
             doc = docs_dir / "persistent.txt"
-            doc.write_text("This content should persist across restarts.")
-            
-            # Setup mocks
-            mock_provider = MagicMock()
-            mock_provider.embed_texts.return_value = [[0.1, 0.2, 0.3] * 128]
-            mock_provider.embed_query.return_value = [0.1, 0.2, 0.3] * 128
-            mock_provider.get_model_info.return_value = {"model_version": "test-v1"}
-            mock_embedding_provider.return_value = mock_provider
-            
-            mock_llm = MagicMock()
-            mock_llm.invoke.return_value.content = "Persistent content answer"
-            mock_chat_openai.return_value = mock_llm
+            doc.write_text("This content should persist across engine restarts. Python is a programming language.")
             
             config = RAGConfig(
                 documents_dir=str(docs_dir),
                 cache_dir=str(cache_dir),
-                vectorstore_backend="fake",
-                openai_api_key="sk-test"
+                vectorstore_backend="faiss",
+                openai_api_key=os.getenv("OPENAI_API_KEY")
             )
             runtime = RuntimeOptions()
             
@@ -382,10 +320,6 @@ NLP focuses on the interaction between computers and human language.
             assert len(files1) == 1
             
             # Create second engine instance (simulating restart)
-            # Reset mocks for second instance
-            mock_embedding_provider.return_value = mock_provider
-            mock_chat_openai.return_value = mock_llm
-            
             engine2 = RAGEngine(config, runtime)
             
             # Should still see the indexed file
@@ -394,6 +328,6 @@ NLP focuses on the interaction between computers and human language.
             assert files2[0]["file_path"] == str(doc)
             
             # Should be able to query the persisted data
-            response = engine2.answer("What is persistent?")
+            response = engine2.answer("What programming language is mentioned?")
             assert "answer" in response
-            assert response["answer"] == "Persistent content answer"
+            assert "python" in response["answer"].lower()

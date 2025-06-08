@@ -1,20 +1,31 @@
 """End-to-end CLI workflow tests.
 
 Tests complete CLI workflows as users would actually use them.
-Uses real CLI commands with minimal mocking.
+Uses real CLI commands with real APIs.
+Requires OPENAI_API_KEY to be set in environment or .env file.
 """
 
+import os
 import pytest
 import subprocess
 import tempfile
 import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 @pytest.mark.e2e
 class TestCLIWorkflow:
     """End-to-end tests for CLI workflows."""
+    
+    @pytest.fixture(autouse=True)
+    def check_openai_key(self):
+        """Skip tests if OpenAI API key is not available."""
+        if not os.getenv("OPENAI_API_KEY"):
+            pytest.skip("OPENAI_API_KEY not found - skipping e2e tests")
 
     def create_test_documents(self, docs_dir: Path) -> dict[str, Path]:
         """Create test documents for CLI testing."""
@@ -51,9 +62,8 @@ Use the CLI to index documents and ask questions.
         
         return documents
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_cli_index_command_workflow(self, mock_embedding_provider):
-        """Test CLI index command end-to-end workflow."""
+    def test_cli_index_command_workflow(self):
+        """Test CLI index command end-to-end workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
@@ -63,16 +73,10 @@ Use the CLI to index documents and ask questions.
             # Create test documents
             documents = self.create_test_documents(docs_dir)
             
-            # Mock embedding provider to avoid real API calls
-            mock_provider = MagicMock()
-            mock_provider.embed_texts.return_value = [[0.1, 0.2, 0.3] * 128]
-            mock_provider.get_model_info.return_value = {"model_version": "test-v1"}
-            mock_embedding_provider.return_value = mock_provider
-            
-            # Run CLI index command
+            # Run CLI index command with real FAISS backend
             result = subprocess.run([
                 "python", "-m", "rag",
-                "--vectorstore-backend", "fake",
+                "--vectorstore-backend", "faiss",
                 "--cache-dir", str(cache_dir),
                 "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
@@ -85,9 +89,8 @@ Use the CLI to index documents and ask questions.
             cache_files = [f for f in cache_files if f.is_file()]
             assert len(cache_files) > 0, "No cache files were created"
 
-    @patch('rag.embeddings.embedding_provider.EmbeddingProvider')
-    def test_cli_list_command_workflow(self, mock_embedding_provider):
-        """Test CLI list command workflow."""
+    def test_cli_list_command_workflow(self):
+        """Test CLI list command workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
@@ -97,16 +100,10 @@ Use the CLI to index documents and ask questions.
             # Create test documents
             documents = self.create_test_documents(docs_dir)
             
-            # Mock embedding provider
-            mock_provider = MagicMock()
-            mock_provider.embed_texts.return_value = [[0.1, 0.2, 0.3] * 128]
-            mock_provider.get_model_info.return_value = {"model_version": "test-v1"}
-            mock_embedding_provider.return_value = mock_provider
-            
             # First index documents
             index_result = subprocess.run([
                 "python", "-m", "rag",
-                "--vectorstore-backend", "fake",
+                "--vectorstore-backend", "faiss",
                 "--cache-dir", str(cache_dir),
                 "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
