@@ -39,8 +39,13 @@ python --version
 # Run all checks
 echo "🔍 Starting code quality checks..."
 
-# Run tests (excluding integration tests)
-run_check "python tests/run_tests.py" "Running tests (excluding integration tests)"
+# Run unit tests first
+run_check "python tests/run_tests.py" "Running unit tests"
+
+# Run integration tests if unit tests passed
+if [ $OVERALL_STATUS -eq 0 ]; then
+  run_check "python tests/run_integration_tests.py" "Running integration tests"
+fi
 
 # Format code (excluding tests)
 run_check "ruff format src/ --line-length 88" "Formatting code"

@@ -29,7 +29,7 @@ jobs:
           . .venv/bin/activate
           uv pip install -e .[dev]
 
-      - name: Run integration tests
+      - name: Run e2e tests
         run: |
           . .venv/bin/activate
-          python tests/run_integration_tests.py --verbose
+          python -m pytest tests/e2e/ -v --tb=short
