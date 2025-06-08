@@ -12,6 +12,7 @@ from pathlib import Path
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
+from rag.embeddings.fake_openai import FakeOpenAI
 from rag.factory import ComponentOverrides, RAGComponentsFactory
 from rag.storage.fakes import (
     InMemoryCacheRepository,
@@ -201,6 +202,65 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         """
         return cls(test_options=FakeComponentOptions())
 
+    @classmethod
+    def create_for_integration_tests(
+        cls,
+        config: RAGConfig | None = None,
+        runtime: RuntimeOptions | None = None,
+        use_real_filesystem: bool = True,
+    ) -> FakeRAGComponentsFactory:
+        """Create a factory suitable for integration tests.
+
+        Integration tests should use real file system persistence but fake
+        external services like OpenAI.
+
+        Args:
+            config: Optional RAG configuration. If None, creates test config.
+            runtime: Optional runtime options. If None, creates default.
+            use_real_filesystem: If True, use real filesystem instead of fake.
+
+        Returns:
+            A FakeRAGComponentsFactory configured for integration testing.
+        """
+        if config is None:
+            config = RAGConfig(
+                documents_dir="/tmp/test_docs",
+                cache_dir="/tmp/test_cache", 
+                vectorstore_backend="fake",
+                openai_api_key="sk-test",
+            )
+
+        if runtime is None:
+            runtime = RuntimeOptions()
+
+        # For integration tests, we want minimal fake components but real file operations
+        if use_real_filesystem:
+            # Use minimal fake components - primarily just fake external APIs
+            test_options = FakeComponentOptions(
+                use_deterministic_embeddings=False,  # Use fake but not deterministic
+                embedding_dimension=1536,  # Standard OpenAI dimension
+            )
+            
+            # Create the factory
+            factory = cls(config=config, runtime_options=runtime, test_options=test_options)
+            
+            # Override filesystem and document loader for real file operations
+            from rag.storage.filesystem import FilesystemManager
+            from rag.data.document_loader import DocumentLoader
+            
+            factory._filesystem_manager = FilesystemManager()
+            factory._document_loader = DocumentLoader(
+                filesystem_manager=factory._filesystem_manager,
+                log_callback=runtime.log_callback,
+            )
+        else:
+            # For tests that want fake filesystem, use all fake components
+            test_options = FakeComponentOptions()
+            factory = cls(config=config, runtime_options=runtime, test_options=test_options)
+            
+        return factory
+
+
     def add_test_document(self, path: str, content: str) -> None:
         """Add a test document to the fake filesystem.
 
@@ -254,3 +314,29 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             raise ValueError("Can only get test metadata from InMemoryCacheRepository")
 
         return dict(self.cache_repository.document_metadata)
+
+    def inject_fake_openai(self) -> FakeOpenAI:
+        """Inject and return a FakeOpenAI instance for the factory.
+        
+        This replaces any real OpenAI calls with fake implementations,
+        which is useful for integration tests.
+        
+        Returns:
+            The FakeOpenAI instance that was injected.
+        """
+        fake_openai = FakeOpenAI()
+        
+        # If we have embedding providers that use OpenAI, replace them
+        if hasattr(self, 'embedding_provider'):
+            # Inject the fake OpenAI into the embedding provider
+            if hasattr(self.embedding_provider, 'openai_client'):
+                self.embedding_provider.openai_client = fake_openai
+            if hasattr(self.embedding_provider, '_client'):
+                self.embedding_provider._client = fake_openai
+                
+        # If we have chat models that use OpenAI, replace them  
+        if hasattr(self, 'chat_model'):
+            if hasattr(self.chat_model, 'client'):
+                self.chat_model.client = fake_openai
+                
+        return fake_openai

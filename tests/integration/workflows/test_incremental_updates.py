@@ -1,17 +1,15 @@
 """Integration tests for incremental update workflows.
 
 Tests component interactions during incremental updates with real persistence
-but mocked external services.
+but fake external services.
 """
 
 import pytest
 import time
 from pathlib import Path
-from unittest.mock import patch
 
 from rag.config import RAGConfig, RuntimeOptions
-from rag.engine import RAGEngine
-from rag.embeddings.fake_openai import FakeOpenAI
+from rag.testing.test_factory import FakeRAGComponentsFactory
 
 
 @pytest.mark.integration
@@ -38,18 +36,19 @@ class TestIncrementalUpdates:
         doc_path.write_text(content)
         return doc_path
 
-    @patch('openai.OpenAI')
-    def test_file_addition_incremental_update(self, mock_openai_class, tmp_path):
+    def test_file_addition_incremental_update(self, tmp_path):
         """Test incremental updates when new files are added."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Initial state: index one file
@@ -74,18 +73,19 @@ class TestIncrementalUpdates:
         assert str(doc1) in indexed_paths
         assert str(doc2) in indexed_paths
 
-    @patch('openai.OpenAI')
-    def test_file_modification_incremental_update(self, mock_openai_class, tmp_path):
+    def test_file_modification_incremental_update(self, tmp_path):
         """Test incremental updates when existing files are modified."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Initial indexing
@@ -114,18 +114,19 @@ class TestIncrementalUpdates:
         indexed_files = engine.list_indexed_files()
         assert len(indexed_files) == 2
 
-    @patch('openai.OpenAI')
-    def test_file_deletion_incremental_update(self, mock_openai_class, tmp_path):
+    def test_file_deletion_incremental_update(self, tmp_path):
         """Test incremental updates when files are deleted."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Initial indexing with two files
@@ -152,18 +153,19 @@ class TestIncrementalUpdates:
         # Implementation may vary - some systems clean up immediately, others don't
         assert len(indexed_files) >= 1  # At least the remaining file
 
-    @patch('openai.OpenAI')
-    def test_parameter_change_incremental_update(self, mock_openai_class, tmp_path):
+    def test_parameter_change_incremental_update(self, tmp_path):
         """Test incremental updates when chunking parameters change."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Initial indexing with default parameters
@@ -173,7 +175,12 @@ class TestIncrementalUpdates:
         
         # Create new engine with different chunk parameters
         config_modified = self.create_test_config(tmp_path)
-        engine_modified = RAGEngine(config_modified, runtime)
+        factory_modified = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config_modified,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
+        engine_modified = factory_modified.create_rag_engine()
         
         # Re-index with different parameters (simulated by different engine instance)
         success, _ = engine_modified.index_file(doc)
@@ -182,18 +189,19 @@ class TestIncrementalUpdates:
         # Should trigger re-processing due to parameter changes
         # (FakeOpenAI automatically handles embedding calls)
 
-    @patch('openai.OpenAI')
-    def test_mixed_operations_incremental_update(self, mock_openai_class, tmp_path):
+    def test_mixed_operations_incremental_update(self, tmp_path):
         """Test incremental updates with mixed file operations."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Initial state: 3 files
@@ -228,18 +236,19 @@ class TestIncrementalUpdates:
         # Verify additional embedding calls occurred
         # (FakeOpenAI automatically handles embedding calls)
 
-    @patch('openai.OpenAI')
-    def test_cache_consistency_during_updates(self, mock_openai_class, tmp_path):
+    def test_cache_consistency_during_updates(self, tmp_path):
         """Test cache consistency during incremental updates."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Initial indexing
@@ -268,20 +277,21 @@ class TestIncrementalUpdates:
         assert len(indexed_files) == 1
         assert indexed_files[0]["file_path"] == str(doc)
 
-    @patch('openai.OpenAI')
-    def test_concurrent_update_safety(self, mock_openai_class, tmp_path):
+    def test_concurrent_update_safety(self, tmp_path):
         """Test incremental update safety with concurrent-like operations."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
         # Create two engine instances (simulating concurrent access)
-        engine1 = RAGEngine(config, runtime)
-        engine2 = RAGEngine(config, runtime)
+        engine1 = factory.create_rag_engine()
+        engine2 = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Initial indexing with engine1
@@ -303,18 +313,19 @@ class TestIncrementalUpdates:
         assert len(files2) == 1
         assert files1[0]["file_path"] == files2[0]["file_path"]
 
-    @patch('openai.OpenAI')
-    def test_large_scale_incremental_update(self, mock_openai_class, tmp_path):
+    def test_large_scale_incremental_update(self, tmp_path):
         """Test incremental updates with larger number of files."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create and index many files

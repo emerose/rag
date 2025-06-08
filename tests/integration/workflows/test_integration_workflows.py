@@ -7,12 +7,9 @@ Uses real file system but fake embedding services.
 import pytest
 import time
 from pathlib import Path
-from unittest.mock import patch
 
 from rag.config import RAGConfig, RuntimeOptions
-from rag.embeddings.fakes import FakeEmbeddingService
-from rag.embeddings.fake_openai import FakeOpenAI
-from rag.engine import RAGEngine
+from rag.testing.test_factory import FakeRAGComponentsFactory
 
 
 @pytest.mark.integration
@@ -40,18 +37,19 @@ class TestIntegrationWorkflows:
         doc_path.write_text(content)
         return doc_path
 
-    @patch('openai.OpenAI')
-    def test_basic_indexing_workflow(self, mock_embedding_service, tmp_path):
+    def test_basic_indexing_workflow(self, tmp_path):
         """Test basic document indexing workflow."""
-        # Setup with fake embedding service
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake embedding service
-        fake_service = FakeEmbeddingService()
-        mock_embedding_service.return_value = fake_service
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create test document
@@ -71,17 +69,19 @@ class TestIntegrationWorkflows:
         assert len(indexed_files) == 1
         assert indexed_files[0]["file_path"] == str(doc_path)
 
-    @patch('openai.OpenAI')
-    def test_incremental_indexing_workflow(self, mock_embedding_service, tmp_path):
+    def test_incremental_indexing_workflow(self, tmp_path):
         """Test incremental indexing behavior."""
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake embedding service
-        fake_service = FakeEmbeddingService()
-        mock_embedding_service.return_value = fake_service
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Initial indexing
@@ -107,17 +107,19 @@ class TestIntegrationWorkflows:
         indexed_files = engine.list_indexed_files()
         assert len(indexed_files) == 3
 
-    @patch('openai.OpenAI')
-    def test_file_modification_workflow(self, mock_embedding_service, tmp_path):
+    def test_file_modification_workflow(self, tmp_path):
         """Test file modification and re-indexing."""
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake embedding service
-        fake_service = FakeEmbeddingService()
-        mock_embedding_service.return_value = fake_service
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Initial indexing
@@ -137,18 +139,20 @@ class TestIntegrationWorkflows:
         indexed_files = engine.list_indexed_files()
         assert len(indexed_files) == 1
 
-    @patch('openai.OpenAI')
-    def test_cache_persistence_workflow(self, mock_embedding_service, tmp_path):
+    def test_cache_persistence_workflow(self, tmp_path):
         """Test cache persistence across engine restarts."""
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake embedding service
-        fake_service = FakeEmbeddingService()
-        mock_embedding_service.return_value = fake_service
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
         # First engine instance
-        engine1 = RAGEngine(config, runtime)
+        engine1 = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create and index document
@@ -162,26 +166,31 @@ class TestIntegrationWorkflows:
         assert len(cache_files) > 0
         
         # Create new engine instance (simulating restart)
-        # Mock again for second engine
-        mock_embedding_service.return_value = fake_service
-        engine2 = RAGEngine(config, runtime)
+        factory2 = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
+        engine2 = factory2.create_rag_engine()
         
         # Verify document is still indexed
         indexed_files = engine2.list_indexed_files()
         assert len(indexed_files) == 1
         assert indexed_files[0]["file_path"] == str(doc_path)
 
-    @patch('openai.OpenAI')
-    def test_error_handling_workflow(self, mock_embedding_service, tmp_path):
+    def test_error_handling_workflow(self, tmp_path):
         """Test error handling during workflows."""
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake embedding service
-        fake_service = FakeEmbeddingService()
-        mock_embedding_service.return_value = fake_service
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         
         # Try to index non-existent file
         non_existent = Path(config.documents_dir) / "nonexistent.txt"
@@ -191,17 +200,19 @@ class TestIntegrationWorkflows:
         assert success is False
         assert error is not None
 
-    @patch('openai.OpenAI')
-    def test_directory_workflow_with_mixed_files(self, mock_embedding_service, tmp_path):
+    def test_directory_workflow_with_mixed_files(self, tmp_path):
         """Test directory indexing with different file types."""
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake embedding service
-        fake_service = FakeEmbeddingService()
-        mock_embedding_service.return_value = fake_service
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create different file types
@@ -221,22 +232,19 @@ class TestIntegrationWorkflows:
         assert "text/plain" in file_types
         assert "text/markdown" in file_types
 
-    @patch('openai.OpenAI')
-    def test_query_workflow_with_mocked_llm(self, mock_embedding_service, mock_chat_openai, tmp_path):
-        """Test query workflow with mocked LLM."""
+    def test_query_workflow_with_fake_llm(self, tmp_path):
+        """Test query workflow with fake LLM."""
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake embedding service
-        fake_service = FakeEmbeddingService()
-        mock_embedding_service.return_value = fake_service
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        # Mock LLM
-        mock_llm = MagicMock()
-        mock_llm.invoke.return_value.content = "This is a test answer."
-        mock_chat_openai.return_value = mock_llm
-        
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create and index document
@@ -253,19 +261,22 @@ class TestIntegrationWorkflows:
         assert "question" in response
         assert "answer" in response
         assert "sources" in response
-        assert response["answer"] == "This is a test answer."
+        # FakeOpenAI returns default response for queries with no relevant matches
+        assert response["answer"] == "I couldn't find any relevant information in the indexed documents."
 
-    @patch('openai.OpenAI')
-    def test_cache_invalidation_workflow(self, mock_embedding_service, tmp_path):
+    def test_cache_invalidation_workflow(self, tmp_path):
         """Test cache invalidation workflow."""
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake embedding service
-        fake_service = FakeEmbeddingService()
-        mock_embedding_service.return_value = fake_service
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Index a document

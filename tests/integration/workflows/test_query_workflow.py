@@ -1,16 +1,14 @@
 """Integration tests for query workflows.
 
 Tests component interactions during query processing with real persistence
-but mocked external services (OpenAI, etc.).
+but fake external services (OpenAI, etc.).
 """
 
 import pytest
 from pathlib import Path
-from unittest.mock import patch
 
 from rag.config import RAGConfig, RuntimeOptions
-from rag.engine import RAGEngine
-from rag.embeddings.fake_openai import FakeOpenAI
+from rag.testing.test_factory import FakeRAGComponentsFactory
 
 
 @pytest.mark.integration
@@ -37,18 +35,19 @@ class TestQueryWorkflow:
         doc_path.write_text(content)
         return doc_path
 
-    @patch('openai.OpenAI')
-    def test_basic_query_workflow(self, mock_openai_class, tmp_path):
+    def test_basic_query_workflow(self, tmp_path):
         """Test basic query workflow with indexed documents."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create and index test documents
@@ -81,18 +80,19 @@ class TestQueryWorkflow:
         assert response["num_documents_retrieved"] > 0
         assert len(response["sources"]) > 0
 
-    @patch('openai.OpenAI')
-    def test_multi_document_retrieval_workflow(self, mock_openai_class, tmp_path):
+    def test_multi_document_retrieval_workflow(self, tmp_path):
         """Test query workflow retrieving from multiple documents."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create multiple documents with related content
@@ -122,18 +122,19 @@ class TestQueryWorkflow:
         assert len(response["sources"]) <= 3
         assert len(response["answer"]) > 0  # FakeOpenAI returns a valid response
 
-    @patch('openai.OpenAI')
-    def test_query_with_no_results_workflow(self, mock_openai_class, tmp_path):
+    def test_query_with_no_results_workflow(self, tmp_path):
         """Test query workflow when no relevant documents are found."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create document with unrelated content
@@ -154,18 +155,19 @@ class TestQueryWorkflow:
         assert "answer" in response
         assert response["answer"] == "I couldn't find any relevant information in the indexed documents."
 
-    @patch('openai.OpenAI')
-    def test_query_with_empty_index_workflow(self, mock_openai_class, tmp_path):
+    def test_query_with_empty_index_workflow(self, tmp_path):
         """Test query workflow with no indexed documents."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         
         # Query without any indexed documents
         response = engine.answer("What is the capital of France?")
@@ -176,18 +178,19 @@ class TestQueryWorkflow:
         assert response["num_documents_retrieved"] == 0
         assert len(response["sources"]) == 0
 
-    @patch('openai.OpenAI')
-    def test_query_parameter_variations_workflow(self, mock_openai_class, tmp_path):
+    def test_query_parameter_variations_workflow(self, tmp_path):
         """Test query workflow with different parameters."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create multiple test documents
@@ -215,18 +218,19 @@ class TestQueryWorkflow:
         assert len(response_k3["sources"]) <= 3
         assert len(response_k5["sources"]) <= 5
 
-    @patch('openai.OpenAI')
-    def test_query_error_recovery_workflow(self, mock_openai_class, tmp_path):
+    def test_query_error_recovery_workflow(self, tmp_path):
         """Test query workflow error recovery."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create and index a document
@@ -239,18 +243,19 @@ class TestQueryWorkflow:
         assert "answer" in response
         assert response["answer"] == "I couldn't find any relevant information in the indexed documents."
 
-    @patch('openai.OpenAI')
-    def test_query_with_metadata_filtering_workflow(self, mock_openai_class, tmp_path):
+    def test_query_with_metadata_filtering_workflow(self, tmp_path):
         """Test query workflow with metadata-based filtering."""
-        # Setup
+        # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
-        # Use fake OpenAI instead of complex mocking
-        fake_openai = FakeOpenAI()
-        mock_openai_class.return_value = fake_openai
+        factory = FakeRAGComponentsFactory.create_for_integration_tests(
+            config=config,
+            runtime=runtime,
+            use_real_filesystem=True
+        )
         
-        engine = RAGEngine(config, runtime)
+        engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
         # Create documents with different types
