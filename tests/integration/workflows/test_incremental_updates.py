@@ -4,8 +4,8 @@ Tests component interactions during incremental updates with real persistence
 but fake external services.
 """
 
+import os
 import pytest
-import time
 from pathlib import Path
 
 from rag.config import RAGConfig, RuntimeOptions
@@ -30,11 +30,34 @@ class TestIncrementalUpdates:
             openai_api_key="sk-test"
         )
 
-    def create_test_document(self, docs_dir: Path, filename: str, content: str) -> Path:
-        """Create a test document file."""
+    def create_test_document(self, docs_dir: Path, filename: str, content: str, mtime: float | None = None) -> Path:
+        """Create a test document file.
+        
+        Args:
+            docs_dir: Directory to create the document in
+            filename: Name of the file
+            content: Content to write
+            mtime: Optional modification time to set (Unix timestamp)
+        """
         doc_path = docs_dir / filename
         doc_path.write_text(content)
+        
+        if mtime is not None:
+            # Set specific modification time
+            os.utime(doc_path, (mtime, mtime))
+        
         return doc_path
+    
+    def modify_document(self, doc_path: Path, content: str, mtime: float) -> None:
+        """Modify a document with a specific modification time.
+        
+        Args:
+            doc_path: Path to the document
+            content: New content
+            mtime: Modification time to set (Unix timestamp)
+        """
+        doc_path.write_text(content)
+        os.utime(doc_path, (mtime, mtime))
 
     def test_file_addition_incremental_update(self, tmp_path):
         """Test incremental updates when new files are added."""
@@ -88,16 +111,15 @@ class TestIncrementalUpdates:
         engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
-        # Initial indexing
-        doc1 = self.create_test_document(docs_dir, "doc1.txt", "Original content.")
-        doc2 = self.create_test_document(docs_dir, "doc2.txt", "Unchanged content.")
+        # Initial indexing with specific modification times
+        doc1 = self.create_test_document(docs_dir, "doc1.txt", "Original content.", mtime=1000.0)
+        doc2 = self.create_test_document(docs_dir, "doc2.txt", "Unchanged content.", mtime=1000.0)
         
         results = engine.index_directory(docs_dir)
         assert len(results) == 2
         
-        # Modify one file
-        time.sleep(0.1)  # Ensure different modification time
-        doc1.write_text("Modified content with new information.")
+        # Modify one file with a later modification time
+        self.modify_document(doc1, "Modified content with new information.", mtime=1001.0)
         
         # Re-index directory
         results = engine.index_directory(docs_dir)
@@ -204,18 +226,17 @@ class TestIncrementalUpdates:
         engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
-        # Initial state: 3 files
-        doc1 = self.create_test_document(docs_dir, "doc1.txt", "First document.")
-        doc2 = self.create_test_document(docs_dir, "doc2.txt", "Second document.")
-        doc3 = self.create_test_document(docs_dir, "doc3.txt", "Third document.")
+        # Initial state: 3 files with specific modification times
+        doc1 = self.create_test_document(docs_dir, "doc1.txt", "First document.", mtime=1000.0)
+        doc2 = self.create_test_document(docs_dir, "doc2.txt", "Second document.", mtime=1000.0)
+        doc3 = self.create_test_document(docs_dir, "doc3.txt", "Third document.", mtime=1000.0)
         
         results = engine.index_directory(docs_dir)
         assert len(results) == 3
         
         # Mixed operations:
-        # 1. Modify doc1
-        time.sleep(0.1)
-        doc1.write_text("Modified first document.")
+        # 1. Modify doc1 with a later modification time
+        self.modify_document(doc1, "Modified first document.", mtime=1001.0)
         
         # 2. Delete doc2
         doc2.unlink()
@@ -251,8 +272,8 @@ class TestIncrementalUpdates:
         engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
-        # Initial indexing
-        doc = self.create_test_document(docs_dir, "doc.txt", "Original content.")
+        # Initial indexing with specific modification time
+        doc = self.create_test_document(docs_dir, "doc.txt", "Original content.", mtime=1000.0)
         success, _ = engine.index_file(doc)
         assert success is True
         
@@ -261,9 +282,8 @@ class TestIncrementalUpdates:
         cache_files_before = [f for f in cache_files_before if f.is_file()]
         assert len(cache_files_before) > 0
         
-        # Modify file and re-index
-        time.sleep(0.1)
-        doc.write_text("Modified content.")
+        # Modify file and re-index with a later modification time
+        self.modify_document(doc, "Modified content.", mtime=1001.0)
         success, _ = engine.index_file(doc)
         assert success is True
         
@@ -295,13 +315,12 @@ class TestIncrementalUpdates:
         docs_dir = Path(config.documents_dir)
         
         # Initial indexing with engine1
-        doc = self.create_test_document(docs_dir, "doc.txt", "Initial content.")
+        doc = self.create_test_document(docs_dir, "doc.txt", "Initial content.", mtime=1000.0)
         success, _ = engine1.index_file(doc)
         assert success is True
         
-        # Modify and index with engine2
-        time.sleep(0.1)
-        doc.write_text("Modified by engine2.")
+        # Modify and index with engine2 with a later modification time
+        self.modify_document(doc, "Modified by engine2.", mtime=1001.0)
         success, _ = engine2.index_file(doc)
         assert success is True
         
@@ -328,13 +347,14 @@ class TestIncrementalUpdates:
         engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
         
-        # Create and index many files
+        # Create and index many files with specific modification times
         num_files = 20
         docs = []
         for i in range(num_files):
             doc = self.create_test_document(
                 docs_dir, f"doc{i:02d}.txt", 
-                f"Document {i} with content about topic {i}."
+                f"Document {i} with content about topic {i}.",
+                mtime=1000.0
             )
             docs.append(doc)
         
@@ -342,11 +362,10 @@ class TestIncrementalUpdates:
         results = engine.index_directory(docs_dir)
         assert len(results) == num_files
         
-        # Modify a subset of files
+        # Modify a subset of files with later modification times
         modified_indices = [2, 7, 13, 18]  # Modify some files
         for i in modified_indices:
-            time.sleep(0.01)  # Small delay to ensure different mtime
-            docs[i].write_text(f"Modified document {i} with updated content.")
+            self.modify_document(docs[i], f"Modified document {i} with updated content.", mtime=1001.0)
         
         # Add a few new files
         new_docs = []
