@@ -15,6 +15,8 @@
 - [#226] [P4] **Plugin system** – Create extensible plugin architecture
 - [#227] [P3] **API versioning** – Add proper API versioning support
 - [#228] [P4] **Migration tools** – Create tools for data migration between versions
+- [#296] [P2] **Rename EmbeddingService to OpenAIEmbeddingService** – Make it clearer what it's responsible for, and enable alternate embedding services
+- [#297] [P3] **Make EmbeddingBatcher meet the EmbeddingServiceProtocol** – Should make things simpler, at least conceptually
 
 ### Retrieval & Relevance
 
@@ -49,11 +51,13 @@
 - [#241] [P3] **Batch processing** – Implement efficient batch processing for large datasets
 - [#242] [P5] **Distributed processing** – Add support for distributed processing
 - [#243] [P3] **Metrics collection** – Implement detailed metrics collection and reporting
+- [#281] [P2] **Fix parallelization** – Indexer should start n parallel workers, each indexing a file end-to-end
 
 ### Evaluation & Testing
 
-- [P3] **OpenEvals integration** – Evaluate subsystem performance using the
-  OpenEvals library
+- [#300] [P3] **OpenEvals integration** – Evaluate subsystem performance using the OpenEvals library
+- [#299] [P3] **Build PDF parsing test corpus** – Create comprehensive test corpus using PubLayNet, DocLayNet, and OmniDocBench datasets
+- [#298] [P2] **Add timeouts to tests** – Tests that take too long should fail using time limits from testing.md
 
 
 
