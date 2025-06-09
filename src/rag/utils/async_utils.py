@@ -28,7 +28,8 @@ def get_optimal_concurrency(max_concurrency: int | None = None) -> int:
 
     """
     # Default to min(32, cpu_count + 4)
-    optimal = min(32, os.cpu_count() + 4 if os.cpu_count() else 8)
+    cpu_count = os.cpu_count()
+    optimal = min(32, (cpu_count + 4) if cpu_count else 8)
 
     # If max_concurrency is specified and less than optimal, use that instead
     if max_concurrency is not None and max_concurrency > 0:

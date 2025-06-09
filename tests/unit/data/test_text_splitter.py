@@ -202,7 +202,7 @@ class TestTextSplitterFactory:
 
         # Check that each chunk's token count doesn't exceed the max
         for doc in split_docs:
-            token_count = factory._token_length(doc.page_content)
+            token_count = factory.get_token_length(doc.page_content)
             assert token_count <= 10, (
                 f"Chunk has {token_count} tokens, which exceeds the limit of 10"
             )
@@ -312,7 +312,7 @@ Content for section 2.
 
         # With semantic chunking disabled and small chunk size, we'd expect token-based splitting
         # rather than splitting at the paragraph boundary
-        token_count = factory._token_length(text)
+        token_count = factory.get_token_length(text)
         if token_count > factory.chunk_size:
             # Should be split, but not necessarily at semantic boundaries
             assert len(split_docs) > 1, (
@@ -321,7 +321,7 @@ Content for section 2.
 
         # Check each chunk against TokenTextSplitter behavior
         for doc in split_docs:
-            token_count = factory._token_length(doc.page_content)
+            token_count = factory.get_token_length(doc.page_content)
             assert token_count <= factory.chunk_size, (
                 f"Chunk has {token_count} tokens, which exceeds the limit of {factory.chunk_size}"
             )
@@ -440,22 +440,3 @@ Content for section 1.
                     assert any(h["text"] == "Document Title" for h in headings)
                     assert all("level" in h for h in headings)
                     assert all("path" in h for h in headings)
-
-                    # Test that the deprecated factory method still works but issues a warning
-                    from rag.data.text_splitter import TextSplitterFactory
-                    import warnings
-
-                    factory = TextSplitterFactory()
-
-                    # Expect a deprecation warning when using the old method
-                    with warnings.catch_warnings(record=True) as w:
-                        warnings.simplefilter("always")
-                        factory_headings = factory.extract_pdf_headings("mock_pdf.pdf")
-
-                        # Verify deprecation warning was issued
-                        assert len(w) == 1
-                        assert issubclass(w[0].category, DeprecationWarning)
-                        assert "deprecated" in str(w[0].message).lower()
-
-                    # Verify factory approach still works (deprecated but should still function)
-                    assert len(factory_headings) > 0

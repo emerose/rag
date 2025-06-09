@@ -27,7 +27,7 @@ def run_evaluations(evaluations: Sequence[Evaluation]) -> list[EvaluationResult]
             raise InvalidConfigurationError(
                 config_key="evaluation.category",
                 value=evaluation.category,
-                expected=f"one of {available_categories}"
+                expected=f"one of {available_categories}",
             )
         evaluator = evaluator_cls(evaluation)
         result = evaluator.evaluate()

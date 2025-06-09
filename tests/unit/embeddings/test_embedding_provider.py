@@ -9,6 +9,7 @@ from unittest.mock import patch
 from rag.embeddings.embedding_provider import EmbeddingProvider
 from rag.embeddings.fakes import FakeEmbeddingService, DeterministicEmbeddingService
 from rag.utils.exceptions import EmbeddingGenerationError
+from rag.config.components import EmbeddingConfig
 
 
 def test_embedding_provider_init() -> None:
@@ -18,8 +19,9 @@ def test_embedding_provider_init() -> None:
         "rag.embeddings.embedding_service.OpenAIEmbeddings",
         return_value=FakeEmbeddingService(),
     ):
+        config = EmbeddingConfig(model="test-model")
         provider = EmbeddingProvider(
-            model_name="test-model",
+            config=config,
             openai_api_key="test-key",
             show_progress_bar=True,
             log_callback=lambda _level, _msg, _subsystem: None,
@@ -51,8 +53,9 @@ def test_get_model_info() -> None:
             "rag.embeddings.embedding_service.OpenAIEmbeddings",
             return_value=FakeEmbeddingService(),
         ):
+            config = EmbeddingConfig(model=model_name)
             provider = EmbeddingProvider(
-                model_name=model_name,
+                config=config,
                 openai_api_key="test-key-for-unit-tests",
             )
 
@@ -81,8 +84,9 @@ def test_embed_query() -> None:
         "rag.embeddings.embedding_service.OpenAIEmbeddings",
         return_value=fake_embeddings,
     ):
+        config = EmbeddingConfig(model="test-model")
         provider = EmbeddingProvider(
-            model_name="test-model",
+            config=config,
             openai_api_key="test-key",
         )
 
@@ -112,8 +116,9 @@ def test_embed_texts() -> None:
         "rag.embeddings.embedding_service.OpenAIEmbeddings",
         return_value=fake_embeddings,
     ):
+        config = EmbeddingConfig(model="test-model")
         provider = EmbeddingProvider(
-            model_name="test-model",
+            config=config,
             openai_api_key="test-key",
         )
 
@@ -136,8 +141,9 @@ def test_error_handling() -> None:
         "rag.embeddings.embedding_service.OpenAIEmbeddings",
         return_value=fake_embeddings,
     ):
+        config = EmbeddingConfig(model="test-model")
         provider = EmbeddingProvider(
-            model_name="test-model",
+            config=config,
             openai_api_key="test-key",
         )
 

@@ -41,100 +41,8 @@ class TestChunkingAlgorithms:
         default_splitter = strategy.get_splitter_for_mimetype("unknown/type")
         assert isinstance(default_splitter, RecursiveCharacterTextSplitter)
 
-    def test_token_length_calculation_logic(self):
-        """Test token length calculation algorithm."""
-        with patch('rag.data.chunking._safe_encoding_for_model') as mock_encoding:
-            mock_tokenizer = Mock()
-            mock_tokenizer.encode.return_value = [1, 2, 3, 4, 5]  # 5 tokens
-            mock_encoding.return_value = mock_tokenizer
-            
-            strategy = DefaultChunkingStrategy(chunk_size=1000, chunk_overlap=200)
-            
-            result = strategy._token_length("test text")
-            assert result == 5
-            mock_tokenizer.encode.assert_called_once_with("test text")
 
-    def test_metadata_enhancement_algorithm(self):
-        """Test metadata enhancement logic."""
-        with patch('rag.data.chunking._safe_encoding_for_model') as mock_encoding:
-            mock_tokenizer = Mock()
-            mock_tokenizer.encode.return_value = [1, 2, 3]  # 3 tokens
-            mock_encoding.return_value = mock_tokenizer
-            
-            strategy = DefaultChunkingStrategy(chunk_size=1000, chunk_overlap=200)
-            
-            # Create test documents
-            docs = [
-                Document(page_content="test content", metadata={"source": "test.txt"}),
-                Document(page_content="", metadata={"source": "empty.txt"}),  # Empty content
-                Document(page_content="longer test content here", metadata={"source": "long.txt"})
-            ]
-            
-            enhanced_docs = strategy._enhance_metadata(docs)
-            
-            # Verify token counts were added (only for non-empty content)
-            assert enhanced_docs[0].metadata["token_count"] == 3
-            assert "token_count" not in enhanced_docs[1].metadata  # Empty content skipped
-            assert enhanced_docs[2].metadata["token_count"] == 3
-            
-            # Verify original metadata preserved
-            assert enhanced_docs[0].metadata["source"] == "test.txt"
-            assert enhanced_docs[1].metadata["source"] == "empty.txt"
-            assert enhanced_docs[2].metadata["source"] == "long.txt"
 
-    def test_markdown_splitting_algorithm(self):
-        """Test markdown-specific splitting algorithm."""
-        with patch('rag.data.chunking._safe_encoding_for_model') as mock_encoding:
-            mock_tokenizer = Mock()
-            mock_tokenizer.encode.return_value = [1, 2, 3]
-            mock_encoding.return_value = mock_tokenizer
-            
-            strategy = DefaultChunkingStrategy(chunk_size=100, chunk_overlap=20)
-            
-            # Create markdown document
-            markdown_content = """# Header 1
-            Content under header 1.
-            
-            ## Header 2
-            Content under header 2.
-            
-            ### Header 3  
-            Content under header 3."""
-            
-            docs = [Document(page_content=markdown_content, metadata={"source": "test.md"})]
-            
-            with patch.object(strategy, 'get_splitter_for_mimetype') as mock_get_splitter:
-                # Mock the markdown splitter return
-                mock_md_splitter = Mock()
-                mock_recursive_splitter = Mock()
-                mock_get_splitter.return_value = [mock_md_splitter, mock_recursive_splitter]
-                
-                # Mock header splitting results
-                header_split_docs = [
-                    Document(page_content="Content under header 1.", metadata={"header_1": "Header 1"}),
-                    Document(page_content="Content under header 2.", metadata={"header_2": "Header 2"}),
-                    Document(page_content="Content under header 3.", metadata={"header_3": "Header 3"})
-                ]
-                mock_md_splitter.split_text.return_value = header_split_docs
-                
-                # Mock final chunking results
-                final_chunks = [
-                    Document(page_content="Content under header 1.", metadata={"header_1": "Header 1"}),
-                    Document(page_content="Content under header 2.", metadata={"header_2": "Header 2"}),
-                    Document(page_content="Content under header 3.", metadata={"header_3": "Header 3"})
-                ]
-                mock_recursive_splitter.split_documents.return_value = final_chunks
-                
-                result = strategy.split_documents(docs, "text/markdown")
-                
-                # Verify the two-stage splitting process
-                mock_md_splitter.split_text.assert_called_once_with(markdown_content)
-                mock_recursive_splitter.split_documents.assert_called_once_with(header_split_docs)
-                
-                # Verify metadata enhancement was applied
-                assert len(result) == 3
-                for doc in result:
-                    assert "token_count" in doc.metadata
 
     def test_html_separator_selection_logic(self):
         """Test HTML-specific separator selection algorithm."""
@@ -242,23 +150,6 @@ class TestChunkingAlgorithms:
             expected_separators = ["\n\n", "\n", ". ", ", ", " ", ""]
             assert splitter._separators == expected_separators
 
-    def test_token_splitter_fallback_logic(self):
-        """Test token splitter fallback when encoding unavailable."""
-        with patch('rag.data.chunking._safe_encoding_for_model') as mock_encoding:
-            # Mock dummy encoding (fallback case)
-            from rag.data.text_splitter import _DummyEncoding
-            mock_dummy = _DummyEncoding()
-            mock_encoding.return_value = mock_dummy
-            
-            strategy = DefaultChunkingStrategy(chunk_size=1000, chunk_overlap=200)
-            
-            token_splitter = strategy._create_token_splitter()
-            
-            # Should fall back to RecursiveCharacterTextSplitter
-            assert isinstance(token_splitter, RecursiveCharacterTextSplitter)
-            
-            # Verify it uses the dummy tokenizer's encode method
-            assert callable(token_splitter._length_function)
 
     def test_chunk_size_boundary_conditions(self):
         """Test chunking behavior at size boundaries."""

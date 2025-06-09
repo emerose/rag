@@ -10,10 +10,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-try:
-    import structlog
-except ModuleNotFoundError:  # pragma: no cover - structlog may be missing
-    structlog = None  # type: ignore[assignment]
+import structlog
 import typer
 from dotenv import load_dotenv
 from prompt_toolkit import PromptSession
@@ -32,30 +29,17 @@ from rich.progress import (
     Progress,
 )
 
+# Standard absolute imports
+from rag.cli.output import Error, TableData, set_json_mode, write
+from rag.config import RAGConfig, RuntimeOptions
+from rag.engine import RAGEngine
+from rag.evaluation import Evaluation, run_evaluations
+from rag.factory import RAGComponentsFactory
+from rag.mcp import build_server, run_http_server, run_stdio_server
+from rag.prompts import list_prompts
+from rag.utils import exceptions
 from rag.utils.async_utils import get_optimal_concurrency
 from rag.utils.logging_utils import get_logger, setup_logging
-
-# Try both relative and absolute imports
-try:
-    # Try relative imports first (for module usage)
-    from ..evaluation import Evaluation, run_evaluations
-    from ..prompts import list_prompts
-    from .config import RAGConfig, RuntimeOptions
-    from .engine import RAGEngine
-    from .factory import RAGComponentsFactory
-    from .mcp import build_server, run_http_server, run_stdio_server
-    from .output import Error, TableData, set_json_mode, write
-    from .utils import exceptions
-except ImportError:
-    # Fall back to absolute imports (for direct script usage)
-    from rag.cli.output import Error, TableData, set_json_mode, write
-    from rag.config import RAGConfig, RuntimeOptions
-    from rag.engine import RAGEngine
-    from rag.evaluation import Evaluation, run_evaluations
-    from rag.factory import RAGComponentsFactory
-    from rag.mcp import build_server, run_http_server, run_stdio_server
-    from rag.prompts import list_prompts
-    from rag.utils import exceptions
 
 
 class LogLevel(str, Enum):
@@ -248,10 +232,9 @@ def configure_logging(
             logging.getLogger().setLevel(logging.DEBUG)
             final_level = logging.DEBUG
 
-    if structlog is not None:
-        structlog.configure(
-            wrapper_class=structlog.make_filtering_bound_logger(final_level)
-        )
+    structlog.configure(
+        wrapper_class=structlog.make_filtering_bound_logger(final_level)
+    )
 
     return get_logger()
 

@@ -5,12 +5,14 @@ from langchain.schema import Document
 
 from rag.embeddings.batching import EmbeddingBatcher
 from rag.embeddings.embedding_provider import EmbeddingProvider
+from rag.config.components import EmbeddingConfig
 
 
 def test_process_embeddings_stream_yields_results_in_order() -> None:
     provider = MagicMock(spec=EmbeddingProvider)
     provider.embed_texts.side_effect = [[[1]], [[2]], [[3]], [[4]]]
-    batcher = EmbeddingBatcher(provider, max_concurrency=2, initial_batch_size=2)
+    config = EmbeddingConfig(model="test-model", max_workers=2, batch_size=2)
+    batcher = EmbeddingBatcher(provider, config=config)
 
     docs = [
         Document(page_content="a"),

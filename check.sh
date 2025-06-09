@@ -40,11 +40,11 @@ python --version
 echo "🔍 Starting code quality checks..."
 
 # Run unit tests first
-run_check "python tests/run_tests.py" "Running unit tests"
+run_check "python scripts/run_tests.py unit" "Running unit tests"
 
 # Run integration tests if unit tests passed
 if [ $OVERALL_STATUS -eq 0 ]; then
-  run_check "python tests/run_integration_tests.py" "Running integration tests"
+  run_check "python scripts/run_tests.py integration" "Running integration tests"
 fi
 
 # Format code (excluding tests)

@@ -22,7 +22,7 @@ def load_model_map(path: str | Path) -> dict[str, str]:
         raise InvalidConfigurationError(
             config_key="embedding_model_map",
             value=type(data).__name__,
-            expected="dictionary/mapping"
+            expected="dictionary/mapping",
         )
     return {str(k): str(v) for k, v in data.items()}
 

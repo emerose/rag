@@ -1,14 +1,10 @@
 """Cache management module for the RAG system.
 
-This module provides functionality for managing cache metadata including vector stores
-and handling migration from JSON to SQLite storage.
+This module provides functionality for managing cache metadata including vector stores.
 """
 
 import hashlib
-import json
 import logging
-import shutil
-import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, TypeAlias
@@ -27,8 +23,8 @@ LogCallback: TypeAlias = Callable[[str, str, str], None]
 class CacheManager:
     """Manages cache metadata and vector stores.
 
-    This class provides functionality to track and manage vector store cache files,
-    handle cache invalidation, and migrate data from JSON to SQLite.
+    This class provides functionality to track and manage vector store cache files
+    and handle cache invalidation.
     """
 
     def __init__(
@@ -53,13 +49,6 @@ class CacheManager:
         self.log_callback = log_callback
         self.filesystem_manager = filesystem_manager
         self.vector_repository = vector_repository
-
-        # Legacy JSON cache paths (for migration)
-        self.cache_metadata_path = self.cache_dir / "cache_metadata.json"
-        self.migrated_marker = self.cache_dir / "cache_metadata.json.migrated"
-
-        # Initialize an empty cache metadata dictionary (for compatibility)
-        self.cache_metadata: dict[str, dict[str, Any]] = {}
 
     def _log(self, level: str, message: str) -> None:
         """Log a message.
@@ -89,92 +78,6 @@ class CacheManager:
         faiss_file = self.cache_dir / f"{file_hash}.faiss"
         pkl_file = self.cache_dir / f"{file_hash}.pkl"
         return faiss_file, pkl_file
-
-    def migrate_json_to_sqlite(self) -> bool:
-        """Migrate cache metadata from JSON files to SQLite.
-
-        This method checks if a JSON cache metadata file exists and if so,
-        migrates its contents to the SQLite database.
-
-        Returns:
-            True if migration was performed, False if no migration was needed
-
-        """
-        # Skip if already migrated
-        if self.migrated_marker.exists():
-            return False
-
-        # Check if JSON cache exists
-        if not self.cache_metadata_path.exists():
-            # No JSON cache to migrate
-            self._log("DEBUG", "No JSON cache metadata found, no migration needed")
-            return False
-
-        try:
-            # Load JSON cache metadata
-            with self.cache_metadata_path.open() as f:
-                json_metadata = json.load(f)
-
-            total_files = len(json_metadata)
-            self._log(
-                "INFO",
-                f"Starting migration of {total_files} files from JSON to SQLite",
-            )
-
-            # Extract global model info if available
-            if "_model_info" in json_metadata:
-                model_info = json_metadata.pop("_model_info")
-                if "embedding_model" in model_info:
-                    self.index_manager.set_global_setting(
-                        "embedding_model",
-                        model_info["embedding_model"],
-                    )
-                if "model_version" in model_info:
-                    self.index_manager.set_global_setting(
-                        "model_version",
-                        model_info["model_version"],
-                    )
-
-            # Migrate each file's metadata
-            for file_path, metadata in json_metadata.items():
-                # Update file metadata
-                if (
-                    "size" in metadata
-                    and "mtime" in metadata
-                    and "content_hash" in metadata
-                ):
-                    chunks_total = metadata.get("chunks", {}).get("total")
-                    source_type = metadata.get("source_type")
-
-                    file_metadata = FileMetadata(
-                        file_path=file_path,
-                        size=metadata["size"],
-                        mtime=metadata["mtime"],
-                        content_hash=metadata["content_hash"],
-                        source_type=source_type,
-                        chunks_total=chunks_total,
-                    )
-                    self.index_manager.update_file_metadata(file_metadata)
-
-            # Mark migration as complete by renaming the JSON file
-            shutil.move(self.cache_metadata_path, self.migrated_marker)
-
-            self._log("INFO", "Successfully migrated metadata from JSON to SQLite")
-        except (
-            OSError,
-            ValueError,
-            KeyError,
-            ImportError,
-            AttributeError,
-            TypeError,
-            FileNotFoundError,
-            sqlite3.Error,
-            json.JSONDecodeError,
-        ) as e:
-            self._log("ERROR", f"Failed to migrate cache metadata: {e}")
-            return False
-        else:
-            return True
 
     def load_cache_metadata(self) -> dict[str, dict[str, Any]]:
         """Load cache metadata from the SQLite database.
@@ -243,8 +146,10 @@ class CacheManager:
         """
         str_file_path = str(Path(file_path).absolute())  # Ensure consistent path format
 
-        if str_file_path in self.cache_metadata:
-            del self.cache_metadata[str_file_path]
+        # Check if metadata exists and remove it
+        existing_metadata = self.index_manager.get_metadata(Path(str_file_path))
+        if existing_metadata:
+            self._log("DEBUG", f"Removing cached metadata for {str_file_path}")
 
         # Remove from database (IndexManager uses absolute paths)
         self.index_manager.remove_metadata(Path(str_file_path))

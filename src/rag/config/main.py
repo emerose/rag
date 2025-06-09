@@ -49,7 +49,7 @@ class RAGConfig:
     embedding_model_map_file: str | None = None
     batch_size: int = 64
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Initialize derived attributes after instance creation."""
         if not self.openai_api_key:
             object.__setattr__(self, "openai_api_key", os.getenv("OPENAI_API_KEY", ""))

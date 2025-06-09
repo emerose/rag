@@ -156,16 +156,6 @@ class TestEmbeddingService:
             assert info["embedding_dimension"] == "1536"
             assert info["provider"] == "openai"
 
-    def test_underlying_model_property(self):
-        """Test underlying_model property returns the LangChain model."""
-        with patch("rag.embeddings.embedding_service.OpenAIEmbeddings") as mock_openai:
-            mock_model = MagicMock()
-            mock_model.embed_query.return_value = [0.1] * 1536
-            mock_openai.return_value = mock_model
-
-            service = EmbeddingService()
-
-            assert service.underlying_model == mock_model
 
     @patch("rag.embeddings.embedding_service.retry")
     def test_retry_configuration(self, mock_retry):

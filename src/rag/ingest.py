@@ -383,7 +383,9 @@ class IngestManager:
 
         return result
 
-    def ingest_directory(self, directory: Path | str, files: list[Path] | None = None) -> dict[str, IngestResult]:
+    def ingest_directory(
+        self, directory: Path | str, files: list[Path] | None = None
+    ) -> dict[str, IngestResult]:
         """Ingest all files in a directory.
 
         Args:

@@ -27,16 +27,15 @@ LogCallback: TypeAlias = Callable[[str, str, str], None]
 class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
     """High-level embedding provider that wraps EmbeddingService.
 
-    This class provides backward compatibility and additional functionality
+    This class provides a high-level interface for embedding operations
     while delegating core embedding operations to the focused EmbeddingService.
     Implements the EmbeddingServiceProtocol for dependency injection compatibility.
     """
 
     def __init__(
         self,
-        config: EmbeddingConfig | None = None,
+        config: EmbeddingConfig,
         *,
-        model_name: str | None = None,
         openai_api_key: str | None = None,
         show_progress_bar: bool = False,
         log_callback: LogCallback | None = None,
@@ -45,31 +44,15 @@ class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
         """Initialize the embedding provider.
 
         Args:
-            config: Embedding configuration (preferred way to configure)
-            model_name: [DEPRECATED] Name of the embedding model to use
+            config: Embedding configuration
             openai_api_key: OpenAI API key (optional if set in environment)
             show_progress_bar: Whether to show a progress bar for batch operations
             log_callback: Optional callback for logging
             embedding_service: Optional pre-configured EmbeddingService instance
-
-        Note:
-            If config is provided, it takes precedence over individual parameters.
-            Individual parameters are maintained for backward compatibility.
         """
-        # Use config if provided, otherwise use individual parameters
-        if config is not None:
-            self.config = config
-            self.model_name = config.model
-            self.openai_api_key = openai_api_key  # Keep API key separate for security
-        else:
-            # Backward compatibility: create config from individual parameters
-            self.config = EmbeddingConfig(
-                model=model_name or "text-embedding-3-small",
-                # Note: Other config parameters use defaults from EmbeddingConfig
-            )
-            self.model_name = self.config.model
-            self.openai_api_key = openai_api_key
-
+        self.config = config
+        self.model_name = config.model
+        self.openai_api_key = openai_api_key  # Keep API key separate for security
         self.show_progress_bar = show_progress_bar
         self.log_callback = log_callback
 

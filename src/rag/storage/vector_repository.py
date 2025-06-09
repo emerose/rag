@@ -17,7 +17,7 @@ from langchain_core.embeddings import Embeddings
 
 from rag.storage.protocols import VectorRepositoryProtocol, VectorStoreProtocol
 from rag.storage.vectorstore import VectorStoreManager
-from rag.utils.exceptions import VectorstoreError, VectorstoreNotInitializedError
+from rag.utils.exceptions import VectorstoreError
 from rag.utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
@@ -150,7 +150,9 @@ class VectorRepository(VectorRepositoryProtocol):
             raise VectorstoreError(
                 "Cannot create vector store from empty document list",
                 operation="create",
-                backend=self._manager.backend if hasattr(self._manager, 'backend') else None
+                backend=self._manager.backend
+                if hasattr(self._manager, "backend")
+                else None,
             )
 
         try:
@@ -164,8 +166,10 @@ class VectorRepository(VectorRepositoryProtocol):
             raise VectorstoreError(
                 "Vector store creation failed",
                 operation="create",
-                backend=self._manager.backend if hasattr(self._manager, 'backend') else None,
-                original_error=e
+                backend=self._manager.backend
+                if hasattr(self._manager, "backend")
+                else None,
+                original_error=e,
             ) from e
 
     def create_empty_vectorstore(self) -> VectorStoreProtocol:
@@ -188,8 +192,10 @@ class VectorRepository(VectorRepositoryProtocol):
             raise VectorstoreError(
                 "Empty vector store creation failed",
                 operation="create_empty",
-                backend=self._manager.backend if hasattr(self._manager, 'backend') else None,
-                original_error=e
+                backend=self._manager.backend
+                if hasattr(self._manager, "backend")
+                else None,
+                original_error=e,
             ) from e
 
     def add_documents_to_vectorstore(
@@ -216,7 +222,9 @@ class VectorRepository(VectorRepositoryProtocol):
                 f"Documents count ({len(documents)}) doesn't match "
                 f"embeddings count ({len(embeddings)})",
                 operation="add_documents",
-                backend=self._manager.backend if hasattr(self._manager, 'backend') else None
+                backend=self._manager.backend
+                if hasattr(self._manager, "backend")
+                else None,
             )
 
         try:
@@ -237,7 +245,9 @@ class VectorRepository(VectorRepositoryProtocol):
                 raise VectorstoreError(
                     "Failed to add documents to vector store",
                     operation="add_documents",
-                    backend=self._manager.backend if hasattr(self._manager, 'backend') else None
+                    backend=self._manager.backend
+                    if hasattr(self._manager, "backend")
+                    else None,
                 )
 
             self._log("INFO", f"Successfully added {len(documents)} documents")
@@ -251,8 +261,10 @@ class VectorRepository(VectorRepositoryProtocol):
             raise VectorstoreError(
                 "Adding documents failed",
                 operation="add_documents",
-                backend=self._manager.backend if hasattr(self._manager, 'backend') else None,
-                original_error=e
+                backend=self._manager.backend
+                if hasattr(self._manager, "backend")
+                else None,
+                original_error=e,
             ) from e
 
     def merge_vectorstores(
@@ -273,7 +285,9 @@ class VectorRepository(VectorRepositoryProtocol):
             raise VectorstoreError(
                 "Cannot merge empty list of vector stores",
                 operation="merge",
-                backend=self._manager.backend if hasattr(self._manager, 'backend') else None
+                backend=self._manager.backend
+                if hasattr(self._manager, "backend")
+                else None,
             )
 
         try:
@@ -287,8 +301,10 @@ class VectorRepository(VectorRepositoryProtocol):
             raise VectorstoreError(
                 "Vector store merging failed",
                 operation="merge",
-                backend=self._manager.backend if hasattr(self._manager, 'backend') else None,
-                original_error=e
+                backend=self._manager.backend
+                if hasattr(self._manager, "backend")
+                else None,
+                original_error=e,
             ) from e
 
     def similarity_search(
@@ -311,14 +327,18 @@ class VectorRepository(VectorRepositoryProtocol):
             raise VectorstoreError(
                 "k must be at least 1",
                 operation="similarity_search",
-                backend=self._manager.backend if hasattr(self._manager, 'backend') else None
+                backend=self._manager.backend
+                if hasattr(self._manager, "backend")
+                else None,
             )
 
         if not query.strip():
             raise VectorstoreError(
                 "Query cannot be empty",
                 operation="similarity_search",
-                backend=self._manager.backend if hasattr(self._manager, 'backend') else None
+                backend=self._manager.backend
+                if hasattr(self._manager, "backend")
+                else None,
             )
 
         try:
@@ -335,8 +355,10 @@ class VectorRepository(VectorRepositoryProtocol):
             raise VectorstoreError(
                 "Similarity search failed",
                 operation="similarity_search",
-                backend=self._manager.backend if hasattr(self._manager, 'backend') else None,
-                original_error=e
+                backend=self._manager.backend
+                if hasattr(self._manager, "backend")
+                else None,
+                original_error=e,
             ) from e
 
     def remove_vectorstore(self, file_path: str) -> None:

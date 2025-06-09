@@ -11,6 +11,7 @@ from unittest.mock import Mock, MagicMock, AsyncMock, patch
 from langchain.schema import Document
 
 from rag.embeddings.batching import EmbeddingBatcher
+from rag.config.components import EmbeddingConfig
 
 
 class TestEmbeddingBatchingAlgorithms:
@@ -19,7 +20,8 @@ class TestEmbeddingBatchingAlgorithms:
     def test_optimal_batch_size_calculation_algorithm(self):
         """Test the algorithm that calculates optimal batch size."""
         mock_provider = Mock()
-        batcher = EmbeddingBatcher(embedding_provider=mock_provider)
+        config = EmbeddingConfig(model="test-model")
+        batcher = EmbeddingBatcher(embedding_provider=mock_provider, config=config)
         
         # Test very small sets (≤10)
         assert batcher.calculate_optimal_batch_size(5) == 1
@@ -49,19 +51,22 @@ class TestEmbeddingBatchingAlgorithms:
             mock_get_concurrency.return_value = 8
             
             # Test with explicit concurrency
-            batcher = EmbeddingBatcher(embedding_provider=mock_provider, max_concurrency=4)
+            config = EmbeddingConfig(model="test-model", max_workers=4)
+            batcher = EmbeddingBatcher(embedding_provider=mock_provider, config=config)
             mock_get_concurrency.assert_called_once_with(4)
             assert batcher.concurrency == 8
             
             # Test with default concurrency
             mock_get_concurrency.reset_mock()
-            batcher = EmbeddingBatcher(embedding_provider=mock_provider)
+            config_default = EmbeddingConfig(model="test-model", max_workers=None)
+            batcher = EmbeddingBatcher(embedding_provider=mock_provider, config=config_default)
             mock_get_concurrency.assert_called_once_with(None)
 
     def test_empty_document_handling_logic(self):
         """Test handling of empty document lists."""
         mock_provider = Mock()
-        batcher = EmbeddingBatcher(embedding_provider=mock_provider)
+        config = EmbeddingConfig(model="test-model")
+        batcher = EmbeddingBatcher(embedding_provider=mock_provider, config=config)
         
         # Synchronous method
         result = batcher.process_embeddings([])
@@ -79,7 +84,8 @@ class TestEmbeddingBatchingAlgorithms:
         mock_provider = Mock()
         mock_provider.embed_texts.return_value = [[1.0, 2.0], [3.0, 4.0]]
         
-        batcher = EmbeddingBatcher(embedding_provider=mock_provider)
+        config = EmbeddingConfig(model="test-model")
+        batcher = EmbeddingBatcher(embedding_provider=mock_provider, config=config)
         
         docs = [
             Document(page_content="First document", metadata={"source": "doc1.txt"}),
@@ -242,8 +248,10 @@ class TestEmbeddingBatchingAlgorithms:
         mock_provider.embed_texts.return_value = [[1.0, 2.0]]
         
         mock_log_callback = Mock()
+        config = EmbeddingConfig(model="test-model")
         batcher = EmbeddingBatcher(
             embedding_provider=mock_provider, 
+            config=config,
             log_callback=mock_log_callback
         )
         
@@ -309,7 +317,8 @@ class TestEmbeddingBatchingAlgorithms:
     def test_semaphore_concurrency_control(self):
         """Test semaphore-based concurrency control."""
         mock_provider = Mock()
-        batcher = EmbeddingBatcher(embedding_provider=mock_provider, max_concurrency=2)
+        config = EmbeddingConfig(model="test-model", max_workers=2)
+        batcher = EmbeddingBatcher(embedding_provider=mock_provider, config=config)
         
         # Verify concurrency setting was applied
         assert batcher.concurrency == 2 or hasattr(batcher, 'concurrency')  # May be optimized

@@ -20,11 +20,10 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any
 
+import tiktoken
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableLambda, RunnableParallel
-
-from rag.data.text_splitter import _safe_get_encoding
 
 # Import the prompt registry
 from rag.prompts import get_prompt
@@ -42,7 +41,7 @@ logger = logging.getLogger(__name__)
 MAX_CONTEXT_TOKENS = 4096
 
 # Tokenizer for estimating token counts
-_tokenizer = _safe_get_encoding("cl100k_base")
+_tokenizer = tiktoken.get_encoding("cl100k_base")
 
 # ---------------------------------------------------------------------------
 # Metadata-filter helpers (ported from the old QueryEngine)

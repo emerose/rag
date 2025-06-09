@@ -16,18 +16,17 @@ from rag.config.components import (
     ChunkingConfig,
     EmbeddingConfig,
     IndexingConfig,
-    QueryConfig,
     StorageConfig,
 )
-from rag.utils.exceptions import ConfigurationError
-from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
 from rag.embeddings.fake_openai import FakeOpenAI
+from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
 from rag.factory import ComponentOverrides, RAGComponentsFactory
 from rag.storage.fakes import (
     InMemoryCacheRepository,
     InMemoryFileSystem,
     InMemoryVectorRepository,
 )
+from rag.utils.exceptions import ConfigurationError
 
 
 @dataclass
@@ -93,8 +92,8 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         """Create a default test configuration."""
         return RAGConfig(
             documents_dir="/tmp/test_docs",
-            embedding_model="text-embedding-test",
-            chat_model="gpt-test",
+            embedding_model="text-embedding-3-small",
+            chat_model="gpt-3.5-turbo",
             temperature=0.0,
             chunk_size=500,
             chunk_overlap=50,
@@ -234,7 +233,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         if config is None:
             config = RAGConfig(
                 documents_dir="/tmp/test_docs",
-                cache_dir="/tmp/test_cache", 
+                cache_dir="/tmp/test_cache",
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
             )
@@ -249,16 +248,19 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 use_deterministic_embeddings=False,  # Use fake but not deterministic
                 embedding_dimension=1536,  # Standard OpenAI dimension
             )
-            
+
             # Create the factory
-            factory = cls(config=config, runtime_options=runtime, test_options=test_options)
-            
+            factory = cls(
+                config=config, runtime_options=runtime, test_options=test_options
+            )
+
             # Override filesystem, cache repository, and document loader for real file operations
             from pathlib import Path
+
+            from rag.data.document_loader import DocumentLoader
             from rag.storage.filesystem import FilesystemManager
             from rag.storage.index_manager import IndexManager
-            from rag.data.document_loader import DocumentLoader
-            
+
             factory._filesystem_manager = FilesystemManager()
             factory._cache_repository = IndexManager(
                 cache_dir=Path(config.cache_dir),
@@ -271,17 +273,19 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         else:
             # For tests that want fake filesystem, use all fake components
             test_options = FakeComponentOptions()
-            factory = cls(config=config, runtime_options=runtime, test_options=test_options)
-            
+            factory = cls(
+                config=config, runtime_options=runtime, test_options=test_options
+            )
+
         return factory
 
     @classmethod
     def create_test_indexing_config(cls) -> IndexingConfig:
         """Create an IndexingConfig optimized for testing.
-        
+
         This configuration uses small batch sizes, minimal workers,
         and settings optimized for fast, deterministic tests.
-        
+
         Returns:
             An IndexingConfig suitable for testing.
         """
@@ -294,7 +298,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 semantic_chunking=False,  # Faster without semantic analysis
             ),
             embedding=EmbeddingConfig(
-                model="text-embedding-test",
+                model="text-embedding-3-small",
                 batch_size=2,  # Small batches for fast tests
                 max_workers=1,  # Single-threaded for deterministic tests
                 async_batching=False,  # Simpler synchronous processing
@@ -318,10 +322,10 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
     @classmethod
     def create_production_indexing_config(cls) -> IndexingConfig:
         """Create an IndexingConfig optimized for production.
-        
+
         This configuration uses larger batch sizes, more workers,
         and settings optimized for performance and quality.
-        
+
         Returns:
             An IndexingConfig suitable for production use.
         """
@@ -425,26 +429,26 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
     def inject_fake_openai(self) -> FakeOpenAI:
         """Inject and return a FakeOpenAI instance for the factory.
-        
+
         This replaces any real OpenAI calls with fake implementations,
         which is useful for integration tests.
-        
+
         Returns:
             The FakeOpenAI instance that was injected.
         """
         fake_openai = FakeOpenAI()
-        
+
         # If we have embedding providers that use OpenAI, replace them
-        if hasattr(self, 'embedding_provider'):
+        if hasattr(self, "embedding_provider"):
             # Inject the fake OpenAI into the embedding provider
-            if hasattr(self.embedding_provider, 'openai_client'):
+            if hasattr(self.embedding_provider, "openai_client"):
                 self.embedding_provider.openai_client = fake_openai
-            if hasattr(self.embedding_provider, '_client'):
+            if hasattr(self.embedding_provider, "_client"):
                 self.embedding_provider._client = fake_openai
-                
-        # If we have chat models that use OpenAI, replace them  
-        if hasattr(self, 'chat_model'):
-            if hasattr(self.chat_model, 'client'):
+
+        # If we have chat models that use OpenAI, replace them
+        if hasattr(self, "chat_model"):
+            if hasattr(self.chat_model, "client"):
                 self.chat_model.client = fake_openai
-                
+
         return fake_openai

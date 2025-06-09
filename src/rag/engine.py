@@ -210,19 +210,35 @@ class RAGEngine:
         """
         # Initialize embedding provider
         if embedding_provider is None:
+            from rag.config.components import EmbeddingConfig
+
+            embedding_config = EmbeddingConfig(
+                model=self.config.embedding_model,
+                batch_size=self.config.batch_size,
+                max_workers=self.runtime.max_workers,
+            )
             embedding_provider = EmbeddingProvider(
-                model_name=self.config.embedding_model,
+                config=embedding_config,
                 openai_api_key=self.config.openai_api_key,
                 log_callback=self.runtime.log_callback,
             )
         self.embedding_provider = embedding_provider
 
         # Initialize embedding batcher
-        self.embedding_batcher = embedding_batcher or EmbeddingBatcher(
-            embedding_provider=self.embedding_provider,
-            initial_batch_size=self.config.batch_size,
-            log_callback=self.runtime.log_callback,
-        )
+        if embedding_batcher is None:
+            from rag.config.components import EmbeddingConfig
+
+            embedding_config = EmbeddingConfig(
+                model=self.config.embedding_model,
+                batch_size=self.config.batch_size,
+                max_workers=self.runtime.max_workers,
+            )
+            embedding_batcher = EmbeddingBatcher(
+                embedding_provider=self.embedding_provider,
+                config=embedding_config,
+                log_callback=self.runtime.log_callback,
+            )
+        self.embedding_batcher = embedding_batcher
 
     def _initialize_storage(
         self,

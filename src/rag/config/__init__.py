@@ -6,29 +6,27 @@ from the main system configuration to component-specific configurations.
 
 # Export new component-specific configurations
 from .components import (
+    CacheConfig,
     ChunkingConfig,
     EmbeddingConfig,
-    CacheConfig,
-    QueryConfig,
-    StorageConfig,
     IndexingConfig,
+    QueryConfig,
     QueryProcessingConfig,
+    StorageConfig,
 )
 
-# Re-export main config classes for backward compatibility
+# Re-export main config classes for convenience
 # Import these after components to avoid circular import
 from .main import RAGConfig, RuntimeOptions
 
 __all__ = [
-    # Main configurations
+    "CacheConfig",
+    "ChunkingConfig",
+    "EmbeddingConfig",
+    "IndexingConfig",
+    "QueryConfig",
+    "QueryProcessingConfig",
     "RAGConfig",
     "RuntimeOptions",
-    # Component configurations
-    "ChunkingConfig",
-    "EmbeddingConfig", 
-    "CacheConfig",
-    "QueryConfig",
     "StorageConfig",
-    "IndexingConfig",
-    "QueryProcessingConfig",
 ]

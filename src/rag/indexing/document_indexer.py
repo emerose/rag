@@ -137,13 +137,21 @@ class DocumentIndexer:
             Tuple of (embedding_provider, embedding_batcher)
         """
         if model_name != self.config.embedding_model:
+            from rag.config.components import EmbeddingConfig
+
+            embedding_config = EmbeddingConfig(
+                model=model_name,
+                batch_size=128,
+                max_workers=self.runtime.max_workers,
+            )
             provider = EmbeddingProvider(
-                model_name=model_name,
+                config=embedding_config,
                 openai_api_key=self.config.openai_api_key,
                 log_callback=self.log_callback,
             )
             batcher = EmbeddingBatcher(
                 embedding_provider=provider,
+                config=embedding_config,
                 log_callback=self.log_callback,
                 progress_callback=self.runtime.progress_callback,
             )
@@ -510,7 +518,9 @@ class DocumentIndexer:
             return {}
 
         # Validate directory and get files in one operation to avoid redundant scans
-        directory_valid, all_files = self.filesystem_manager.validate_and_scan_documents_dir(directory)
+        directory_valid, all_files = (
+            self.filesystem_manager.validate_and_scan_documents_dir(directory)
+        )
         if not directory_valid:
             self._log("ERROR", f"Invalid documents directory: {directory}")
             if progress_callback:

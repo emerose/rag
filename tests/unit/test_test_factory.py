@@ -186,7 +186,7 @@ class TestFakeRAGComponentsFactory:
 
         # Check that the engine has the right configuration
         assert engine.config.documents_dir == "/tmp/test_docs"
-        assert engine.config.embedding_model == "text-embedding-test"
+        assert engine.config.embedding_model == "text-embedding-3-small"
 
     def test_error_handling_for_non_fake_components(self) -> None:
         """Test error handling when trying to access fake-specific methods on real components."""

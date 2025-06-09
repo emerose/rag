@@ -143,8 +143,16 @@ class RAGComponentsFactory:
     def embedding_service(self) -> EmbeddingServiceProtocol:
         """Get or create embedding service."""
         if self._embedding_service is None:
+            # Create config for embedding provider
+            from rag.config.components import EmbeddingConfig
+
+            embedding_config = EmbeddingConfig(
+                model=self.config.embedding_model,
+                batch_size=128,
+                max_workers=self.runtime.max_workers,
+            )
             self._embedding_service = EmbeddingProvider(
-                model_name=self.config.embedding_model,
+                config=embedding_config,
                 openai_api_key=self.config.openai_api_key,
                 log_callback=self.runtime.log_callback,
             )
@@ -229,8 +237,17 @@ class RAGComponentsFactory:
     def create_document_indexer(self) -> DocumentIndexer:
         """Create a DocumentIndexer with all dependencies wired."""
         if self._document_indexer is None:
+            # Create config for embedding batcher
+            from rag.config.components import EmbeddingConfig
+
+            embedding_config = EmbeddingConfig(
+                model=self.config.embedding_model,
+                batch_size=128,
+                max_workers=self.runtime.max_workers,
+            )
             embedding_batcher = EmbeddingBatcher(
                 embedding_provider=self.embedding_service,
+                config=embedding_config,
                 log_callback=self.runtime.log_callback,
                 progress_callback=self.runtime.progress_callback,
             )

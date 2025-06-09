@@ -35,20 +35,6 @@ class TestConfigIntegrationWithComponents:
         assert provider.config.batch_size == 32
         assert provider.config.max_retries == 5
 
-    def test_embedding_provider_backward_compatibility(self):
-        """Test EmbeddingProvider still works with old-style parameters."""
-        fake_service = FakeEmbeddingService(embedding_dimension=384)
-        
-        provider = EmbeddingProvider(
-            model_name="old-style-model",
-            openai_api_key="test-key",
-            embedding_service=fake_service,
-        )
-        
-        # Should create a config internally
-        assert provider.config is not None
-        assert provider.config.model == "old-style-model"
-        assert provider.model_name == "old-style-model"
 
     def test_embedding_batcher_with_config(self):
         """Test EmbeddingBatcher constructor with EmbeddingConfig."""
@@ -69,20 +55,6 @@ class TestConfigIntegrationWithComponents:
         assert batcher.batch_size == 16
         assert batcher.concurrency == 2  # Should use max_workers from config
 
-    def test_embedding_batcher_backward_compatibility(self):
-        """Test EmbeddingBatcher still works with old-style parameters."""
-        fake_service = FakeEmbeddingService(embedding_dimension=384)
-        
-        batcher = EmbeddingBatcher(
-            embedding_provider=fake_service,
-            initial_batch_size=8,
-            max_concurrency=1,
-        )
-        
-        # Should create a config internally
-        assert batcher.config is not None
-        assert batcher.config.batch_size == 8
-        assert batcher.batch_size == 8
 
     def test_test_factory_config_methods(self):
         """Test the new config creation methods in test factory."""

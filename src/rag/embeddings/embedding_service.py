@@ -10,17 +10,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TypeAlias
 
-from langchain_core.embeddings import Embeddings
 from langchain_openai import OpenAIEmbeddings
 
-# Update OpenAI error imports for newer OpenAI library versions
-try:
-    # Try importing from older OpenAI versions (< 1.0.0)
-    from openai.error import APIConnectionError, APIError, RateLimitError
-except ImportError:
-    # Use newer OpenAI imports (>= 1.0.0)
-    from openai import APIConnectionError, APIError, RateLimitError
-
+# Import OpenAI errors (requires OpenAI >= 1.0.0)
+from openai import APIConnectionError, APIError, RateLimitError
 from tenacity import (
     before_sleep_log,
     retry,
@@ -80,9 +73,13 @@ class EmbeddingService:
         self.retry_config = retry_config or RetryConfig()
 
         # Initialize the underlying embeddings model
+        # Set API key via environment if provided
+        if openai_api_key:
+            import os
+            os.environ["OPENAI_API_KEY"] = openai_api_key
+        
         self._embeddings = OpenAIEmbeddings(
             model=model_name,
-            openai_api_key=openai_api_key,
             show_progress_bar=show_progress_bar,
         )
 
@@ -133,6 +130,15 @@ class EmbeddingService:
         return self._embedding_dimension
 
     @property
+    def underlying_model(self) -> "OpenAIEmbeddings":
+        """Get the underlying LangChain embeddings model.
+
+        Returns:
+            The LangChain OpenAIEmbeddings model instance
+        """
+        return self._embeddings
+
+    @property
     def model_info(self) -> dict[str, str]:
         """Get information about the embedding model.
 
@@ -145,7 +151,7 @@ class EmbeddingService:
             "provider": "openai",
         }
 
-    def _create_retry_decorator(self):
+    def _create_retry_decorator(self) -> Callable[[Callable], Callable]:
         """Create a retry decorator with the configured parameters."""
         return retry(
             retry=retry_if_exception_type(
@@ -174,16 +180,14 @@ class EmbeddingService:
             RateLimitError, APIError, APIConnectionError: After max retries exceeded
         """
         if not texts:
-            raise EmbeddingGenerationError(
-                message="Cannot embed empty text list"
-            )
+            raise EmbeddingGenerationError(message="Cannot embed empty text list")
 
         # Validate all texts are strings
         for i, text in enumerate(texts):
             if not isinstance(text, str):
                 raise EmbeddingGenerationError(
                     text=str(text) if text else None,
-                    message=f"Text at index {i} must be a string, got {type(text).__name__}"
+                    message=f"Text at index {i} must be a string, got {type(text).__name__}",
                 )
 
         # Create and apply retry decorator
@@ -236,12 +240,11 @@ class EmbeddingService:
         if not isinstance(query, str):
             raise EmbeddingGenerationError(
                 text=str(query) if query else None,
-                message=f"Query must be a string, got {type(query).__name__}"
+                message=f"Query must be a string, got {type(query).__name__}",
             )
         if not query.strip():
             raise EmbeddingGenerationError(
-                text=query,
-                message="Cannot embed empty query"
+                text=query, message="Cannot embed empty query"
             )
 
         # Create and apply retry decorator
@@ -275,16 +278,3 @@ class EmbeddingService:
         except (ValueError, TypeError) as e:
             self._log("ERROR", f"Non-retryable error in query embedding: {e}")
             raise
-
-    @property
-    def underlying_model(self) -> Embeddings:
-        """Get the underlying LangChain embeddings model.
-
-        Returns:
-            The LangChain embeddings model instance
-
-        Note:
-            This property is provided for compatibility with existing code
-            that needs direct access to the LangChain model.
-        """
-        return self._embeddings

@@ -268,7 +268,9 @@ class FilesystemManager(FileSystemProtocol):
 
         return True
 
-    def validate_and_scan_documents_dir(self, directory: Path | str) -> tuple[bool, list[Path]]:
+    def validate_and_scan_documents_dir(
+        self, directory: Path | str
+    ) -> tuple[bool, list[Path]]:
         """Validate directory and return supported files in one operation.
 
         Args:

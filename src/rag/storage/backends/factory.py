@@ -44,7 +44,7 @@ def create_vectorstore_backend(
         raise InvalidConfigurationError(
             config_key="backend_name",
             value=backend_name,
-            expected=f"one of {supported_backends}"
+            expected=f"one of {supported_backends}",
         )
 
 

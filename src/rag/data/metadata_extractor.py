@@ -12,13 +12,11 @@ from typing import Any, Protocol
 
 from langchain_core.documents import Document
 
-try:
-    from pdfminer.high_level import extract_pages
-    from pdfminer.layout import LTTextContainer
+# Import pdfminer dependencies (required for PDF processing)
+from pdfminer.high_level import extract_pages
+from pdfminer.layout import LTTextContainer
 
-    PDFMINER_AVAILABLE = True
-except ImportError:
-    PDFMINER_AVAILABLE = False
+PDFMINER_AVAILABLE = True
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +193,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
 
         # Try to extract PDF headings from the source file
         source_path = document.metadata.get("source")
-        if source_path and os.path.isfile(source_path) and PDFMINER_AVAILABLE:
+        if source_path and os.path.isfile(source_path):
             try:
                 headings = self.extract_pdf_headings(source_path)
                 if headings:
@@ -252,11 +250,6 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         Returns:
             List of heading dictionaries with level, text, and position info
         """
-        if not PDFMINER_AVAILABLE:
-            logger.warning(
-                "PDF heading extraction disabled due to missing dependencies"
-            )
-            return []
 
         try:
             # Extract font sizes and text from PDF
@@ -286,8 +279,6 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         Returns:
             List of dictionaries with font size, text, and position information
         """
-        if not PDFMINER_AVAILABLE:
-            return []
 
         font_data = []
         char_count = 0

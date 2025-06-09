@@ -7,6 +7,7 @@ document types, optimizing for semantic boundaries and metadata preservation.
 import logging
 from typing import Any
 
+import tiktoken
 from langchain_core.documents import Document
 from langchain_text_splitters import (
     MarkdownHeaderTextSplitter,
@@ -18,7 +19,7 @@ from langchain_text_splitters import (
 from rag.ingest import ChunkingStrategy
 from rag.utils.logging_utils import log_message
 
-from .text_splitter import TextSplitterFactory, _DummyEncoding, _safe_encoding_for_model
+from .text_splitter import TextSplitterFactory
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ class DefaultChunkingStrategy(ChunkingStrategy):
         self.log_callback = log_callback
 
         # Initialize tokenizer
-        self.tokenizer = _safe_encoding_for_model(model_name)
+        self.tokenizer = tiktoken.encoding_for_model(model_name)
 
     def _log(self, level: str, message: str) -> None:
         """Log a message.
@@ -215,13 +216,6 @@ class DefaultChunkingStrategy(ChunkingStrategy):
         Returns:
             Token-based text splitter
         """
-        if isinstance(self.tokenizer, _DummyEncoding):
-            return RecursiveCharacterTextSplitter(
-                chunk_size=self.chunk_size,
-                chunk_overlap=self.chunk_overlap,
-                length_function=lambda text: len(self.tokenizer.encode(text)),
-            )
-
         return TokenTextSplitter(
             encoding_name=self.tokenizer.name,
             chunk_size=self.chunk_size,

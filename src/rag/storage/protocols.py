@@ -238,7 +238,9 @@ class FileSystemProtocol(Protocol):
             True if the directory is valid, False otherwise
         """
 
-    def validate_and_scan_documents_dir(self, directory: Path | str) -> tuple[bool, list[Path]]:
+    def validate_and_scan_documents_dir(
+        self, directory: Path | str
+    ) -> tuple[bool, list[Path]]:
         """Validate directory and return supported files in one operation.
 
         Args:

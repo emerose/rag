@@ -6,8 +6,6 @@ using different strategies based on content type.
 
 import logging
 import os
-import statistics
-import warnings
 from collections.abc import Callable, Sequence
 from typing import Any, ClassVar
 
@@ -19,343 +17,14 @@ from langchain_text_splitters import (
     TokenTextSplitter,
 )
 
+# Import pdfminer dependencies (required for PDF processing)
 from rag.utils.logging_utils import log_message
 
 from .metadata_extractor import DocumentMetadataExtractor
 
-
-class _DummyEncoding:
-    """Fallback tokenizer used when ``tiktoken`` data is unavailable."""
-
-    name = "dummy"
-
-    def encode(self, text: str, **_: Any) -> list[str]:
-        return text.split()
-
-
-def _safe_get_encoding(name: str) -> Any:
-    """Return a ``tiktoken`` encoding, falling back to a dummy encoding."""
-
-    try:
-        return tiktoken.get_encoding(name)
-    except Exception as exc:  # pragma: no cover - network failure
-        logger.warning("Falling back to dummy encoding for %s: %s", name, exc)
-        return _DummyEncoding()
-
-
-def _safe_encoding_for_model(model_name: str) -> Any:
-    """Return the encoding for a model, using a dummy one if needed."""
-
-    try:
-        return tiktoken.encoding_for_model(model_name)
-    except Exception as exc:  # pragma: no cover - network failure
-        logger.warning(
-            "Falling back to dummy encoding for model %s: %s", model_name, exc
-        )
-        return _DummyEncoding()
-
-
-try:
-    from pdfminer.high_level import extract_pages
-    from pdfminer.layout import LTTextContainer
-
-    PDFMINER_AVAILABLE = True
-except ImportError:
-    PDFMINER_AVAILABLE = False
+PDFMINER_AVAILABLE = True
 
 logger = logging.getLogger(__name__)
-
-
-class PDFHeadingExtractor:
-    """Extract heading information from PDF documents using font size analysis.
-
-    This class analyzes PDF documents to identify headings based on font size
-    differences, using the assumption that headings typically have larger font sizes
-    than regular text.
-
-    Deprecated: Use PDFMetadataExtractor from metadata_extractor.py instead.
-    """
-
-    def __init__(self) -> None:
-        """Initialize the PDF heading extractor."""
-        warnings.warn(
-            "PDFHeadingExtractor is deprecated. Use PDFMetadataExtractor from metadata_extractor.py instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        if not PDFMINER_AVAILABLE:
-            logger.warning(
-                "pdfminer.six is not available, PDF heading extraction disabled. "
-                "Install with 'pip install pdfminer.six'"
-            )
-
-    def extract_headings(self, pdf_path: str) -> list[dict[str, Any]]:
-        """Extract heading information from a PDF.
-
-        Args:
-            pdf_path: Path to the PDF file
-
-        Returns:
-            List of heading dictionaries with level, text, and position info
-        """
-        if not PDFMINER_AVAILABLE:
-            logger.warning(
-                "PDF heading extraction disabled due to missing dependencies"
-            )
-            return []
-
-        try:
-            # Extract font sizes and text from PDF
-            font_data = self._extract_font_data(pdf_path)
-            if not font_data:
-                return []
-
-            # Find headings based on font size analysis
-            return self._identify_headings(font_data)
-        except (
-            OSError,
-            ValueError,
-            KeyError,
-            IndexError,
-            AttributeError,
-            TypeError,
-        ) as e:
-            logger.error(f"Error extracting headings from PDF: {e}")
-            return []
-
-    def _extract_font_data(self, pdf_path: str) -> list[dict[str, Any]]:
-        """Extract font size and text data from the PDF.
-
-        Args:
-            pdf_path: Path to the PDF file
-
-        Returns:
-            List of dictionaries with font size, text, and position information
-        """
-        if not PDFMINER_AVAILABLE:
-            return []
-
-        font_data = []
-        char_count = 0
-        current_position = 0
-
-        for page_num, page_layout in enumerate(extract_pages(pdf_path)):
-            for element in page_layout:
-                if isinstance(element, LTTextContainer):
-                    text = element.get_text().strip()
-                    if not text:
-                        continue
-
-                    # Try to extract font information
-                    avg_font_size, is_bold = self._analyze_text_element(element)
-
-                    # Skip elements without font information
-                    if avg_font_size <= 0:
-                        continue
-
-                    # Add to font data
-                    font_data.append(
-                        {
-                            "text": text,
-                            "font_size": avg_font_size,
-                            "is_bold": is_bold,
-                            "page": page_num + 1,
-                            "position": current_position,
-                            "length": len(text),
-                        }
-                    )
-
-                    current_position += len(text)
-                    char_count += len(text)
-
-        return font_data
-
-    def _analyze_text_element(self, element: LTTextContainer) -> tuple[float, bool]:
-        """Analyze a text element to determine font size and if it's bold.
-
-        Args:
-            element: PDF text element to analyze
-
-        Returns:
-            Tuple of (average font size, is bold)
-        """
-        font_sizes = []
-        bold_count = 0
-        char_count = 0
-
-        # Use the public API to get character information
-        if hasattr(element, "get_text"):
-            # Process each character in the element
-            for char in self._extract_chars_from_element(element):
-                if hasattr(char, "size"):
-                    font_sizes.append(char.size)
-                    # Heuristic: Some PDFs mark bold with 'Bold' in font name
-                    if hasattr(char, "fontname") and "Bold" in char.fontname:
-                        bold_count += 1
-                    char_count += 1
-
-        # Calculate average font size
-        if font_sizes:
-            avg_font_size = sum(font_sizes) / len(font_sizes)
-        else:
-            avg_font_size = 0
-
-        # Determine if text is bold (if more than 50% of chars are bold)
-        is_bold = (bold_count / char_count) > 0.5 if char_count > 0 else False
-
-        return avg_font_size, is_bold
-
-    def _extract_chars_from_element(self, element: Any) -> list:
-        """Extract characters from a text element.
-
-        Args:
-            element: Text element to extract characters from
-
-        Returns:
-            List of character information dictionaries
-        """
-        chars = []
-
-        # Use the public API to get character information
-        if hasattr(element, "get_text"):
-            # Process each character in the element
-            if hasattr(element, "_objs"):
-                for obj in element._objs:
-                    if hasattr(obj, "_objs"):  # LTTextLine
-                        for char_obj in obj._objs:
-                            if hasattr(char_obj, "fontname") and hasattr(
-                                char_obj, "size"
-                            ):
-                                # LTChar or similar
-                                chars.append(
-                                    {
-                                        "text": char_obj.get_text()
-                                        if hasattr(char_obj, "get_text")
-                                        else "",
-                                        "fontname": char_obj.fontname,
-                                        "size": char_obj.size,
-                                    }
-                                )
-
-        return chars
-
-    def _identify_headings(
-        self, font_data: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
-        """Identify headings based on font size analysis.
-
-        Args:
-            font_data: List of font data dictionaries
-
-        Returns:
-            List of identified headings with level, text, and position
-        """
-        if not font_data:
-            return []
-
-        # Extract font sizes to analyze distribution
-        font_sizes = [item["font_size"] for item in font_data]
-
-        try:
-            # Calculate statistical measures
-            mean_size = statistics.mean(font_sizes)
-            std_dev = statistics.stdev(font_sizes) if len(font_sizes) > 1 else 0
-
-            # Set thresholds for heading levels
-            # Level 1: > mean + 2*std_dev (largest headings)
-            # Level 2: > mean + 1.5*std_dev
-            # Level 3: > mean + 1*std_dev
-            threshold_level1 = mean_size + (2 * std_dev)
-            threshold_level2 = mean_size + (1.5 * std_dev)
-            threshold_level3 = mean_size + std_dev
-
-            # Identify headings
-            headings = []
-            for item in font_data:
-                font_size = item["font_size"]
-                text = item["text"]
-                position = item["position"]
-
-                # Skip very short texts (likely not headings)
-                if len(text) < 2 or len(text) > 200:
-                    continue
-
-                # Determine heading level based on font size
-                if font_size >= threshold_level1:
-                    level = 1
-                elif font_size >= threshold_level2:
-                    level = 2
-                elif font_size >= threshold_level3:
-                    level = 3
-                else:
-                    # Not a heading
-                    continue
-
-                # Boost level if text is bold
-                if item.get("is_bold", False) and level > 1:
-                    level -= 1
-
-                # Create heading entry
-                heading = {
-                    "level": level,
-                    "text": text,
-                    "position": position,
-                    "page": item.get("page", 1),
-                }
-
-                headings.append(heading)
-
-            # Sort headings by position
-            headings.sort(key=lambda h: h["position"])
-
-            # Build heading paths
-            self._build_heading_paths(headings)
-        except (
-            KeyError,
-            IndexError,
-            ValueError,
-            TypeError,
-            AttributeError,
-            ZeroDivisionError,
-            statistics.StatisticsError,
-        ) as e:
-            logger.error(f"Error in heading identification: {e}")
-            return []
-        else:
-            return headings
-
-    def _build_heading_paths(self, headings: list[dict[str, Any]]) -> None:
-        """Build hierarchical paths for headings.
-
-        Args:
-            headings: List of heading dictionaries to enrich with paths
-        """
-        if not headings:
-            return
-
-        # Initialize arrays to track current heading at each level
-        current_headings = [None] * 10  # Support up to 10 levels
-
-        for heading in headings:
-            level = heading["level"]
-            text = heading["text"]
-
-            # Update current heading at this level
-            current_headings[level - 1] = text
-
-            # Clear all lower levels (a level 2 heading resets level 3+)
-            for i in range(level, len(current_headings)):
-                current_headings[i] = None
-
-            # Build path from present headings
-            path_components = []
-            for i in range(level):
-                if current_headings[i] is not None:
-                    path_components.append(current_headings[i])
-
-            # Store path in heading
-            heading["path"] = " > ".join(path_components)
 
 
 class SemanticRecursiveCharacterTextSplitter:
@@ -473,7 +142,7 @@ class SemanticRecursiveCharacterTextSplitter:
         Returns:
             A SemanticRecursiveCharacterTextSplitter instance
         """
-        enc = _safe_get_encoding(encoding_name)
+        enc = tiktoken.get_encoding(encoding_name)
 
         if disallowed_special is None:
             disallowed_special = []
@@ -511,8 +180,8 @@ class SemanticRecursiveCharacterTextSplitter:
         chunk_size = int(os.environ.get("RAG_CHUNK_SIZE", "1000"))
         chunk_overlap = int(os.environ.get("RAG_CHUNK_OVERLAP", "200"))
 
-        enc = _safe_encoding_for_model(model_name)
-        encoding_name = getattr(enc, "name", "dummy")
+        enc = tiktoken.encoding_for_model(model_name)
+        encoding_name = enc.name
 
         return cls.from_tiktoken_encoder(
             encoding_name=encoding_name,
@@ -674,11 +343,9 @@ class TextSplitterFactory:
         self.metadata_extractor = DocumentMetadataExtractor()
 
         # Initialize tokenizer
-        self.tokenizer = _safe_encoding_for_model(model_name)
+        self.tokenizer = tiktoken.encoding_for_model(model_name)
 
-        self.tokenizer_name = (
-            self.tokenizer.name if hasattr(self.tokenizer, "name") else "unknown"
-        )
+        self.tokenizer_name = self.tokenizer.name
 
         # Initialize default semantic splitter
         self.semantic_splitter = (
@@ -765,7 +432,7 @@ class TextSplitterFactory:
             separators=separators,
             chunk_size=self.chunk_size,
             chunk_overlap=self.chunk_overlap,
-            length_function=self._token_length,
+            length_function=self.get_token_length,
         )
 
     def _create_markdown_splitter(self) -> Any:
@@ -809,13 +476,6 @@ class TextSplitterFactory:
             Token-based text splitter
 
         """
-        if isinstance(self.tokenizer, _DummyEncoding):
-            return SemanticRecursiveCharacterTextSplitter(
-                chunk_size=self.chunk_size,
-                chunk_overlap=self.chunk_overlap,
-                length_function=lambda text: len(self.tokenizer.encode(text)),
-            )
-
         return TokenTextSplitter(
             encoding_name=self.tokenizer.name,
             chunk_size=self.chunk_size,
@@ -834,20 +494,6 @@ class TextSplitterFactory:
         """
         tokens = self.tokenizer.encode(text)
         return len(tokens)
-
-    def _token_length(self, text: str) -> int:
-        """Calculate the number of tokens in a text (deprecated).
-
-        Use get_token_length instead.
-
-        Args:
-            text: Text to calculate token length for
-
-        Returns:
-            Number of tokens in the text
-
-        """
-        return self.get_token_length(text)
 
     def split_documents(
         self,
@@ -1103,39 +749,6 @@ class TextSplitterFactory:
                         )
 
         return chunked_docs
-
-    def extract_pdf_headings(self, file_path: str) -> list[dict[str, Any]]:
-        """Extract heading information from a PDF file.
-
-        Args:
-            file_path: Path to the PDF file
-
-        Returns:
-            List of heading dictionaries with level, text, and position
-
-        Deprecated:
-            This method is deprecated in favor of using PDFMetadataExtractor.
-            It now delegates to the metadata extractor.
-        """
-        warnings.warn(
-            "TextSplitterFactory.extract_pdf_headings is deprecated. "
-            "Use PDFMetadataExtractor from metadata_extractor.py instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        # For backwards compatibility, still extract headings but use the metadata extractor
-        from langchain_core.documents import Document
-
-        # Create a temporary document from the file
-        temp_doc = Document(page_content="", metadata={"source": file_path})
-
-        # Use the metadata extractor to get headings
-        pdf_extractor = self.metadata_extractor.get_extractor("application/pdf")
-        metadata = pdf_extractor.extract_metadata(temp_doc)
-
-        # Return heading hierarchy if found, otherwise empty list
-        return metadata.get("heading_hierarchy", [])
 
     def _preserve_metadata_hierarchy(self, docs: list[Document]) -> list[Document]:
         """Preserve metadata hierarchy across chunks.

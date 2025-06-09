@@ -23,7 +23,6 @@ from openpyxl import load_workbook
 from rag.storage.filesystem import FilesystemManager
 from rag.utils.exceptions import (
     DocumentLoadingError,
-    LoaderInitializationError,
     UnsupportedFileError,
 )
 from rag.utils.logging_utils import log_message
@@ -96,7 +95,7 @@ class DocumentLoader:
             Langchain document loader instance
 
         Raises:
-            LoaderInitializationError: If the loader could not be initialized
+            DocumentLoadingError: If the loader could not be initialized
             UnsupportedFileError: If the file type is not supported
 
         """
@@ -141,7 +140,7 @@ class DocumentLoader:
             return loader_class(str(file_path))
         except Exception as e:
             self._log("ERROR", f"Failed to initialize loader for {file_path}: {e}")
-            raise LoaderInitializationError(file_path, str(e)) from e
+            raise DocumentLoadingError(file_path, str(e)) from e
 
     def load_document(self, file_path: Path | str) -> list[Document]:
         """Load a document from a file.

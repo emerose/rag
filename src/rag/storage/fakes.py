@@ -215,7 +215,9 @@ class InMemoryFileSystem(FileSystemProtocol):
         supported_files = self.scan_directory(directory)
         return len(supported_files) > 0
 
-    def validate_and_scan_documents_dir(self, directory: Path | str) -> tuple[bool, list[Path]]:
+    def validate_and_scan_documents_dir(
+        self, directory: Path | str
+    ) -> tuple[bool, list[Path]]:
         """Validate directory and return supported files in one operation.
 
         Args:
@@ -239,7 +241,7 @@ class InMemoryCacheRepository(CacheRepositoryProtocol):
 
     def __init__(self, filesystem_manager: FileSystemProtocol | None = None) -> None:
         """Initialize the in-memory cache repository.
-        
+
         Args:
             filesystem_manager: Optional filesystem manager for file modification time access
         """

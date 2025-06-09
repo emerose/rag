@@ -47,8 +47,6 @@ from rag.utils.exceptions import (
     APIError,
     RateLimitError,
     
-    # Legacy alias
-    LoaderInitializationError,
 )
 
 
@@ -428,19 +426,6 @@ class TestExternalServiceErrors:
             assert isinstance(error, ExternalServiceError)
             assert isinstance(error, RAGError)
 
-
-class TestLegacyCompatibility:
-    """Test backward compatibility with legacy exception names."""
-
-    def test_loader_initialization_error_alias(self):
-        """Test that LoaderInitializationError is an alias for DocumentLoadingError."""
-        assert LoaderInitializationError is DocumentLoadingError
-        
-        # Should work the same as DocumentLoadingError
-        error = LoaderInitializationError("/test/file.txt", "Failed to initialize")
-        assert isinstance(error, DocumentLoadingError)
-        assert isinstance(error, DocumentError)
-        assert isinstance(error, RAGError)
 
 
 class TestExceptionChaining:
