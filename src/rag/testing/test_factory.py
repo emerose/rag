@@ -21,6 +21,7 @@ from rag.config.components import (
 from rag.embeddings.fake_openai import FakeOpenAI
 from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
 from rag.factory import ComponentOverrides, RAGComponentsFactory
+from rag.storage.fake_index_manager import FakeIndexManager
 from rag.storage.fakes import (
     InMemoryCacheRepository,
     InMemoryFileSystem,
@@ -120,11 +121,11 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 filesystem.add_file(path, content)
 
         # Create fake cache repository with initial metadata if provided
-        cache_repo = InMemoryCacheRepository(filesystem_manager=filesystem)
+        cache_repo = FakeIndexManager(cache_dir="/fake/cache")
         if self.test_options.initial_metadata:
             # Directly populate the internal storage for testing
             for file_path, metadata in self.test_options.initial_metadata.items():
-                cache_repo.document_metadata[file_path] = metadata
+                cache_repo._document_metadata[file_path] = metadata
 
         # Create fake vector repository with initial vectors if provided
         vector_repo = InMemoryVectorRepository()
@@ -200,6 +201,27 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         )
 
         return cls(test_options=test_options)
+
+    @classmethod
+    def create_fake_index_manager(
+        cls,
+        cache_dir: str = "/fake/cache",
+        initial_metadata: dict[str, dict] | None = None,
+    ) -> FakeIndexManager:
+        """Create a standalone FakeIndexManager for testing.
+
+        Args:
+            cache_dir: Cache directory for the manager
+            initial_metadata: Initial metadata to populate
+
+        Returns:
+            Configured FakeIndexManager instance
+        """
+        manager = FakeIndexManager(cache_dir=cache_dir)
+        if initial_metadata:
+            for file_path, metadata in initial_metadata.items():
+                manager._document_metadata[file_path] = metadata
+        return manager
 
     @classmethod
     def create_minimal(cls) -> FakeRAGComponentsFactory:
@@ -377,8 +399,16 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             # If relative, make it relative to the documents directory
             path_obj = Path(self.config.documents_dir) / path_obj
 
+        # Use resolved path to match DocumentIndexer behavior
+        resolved_path = path_obj.resolve()
+        fixed_mtime = 1640995200.0  # Use fixed modification time for consistent testing
+
         # Add the file to the fake filesystem
-        self.filesystem_manager.add_file(str(path_obj), content)
+        self.filesystem_manager.add_file(str(resolved_path), content)
+
+        # Also add the file to the FakeIndexManager if it's being used
+        if hasattr(self.cache_repository, "add_mock_file"):
+            self.cache_repository.add_mock_file(resolved_path, content, fixed_mtime)
 
     def add_test_metadata(self, file_path: str, metadata: dict) -> None:
         """Add test metadata to the fake cache repository.
@@ -388,11 +418,16 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             metadata: Metadata dictionary
         """
         # Directly add to internal storage for testing
-        if isinstance(self.cache_repository, InMemoryCacheRepository):
-            self.cache_repository.document_metadata[file_path] = metadata
+        if isinstance(
+            self.cache_repository, InMemoryCacheRepository | FakeIndexManager
+        ):
+            if isinstance(self.cache_repository, InMemoryCacheRepository):
+                self.cache_repository.document_metadata[file_path] = metadata
+            else:
+                self.cache_repository._document_metadata[file_path] = metadata
         else:
             raise ConfigurationError(
-                "Can only add test metadata to InMemoryCacheRepository, "
+                "Can only add test metadata to InMemoryCacheRepository or FakeIndexManager, "
                 f"got {type(self.cache_repository).__name__}"
             )
 
@@ -419,13 +454,18 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         Returns:
             Dictionary mapping file paths to their metadata
         """
-        if not isinstance(self.cache_repository, InMemoryCacheRepository):
+        if not isinstance(
+            self.cache_repository, InMemoryCacheRepository | FakeIndexManager
+        ):
             raise ConfigurationError(
-                "Can only get test metadata from InMemoryCacheRepository, "
+                "Can only get test metadata from InMemoryCacheRepository or FakeIndexManager, "
                 f"got {type(self.cache_repository).__name__}"
             )
 
-        return dict(self.cache_repository.document_metadata)
+        if isinstance(self.cache_repository, InMemoryCacheRepository):
+            return dict(self.cache_repository.document_metadata)
+        else:
+            return dict(self.cache_repository._document_metadata)
 
     def inject_fake_openai(self) -> FakeOpenAI:
         """Inject and return a FakeOpenAI instance for the factory.

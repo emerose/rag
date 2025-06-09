@@ -21,12 +21,18 @@ class TestCacheLogic:
         """Create a sample text file for testing using the fake filesystem."""
         # Add a test file to the fake filesystem
         file_path = Path(rag_engine.config.documents_dir) / "sample.txt"
+        resolved_file_path = file_path.resolve()  # Use resolved path to match DocumentIndexer
         content = "This is a sample document for testing cache logic."
+        fixed_mtime = 1640995200.0  # Use fixed modification time for consistent testing
         
         # Add file directly to the filesystem manager (which should be InMemoryFileSystem)
-        rag_engine.filesystem_manager.add_file(str(file_path), content)
+        rag_engine.filesystem_manager.add_file(str(resolved_file_path), content)
         
-        return file_path
+        # Also add the file to the FakeIndexManager if it's being used
+        if hasattr(rag_engine.index_manager, 'add_mock_file'):
+            rag_engine.index_manager.add_mock_file(resolved_file_path, content, fixed_mtime)
+        
+        return resolved_file_path
 
     @pytest.fixture
     def rag_engine(self, temp_dir):
@@ -90,10 +96,13 @@ class TestCacheLogic:
 
         # Modify the file content in the fake filesystem
         time.sleep(0.1)  # Ensure mtime changes
-        rag_engine.filesystem_manager.add_file(
-            str(sample_text_file),
-            "This is modified content that should trigger reindexing."
-        )
+        new_content = "This is modified content that should trigger reindexing."
+        new_mtime = 1640995300.0  # New modification time to trigger reindexing
+        rag_engine.filesystem_manager.add_file(str(sample_text_file), new_content)
+        
+        # Also update the file in the FakeIndexManager if it's being used
+        if hasattr(rag_engine.index_manager, 'add_mock_file'):
+            rag_engine.index_manager.add_mock_file(sample_text_file, new_content, new_mtime)
 
         # Second indexing after content change - should process the file
         success, error = rag_engine.index_file(sample_text_file)
@@ -110,10 +119,18 @@ class TestCacheLogic:
         docs_dir = Path(rag_engine.config.documents_dir)
         file1 = docs_dir / "file1.txt"
         file2 = docs_dir / "file2.txt"
+        resolved_file1 = file1.resolve()
+        resolved_file2 = file2.resolve()
+        fixed_mtime = 1640995200.0  # Use fixed modification time for consistent testing
         
         # Add files to fake filesystem
-        rag_engine.filesystem_manager.add_file(str(file1), "Content of file 1")
-        rag_engine.filesystem_manager.add_file(str(file2), "Content of file 2")
+        rag_engine.filesystem_manager.add_file(str(resolved_file1), "Content of file 1")
+        rag_engine.filesystem_manager.add_file(str(resolved_file2), "Content of file 2")
+        
+        # Also add files to the FakeIndexManager if it's being used
+        if hasattr(rag_engine.index_manager, 'add_mock_file'):
+            rag_engine.index_manager.add_mock_file(resolved_file1, "Content of file 1", fixed_mtime)
+            rag_engine.index_manager.add_mock_file(resolved_file2, "Content of file 2", fixed_mtime)
 
         # First directory indexing - should process both files
         results = rag_engine.index_directory(docs_dir)

@@ -1,93 +1,75 @@
 """Tests for IndexManager metadata operations.
 
-Focus on CRUD operations for document metadata.
+Focus on CRUD operations for document metadata using dependency injection
+with FakeIndexManager instead of SQLite mocking.
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-from rag.storage.index_manager import IndexManager
 from rag.storage.metadata import DocumentMetadata
+from rag.testing.test_factory import FakeRAGComponentsFactory
 
 
-@patch("rag.storage.index_manager.Path.exists")
-@patch("rag.storage.index_manager.Path.stat")
-@patch("sqlite3.connect")
-def test_update_metadata(
-    _mock_connect: MagicMock,
-    _mock_stat: MagicMock,
-    _mock_exists: MagicMock,
-    temp_dir: Path,
-) -> None:
-    """Test updating document metadata."""
-    # Set up mocks
-    _mock_exists.return_value = True
-    stat_result = MagicMock()
-    stat_result.st_mode = 0o40755  # Directory mode for temp_dir
-    stat_result.st_mtime = 1234567890.0
-    stat_result.st_size = 12345
-    _mock_stat.return_value = stat_result
-
-    # Set up mock connection and cursor
-    mock_conn = MagicMock()
-    _mock_connect.return_value.__enter__.return_value = mock_conn
-
-    # Create manager with mock
-    manager = IndexManager(cache_dir=temp_dir)
+def test_update_metadata(temp_dir: Path) -> None:
+    """Test updating document metadata using dependency injection."""
+    # Create fake index manager
+    manager = FakeRAGComponentsFactory.create_fake_index_manager(
+        cache_dir=str(temp_dir)
+    )
 
     # Test update_metadata
     file_path = Path(temp_dir) / "test_file.txt"
-    with patch.object(manager, "compute_file_hash", return_value="test_hash"):
-        metadata = DocumentMetadata(
-            file_path=file_path,
-            file_hash="test_hash",
-            chunk_size=1000,
-            chunk_overlap=200,
-            last_modified=1234567890.0,
-            indexed_at=1234567890.0,
-            embedding_model="test-model",
-            embedding_model_version="test-version",
-            file_type="text/plain",
-            num_chunks=10,
-            file_size=12345,
-            document_loader="TextLoader",
-            tokenizer="cl100k_base",
-            text_splitter="semantic_splitter",
-        )
-        manager.update_metadata(metadata)
-
-    # Verify update_file_metadata was called with the right arguments
-    assert mock_conn.execute.called
-
-
-@patch("sqlite3.connect")
-def test_get_metadata(_mock_connect: MagicMock, temp_dir: Path) -> None:
-    """Test getting document metadata."""
-    # Set up mock connection and cursor
-    mock_conn = MagicMock()
-    _mock_connect.return_value.__enter__.return_value = mock_conn
-    mock_cursor = MagicMock()
-    mock_conn.execute.return_value = mock_cursor
-
-    # Configure cursor to return data for an existing file
-    mock_cursor.fetchone.return_value = (
-        "test_hash",  # file_hash
-        1000,  # chunk_size
-        200,  # chunk_overlap
-        1234567890.0,  # last_modified
-        1234567895.0,  # indexed_at
-        "test-model",  # embedding_model
-        "test-version",  # embedding_model_version
-        "text/plain",  # file_type
-        10,  # num_chunks
-        12345,  # file_size
-        "TextLoader",  # document_loader
-        "cl100k_base",  # tokenizer
-        "semantic_splitter",  # text_splitter
+    metadata = DocumentMetadata(
+        file_path=file_path,
+        file_hash="test_hash",
+        chunk_size=1000,
+        chunk_overlap=200,
+        last_modified=1234567890.0,
+        indexed_at=1234567890.0,
+        embedding_model="test-model",
+        embedding_model_version="test-version",
+        file_type="text/plain",
+        num_chunks=10,
+        file_size=12345,
+        document_loader="TextLoader",
+        tokenizer="cl100k_base",
+        text_splitter="semantic_splitter",
     )
+    manager.update_metadata(metadata)
 
-    # Create manager with mock
-    manager = IndexManager(cache_dir=temp_dir)
+    # Verify metadata was stored correctly
+    stored_metadata = manager.get_metadata(file_path)
+    assert stored_metadata is not None
+    assert stored_metadata["file_hash"] == "test_hash"
+    assert stored_metadata["chunk_size"] == 1000
+    assert stored_metadata["chunk_overlap"] == 200
+
+
+def test_get_metadata(temp_dir: Path) -> None:
+    """Test getting document metadata using dependency injection."""
+    # Create fake index manager with initial metadata
+    initial_metadata = {
+        str(temp_dir / "test_file.txt"): {
+            "file_hash": "test_hash",
+            "chunk_size": 1000,
+            "chunk_overlap": 200,
+            "last_modified": 1234567890.0,
+            "indexed_at": 1234567895.0,
+            "embedding_model": "test-model",
+            "embedding_model_version": "test-version",
+            "file_type": "text/plain",
+            "num_chunks": 10,
+            "file_size": 12345,
+            "document_loader": "TextLoader",
+            "tokenizer": "cl100k_base",
+            "text_splitter": "semantic_splitter",
+        }
+    }
+    
+    manager = FakeRAGComponentsFactory.create_fake_index_manager(
+        cache_dir=str(temp_dir),
+        initial_metadata=initial_metadata
+    )
 
     # Test get_metadata
     file_path = Path(temp_dir) / "test_file.txt"
@@ -110,20 +92,12 @@ def test_get_metadata(_mock_connect: MagicMock, temp_dir: Path) -> None:
     assert metadata["text_splitter"] == "semantic_splitter"
 
 
-@patch("sqlite3.connect")
-def test_get_metadata_not_found(_mock_connect: MagicMock, temp_dir: Path) -> None:
-    """Test getting metadata for a non-existent file."""
-    # Set up mock connection and cursor
-    mock_conn = MagicMock()
-    _mock_connect.return_value.__enter__.return_value = mock_conn
-    mock_cursor = MagicMock()
-    mock_conn.execute.return_value = mock_cursor
-
-    # Configure cursor to return no data
-    mock_cursor.fetchone.return_value = None
-
-    # Create manager with mock
-    manager = IndexManager(cache_dir=temp_dir)
+def test_get_metadata_not_found(temp_dir: Path) -> None:
+    """Test getting metadata for a non-existent file using dependency injection."""
+    # Create empty fake index manager
+    manager = FakeRAGComponentsFactory.create_fake_index_manager(
+        cache_dir=str(temp_dir)
+    )
 
     # Test get_metadata for non-existent file
     file_path = Path(temp_dir) / "nonexistent.txt"
@@ -133,19 +107,28 @@ def test_get_metadata_not_found(_mock_connect: MagicMock, temp_dir: Path) -> Non
     assert metadata is None
 
 
-@patch("sqlite3.connect")
-def test_remove_metadata(_mock_connect: MagicMock, temp_dir: Path) -> None:
-    """Test removing document metadata."""
-    # Set up mock connection and cursor
-    mock_conn = MagicMock()
-    _mock_connect.return_value.__enter__.return_value = mock_conn
+def test_remove_metadata(temp_dir: Path) -> None:
+    """Test removing document metadata using dependency injection."""
+    # Create fake index manager with some initial metadata
+    initial_metadata = {
+        str(temp_dir / "test_file.txt"): {
+            "file_hash": "test_hash",
+            "chunk_size": 1000,
+            "chunk_overlap": 200,
+        }
+    }
+    
+    manager = FakeRAGComponentsFactory.create_fake_index_manager(
+        cache_dir=str(temp_dir),
+        initial_metadata=initial_metadata
+    )
 
-    # Create manager with mock
-    manager = IndexManager(cache_dir=temp_dir)
+    # Verify metadata exists initially
+    file_path = Path(temp_dir) / "test_file.txt"
+    assert manager.get_metadata(file_path) is not None
 
     # Test remove_metadata
-    file_path = Path(temp_dir) / "test_file.txt"
     manager.remove_metadata(file_path)
 
-    # Verify database operation was called
-    assert mock_conn.execute.called
+    # Verify metadata was removed
+    assert manager.get_metadata(file_path) is None

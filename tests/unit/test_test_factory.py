@@ -12,6 +12,7 @@ from rag.storage.fakes import (
     InMemoryFileSystem,
     InMemoryVectorRepository,
 )
+from rag.storage.fake_index_manager import FakeIndexManager
 from rag.testing import FakeRAGComponentsFactory
 from rag.testing.test_factory import FakeComponentOptions
 
@@ -25,7 +26,7 @@ class TestFakeRAGComponentsFactory:
 
         # Check that all components are fake implementations
         assert isinstance(factory.filesystem_manager, InMemoryFileSystem)
-        assert isinstance(factory.cache_repository, InMemoryCacheRepository)
+        assert isinstance(factory.cache_repository, (InMemoryCacheRepository, FakeIndexManager))
         assert isinstance(factory.vector_repository, InMemoryVectorRepository)
         assert isinstance(
             factory.embedding_service,
@@ -177,7 +178,7 @@ class TestFakeRAGComponentsFactory:
 
         # Check that the engine has fake components injected
         assert isinstance(engine.filesystem_manager, InMemoryFileSystem)
-        assert isinstance(engine.index_manager, InMemoryCacheRepository)
+        assert isinstance(engine.index_manager, (InMemoryCacheRepository, FakeIndexManager))
         assert isinstance(engine.vectorstore_manager, InMemoryVectorRepository)
         assert isinstance(
             engine.embedding_provider,
@@ -218,6 +219,6 @@ class TestFakeRAGComponentsFactory:
             factory.get_test_files()
 
         with pytest.raises(
-            ConfigurationError, match="Can only get test metadata from InMemoryCacheRepository"
+            ConfigurationError, match="Can only get test metadata from InMemoryCacheRepository|FakeIndexManager"
         ):
             factory.get_test_metadata()

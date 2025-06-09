@@ -1,4 +1,9 @@
-"""Fake index manager for testing."""
+"""Fake index manager for testing.
+
+Provides a complete in-memory implementation of IndexManager that replaces
+the need for SQLite mocking in unit tests. Follows dependency injection
+patterns for clean, fast testing.
+"""
 
 import hashlib
 import time
@@ -20,13 +25,14 @@ class FakeIndexManager(CacheRepositoryProtocol):
         """Initialize the fake index manager.
 
         Args:
-            cache_dir: Ignored (for compatibility)
-            log_callback: Ignored (for compatibility)
+            cache_dir: Cache directory (for compatibility with real IndexManager)
+            log_callback: Optional logging callback (for compatibility)
         """
         self.cache_dir = Path(cache_dir) if cache_dir else Path("/fake/cache")
+        self.db_path = self.cache_dir / "index_metadata.db"  # For compatibility
         self.log_callback = log_callback
 
-        # In-memory storage
+        # In-memory storage - replaces SQLite tables
         self._document_metadata: dict[str, dict[str, Any]] = {}
         self._chunk_hashes: dict[str, list[str]] = {}
         self._file_metadata: dict[str, dict[str, Any]] = {}
@@ -34,6 +40,17 @@ class FakeIndexManager(CacheRepositoryProtocol):
 
         # Mock file system state for testing
         self._mock_files: dict[str, dict[str, Any]] = {}
+
+    def _log(self, level: str, message: str) -> None:
+        """Log a message (compatibility method).
+
+        Args:
+            level: Log level (DEBUG, INFO, WARNING, ERROR, etc.)
+            message: The log message
+        """
+        # For testing, we can just pass or optionally print for debugging
+        if self.log_callback:
+            self.log_callback(level, message, "FakeIndexManager")
 
     def add_mock_file(
         self,
@@ -99,9 +116,13 @@ class FakeIndexManager(CacheRepositoryProtocol):
         if path_str in self._mock_files and not self._mock_files[path_str]["exists"]:
             return False
 
+        # Check if file exists at all (for non-mock files, assume they don't exist)
+        if path_str not in self._mock_files:
+            return False  # Non-existent files don't need reindexing
+
         # Check if we have metadata for this file
         if path_str not in self._document_metadata:
-            return True  # New file
+            return True  # New file that exists
 
         metadata = self._document_metadata[path_str]
         current_hash = self.compute_file_hash(file_path)
@@ -113,14 +134,23 @@ class FakeIndexManager(CacheRepositoryProtocol):
             current_mtime = time.time()  # Default for non-mock files
 
         # Check various conditions for reindexing
-        return (
-            metadata["file_hash"] != current_hash
-            or metadata["chunk_size"] != chunk_size
-            or metadata["chunk_overlap"] != chunk_overlap
-            or metadata["embedding_model"] != embedding_model
-            or metadata["embedding_model_version"] != embedding_model_version
-            or metadata["last_modified"] < current_mtime
+        hash_changed = metadata["file_hash"] != current_hash
+        chunk_size_changed = metadata["chunk_size"] != chunk_size
+        chunk_overlap_changed = metadata["chunk_overlap"] != chunk_overlap
+        model_changed = metadata["embedding_model"] != embedding_model
+        version_changed = metadata["embedding_model_version"] != embedding_model_version
+        file_modified = metadata["last_modified"] < current_mtime
+
+        result = (
+            hash_changed
+            or chunk_size_changed
+            or chunk_overlap_changed
+            or model_changed
+            or version_changed
+            or file_modified
         )
+
+        return result
 
     def update_metadata(self, metadata: DocumentMetadata) -> None:
         """Update metadata for a file."""
@@ -177,10 +207,16 @@ class FakeIndexManager(CacheRepositoryProtocol):
             "modified_at": metadata.modified_at,
         }
 
-    def get_file_metadata(self, file_path: str | Path) -> dict[str, Any] | None:
-        """Get file metadata."""
-        path_str = str(file_path)
-        return self._file_metadata.get(path_str)
+    def get_file_metadata(self, file_path: str) -> dict[str, Any] | None:
+        """Get file metadata.
+
+        Args:
+            file_path: File path as string (matches real IndexManager signature)
+
+        Returns:
+            File metadata dict or None if not found
+        """
+        return self._file_metadata.get(file_path)
 
     def get_all_file_metadata(self) -> dict[str, dict[str, Any]]:
         """Get metadata for all files."""
@@ -195,19 +231,32 @@ class FakeIndexManager(CacheRepositoryProtocol):
         return self._global_settings.get(key)
 
     def list_indexed_files(self) -> list[dict[str, Any]]:
-        """List all indexed files."""
+        """List all indexed files.
+
+        Simulates the JOIN behavior of real IndexManager where files must exist
+        in both document_metadata and file_metadata tables to appear in results.
+        """
         files = []
-        for path_str, metadata in self._document_metadata.items():
-            files.append(
-                {
-                    "file_path": path_str,
-                    "file_type": metadata.get("file_type", "unknown"),
-                    "num_chunks": metadata.get("num_chunks", 0),
-                    "file_size": metadata.get("file_size", 0),
-                    "indexed_at": metadata.get("indexed_at", 0),
-                    "last_modified": metadata.get("last_modified", 0),
-                }
-            )
+        for path_str, doc_metadata in self._document_metadata.items():
+            # Only include files that have entries in BOTH tables (simulating JOIN)
+            if path_str in self._file_metadata:
+                files.append(
+                    {
+                        "file_path": path_str,
+                        "file_type": doc_metadata.get("file_type", "unknown"),
+                        "num_chunks": doc_metadata.get("num_chunks", 0),
+                        "file_size": doc_metadata.get("file_size", 0),
+                        "indexed_at": doc_metadata.get("indexed_at", 0),
+                        "last_modified": doc_metadata.get("last_modified", 0),
+                        "embedding_model": doc_metadata.get("embedding_model", ""),
+                        "embedding_model_version": doc_metadata.get(
+                            "embedding_model_version", ""
+                        ),
+                        "document_loader": doc_metadata.get("document_loader", ""),
+                        "tokenizer": doc_metadata.get("tokenizer", ""),
+                        "text_splitter": doc_metadata.get("text_splitter", ""),
+                    }
+                )
         return files
 
     def clear_all_file_metadata(self) -> None:
@@ -216,7 +265,7 @@ class FakeIndexManager(CacheRepositoryProtocol):
         self._chunk_hashes.clear()
         self._file_metadata.clear()
         self._global_settings.clear()
-        self._mock_files.clear()
+        # Note: We keep _mock_files intact as they represent the filesystem state
 
     def get_global_model_info(self) -> dict[str, str]:
         """Get global model information."""

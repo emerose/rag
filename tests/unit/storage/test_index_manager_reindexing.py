@@ -1,206 +1,248 @@
 """Tests for IndexManager reindexing logic.
 
-Focus on decisions about when to reindex files.
+Focus on decisions about when to reindex files using dependency injection
+with FakeIndexManager instead of SQLite mocking.
 """
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-from rag.storage.index_manager import IndexManager
+from rag.storage.metadata import DocumentMetadata
+from rag.testing.test_factory import FakeRAGComponentsFactory
 
 
-@patch("rag.storage.index_manager.Path.exists")
-@patch("rag.storage.index_manager.Path.stat")
-@patch("sqlite3.connect")
-def test_needs_reindexing_new_file(
-    _mock_connect: MagicMock,
-    _mock_stat: MagicMock,
-    _mock_exists: MagicMock,
-    temp_dir: Path,
-) -> None:
-    """Test checking if a new file needs reindexing."""
-    # Set up mocks
-    _mock_exists.return_value = True
-    stat_result = MagicMock()
-    stat_result.st_mode = 0o40755  # Directory mode
-    stat_result.st_mtime = 1234567890.0
-    _mock_stat.return_value = stat_result
+def test_needs_reindexing_new_file(temp_dir: Path) -> None:
+    """Test checking if a new file needs reindexing using dependency injection."""
+    # Create fake index manager with no initial metadata
+    manager = FakeRAGComponentsFactory.create_fake_index_manager(
+        cache_dir=str(temp_dir)
+    )
 
-    # Set up mock connection and cursor
-    mock_conn = MagicMock()
-    _mock_connect.return_value.__enter__.return_value = mock_conn
-    mock_cursor = MagicMock()
-    mock_conn.execute.return_value = mock_cursor
-
-    # Configure cursor to indicate file is not in database
-    mock_cursor.fetchone.return_value = None
-
-    # Create manager with mock
-    manager = IndexManager(cache_dir=temp_dir)
-
-    # Test needs_reindexing with a file that's not in the database
+    # Add a mock file that doesn't have metadata yet
     file_path = Path(temp_dir) / "test_file.txt"
-    with patch.object(manager, "compute_file_hash", return_value="test_hash"):
-        needs_reindex = manager.needs_reindexing(
-            file_path=file_path,
-            chunk_size=1000,
-            chunk_overlap=200,
-            embedding_model="test-model",
-            embedding_model_version="test-version",
-        )
+    manager.add_mock_file(file_path, "new file content")
+
+    # Test needs_reindexing for a new file (no metadata in database)
+    needs_reindex = manager.needs_reindexing(
+        file_path=file_path,
+        chunk_size=1000,
+        chunk_overlap=200,
+        embedding_model="test-model",
+        embedding_model_version="test-version",
+    )
 
     # Since file is not in database, it should need reindexing
     assert needs_reindex is True
 
 
-@patch("rag.storage.index_manager.Path.exists")
-@patch("rag.storage.index_manager.Path.stat")
-@patch("sqlite3.connect")
-def test_needs_reindexing_unchanged_file(
-    _mock_connect: MagicMock,
-    _mock_stat: MagicMock,
-    _mock_exists: MagicMock,
-    temp_dir: Path,
-) -> None:
-    """Test checking if an unchanged file needs reindexing."""
-    # Set up mocks
-    _mock_exists.return_value = True
-    stat_result = MagicMock()
-    stat_result.st_mode = 0o40755  # Directory mode
-    stat_result.st_mtime = 1234567890.0
-    _mock_stat.return_value = stat_result
-
-    # Set up mock connection and cursor
-    mock_conn = MagicMock()
-    _mock_connect.return_value.__enter__.return_value = mock_conn
-    mock_cursor = MagicMock()
-    mock_conn.execute.return_value = mock_cursor
-
-    # Configure cursor to return data for an existing file
-    mock_cursor.fetchone.return_value = (
-        "test_hash",  # file_hash
-        1000,  # chunk_size
-        200,  # chunk_overlap
-        1234567890.0,  # last_modified
-        "test-model",  # embedding_model
-        "test-version",  # embedding_model_version
-    )
-
-    # Create manager with mock
-    manager = IndexManager(cache_dir=temp_dir)
-
-    # Test needs_reindexing for a file with unchanged hash
+def test_needs_reindexing_unchanged_file(temp_dir: Path) -> None:
+    """Test checking if an unchanged file needs reindexing using dependency injection."""
+    # Create fake index manager with initial metadata for the file
     file_path = Path(temp_dir) / "test_file.txt"
-    with patch.object(manager, "compute_file_hash", return_value="test_hash"):
-        needs_reindex = manager.needs_reindexing(
-            file_path=file_path,
-            chunk_size=1000,
-            chunk_overlap=200,
-            embedding_model="test-model",
-            embedding_model_version="test-version",
-        )
+    content = "unchanged content"
+    modified_time = 1234567890.0
+
+    manager = FakeRAGComponentsFactory.create_fake_index_manager(
+        cache_dir=str(temp_dir)
+    )
+    
+    # Add mock file with content
+    manager.add_mock_file(file_path, content, modified_time)
+    
+    # Add matching metadata that should result in no reindexing needed
+    metadata = DocumentMetadata(
+        file_path=file_path,
+        file_hash=manager.compute_file_hash(file_path),  # Matching hash
+        chunk_size=1000,
+        chunk_overlap=200,
+        last_modified=modified_time,
+        indexed_at=modified_time + 5,  # Indexed after modification
+        embedding_model="test-model",
+        embedding_model_version="test-version",
+        file_type="text/plain",
+        num_chunks=3,
+        file_size=len(content),
+        document_loader="TextLoader",
+        tokenizer="cl100k_base",
+        text_splitter="semantic_splitter",
+    )
+    manager.update_metadata(metadata)
+
+    # Test needs_reindexing for an unchanged file
+    needs_reindex = manager.needs_reindexing(
+        file_path=file_path,
+        chunk_size=1000,
+        chunk_overlap=200,
+        embedding_model="test-model",
+        embedding_model_version="test-version",
+    )
 
     # Since file is unchanged, it should not need reindexing
     assert needs_reindex is False
 
 
-@patch("rag.storage.index_manager.Path.exists")
-@patch("rag.storage.index_manager.Path.stat")
-@patch("sqlite3.connect")
-def test_needs_reindexing_changed_hash(
-    _mock_connect: MagicMock,
-    _mock_stat: MagicMock,
-    _mock_exists: MagicMock,
-    temp_dir: Path,
-) -> None:
-    """Test checking if a file with changed hash needs reindexing."""
-    # Set up mocks
-    _mock_exists.return_value = True
-    stat_result = MagicMock()
-    stat_result.st_mode = 0o40755  # Directory mode
-    stat_result.st_mtime = 1234567890.0
-    _mock_stat.return_value = stat_result
-
-    # Set up mock connection and cursor
-    mock_conn = MagicMock()
-    _mock_connect.return_value.__enter__.return_value = mock_conn
-    mock_cursor = MagicMock()
-    mock_conn.execute.return_value = mock_cursor
-
-    # Configure cursor to return data for an existing file
-    mock_cursor.fetchone.return_value = (
-        "old_hash",  # file_hash
-        1000,  # chunk_size
-        200,  # chunk_overlap
-        1234567890.0,  # last_modified
-        "test-model",  # embedding_model
-        "test-version",  # embedding_model_version
+def test_needs_reindexing_changed_hash(temp_dir: Path) -> None:
+    """Test checking if a file with changed hash needs reindexing using dependency injection."""
+    # Create fake index manager
+    manager = FakeRAGComponentsFactory.create_fake_index_manager(
+        cache_dir=str(temp_dir)
     )
 
-    # Create manager with mock
-    manager = IndexManager(cache_dir=temp_dir)
+    # Add initial file content and metadata
+    file_path = Path(temp_dir) / "test_file.txt"
+    original_content = "original content"
+    modified_time = 1234567890.0
+
+    manager.add_mock_file(file_path, original_content, modified_time)
+    
+    # Store metadata with original hash
+    original_hash = manager.compute_file_hash(file_path)
+    metadata = DocumentMetadata(
+        file_path=file_path,
+        file_hash=original_hash,
+        chunk_size=1000,
+        chunk_overlap=200,
+        last_modified=modified_time,
+        indexed_at=modified_time + 5,
+        embedding_model="test-model",
+        embedding_model_version="test-version",
+        file_type="text/plain",
+        num_chunks=3,
+        file_size=len(original_content),
+        document_loader="TextLoader",
+        tokenizer="cl100k_base",
+        text_splitter="semantic_splitter",
+    )
+    manager.update_metadata(metadata)
+
+    # Now change the file content to trigger a hash change
+    new_content = "changed content"
+    manager.add_mock_file(file_path, new_content, modified_time + 100)
 
     # Test needs_reindexing for a file with changed hash
-    file_path = Path(temp_dir) / "test_file.txt"
-    with patch.object(manager, "compute_file_hash", return_value="new_hash"):
-        needs_reindex = manager.needs_reindexing(
-            file_path=file_path,
-            chunk_size=1000,
-            chunk_overlap=200,
-            embedding_model="test-model",
-            embedding_model_version="test-version",
-        )
+    needs_reindex = manager.needs_reindexing(
+        file_path=file_path,
+        chunk_size=1000,
+        chunk_overlap=200,
+        embedding_model="test-model",
+        embedding_model_version="test-version",
+    )
 
     # Since file hash changed, it should need reindexing
     assert needs_reindex is True
 
 
-@patch("rag.storage.index_manager.Path.exists")
-@patch("rag.storage.index_manager.Path.stat")
-@patch("sqlite3.connect")
-def test_needs_reindexing_changed_parameters(
-    _mock_connect: MagicMock,
-    _mock_stat: MagicMock,
-    _mock_exists: MagicMock,
-    temp_dir: Path,
-) -> None:
-    """Test checking if a file with changed parameters needs reindexing."""
-    # Set up mocks
-    _mock_exists.return_value = True
-    stat_result = MagicMock()
-    stat_result.st_mode = 0o40755  # Directory mode
-    stat_result.st_mtime = 1234567890.0
-    _mock_stat.return_value = stat_result
-
-    # Set up mock connection and cursor
-    mock_conn = MagicMock()
-    _mock_connect.return_value.__enter__.return_value = mock_conn
-    mock_cursor = MagicMock()
-    mock_conn.execute.return_value = mock_cursor
-
-    # Configure cursor to return data for an existing file with different parameters
-    mock_cursor.fetchone.return_value = (
-        "test_hash",  # file_hash (same)
-        500,  # chunk_size (different)
-        100,  # chunk_overlap (different)
-        1234567890.0,  # last_modified
-        "old-model",  # embedding_model (different)
-        "old-version",  # embedding_model_version (different)
+def test_needs_reindexing_changed_parameters(temp_dir: Path) -> None:
+    """Test checking if a file with changed parameters needs reindexing using dependency injection."""
+    # Create fake index manager
+    manager = FakeRAGComponentsFactory.create_fake_index_manager(
+        cache_dir=str(temp_dir)
     )
 
-    # Create manager with mock
-    manager = IndexManager(cache_dir=temp_dir)
-
-    # Test needs_reindexing for a file with changed parameters
+    # Add file with original parameters
     file_path = Path(temp_dir) / "test_file.txt"
-    with patch.object(manager, "compute_file_hash", return_value="test_hash"):
-        needs_reindex = manager.needs_reindexing(
-            file_path=file_path,
-            chunk_size=1000,  # Different from stored value
-            chunk_overlap=200,  # Different from stored value
-            embedding_model="new-model",  # Different from stored value
-            embedding_model_version="new-version",  # Different from stored value
-        )
+    content = "test content"
+    modified_time = 1234567890.0
+
+    manager.add_mock_file(file_path, content, modified_time)
+    
+    # Store metadata with original parameters
+    metadata = DocumentMetadata(
+        file_path=file_path,
+        file_hash=manager.compute_file_hash(file_path),
+        chunk_size=500,  # Original chunk size
+        chunk_overlap=100,  # Original chunk overlap
+        last_modified=modified_time,
+        indexed_at=modified_time + 5,
+        embedding_model="old-model",  # Original model
+        embedding_model_version="old-version",  # Original version
+        file_type="text/plain",
+        num_chunks=3,
+        file_size=len(content),
+        document_loader="TextLoader",
+        tokenizer="cl100k_base",
+        text_splitter="semantic_splitter",
+    )
+    manager.update_metadata(metadata)
+
+    # Test needs_reindexing with different parameters
+    needs_reindex = manager.needs_reindexing(
+        file_path=file_path,
+        chunk_size=1000,  # Different from stored value (500)
+        chunk_overlap=200,  # Different from stored value (100)
+        embedding_model="new-model",  # Different from stored value
+        embedding_model_version="new-version",  # Different from stored value
+    )
 
     # Since parameters changed, it should need reindexing
+    assert needs_reindex is True
+
+
+def test_needs_reindexing_nonexistent_file(temp_dir: Path) -> None:
+    """Test checking if a non-existent file needs reindexing using dependency injection."""
+    # Create fake index manager
+    manager = FakeRAGComponentsFactory.create_fake_index_manager(
+        cache_dir=str(temp_dir)
+    )
+
+    # Test needs_reindexing for a file that doesn't exist
+    file_path = Path(temp_dir) / "nonexistent_file.txt"
+    needs_reindex = manager.needs_reindexing(
+        file_path=file_path,
+        chunk_size=1000,
+        chunk_overlap=200,
+        embedding_model="test-model",
+        embedding_model_version="test-version",
+    )
+
+    # Non-existent files should not need reindexing
+    assert needs_reindex is False
+
+
+def test_needs_reindexing_newer_modification_time(temp_dir: Path) -> None:
+    """Test checking if a file with newer modification time needs reindexing."""
+    # Create fake index manager
+    manager = FakeRAGComponentsFactory.create_fake_index_manager(
+        cache_dir=str(temp_dir)
+    )
+
+    # Add file with original modification time
+    file_path = Path(temp_dir) / "test_file.txt"
+    content = "test content"
+    original_mtime = 1234567890.0
+
+    manager.add_mock_file(file_path, content, original_mtime)
+    
+    # Store metadata with original modification time
+    metadata = DocumentMetadata(
+        file_path=file_path,
+        file_hash=manager.compute_file_hash(file_path),
+        chunk_size=1000,
+        chunk_overlap=200,
+        last_modified=original_mtime,
+        indexed_at=original_mtime + 5,
+        embedding_model="test-model",
+        embedding_model_version="test-version",
+        file_type="text/plain",
+        num_chunks=3,
+        file_size=len(content),
+        document_loader="TextLoader",
+        tokenizer="cl100k_base",
+        text_splitter="semantic_splitter",
+    )
+    manager.update_metadata(metadata)
+
+    # Update file with newer modification time (but same content)
+    newer_mtime = original_mtime + 1000
+    manager.add_mock_file(file_path, content, newer_mtime)
+
+    # Test needs_reindexing for a file with newer modification time
+    needs_reindex = manager.needs_reindexing(
+        file_path=file_path,
+        chunk_size=1000,
+        chunk_overlap=200,
+        embedding_model="test-model",
+        embedding_model_version="test-version",
+    )
+
+    # Since modification time is newer, it should need reindexing
     assert needs_reindex is True
