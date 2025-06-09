@@ -9,8 +9,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      PATH: .venv/bin:${PATH}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,7 +23,6 @@ jobs:
 
       - name: Create virtual environment
         run: uv venv
-
 
       - name: Cache uv dependencies
         uses: actions/cache@v4
@@ -52,13 +49,13 @@ jobs:
         run: uv pip list
 
       - name: Run formatter
-        run: ruff format src/ --line-length 88
+        run: uv run ruff format src/ --line-length 88
 
       - name: Run linter
-        run: ruff check src/rag --line-length 88
+        run: uv run ruff check src/rag --line-length 88
 
       - name: Run unit tests
-        run: uv run scripts/run_tests.py unit
+        run: uv run python scripts/run_tests.py unit
 
       - name: Run integration tests
-        run: uv run scripts/run_tests.py integration
+        run: uv run python scripts/run_tests.py integration
