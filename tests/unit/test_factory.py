@@ -12,21 +12,31 @@ from rag.storage.fakes import (
     InMemoryFileSystem,
     InMemoryVectorRepository,
 )
+from rag.embeddings.fakes import FakeEmbeddingService
+from langchain_core.language_models import FakeListChatModel
 
 
-@pytest.mark.timeout(2)  # Real component creation may be slow
 def test_factory_creates_real_components(temp_dir: Path) -> None:
-    """Test that factory creates real components by default."""
+    """Test that factory creates real components with injected fake embeddings."""
     config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")
     runtime = RuntimeOptions()
     
-    factory = RAGComponentsFactory(config, runtime)
+    # Use ComponentOverrides to inject fake embedding service
+    # and mock the chat model to avoid OpenAI connection
+    overrides = ComponentOverrides(
+        embedding_service=FakeEmbeddingService()
+    )
+    factory = RAGComponentsFactory(config, runtime, overrides)
     
-    # Test that properties create real implementations
+    # Override the chat model property to return a fake
+    fake_chat_model = FakeListChatModel(responses=["Fake response"])
+    factory._chat_model = fake_chat_model
+    
+    # Test that properties create real implementations (except embeddings)
     assert factory.filesystem_manager is not None
     assert factory.cache_repository is not None
     assert factory.vector_repository is not None
-    assert factory.embedding_service is not None
+    assert isinstance(factory.embedding_service, FakeEmbeddingService)
     assert factory.chat_model is not None
     assert factory.document_loader is not None
     assert factory.ingest_manager is not None
@@ -67,13 +77,21 @@ def test_factory_uses_injected_dependencies(temp_dir: Path) -> None:
     assert factory.vector_repository is fake_vector_repo
 
 
-@pytest.mark.timeout(2)  # Real component creation may be slow
 def test_factory_singleton_behavior(temp_dir: Path) -> None:
     """Test that factory returns the same instance for multiple calls."""
     config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")
     runtime = RuntimeOptions()
     
-    factory = RAGComponentsFactory(config, runtime)
+    # Use ComponentOverrides to inject fake embedding service
+    # and mock the chat model to avoid OpenAI connection
+    overrides = ComponentOverrides(
+        embedding_service=FakeEmbeddingService()
+    )
+    factory = RAGComponentsFactory(config, runtime, overrides)
+    
+    # Override the chat model property to return a fake
+    fake_chat_model = FakeListChatModel(responses=["Fake response"])
+    factory._chat_model = fake_chat_model
     
     # Test singleton behavior for components
     indexer1 = factory.create_document_indexer()
@@ -89,13 +107,21 @@ def test_factory_singleton_behavior(temp_dir: Path) -> None:
     assert orchestrator1 is orchestrator2
 
 
-@pytest.mark.timeout(2)  # Real component creation may be slow
 def test_factory_create_all_components(temp_dir: Path) -> None:
     """Test creating all components at once."""
     config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")
     runtime = RuntimeOptions()
     
-    factory = RAGComponentsFactory(config, runtime)
+    # Use ComponentOverrides to inject fake embedding service
+    # and mock the chat model to avoid OpenAI connection
+    overrides = ComponentOverrides(
+        embedding_service=FakeEmbeddingService()
+    )
+    factory = RAGComponentsFactory(config, runtime, overrides)
+    
+    # Override the chat model property to return a fake
+    fake_chat_model = FakeListChatModel(responses=["Fake response"])
+    factory._chat_model = fake_chat_model
     components = factory.create_all_components()
     
     # Check that all expected components are present
@@ -118,13 +144,21 @@ def test_factory_create_all_components(temp_dir: Path) -> None:
     assert all(components[key] is not None or key == "reranker" for key in expected_keys)
 
 
-@pytest.mark.timeout(2)  # Real component creation may be slow
 def test_factory_creates_rag_engine(temp_dir: Path) -> None:
     """Test that factory can create a complete RAGEngine instance."""
     config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")
     runtime = RuntimeOptions()
     
-    factory = RAGComponentsFactory(config, runtime)
+    # Use ComponentOverrides to inject fake embedding service
+    # and mock the chat model to avoid OpenAI connection
+    overrides = ComponentOverrides(
+        embedding_service=FakeEmbeddingService()
+    )
+    factory = RAGComponentsFactory(config, runtime, overrides)
+    
+    # Override the chat model property to return a fake
+    fake_chat_model = FakeListChatModel(responses=["Fake response"])
+    factory._chat_model = fake_chat_model
     
     # Create RAGEngine via factory
     engine = factory.create_rag_engine()

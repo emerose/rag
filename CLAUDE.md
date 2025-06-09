@@ -108,10 +108,11 @@ The RAG system follows strict testing standards with three-tier architecture opt
 - **E2E tests** (`tests/e2e/`): <30s per test (automatically enforced), real CLI scenarios with mocked external APIs for cost control
 
 ### Testing Principles
-1. **Dependency Injection over Mocking**: Use `FakeRAGComponentsFactory` instead of complex `@patch` decorators
-2. **Domain-Specific Exceptions**: Test custom exceptions with proper error codes and context
-3. **Configuration Objects**: Use dataclasses for test configuration instead of parameter proliferation
-4. **Automatic Timeout Enforcement**: Individual test timeouts prevent slow tests, no overall suite limits
+1. **No Real API Calls**: Unit and integration tests MUST use fake implementations, never call real external APIs
+2. **Dependency Injection over Mocking**: Use `FakeRAGComponentsFactory` instead of complex `@patch` decorators
+3. **Domain-Specific Exceptions**: Test custom exceptions with proper error codes and context
+4. **Configuration Objects**: Use dataclasses for test configuration instead of parameter proliferation
+5. **Automatic Timeout Enforcement**: Individual test timeouts prevent slow tests, no overall suite limits
 
 ### Test Execution
 ```bash

@@ -14,6 +14,7 @@ The test suite is organized into three main categories, each with specific purpo
 - **Dependencies**: Use fake implementations exclusively (FakeRAGComponentsFactory)
 - **Scope**: Single function/method/class behavior
 - **External dependencies**: None (no network, filesystem, external APIs)
+- **API Calls**: NEVER make real API calls - always use mocks/fakes
 
 #### Integration Tests (`tests/integration/`)
 - **Purpose**: Test component interactions and workflows
@@ -21,6 +22,7 @@ The test suite is organized into three main categories, each with specific purpo
 - **Dependencies**: Mix of real and fake components (real filesystem, fake external APIs)
 - **Scope**: Multi-component workflows and data persistence
 - **External dependencies**: Controlled temp directories only
+- **API Calls**: NEVER make real API calls - always use FakeRAGComponentsFactory or mock patches
 
 #### E2E Tests (`tests/e2e/`)
 - **Purpose**: Test complete user workflows
@@ -31,7 +33,29 @@ The test suite is organized into three main categories, each with specific purpo
 
 ## Core Testing Principles
 
-### 1. Dependency Injection Over Mocking
+### 1. No Real API Calls in Unit/Integration Tests
+
+**Critical Rule**: Unit and integration tests must NEVER make real API calls to external services like OpenAI, web APIs, or other network services.
+
+**✅ Correct: Using Fake Components**
+```python
+def test_embedding_service():
+    """Test embedding service with fake implementation."""
+    # Use FakeEmbeddingService instead of real EmbeddingService
+    service = FakeEmbeddingService()
+    embeddings = service.embed_texts(["test text"])
+    assert len(embeddings) == 1
+```
+
+**❌ Wrong: Creating Real Services**
+```python
+def test_embedding_service():
+    """WRONG: This will try to connect to OpenAI!"""
+    service = EmbeddingService()  # This makes real API calls!
+    embeddings = service.embed_texts(["test text"])
+```
+
+### 2. Dependency Injection Over Mocking
 
 **✅ Preferred: Dependency Injection**
 ```python

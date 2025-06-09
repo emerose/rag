@@ -53,15 +53,22 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 
 
 @pytest.fixture(autouse=True)
-def setup_openai_api_key() -> Generator[None, None, None]:
-    """Set up OpenAI API key for different test levels.
+def setup_test_environment() -> Generator[None, None, None]:
+    """Set up test environment including API keys and analytics disabling.
     
     - Unit tests: Set dummy API key
     - Integration tests: Set dummy API key  
     - E2E tests: Use .env file if not already set
+    - All tests: Disable analytics/telemetry
     """
-    # Store original value to restore later
+    # Store original values to restore later
     original_key = os.environ.get("OPENAI_API_KEY")
+    original_do_not_track = os.environ.get("DO_NOT_TRACK")
+    original_scarf_analytics = os.environ.get("SCARF_NO_ANALYTICS")
+    
+    # Always disable analytics/telemetry for all tests
+    os.environ["DO_NOT_TRACK"] = "true"
+    os.environ["SCARF_NO_ANALYTICS"] = "true"
     
     # Determine test type based on file path
     test_path = os.environ.get("PYTEST_CURRENT_TEST", "")
@@ -78,11 +85,21 @@ def setup_openai_api_key() -> Generator[None, None, None]:
     
     yield
     
-    # Restore original value
+    # Restore original values
     if original_key is not None:
         os.environ["OPENAI_API_KEY"] = original_key
     else:
         os.environ.pop("OPENAI_API_KEY", None)
+        
+    if original_do_not_track is not None:
+        os.environ["DO_NOT_TRACK"] = original_do_not_track
+    else:
+        os.environ.pop("DO_NOT_TRACK", None)
+        
+    if original_scarf_analytics is not None:
+        os.environ["SCARF_NO_ANALYTICS"] = original_scarf_analytics
+    else:
+        os.environ.pop("SCARF_NO_ANALYTICS", None)
 
 
 @pytest.fixture(autouse=True)

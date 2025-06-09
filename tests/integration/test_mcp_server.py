@@ -7,6 +7,7 @@ import logging
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.mcp import build_server, create_http_app, run_stdio_server
+from rag.testing.test_factory import FakeRAGComponentsFactory
 
 
 def _dummy_config(tmp_path):
@@ -22,17 +23,35 @@ import pytest
 
 @pytest.mark.integration
 def test_build_server_registers_tools(tmp_path):
+    """Test that the MCP server registers tools correctly."""
     config = _dummy_config(tmp_path)
     runtime = RuntimeOptions()
-    server = build_server(config, runtime)
+    
+    # Create server with fake components to avoid real API calls
+    fake_factory = FakeRAGComponentsFactory.create_for_integration_tests(
+        config=config,
+        runtime=runtime,
+        use_real_filesystem=True
+    )
+    
+    server = build_server(config, runtime, factory=fake_factory)
     assert len(server.tools) > 0
 
 
 @pytest.mark.integration
 def test_http_query_endpoint(tmp_path):
+    """Test the HTTP query endpoint with fake components."""
     config = _dummy_config(tmp_path)
     runtime = RuntimeOptions()
-    server = build_server(config, runtime)
+    
+    # Create server with fake components to avoid real API calls
+    fake_factory = FakeRAGComponentsFactory.create_for_integration_tests(
+        config=config,
+        runtime=runtime,
+        use_real_filesystem=True
+    )
+    
+    server = build_server(config, runtime, factory=fake_factory)
     with patch.object(server.engine, "answer", return_value={"answer": "ok"}):
         result = asyncio.run(server.tool_query("hi", 1))
         assert result["answer"] == "ok"
@@ -40,9 +59,18 @@ def test_http_query_endpoint(tmp_path):
 
 @pytest.mark.integration
 def test_run_stdio_server_invokes_fastmcp(tmp_path, monkeypatch):
+    """Test that stdio server invokes fastmcp correctly."""
     config = _dummy_config(tmp_path)
     runtime = RuntimeOptions()
-    server = build_server(config, runtime)
+    
+    # Create server with fake components to avoid real API calls
+    fake_factory = FakeRAGComponentsFactory.create_for_integration_tests(
+        config=config,
+        runtime=runtime,
+        use_real_filesystem=True
+    )
+    
+    server = build_server(config, runtime, factory=fake_factory)
     called = False
 
     async def fake_run():
@@ -55,12 +83,19 @@ def test_run_stdio_server_invokes_fastmcp(tmp_path, monkeypatch):
 
 
 @pytest.mark.integration
-@pytest.mark.timeout(10)  # MCP server operations may be slow
 def test_call_tool_logs_name_and_args(tmp_path):
     """Test that call_tool function works correctly and executes the expected workflow."""
     config = _dummy_config(tmp_path)
     runtime = RuntimeOptions()
-    server = build_server(config, runtime)
+    
+    # Create server with fake components to avoid real API calls
+    fake_factory = FakeRAGComponentsFactory.create_for_integration_tests(
+        config=config,
+        runtime=runtime,
+        use_real_filesystem=True
+    )
+    
+    server = build_server(config, runtime, factory=fake_factory)
 
     # Test that call_tool works without errors
     result = asyncio.run(server.call_tool("tool_query", {"question": "hi"}))

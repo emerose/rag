@@ -146,6 +146,62 @@ def test_directory_indexing_and_cleanup(tmp_path: Path) -> None:
         assert cleanup_result.get("orphaned_files_removed", 0) >= 1
 
 
+@pytest.mark.timeout(30)  # Allow 30 seconds for comprehensive workflow
+def test_document_summarization_workflow(tmp_path: Path) -> None:
+    """Test complete document summarization workflow with fake components."""
+    from rag.testing.test_factory import FakeRAGComponentsFactory
+    
+    # Create factory with integration test setup
+    config = RAGConfig(
+        documents_dir=str(tmp_path / "docs"),
+        cache_dir=str(tmp_path / "cache"),
+        openai_api_key="sk-test",
+    )
+    
+    # Use factory with real filesystem but fake APIs
+    factory = FakeRAGComponentsFactory.create_for_integration_tests(
+        config=config,
+        runtime=RuntimeOptions(),
+        use_real_filesystem=True
+    )
+    
+    # Create test documents with varying sizes
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    
+    (docs_dir / "short.txt").write_text("Short document with minimal content for testing.")
+    (docs_dir / "medium.txt").write_text(
+        "Medium length document with several paragraphs. " * 10 +
+        "This document has enough content to be interesting for summarization purposes."
+    )
+    (docs_dir / "long.txt").write_text(
+        "Long document with extensive content. " * 50 +
+        "This document contains multiple sections and detailed information that would benefit from summarization."
+    )
+    
+    engine = factory.create_rag_engine()
+    
+    # Index all documents
+    results = engine.index_directory(docs_dir)
+    assert all(r.get("success") for r in results.values())
+    
+    # Test summarization (should pick largest documents)
+    summaries = engine.get_document_summaries(k=2)
+    
+    # Should get summaries for top 2 largest documents
+    assert len(summaries) <= 2
+    
+    for summary in summaries:
+        assert "file_path" in summary
+        assert "file_type" in summary
+        assert "summary" in summary
+        assert "num_chunks" in summary
+        assert summary["summary"]  # Should have non-empty summary
+        assert summary["file_type"] == "text/plain"
+        # Verify it's one of our test files
+        assert any(name in summary["file_path"] for name in ["short.txt", "medium.txt", "long.txt"])
+
+
 def test_prompt_template_listing() -> None:
     runner = CliRunner()
     result = runner.invoke(app, ["prompt", "list"])

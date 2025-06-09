@@ -254,26 +254,26 @@ class TestQueryWorkflow:
 
     def test_query_with_metadata_filtering_workflow(self, tmp_path):
         """Test query workflow with metadata-based filtering."""
-        # Setup using factory pattern - no patches needed!
+        # Setup using factory pattern with fake filesystem to avoid slow loaders
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
         
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
             config=config,
             runtime=runtime,
-            use_real_filesystem=True
+            use_real_filesystem=False  # Use fake filesystem to avoid slow document loaders
         )
         
-        engine = factory.create_rag_engine()
-        docs_dir = Path(config.documents_dir)
+        # Add test documents to fake filesystem
+        factory.add_test_document("info.txt", "Text file content.")
+        factory.add_test_document("guide.txt", "Documentation content in text format.")  # Use .txt to avoid markdown loader
         
-        # Create documents with different types
-        txt_doc = self.create_test_document(docs_dir, "info.txt", "Text file content.")
-        md_doc = self.create_test_document(docs_dir, "info.md", "# Markdown content")
+        engine = factory.create_rag_engine()
         
         # Index documents
-        results = engine.index_directory(docs_dir)
+        results = engine.index_directory(Path(config.documents_dir))
         assert len(results) == 2
+        assert all(result.get("success") for result in results.values())
         
         # Query with metadata filter (if supported by implementation)
         # Note: This tests the workflow even if filtering isn't fully implemented

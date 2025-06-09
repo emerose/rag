@@ -265,9 +265,24 @@ def create_http_app(server: RAGMCPServer, api_key: str | None = None) -> FastAPI
 
 
 def build_server(
-    config: RAGConfig, runtime: RuntimeOptions, **settings: Any
+    config: RAGConfig,
+    runtime: RuntimeOptions,
+    factory: RAGComponentsFactory | None = None,
+    **settings: Any,
 ) -> RAGMCPServer:
-    factory = RAGComponentsFactory(config, runtime)
+    """Build an MCP server with the given configuration.
+
+    Args:
+        config: RAG configuration
+        runtime: Runtime options
+        factory: Optional factory for dependency injection (creates default if None)
+        **settings: Additional server settings
+
+    Returns:
+        Configured RAGMCPServer instance
+    """
+    if factory is None:
+        factory = RAGComponentsFactory(config, runtime)
     engine = factory.create_rag_engine()
     return RAGMCPServer(engine=engine, **settings)
 

@@ -15,6 +15,15 @@ from rag.data.text_splitter import TextSplitterFactory
 from rag.ingest import IngestManager, BasicPreprocessor
 from rag.storage.filesystem import FilesystemManager
 
+# Pre-import heavy dependencies to amortize import costs across all tests
+try:
+    # These imports are very slow (nltk, sklearn, etc.) so do them once at module level
+    from unstructured.partition.md import partition_md
+    from unstructured.partition.pdf import partition_pdf
+except ImportError:
+    # Optional dependencies - tests will skip if not available
+    pass
+
 
 @pytest.fixture
 def fixtures_dir() -> Path:
@@ -39,6 +48,7 @@ def sample_pdf_path(fixtures_dir: Path) -> Path:
     return pdf_path
 
 
+@pytest.mark.timeout(3)  # 3s timeout with pre-imported dependencies
 def test_markdown_ingest_and_split(sample_markdown_path: Path) -> None:
     """Test the ingestion and splitting of a markdown file.
     
@@ -161,6 +171,7 @@ def test_pdf_ingest_and_split(sample_pdf_path: Path) -> None:
     assert content_chunks, "No chunks with closest_heading found"
 
 
+@pytest.mark.timeout(3)  # 3s timeout with pre-imported dependencies
 def test_end_to_end_ingest(sample_markdown_path: Path, sample_pdf_path: Path) -> None:
     """Test end-to-end ingestion with both markdown and PDF files.
     
