@@ -36,20 +36,38 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     - integration: 500ms per test (component interactions) 
     - e2e: 30s per test (end-to-end workflows)
     
+    In CI environments, timeouts are multiplied by CI_TIMEOUT_MULTIPLIER for slower resources.
     Individual @pytest.mark.timeout() decorators override these defaults.
     """
     # Skip if test already has an explicit timeout decorator
     if item.get_closest_marker("timeout"):
         return
+    
+    # Detect if running in CI environment
+    is_ci = any(os.environ.get(var) for var in [
+        "CI",                    # Generic CI indicator
+        "GITHUB_ACTIONS",        # GitHub Actions
+        "TRAVIS",               # Travis CI
+        "CIRCLECI",             # CircleCI
+        "JENKINS_URL",          # Jenkins
+        "BUILDKITE",            # Buildkite
+        "TF_BUILD",             # Azure DevOps
+    ])
+    
+    # Apply CI multiplier if in CI environment
+    ci_multiplier = float(os.environ.get("CI_TIMEOUT_MULTIPLIER", "3.0")) if is_ci else 1.0
         
-    # Determine test type by file path
+    # Determine test type by file path and apply timeouts
     test_path = str(item.path)
     if "/unit/" in test_path:
-        item.add_marker(pytest.mark.timeout(0.1))
+        timeout = 0.1 * ci_multiplier
+        item.add_marker(pytest.mark.timeout(timeout))
     elif "/integration/" in test_path:
-        item.add_marker(pytest.mark.timeout(0.5))
+        timeout = 0.5 * ci_multiplier
+        item.add_marker(pytest.mark.timeout(timeout))
     elif "/e2e/" in test_path:
-        item.add_marker(pytest.mark.timeout(30))
+        timeout = 30 * ci_multiplier
+        item.add_marker(pytest.mark.timeout(timeout))
 
 
 @pytest.fixture(autouse=True)
