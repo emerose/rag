@@ -211,3 +211,6 @@ Types: feat, fix, docs, style, refactor, test, chore
 
 **Development Workflow Guidance**
 - When completing a task from TODO.md, always mention the TODO ID in the commit message (eg "Closes #296") and remove the TODO from TODO.md
+
+### Workflow Memory
+- When wrapping up a task, please update TODO.md by removing the tasks you have completed

@@ -100,6 +100,11 @@ class RAGComponentsFactory:
         self._cache_manager: CacheManager | None = None
         self._reranker: BaseReranker | None = None
 
+        # New pipeline components
+        self._ingestion_pipeline: Any | None = None
+        self._document_source: Any | None = None
+        self._ingest_manager_adapter: Any | None = None
+
         # Initialize component caches
         self._document_indexer: DocumentIndexer | None = None
         self._query_engine: QueryEngine | None = None
@@ -182,7 +187,12 @@ class RAGComponentsFactory:
 
     @property
     def ingest_manager(self) -> IngestManager:
-        """Get or create ingest manager."""
+        """Get or create ingest manager or adapter."""
+        # Use new pipeline architecture if enabled
+        if self.config.use_new_pipeline:
+            return self.ingest_manager_adapter
+
+        # Use legacy architecture
         if self._ingest_manager is None:
             from rag.config.dependencies import IngestManagerDependencies
             from rag.data.chunking import DefaultChunkingStrategy
@@ -202,6 +212,84 @@ class RAGComponentsFactory:
             )
             self._ingest_manager = IngestManager(dependencies=dependencies)
         return self._ingest_manager
+
+    @property
+    def document_source(self) -> Any:
+        """Get or create document source for new pipeline."""
+        if self._document_source is None:
+            from rag.sources.filesystem import FilesystemDocumentSource
+
+            self._document_source = FilesystemDocumentSource(
+                root_path=self.config.documents_dir,
+                filesystem_manager=self.filesystem_manager,
+            )
+        return self._document_source
+
+    @property
+    def ingestion_pipeline(self) -> Any:
+        """Get or create ingestion pipeline."""
+        if self._ingestion_pipeline is None:
+            from rag.integration.pipeline_adapter import (
+                create_pipeline_from_ingest_dependencies,
+            )
+            from rag.storage.document_store import SQLiteDocumentStore
+
+            # Create document store
+            document_store = SQLiteDocumentStore(
+                db_path=Path(self.config.cache_dir) / "documents.db"
+            )
+
+            # Create a simple vector store for the pipeline
+            # For now, use the repository to create an empty vector store
+            vector_store = self.vector_repository.create_empty_vectorstore()
+
+            # Create dependencies for legacy adapter
+            from rag.config.dependencies import IngestManagerDependencies
+            from rag.data.chunking import DefaultChunkingStrategy
+
+            chunking_strategy = DefaultChunkingStrategy(
+                chunk_size=self.config.chunk_size,
+                chunk_overlap=self.config.chunk_overlap,
+                model_name=self.config.embedding_model,
+                log_callback=self.runtime.log_callback,
+            )
+            dependencies = IngestManagerDependencies(
+                filesystem_manager=self.filesystem_manager,
+                chunking_strategy=chunking_strategy,
+                document_loader=self.document_loader,
+                log_callback=self.runtime.log_callback,
+                progress_callback=self.runtime.progress_callback,
+            )
+
+            # Create pipeline using adapter
+            from rag.integration.pipeline_adapter import PipelineCreationConfig
+
+            pipeline_config = PipelineCreationConfig(
+                dependencies=dependencies,
+                document_store=document_store,
+                vector_store=vector_store,
+                config=self.config,
+                embedding_provider=self.embedding_service,
+                source_root=self.config.documents_dir,
+            )
+            pipeline, source = create_pipeline_from_ingest_dependencies(pipeline_config)
+
+            self._ingestion_pipeline = pipeline
+            self._document_source = source
+
+        return self._ingestion_pipeline
+
+    @property
+    def ingest_manager_adapter(self) -> Any:
+        """Get or create ingest manager adapter."""
+        if self._ingest_manager_adapter is None:
+            from rag.integration.pipeline_adapter import IngestManagerAdapter
+
+            self._ingest_manager_adapter = IngestManagerAdapter(
+                pipeline=self.ingestion_pipeline,
+                source=self.document_source,
+            )
+        return self._ingest_manager_adapter
 
     @property
     def cache_manager(self) -> CacheManager:

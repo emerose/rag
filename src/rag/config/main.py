@@ -33,6 +33,7 @@ class RAGConfig:
         embedding_model_map_file: Optional path to embeddings.yaml for per-doc
             model selection
         batch_size: Number of documents to embed per batch (default: 64)
+        use_new_pipeline: Enable new IngestionPipeline architecture (default: False)
 
     """
 
@@ -48,6 +49,7 @@ class RAGConfig:
     vectorstore_backend: str = "faiss"
     embedding_model_map_file: str | None = None
     batch_size: int = 64
+    use_new_pipeline: bool = False  # Enable new IngestionPipeline architecture
 
     def __post_init__(self) -> None:
         """Initialize derived attributes after instance creation."""
