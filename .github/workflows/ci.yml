@@ -29,10 +29,10 @@ jobs:
           uv pip install -e .[dev]
 
       - name: Run unit tests
-        run: python scripts/run_tests.py unit
+        run: uv run scripts/run_tests.py unit
 
       - name: Run integration tests
-        run: python scripts/run_tests.py integration
+        run: uv run scripts/run_tests.py integration
 
       - name: Run formatter
         run: ruff format src/ --line-length 88
