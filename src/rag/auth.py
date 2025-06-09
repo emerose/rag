@@ -19,6 +19,11 @@ class APIKeyAuthMiddleware:
         self.api_key = api_key
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        # Only apply auth to HTTP requests, pass through other scope types (lifespan, websocket)
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+            
         request = Request(scope, receive=receive)
         auth_header = request.headers.get("authorization")
         if auth_header != f"Bearer {self.api_key}":

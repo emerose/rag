@@ -11,7 +11,6 @@ def _homepage(request):
     return PlainTextResponse("ok")
 
 
-@pytest.mark.skip(reason="Temporarily disabled to debug CI hanging issue")
 def test_api_key_middleware() -> None:
     app = Starlette(routes=[Route("/", _homepage)])
     app.add_middleware(APIKeyAuthMiddleware, api_key="secret")
