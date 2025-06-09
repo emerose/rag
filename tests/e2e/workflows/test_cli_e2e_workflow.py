@@ -62,6 +62,7 @@ Use the CLI to index documents and ask questions.
         
         return documents
 
+    @pytest.mark.timeout(60)  # E2E test with real OpenAI API calls
     def test_cli_index_command_workflow(self):
         """Test CLI index command end-to-end workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -89,6 +90,7 @@ Use the CLI to index documents and ask questions.
             cache_files = [f for f in cache_files if f.is_file()]
             assert len(cache_files) > 0, "No cache files were created"
 
+    @pytest.mark.timeout(60)  # E2E test with real OpenAI API calls
     def test_cli_list_command_workflow(self):
         """Test CLI list command workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -136,6 +138,7 @@ Use the CLI to index documents and ask questions.
             except json.JSONDecodeError as e:
                 pytest.fail(f"List command output is not valid JSON: {e}\nOutput: {list_result.stdout}")
 
+    @pytest.mark.timeout(60)  # E2E test with real OpenAI API calls
     def test_cli_answer_command_workflow(self):
         """Test CLI answer command workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -181,6 +184,7 @@ Use the CLI to index documents and ask questions.
             except json.JSONDecodeError as e:
                 pytest.fail(f"Answer command output is not valid JSON: {e}\nOutput: {answer_result.stdout}")
 
+    @pytest.mark.timeout(60)  # E2E test with real OpenAI API calls
     def test_cli_invalidate_command_workflow(self):
         """Test CLI invalidate command workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -239,6 +243,7 @@ Use the CLI to index documents and ask questions.
             remaining_row = table2["rows"][0]
             assert Path(remaining_row[0]).resolve() == documents["markdown"].resolve()  # First column is File Path
 
+    @pytest.mark.timeout(60)  # E2E test with real OpenAI API calls
     def test_cli_error_handling_workflow(self):
         """Test CLI error handling in real scenarios using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -271,6 +276,7 @@ Use the CLI to index documents and ask questions.
             # The exact behavior depends on implementation
             assert answer_result.returncode in [0, 1]  # Either success or graceful failure
 
+    @pytest.mark.timeout(60)  # E2E test with real OpenAI API calls
     def test_cli_incremental_indexing_workflow(self):
         """Test CLI incremental indexing workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -320,6 +326,7 @@ Use the CLI to index documents and ask questions.
             table = output_data["table"]
             assert len(table["rows"]) == 2
 
+    @pytest.mark.timeout(60)  # E2E help command test with subprocess calls
     def test_cli_help_commands_workflow(self):
         """Test CLI help commands work properly."""
         # Test main help

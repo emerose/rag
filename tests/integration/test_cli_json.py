@@ -178,6 +178,7 @@ def test_invalidate_command(fake_openai_factory, sample_file: Path, test_config:
     assert str(sample_file.name) in output["message"]
 
 
+@pytest.mark.timeout(30)  # CLI error test with subprocess calls
 def test_error_output():
     """Test error output in JSON format."""
     runner = CliRunner()

@@ -28,6 +28,30 @@ def pytest_configure(config: pytest.Config) -> None:
     )
 
 
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    """Set marker-based timeouts for tests.
+    
+    Sets default timeouts based on test location:
+    - unit: 100ms per test (fast, isolated tests)
+    - integration: 500ms per test (component interactions) 
+    - e2e: 30s per test (end-to-end workflows)
+    
+    Individual @pytest.mark.timeout() decorators override these defaults.
+    """
+    # Skip if test already has an explicit timeout decorator
+    if item.get_closest_marker("timeout"):
+        return
+        
+    # Determine test type by file path
+    test_path = str(item.path)
+    if "/unit/" in test_path:
+        item.add_marker(pytest.mark.timeout(0.1))
+    elif "/integration/" in test_path:
+        item.add_marker(pytest.mark.timeout(0.5))
+    elif "/e2e/" in test_path:
+        item.add_marker(pytest.mark.timeout(30))
+
+
 @pytest.fixture(autouse=True)
 def setup_openai_api_key() -> Generator[None, None, None]:
     """Set up OpenAI API key for different test levels.

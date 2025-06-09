@@ -103,22 +103,22 @@ Uses Python protocols for interfaces (e.g., `VectorStoreProtocol`, `ChunkingStra
 The RAG system follows strict testing standards with three-tier architecture optimized for speed and reliability.
 
 ### Test Architecture
-- **Unit tests** (`tests/unit/`): <100ms per test, fake implementations only, test business logic in isolation
-- **Integration tests** (`tests/integration/`): <5s total, real filesystem + mocked external APIs, test component workflows  
-- **E2E tests** (`tests/e2e/`): Real CLI scenarios with mocked external APIs for cost control
+- **Unit tests** (`tests/unit/`): <100ms per test (automatically enforced), fake implementations only, test business logic in isolation
+- **Integration tests** (`tests/integration/`): <500ms per test (automatically enforced), real filesystem + mocked external APIs, test component workflows  
+- **E2E tests** (`tests/e2e/`): <30s per test (automatically enforced), real CLI scenarios with mocked external APIs for cost control
 
 ### Testing Principles
 1. **Dependency Injection over Mocking**: Use `FakeRAGComponentsFactory` instead of complex `@patch` decorators
 2. **Domain-Specific Exceptions**: Test custom exceptions with proper error codes and context
 3. **Configuration Objects**: Use dataclasses for test configuration instead of parameter proliferation
-4. **Performance Requirements**: Unit tests <1s total, integration tests <5s total
+4. **Automatic Timeout Enforcement**: Individual test timeouts prevent slow tests, no overall suite limits
 
 ### Test Execution
 ```bash
-# Fast unit tests only (<1 second total)
+# Fast unit tests only (<100ms per test)
 python -m pytest tests/unit/ -v --tb=short
 
-# Integration workflow tests (<5 seconds total) 
+# Integration workflow tests (<500ms per test) 
 python -m pytest tests/integration/ -v --tb=short
 
 # E2E CLI tests

@@ -78,6 +78,7 @@ class TestRAGWorkflow:
             # Restore the original cache directory
             state.cache_dir = original_cache_dir
 
+    @pytest.mark.timeout(30)  # CLI option consistency test with subprocess calls
     def test_cli_option_consistency(self, runner, test_cache_dir):
         """Test that all major commands support the --cache-dir option."""
         commands = [

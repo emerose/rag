@@ -257,6 +257,7 @@ class TestIncrementalUpdates:
         # Verify additional embedding calls occurred
         # (FakeOpenAI automatically handles embedding calls)
 
+    @pytest.mark.timeout(1)  # 1s timeout due to time.sleep(0.01) and file operations
     def test_cache_consistency_during_updates(self, tmp_path):
         """Test cache consistency during incremental updates."""
         # Setup using factory pattern - no patches needed!
@@ -339,6 +340,7 @@ class TestIncrementalUpdates:
         assert len(files2) == 1
         assert files1[0]["file_path"] == files2[0]["file_path"]
 
+    @pytest.mark.timeout(10)  # 10s timeout for large scale test with 20 files
     def test_large_scale_incremental_update(self, tmp_path):
         """Test incremental updates with larger number of files."""
         # Setup using factory pattern - no patches needed!

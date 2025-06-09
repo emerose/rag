@@ -55,6 +55,7 @@ def _build_test_server(tmp_path: Path):
 
 
 @pytest.mark.asyncio
+@pytest.mark.timeout(30)  # MCP stdio transport test needs more time
 async def test_stdio_transport(tmp_path: Path) -> None:
     server = _build_test_server(tmp_path)
     client = Client(server)
@@ -73,6 +74,7 @@ async def test_stdio_transport(tmp_path: Path) -> None:
         await client.call_tool("tool_cleanup")
 
 
+@pytest.mark.timeout(30)  # MCP HTTP transport test needs more time
 def test_http_transport(tmp_path: Path) -> None:
     server = _build_test_server(tmp_path)
     app = create_http_app(server)

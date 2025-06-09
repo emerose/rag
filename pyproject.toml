@@ -59,6 +59,7 @@ dev = [
     "pytest-asyncio>=1.0.0",
     "pytest-cov>=6.1.0",
     "pytest-socket>=0.6.0",
+    "pytest-timeout>=2.3.0",
     "hatch>=1.9.0",
     "httpx>=0.27.0",
     "sphinx>=7.2.0",
@@ -133,10 +134,13 @@ known-first-party = ["rag"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 addopts = "-v --cov=rag --cov-report=term-missing --tb=short"
+timeout = 300
+timeout_func_only = true
 markers = [
     "unit: Unit tests - fast, isolated, no external dependencies",
     "integration: Integration tests - component interactions with controlled dependencies", 
-    "e2e: End-to-end tests - complete workflows with real environment"
+    "e2e: End-to-end tests - complete workflows with real environment",
+    "timeout: Tests with specific timeout requirements"
 ]
 # Default to running only unit tests for speed
 # Run integration tests with: pytest -m integration

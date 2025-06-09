@@ -55,6 +55,7 @@ def test_run_stdio_server_invokes_fastmcp(tmp_path, monkeypatch):
 
 
 @pytest.mark.integration
+@pytest.mark.timeout(10)  # MCP server operations may be slow
 def test_call_tool_logs_name_and_args(tmp_path):
     """Test that call_tool function works correctly and executes the expected workflow."""
     config = _dummy_config(tmp_path)

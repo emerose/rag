@@ -14,6 +14,7 @@ from rag.storage.fakes import (
 )
 
 
+@pytest.mark.timeout(2)  # Real component creation may be slow
 def test_factory_creates_real_components(temp_dir: Path) -> None:
     """Test that factory creates real components by default."""
     config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")
@@ -66,6 +67,7 @@ def test_factory_uses_injected_dependencies(temp_dir: Path) -> None:
     assert factory.vector_repository is fake_vector_repo
 
 
+@pytest.mark.timeout(2)  # Real component creation may be slow
 def test_factory_singleton_behavior(temp_dir: Path) -> None:
     """Test that factory returns the same instance for multiple calls."""
     config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")
@@ -87,6 +89,7 @@ def test_factory_singleton_behavior(temp_dir: Path) -> None:
     assert orchestrator1 is orchestrator2
 
 
+@pytest.mark.timeout(2)  # Real component creation may be slow
 def test_factory_create_all_components(temp_dir: Path) -> None:
     """Test creating all components at once."""
     config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")
@@ -115,6 +118,7 @@ def test_factory_create_all_components(temp_dir: Path) -> None:
     assert all(components[key] is not None or key == "reranker" for key in expected_keys)
 
 
+@pytest.mark.timeout(2)  # Real component creation may be slow
 def test_factory_creates_rag_engine(temp_dir: Path) -> None:
     """Test that factory can create a complete RAGEngine instance."""
     config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")

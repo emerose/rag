@@ -22,6 +22,7 @@ from rag.utils.exceptions import (
 class TestEmbeddingServiceErrorHandling:
     """Test that EmbeddingService raises proper exceptions."""
 
+    @pytest.mark.timeout(10)  # Creates real services that may hit API timeouts
     def test_embed_texts_empty_list(self):
         """Test that embedding empty text list raises EmbeddingGenerationError."""
         service = EmbeddingService()
@@ -33,6 +34,7 @@ class TestEmbeddingServiceErrorHandling:
         assert "Cannot embed empty text list" in str(exc_info.value)
         assert exc_info.value.context.get("text_preview") is None
 
+    @pytest.mark.timeout(10)  # Creates real services that may hit API timeouts
     def test_embed_texts_invalid_type(self):
         """Test that embedding non-string texts raises EmbeddingGenerationError."""
         service = EmbeddingService()
@@ -44,6 +46,7 @@ class TestEmbeddingServiceErrorHandling:
         assert "Text at index 1 must be a string" in str(exc_info.value)
         assert "got int" in str(exc_info.value)
 
+    @pytest.mark.timeout(10)  # Creates real services that may hit API timeouts
     def test_embed_query_non_string(self):
         """Test that embedding non-string query raises EmbeddingGenerationError."""
         service = EmbeddingService()
@@ -55,6 +58,7 @@ class TestEmbeddingServiceErrorHandling:
         assert "Query must be a string" in str(exc_info.value)
         assert "got int" in str(exc_info.value)
 
+    @pytest.mark.timeout(10)  # Creates real services that may hit API timeouts
     def test_embed_query_empty_string(self):
         """Test that embedding empty query raises EmbeddingGenerationError."""
         service = EmbeddingService()

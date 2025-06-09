@@ -10,14 +10,14 @@ The test suite is organized into three main categories, each with specific purpo
 
 #### Unit Tests (`tests/unit/`)
 - **Purpose**: Test individual components in isolation
-- **Speed**: <100ms per test, <1s total for all unit tests
+- **Speed**: <100ms per test (automatically enforced)
 - **Dependencies**: Use fake implementations exclusively (FakeRAGComponentsFactory)
 - **Scope**: Single function/method/class behavior
 - **External dependencies**: None (no network, filesystem, external APIs)
 
 #### Integration Tests (`tests/integration/`)
 - **Purpose**: Test component interactions and workflows
-- **Speed**: <5s total for all integration tests
+- **Speed**: <500ms per test (automatically enforced)
 - **Dependencies**: Mix of real and fake components (real filesystem, fake external APIs)
 - **Scope**: Multi-component workflows and data persistence
 - **External dependencies**: Controlled temp directories only
@@ -358,9 +358,34 @@ def test_specific_error_scenario():
 
 ### Test Speed Targets
 
-- **Unit tests**: <100ms per test, <1s total
-- **Integration tests**: <5s total for all tests
-- **E2E tests**: Optimized for speed while maintaining realism
+- **Unit tests**: <100ms per test
+- **Integration tests**: <500ms per test  
+- **E2E tests**: <30s per test
+
+### Automatic Timeout Enforcement
+
+The test suite automatically enforces timeout limits based on test location and markers:
+
+**Default Timeouts (automatically applied):**
+- Unit tests (`tests/unit/`): 100ms per test
+- Integration tests (`tests/integration/`): 500ms per test  
+- E2E tests (`tests/e2e/`): 30s per test
+
+**Override with explicit timeout:**
+```python
+@pytest.mark.timeout(2)  # Custom 2-second timeout
+def test_slow_operation():
+    # This test needs more time than the 500ms integration default
+    time.sleep(1)
+    assert True
+```
+
+**Benefits:**
+- No need to add timeout decorators to most tests
+- Automatic enforcement prevents individual slow tests
+- Individual tests can override defaults when needed
+- Focus on per-test performance rather than arbitrary suite time limits
+- Scales naturally as test suite grows
 
 ### Optimization Techniques
 

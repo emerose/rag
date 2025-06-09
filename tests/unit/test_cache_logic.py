@@ -83,6 +83,7 @@ class TestCacheLogic:
             "File count should remain the same when already cached and unchanged"
         )
 
+    @pytest.mark.timeout(1)  # 1 second timeout due to time.sleep(0.1)
     def test_file_reindexed_when_content_changes(self, rag_engine, sample_text_file):
         """Test that a file is reindexed when its content changes."""
         # First indexing - should process the file

@@ -107,6 +107,7 @@ class TestIntegrationWorkflows:
         indexed_files = engine.list_indexed_files()
         assert len(indexed_files) == 3
 
+    @pytest.mark.timeout(1)  # 1s timeout due to time.sleep(0.1) and file operations
     def test_file_modification_workflow(self, tmp_path):
         """Test file modification and re-indexing."""
         # Setup using factory pattern - no patches needed!

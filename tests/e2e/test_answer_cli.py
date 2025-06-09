@@ -79,6 +79,7 @@ def check_cache_directory(cache_dir):
     return True
 
 
+@pytest.mark.timeout(30)  # E2E test with subprocess calls
 def test_cli_error_handling(test_environment):
     """Test that errors from the CLI are reported correctly in tests."""
     try:
