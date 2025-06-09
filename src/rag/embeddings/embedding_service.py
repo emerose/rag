@@ -76,8 +76,9 @@ class EmbeddingService:
         # Set API key via environment if provided
         if openai_api_key:
             import os
+
             os.environ["OPENAI_API_KEY"] = openai_api_key
-        
+
         self._embeddings = OpenAIEmbeddings(
             model=model_name,
             show_progress_bar=show_progress_bar,

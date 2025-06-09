@@ -151,7 +151,9 @@ class FakeChat:
 class FakeOpenAI:
     """Fake OpenAI client for testing."""
 
-    def __init__(self, api_key: str | None = None, embedding_dimension: int = 1536) -> None:
+    def __init__(
+        self, api_key: str | None = None, embedding_dimension: int = 1536
+    ) -> None:
         self.api_key = api_key or "sk-fake"
         self.embeddings = FakeEmbeddings(dimension=embedding_dimension)
         self.chat = FakeChat()
