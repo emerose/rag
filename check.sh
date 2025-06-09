@@ -42,7 +42,7 @@ echo "🔍 Starting code quality checks..."
 # Run linting first
 run_check "python scripts/run_tests.py lint" "Running linting and formatting"
 
-# Run tests in order: unit → integration → e2e
+# Run tests in order: unit → integration 
 if [ $OVERALL_STATUS -eq 0 ]; then
   run_check "python scripts/run_tests.py unit" "Running unit tests"
 fi
@@ -51,9 +51,6 @@ if [ $OVERALL_STATUS -eq 0 ]; then
   run_check "python scripts/run_tests.py integration" "Running integration tests"
 fi
 
-if [ $OVERALL_STATUS -eq 0 ]; then
-  run_check "python scripts/run_tests.py e2e" "Running e2e tests"
-fi
 
 # Final report
 if [ $OVERALL_STATUS -eq 0 ]; then

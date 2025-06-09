@@ -334,6 +334,8 @@ class RAGEngine:
             vector_repository=self.vectorstore_manager,
             log_callback=self.runtime.log_callback,
         )
+        # Initialize vectorstores from cache
+        self.cache_orchestrator.initialize_vectorstores()
 
         # Initialize document indexer
         from rag.config.dependencies import (
@@ -365,6 +367,7 @@ class RAGEngine:
             document_loader=self.document_loader,
             reranker=self.reranker,
             log_callback=self.runtime.log_callback,
+            vectorstore_manager=self.vectorstore_manager,
         )
         self.query_engine = QueryEngine(
             config=self.config,

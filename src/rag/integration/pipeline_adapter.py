@@ -95,12 +95,60 @@ class IngestManagerAdapter:
                     error_message=f"Pipeline errors: {pipeline_result.errors}",
                 )
 
-            # For now, return success with empty documents list
-            # In a full implementation, we'd extract documents from the pipeline result
+            # Extract documents from the pipeline's document store
+            # The new pipeline stores documents in the document store, so we need to retrieve them
+            documents = []
+            try:
+                # Try to get the documents that were processed by checking what was stored
+                # Since the pipeline processes one file at a time in this adapter,
+                # we need to fall back to using the original document loading approach
+                # This maintains compatibility while the new pipeline matures
+                
+                # Use a legacy approach for now: re-load and process the document
+                # This ensures the existing indexing system gets the documents it expects
+                from rag.data.document_loader import DocumentLoader
+                from rag.data.chunking import DefaultChunkingStrategy
+                
+                # Create temporary loader and chunking strategy
+                loader = DocumentLoader(
+                    filesystem_manager=getattr(self.source, 'filesystem_manager', None),
+                    log_callback=None,
+                )
+                
+                # Load the document
+                loaded_docs = loader.load_document(file_path)
+                
+                if loaded_docs:
+                    # Create chunking strategy matching the pipeline configuration
+                    chunking_strategy = DefaultChunkingStrategy(
+                        chunk_size=1000,  # Default chunk size
+                        chunk_overlap=200,  # Default overlap
+                        model_name="text-embedding-3-small",  # Default model
+                        log_callback=None,
+                    )
+                    
+                    # Determine MIME type
+                    mime_type = getattr(document_source, 'mime_type', None) or "text/plain"
+                    
+                    # Split into chunks
+                    documents = chunking_strategy.split_documents(loaded_docs, mime_type)
+                
+                # Set source metadata for compatibility
+                document_source.loader_name = loader.last_loader_name
+                document_source.text_splitter_name = getattr(chunking_strategy, 'last_splitter_name', None)
+                document_source.tokenizer_name = getattr(chunking_strategy, 'tokenizer_name', None)
+                
+            except Exception as e:
+                return IngestResult(
+                    document_source,
+                    IngestStatus.PROCESSING_ERROR,
+                    error_message=f"Failed to extract documents from pipeline: {e}",
+                )
+
             return IngestResult(
                 document_source,
                 IngestStatus.SUCCESS,
-                documents=[],  # TODO: Extract documents from pipeline result
+                documents=documents,
             )
 
         except Exception as e:
@@ -110,24 +158,60 @@ class IngestManagerAdapter:
                 error_message=str(e),
             )
 
-    def ingest_directory(self, directory_path: Path | str) -> Any:
+    def ingest_directory(
+        self, directory_path: Path | str, files: list[Path] | None = None
+    ) -> dict[str, IngestResult]:
         """Ingest all files in a directory using the new pipeline.
 
         Args:
             directory_path: Path to the directory to ingest
+            files: Optional pre-scanned list of files to avoid redundant directory scanning
 
         Returns:
-            Ingest result compatible with existing code
+            Dictionary mapping file paths to IngestResult objects
         """
-        # For filesystem sources, we can ingest all documents
-        if isinstance(self.source, FilesystemDocumentSource):
-            result = self.pipeline.ingest_all()
+        directory_path = Path(directory_path)
+        
+        # Use individual file processing to maintain compatibility
+        # This ensures each file gets proper document extraction
+        if files is not None:
+            file_list = files
         else:
-            # For other sources, list documents and ingest them
-            document_ids = self.source.list_documents()
-            result = self.pipeline.ingest_documents(document_ids)
-
-        return _adapt_pipeline_result(result)
+            # Get list of files from the filesystem source
+            if isinstance(self.source, FilesystemDocumentSource):
+                try:
+                    file_list = []
+                    # Get all files in the directory that the source can handle
+                    for source_id in self.source.list_documents():
+                        # Convert source ID back to file path
+                        file_path = self.source.root_path / source_id
+                        if file_path.exists() and file_path.is_file():
+                            file_list.append(file_path)
+                except Exception:
+                    # Fallback to filesystem scanning
+                    file_list = list(directory_path.rglob("*"))
+                    file_list = [f for f in file_list if f.is_file()]
+            else:
+                # For non-filesystem sources, scan directory manually
+                file_list = list(directory_path.rglob("*"))
+                file_list = [f for f in file_list if f.is_file()]
+        
+        # Process each file individually to ensure proper document extraction
+        results = {}
+        for file_path in file_list:
+            try:
+                result = self.ingest_file(file_path)
+                results[str(file_path)] = result
+            except Exception as e:
+                # Create error result for failed files
+                document_source = DocumentSource(file_path)
+                results[str(file_path)] = IngestResult(
+                    document_source,
+                    IngestStatus.PROCESSING_ERROR,
+                    error_message=str(e),
+                )
+        
+        return results
 
 
 class LegacyDocumentTransformerAdapter(DocumentTransformer):

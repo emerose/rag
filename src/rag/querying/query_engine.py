@@ -67,6 +67,7 @@ class QueryEngine:
         self.reranker = dependencies.reranker
         self.default_prompt_id = default_prompt_id
         self.log_callback = dependencies.log_callback
+        self.vectorstore_manager = dependencies.vectorstore_manager
 
         # Lazy-initialised RAG chain cache
         self._rag_chain_cache: dict[tuple[int, str], Any] = {}
@@ -111,6 +112,7 @@ class QueryEngine:
                 reranker=self.reranker,
                 log_callback=self.log_callback,
                 runtime_options=self.runtime,
+                vectorstore_manager=self.vectorstore_manager,
             )
             self._rag_chain_cache[key] = build_rag_chain(
                 engine_proxy, k=k, prompt_id=prompt_id, reranker=self.reranker
@@ -312,6 +314,7 @@ class QueryEngineProxy:
         reranker: BaseReranker | None = None,
         log_callback: Callable[[str, str, str], None] | None = None,
         runtime_options: RuntimeOptions | None = None,
+        vectorstore_manager: Any | None = None,
     ) -> None:
         """Initialize the proxy.
 
@@ -321,12 +324,14 @@ class QueryEngineProxy:
             reranker: Optional reranker for retrieval results
             log_callback: Optional logging callback
             runtime_options: Runtime options for streaming and callbacks
+            vectorstore_manager: Real VectorStoreManager for proper merging
         """
         self.vectorstores = vectorstores
         self.chat_model = chat_model
         self.reranker = reranker
         self.log_callback = log_callback
-        self.vectorstore_manager = SimpleVectorStoreManager(log_callback)
+        # Use the real vectorstore manager if provided, otherwise fall back to simple one
+        self.vectorstore_manager = vectorstore_manager or SimpleVectorStoreManager(log_callback)
 
         # Additional attributes expected by build_rag_chain
         self.system_prompt = ""  # Default empty system prompt

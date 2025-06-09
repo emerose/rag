@@ -141,6 +141,7 @@ class RAGComponentsFactory:
             self._vector_repository = VectorStoreManager(
                 cache_dir=cache_dir,
                 embeddings=embedding_service,
+                backend=self.config.vectorstore_backend,
             )
             self._vector_repository.set_log_callback(self.runtime.log_callback)
         return self._vector_repository
@@ -378,6 +379,7 @@ class RAGComponentsFactory:
                 document_loader=self.document_loader,
                 reranker=self.reranker,
                 log_callback=self.runtime.log_callback,
+                vectorstore_manager=self.vector_repository,
             )
             self._query_engine = QueryEngine(
                 config=self.config,

@@ -108,6 +108,7 @@ class QueryEngineDependencies:
     document_loader: DocumentLoader
     reranker: KeywordReranker | None = None
     log_callback: Callable[[str, str, str], None] | None = None
+    vectorstore_manager: Any | None = None  # VectorStoreManager for proper vectorstore merging
 
 
 @dataclass
