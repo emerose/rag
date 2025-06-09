@@ -102,7 +102,9 @@ def test_cli_error_handling(test_environment):
         
         # Verify the command failed with the expected error message
         assert answer_result.returncode != 0
-        assert "No indexed documents found in cache" in answer_result.stdout
+        # Check both stdout and stderr since error could appear in either
+        output_text = answer_result.stdout + answer_result.stderr
+        assert "No indexed documents found in cache" in output_text
         
         print("CLI error handling test passed!")
         

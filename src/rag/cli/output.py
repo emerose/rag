@@ -182,7 +182,9 @@ def _write_rich(
     if isinstance(payload, str):
         get_console().print(payload)
     elif isinstance(payload, Error):
-        # Log the error so it includes timestamp and file location if configured
+        # Print the error message to the user
+        get_console().print(f"[red]Error:[/red] {payload.message}")
+        # Also log the error so it includes timestamp and file location if configured
         if structlog.is_configured():
             logger.error(payload.message, subsystem="CLI")
     elif isinstance(payload, list):
