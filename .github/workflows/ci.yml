@@ -31,7 +31,6 @@ jobs:
           key: ${{ runner.os }}-uv-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-uv-
-          save-always: true
 
       - name: Cache pip
         uses: actions/cache@v4
@@ -40,7 +39,6 @@ jobs:
           key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-pip-
-          save-always: true
 
       - name: Install dependencies
         run: uv pip install "-e.[dev]"
