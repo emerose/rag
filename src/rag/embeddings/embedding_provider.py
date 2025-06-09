@@ -1,7 +1,7 @@
 """Embedding provider module for the RAG system.
 
 This module provides a high-level embedding provider that wraps the core
-EmbeddingService with additional functionality and maintains backward compatibility.
+OpenAIEmbeddingService with additional functionality and maintains backward compatibility.
 """
 
 import logging
@@ -16,7 +16,7 @@ from rag.utils.logging_utils import log_message
 from .protocols import EmbeddingServiceProtocol
 
 if TYPE_CHECKING:
-    from .embedding_service import EmbeddingService
+    from .embedding_service import OpenAIEmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -25,10 +25,10 @@ LogCallback: TypeAlias = Callable[[str, str, str], None]
 
 
 class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
-    """High-level embedding provider that wraps EmbeddingService.
+    """High-level embedding provider that wraps OpenAIEmbeddingService.
 
     This class provides a high-level interface for embedding operations
-    while delegating core embedding operations to the focused EmbeddingService.
+    while delegating core embedding operations to the focused OpenAIEmbeddingService.
     Implements the EmbeddingServiceProtocol for dependency injection compatibility.
     """
 
@@ -39,7 +39,7 @@ class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
         openai_api_key: str | None = None,
         show_progress_bar: bool = False,
         log_callback: LogCallback | None = None,
-        embedding_service: "EmbeddingService | None" = None,
+        embedding_service: "OpenAIEmbeddingService | None" = None,
     ) -> None:
         """Initialize the embedding provider.
 
@@ -48,7 +48,7 @@ class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
             openai_api_key: OpenAI API key (optional if set in environment)
             show_progress_bar: Whether to show a progress bar for batch operations
             log_callback: Optional callback for logging
-            embedding_service: Optional pre-configured EmbeddingService instance
+            embedding_service: Optional pre-configured OpenAIEmbeddingService instance
         """
         self.config = config
         self.model_name = config.model
@@ -60,7 +60,7 @@ class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
         if embedding_service is not None:
             self._embedding_service = embedding_service
         else:
-            from .embedding_service import EmbeddingService, RetryConfig
+            from .embedding_service import OpenAIEmbeddingService, RetryConfig
 
             # Create retry config from embedding config
             retry_config = RetryConfig(
@@ -68,7 +68,7 @@ class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
                 # Keep other retry settings as defaults for now
             )
 
-            self._embedding_service = EmbeddingService(
+            self._embedding_service = OpenAIEmbeddingService(
                 model_name=self.model_name,
                 openai_api_key=openai_api_key,
                 show_progress_bar=show_progress_bar,

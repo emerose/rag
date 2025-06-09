@@ -19,7 +19,7 @@ from rag.utils.exceptions import (
 )
 
 
-class TestEmbeddingServiceErrorHandling:
+class TestOpenAIEmbeddingServiceErrorHandling:
     """Test that embedding services raise proper exceptions."""
 
     def test_embed_texts_empty_list(self):

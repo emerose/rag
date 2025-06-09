@@ -1,4 +1,4 @@
-"""Tests for the EmbeddingService class.
+"""Tests for the OpenAIOpenAIEmbeddingService class.
 
 This module tests the core embedding service functionality including
 embedding generation with retries and error handling.
@@ -8,21 +8,21 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from rag.embeddings.embedding_service import EmbeddingService, RetryConfig
+from rag.embeddings.embedding_service import OpenAIEmbeddingService, RetryConfig
 from rag.utils.exceptions import EmbeddingGenerationError
 
 
-class TestEmbeddingService:
-    """Test suite for EmbeddingService class."""
+class TestOpenAIEmbeddingService:
+    """Test suite for OpenAIEmbeddingService class."""
 
     def test_init_with_defaults(self):
-        """Test initializing the EmbeddingService with default parameters."""
+        """Test initializing the OpenAIEmbeddingService with default parameters."""
         with patch("rag.embeddings.embedding_service.OpenAIEmbeddings") as mock_openai:
             mock_model = MagicMock()
             mock_model.embed_query.return_value = [0.1] * 1536
             mock_openai.return_value = mock_model
 
-            service = EmbeddingService()
+            service = OpenAIEmbeddingService()
 
             assert service.model_name == "text-embedding-3-small"
             assert service.openai_api_key is None
@@ -34,7 +34,7 @@ class TestEmbeddingService:
             assert service.embedding_dimension == 1536
 
     def test_init_with_custom_params(self):
-        """Test initializing the EmbeddingService with custom parameters."""
+        """Test initializing the OpenAIEmbeddingService with custom parameters."""
         with patch("rag.embeddings.embedding_service.OpenAIEmbeddings") as mock_openai:
             mock_model = MagicMock()
             mock_model.embed_query.return_value = [0.1] * 512
@@ -43,7 +43,7 @@ class TestEmbeddingService:
             log_callback = MagicMock()
             retry_config = RetryConfig(max_retries=5, base_delay=2.0, max_delay=120.0)
 
-            service = EmbeddingService(
+            service = OpenAIEmbeddingService(
                 model_name="custom-model",
                 openai_api_key="test-key",
                 show_progress_bar=True,
@@ -69,15 +69,15 @@ class TestEmbeddingService:
             mock_openai.return_value = mock_model
 
             # Test text-embedding-3 fallback
-            service = EmbeddingService(model_name="text-embedding-3-small")
+            service = OpenAIEmbeddingService(model_name="text-embedding-3-small")
             assert service.embedding_dimension == 1536
 
             # Test ada-002 fallback
-            service = EmbeddingService(model_name="text-embedding-ada-002")
+            service = OpenAIEmbeddingService(model_name="text-embedding-ada-002")
             assert service.embedding_dimension == 1536
 
             # Test unknown model fallback
-            service = EmbeddingService(model_name="unknown-model")
+            service = OpenAIEmbeddingService(model_name="unknown-model")
             assert service.embedding_dimension == 1024
 
     def test_embed_texts_success(self):
@@ -88,7 +88,7 @@ class TestEmbeddingService:
             mock_model.embed_documents.return_value = [[0.1] * 1536, [0.2] * 1536]
             mock_openai.return_value = mock_model
 
-            service = EmbeddingService()
+            service = OpenAIEmbeddingService()
             texts = ["Hello world", "How are you?"]
 
             result = service.embed_texts(texts)
@@ -105,7 +105,7 @@ class TestEmbeddingService:
             mock_model.embed_query.return_value = [0.1] * 1536
             mock_openai.return_value = mock_model
 
-            service = EmbeddingService()
+            service = OpenAIEmbeddingService()
 
             with pytest.raises(EmbeddingGenerationError, match="Cannot embed empty text list"):
                 service.embed_texts([])
@@ -117,7 +117,7 @@ class TestEmbeddingService:
             mock_model.embed_query.return_value = [0.1] * 1536
             mock_openai.return_value = mock_model
 
-            service = EmbeddingService()
+            service = OpenAIEmbeddingService()
             query = "What is the meaning of life?"
 
             result = service.embed_query(query)
@@ -133,7 +133,7 @@ class TestEmbeddingService:
             mock_model.embed_query.return_value = [0.1] * 1536
             mock_openai.return_value = mock_model
 
-            service = EmbeddingService()
+            service = OpenAIEmbeddingService()
 
             with pytest.raises(EmbeddingGenerationError, match="Cannot embed empty query"):
                 service.embed_query("")
@@ -148,7 +148,7 @@ class TestEmbeddingService:
             mock_model.embed_query.return_value = [0.1] * 1536
             mock_openai.return_value = mock_model
 
-            service = EmbeddingService(model_name="text-embedding-3-large")
+            service = OpenAIEmbeddingService(model_name="text-embedding-3-large")
 
             info = service.model_info
 
@@ -170,7 +170,7 @@ class TestEmbeddingService:
             mock_retry.return_value = lambda f: f
 
             retry_config = RetryConfig(max_retries=5, base_delay=2.0, max_delay=120.0)
-            service = EmbeddingService(retry_config=retry_config)
+            service = OpenAIEmbeddingService(retry_config=retry_config)
             service.embed_texts(["test"])
 
             # Verify retry was configured (called when creating retry decorator)
@@ -185,7 +185,7 @@ class TestEmbeddingService:
             mock_openai.return_value = mock_model
 
             log_callback = MagicMock()
-            service = EmbeddingService(log_callback=log_callback)
+            service = OpenAIEmbeddingService(log_callback=log_callback)
 
             service.embed_texts(["test"])
 
@@ -193,8 +193,8 @@ class TestEmbeddingService:
             assert log_callback.called
 
 
-class TestEmbeddingServiceRetries:
-    """Test suite for EmbeddingService retry functionality."""
+class TestOpenAIEmbeddingServiceRetries:
+    """Test suite for OpenAIEmbeddingService retry functionality."""
 
     def test_retry_on_api_errors(self):
         """Test that retries work for API errors."""
@@ -210,7 +210,7 @@ class TestEmbeddingServiceRetries:
             mock_openai.return_value = mock_model
 
             retry_config = RetryConfig(max_retries=3)
-            service = EmbeddingService(retry_config=retry_config)
+            service = OpenAIEmbeddingService(retry_config=retry_config)
 
             # This should succeed
             result = service.embed_query("test query")
@@ -229,7 +229,7 @@ class TestEmbeddingServiceRetries:
             mock_openai.return_value = mock_model
 
             retry_config = RetryConfig(max_retries=3)
-            service = EmbeddingService(retry_config=retry_config)
+            service = OpenAIEmbeddingService(retry_config=retry_config)
 
             # This should fail immediately without retries
             with pytest.raises(ValueError, match="Invalid input"):

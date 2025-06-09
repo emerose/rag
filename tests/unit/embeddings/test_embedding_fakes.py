@@ -243,7 +243,7 @@ class TestDeterministicEmbeddingService:
             service.embed_texts([])
 
 
-class TestEmbeddingServiceCompatibility:
+class TestOpenAIEmbeddingServiceCompatibility:
     """Test that both fake services work as drop-in replacements."""
 
     @pytest.mark.parametrize(

@@ -40,7 +40,7 @@ class RetryConfig:
     max_delay: float = 60.0  # Maximum delay in seconds
 
 
-class EmbeddingService:
+class OpenAIEmbeddingService:
     """Core embedding service focused on embedding generation with retries.
 
     This service handles the low-level embedding generation with comprehensive
@@ -94,7 +94,7 @@ class EmbeddingService:
             level: Log level (DEBUG, INFO, WARNING, ERROR, etc.)
             message: The log message
         """
-        log_message(level, message, "EmbeddingService", self.log_callback)
+        log_message(level, message, "OpenAIEmbeddingService", self.log_callback)
 
     def _determine_embedding_dimension(self) -> int:
         """Determine the embedding dimension for the configured model.
