@@ -28,5 +28,14 @@ jobs:
           . .venv/bin/activate
           uv pip install -e .[dev]
 
-      - name: Run checks
-        run: ./check.sh
+      - name: Run unit tests
+        run: python scripts/run_tests.py unit
+
+      - name: Run integration tests
+        run: python scripts/run_tests.py integration
+
+      - name: Run formatter
+        run: ruff format src/ --line-length 88
+        
+      - name: Run linter
+        run: ruff check src/rag --line-length 88
