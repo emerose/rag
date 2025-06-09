@@ -181,12 +181,16 @@ def test_end_to_end_ingest(sample_markdown_path: Path, sample_pdf_path: Path) ->
         semantic_chunking=True,
     )
     
-    # Create ingest manager with the chunking strategy
-    ingest_manager = IngestManager(
+    # Create dependencies object
+    from rag.config.dependencies import IngestManagerDependencies
+    dependencies = IngestManagerDependencies(
         filesystem_manager=filesystem_manager,
-        preprocessor=basic_preprocessor,
         chunking_strategy=chunking_strategy,
+        preprocessor=basic_preprocessor,
     )
+    
+    # Create ingest manager with the dependencies
+    ingest_manager = IngestManager(dependencies)
     
     # Test markdown ingestion
     md_result = ingest_manager.ingest_file(sample_markdown_path)

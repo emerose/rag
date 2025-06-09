@@ -176,4 +176,5 @@ exclude = [
 dev = [
     "pytest-asyncio>=1.0.0",
     "trio>=0.30.0",
+    "types-pyyaml>=6.0.12.20250516",
 ]
