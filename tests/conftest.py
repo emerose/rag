@@ -65,10 +65,13 @@ def setup_test_environment() -> Generator[None, None, None]:
     original_key = os.environ.get("OPENAI_API_KEY")
     original_do_not_track = os.environ.get("DO_NOT_TRACK")
     original_scarf_analytics = os.environ.get("SCARF_NO_ANALYTICS")
+    original_langsmith_tracing = os.environ.get("LANGSMITH_TRACING")
     
     # Always disable analytics/telemetry for all tests
     os.environ["DO_NOT_TRACK"] = "true"
     os.environ["SCARF_NO_ANALYTICS"] = "true"
+    # Disable LangSmith tracing for tests to prevent network calls
+    os.environ["LANGSMITH_TRACING"] = "false"
     
     # Determine test type based on file path
     test_path = os.environ.get("PYTEST_CURRENT_TEST", "")
@@ -100,6 +103,11 @@ def setup_test_environment() -> Generator[None, None, None]:
         os.environ["SCARF_NO_ANALYTICS"] = original_scarf_analytics
     else:
         os.environ.pop("SCARF_NO_ANALYTICS", None)
+        
+    if original_langsmith_tracing is not None:
+        os.environ["LANGSMITH_TRACING"] = original_langsmith_tracing
+    else:
+        os.environ.pop("LANGSMITH_TRACING", None)
 
 
 @pytest.fixture(autouse=True)
