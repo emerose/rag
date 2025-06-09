@@ -77,7 +77,8 @@ def test_write_error_rich(mock_consoles):
         mock_logger.error.assert_called_once_with(
             "Test error", subsystem="CLI"
         )
-    stdout_console.print.assert_not_called()
+    # Error should be printed to the user in Rich mode
+    stdout_console.print.assert_called_once_with("[red]Error:[/red] Test error")
     stderr_console.print.assert_not_called()
 
 
