@@ -8,6 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -31,19 +32,25 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-uv-
 
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml', '**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install dependencies
-        run: |
-          . .venv/bin/activate
-          uv pip install -e .[dev]
+        run: uv pip install --system -e .[dev]
+
+      - name: Run formatter
+        run: ruff format src/ --line-length 88
+
+      - name: Run linter
+        run: ruff check src/rag --line-length 88
 
       - name: Run unit tests
         run: uv run scripts/run_tests.py unit
 
       - name: Run integration tests
         run: uv run scripts/run_tests.py integration
-
-      - name: Run formatter
-        run: ruff format src/ --line-length 88
-        
-      - name: Run linter
-        run: ruff check src/rag --line-length 88
