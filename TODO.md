@@ -15,7 +15,6 @@
 - [#226] [P4] **Plugin system** – Create extensible plugin architecture
 - [#227] [P3] **API versioning** – Add proper API versioning support
 - [#228] [P4] **Migration tools** – Create tools for data migration between versions
-- [#296] [P2] **Rename EmbeddingService to OpenAIEmbeddingService** – Make it clearer what it's responsible for, and enable alternate embedding services
 - [#297] [P3] **Make EmbeddingBatcher meet the EmbeddingServiceProtocol** – Should make things simpler, at least conceptually
 - [P4] **Streamline dependency groups** – Move heavy docs/research packages to separate extras and deduplicate unstructured extras
 

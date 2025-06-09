@@ -23,7 +23,7 @@ class APIKeyAuthMiddleware:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
-            
+
         request = Request(scope, receive=receive)
         auth_header = request.headers.get("authorization")
         if auth_header != f"Bearer {self.api_key}":
