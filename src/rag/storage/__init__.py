@@ -4,6 +4,11 @@ This module contains components for cache management, index management,
 vectorstore operations, and filesystem utilities.
 """
 
+from .document_store import (
+    DocumentStoreProtocol,
+    FakeDocumentStore,
+    SQLiteDocumentStore,
+)
 from .fakes import (
     InMemoryCacheRepository,
     InMemoryFileSystem,
@@ -23,6 +28,8 @@ from .vectorstore import VectorStoreManager
 
 __all__ = [
     "CacheRepositoryProtocol",
+    "DocumentStoreProtocol",
+    "FakeDocumentStore",
     "FileSystemProtocol",
     "FilesystemManager",
     "InMemoryCacheRepository",
@@ -30,6 +37,7 @@ __all__ = [
     "InMemoryVectorRepository",
     "InMemoryVectorStore",
     "IndexManager",
+    "SQLiteDocumentStore",
     "VectorRepository",
     "VectorRepositoryProtocol",
     "VectorStoreManager",

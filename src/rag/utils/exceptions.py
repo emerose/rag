@@ -203,6 +203,57 @@ class RAGFileNotFoundError(DocumentError):
         )
 
 
+class DocumentStoreError(DocumentError):
+    """Exception raised for document store operation errors."""
+
+    def __init__(
+        self,
+        message: str = "Document store operation failed",
+        context: dict[str, Any] | None = None,
+        *,
+        operation: str | None = None,
+        doc_id: str | None = None,
+        original_error: Exception | None = None,
+    ):
+        """Initialize the exception.
+
+        Args:
+            message: Error message details
+            context: Additional context information
+            operation: The document store operation that failed
+            doc_id: The document ID involved in the operation
+            original_error: The original exception that caused this error
+        """
+        self.operation = operation
+        self.doc_id = doc_id
+        self.original_error = original_error
+
+        error_msg = message
+        if operation:
+            error_msg += f" (operation: {operation})"
+        if doc_id:
+            error_msg += f" (doc_id: {doc_id})"
+        if original_error:
+            error_msg += (
+                f" (caused by: {type(original_error).__name__}: {original_error})"
+            )
+
+        merged_context = context or {}
+        merged_context.update(
+            {
+                "operation": operation,
+                "doc_id": doc_id,
+                "original_error": str(original_error) if original_error else None,
+            }
+        )
+
+        super().__init__(
+            error_msg,
+            error_code="DOCUMENT_STORE_ERROR",
+            context=merged_context,
+        )
+
+
 # Embedding and Vector Storage Errors
 class EmbeddingError(RAGError):
     """Base class for embedding-related errors."""
