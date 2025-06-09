@@ -41,7 +41,7 @@ jobs:
           save-always: true
 
       - name: Install dependencies
-        run: uv pip install --system "-e.[dev]"
+        run: uv pip install "-e.[dev]"
 
       - name: Show installed packages
         run: uv pip list
