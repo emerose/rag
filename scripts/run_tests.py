@@ -7,8 +7,6 @@ to the testing strategy.
 
 import subprocess
 import sys
-from pathlib import Path
-from typing import List
 
 # Colors for output
 RED = "\033[91m"
@@ -18,10 +16,10 @@ BLUE = "\033[94m"
 RESET = "\033[0m"
 
 
-def run_command(cmd: List[str]) -> int:
+def run_command(cmd: list[str]) -> int:
     """Run a command and return its exit code."""
     print(f"{BLUE}Running: {' '.join(cmd)}{RESET}")
-    result = subprocess.run(cmd)
+    result = subprocess.run(cmd, check=False)
     return result.returncode
 
 
@@ -34,7 +32,9 @@ def run_unit_tests() -> int:
 
 def run_integration_tests() -> int:
     """Run integration tests."""
-    print(f"{YELLOW}Running Integration Tests (component interactions with controlled deps){RESET}")
+    print(
+        f"{YELLOW}Running Integration Tests (component interactions with controlled deps){RESET}"
+    )
     cmd = ["python", "-m", "pytest", "-m", "integration", "-v", "--tb=short"]
     return run_command(cmd)
 
@@ -47,23 +47,29 @@ def run_e2e_tests() -> int:
 
 
 def run_all_tests() -> int:
-    """Run all tests in proper order: unit → integration → e2e."""
-    print(f"{BLUE}Running All Tests (unit → integration → e2e){RESET}")
-    
-    # Run unit tests first
-    print(f"{GREEN}Step 1/3: Running unit tests{RESET}")
+    """Run all tests in proper order: lint → unit → integration → e2e."""
+    print(f"{BLUE}Running All Tests (lint → unit → integration → e2e){RESET}")
+
+    # Run lint checks first
+    print(f"{GREEN}Step 1/4: Running lint checks{RESET}")
+    lint_result = run_lint()
+    if lint_result != 0:
+        return lint_result
+
+    # Run unit tests second
+    print(f"{GREEN}Step 2/4: Running unit tests{RESET}")
     unit_result = run_unit_tests()
     if unit_result != 0:
         return unit_result
-    
-    # Run integration tests second
-    print(f"{YELLOW}Step 2/3: Running integration tests{RESET}")
+
+    # Run integration tests third
+    print(f"{YELLOW}Step 3/4: Running integration tests{RESET}")
     integration_result = run_integration_tests()
     if integration_result != 0:
         return integration_result
-    
+
     # Run e2e tests last
-    print(f"{RED}Step 3/3: Running e2e tests{RESET}")
+    print(f"{RED}Step 4/4: Running e2e tests{RESET}")
     return run_e2e_tests()
 
 
@@ -77,28 +83,36 @@ def run_quick_tests() -> int:
 def run_coverage_tests() -> int:
     """Run tests with full coverage reporting."""
     print(f"{BLUE}Running Tests with Coverage{RESET}")
-    cmd = ["python", "-m", "pytest", "tests/unit/", "--cov=rag", "--cov-report=html", "--cov-report=term-missing"]
+    cmd = [
+        "python",
+        "-m",
+        "pytest",
+        "tests/unit/",
+        "--cov=rag",
+        "--cov-report=html",
+        "--cov-report=term-missing",
+    ]
     return run_command(cmd)
 
 
 def run_lint() -> int:
     """Run linting and formatting checks."""
     print(f"{BLUE}Running Linting and Formatting{RESET}")
-    
+
     # Format code
     print(f"{GREEN}Formatting code{RESET}")
     format_cmd = ["ruff", "format", "src/", "--line-length", "88"]
     format_result = run_command(format_cmd)
     if format_result != 0:
         return format_result
-    
+
     # Run linter
     print(f"{GREEN}Linting code{RESET}")
     lint_cmd = ["ruff", "check", "src/rag", "--fix", "--line-length", "88"]
     lint_result = run_command(lint_cmd)
     if lint_result != 0:
         return lint_result
-    
+
     # Format again after linting
     print(f"{GREEN}Re-formatting after linting{RESET}")
     reformat_cmd = ["ruff", "format", "src/", "--line-length", "88"]
@@ -136,7 +150,7 @@ Examples:
         return 1
 
     command = sys.argv[1]
-    
+
     if command == "unit":
         return run_unit_tests()
     elif command == "quick":
