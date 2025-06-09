@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      PATH: .venv/bin:$PATH
+        PATH: .venv/bin:${{ env.PATH }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
