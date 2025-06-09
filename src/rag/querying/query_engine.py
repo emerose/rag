@@ -13,6 +13,7 @@ from langchain_openai import ChatOpenAI
 
 from rag.chains.rag_chain import build_rag_chain
 from rag.config import RAGConfig, RuntimeOptions
+from rag.config.dependencies import QueryEngineDependencies
 from rag.data.document_loader import DocumentLoader
 from rag.retrieval import BaseReranker
 from rag.storage.backends.factory import create_vectorstore_backend
@@ -76,6 +77,37 @@ class QueryEngine:
 
         # Lazy-initialised RAG chain cache
         self._rag_chain_cache: dict[tuple[int, str], Any] = {}
+
+    @classmethod
+    def from_dependencies(
+        cls,
+        config: RAGConfig,
+        runtime_options: RuntimeOptions,
+        dependencies: QueryEngineDependencies,
+        default_prompt_id: str = "default",
+    ) -> "QueryEngine":
+        """Create QueryEngine using dependency configuration object.
+
+        This is the preferred way to create a QueryEngine instance.
+
+        Args:
+            config: RAG configuration
+            runtime_options: Runtime options
+            dependencies: Grouped dependencies
+            default_prompt_id: Default prompt ID to use
+
+        Returns:
+            Configured QueryEngine instance
+        """
+        return cls(
+            config=config,
+            runtime_options=runtime_options,
+            chat_model=dependencies.chat_model,
+            document_loader=dependencies.document_loader,
+            reranker=dependencies.reranker,
+            default_prompt_id=default_prompt_id,
+            log_callback=dependencies.log_callback,
+        )
 
     def _log(self, level: str, message: str, subsystem: str = "QueryEngine") -> None:
         """Log a message.

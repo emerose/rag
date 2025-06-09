@@ -13,6 +13,10 @@ from typing import Any
 from langchain_core.documents import Document
 
 from rag.config import RAGConfig, RuntimeOptions
+from rag.config.dependencies import (
+    DocumentIndexerDependencies,
+    VectorstoreCreationParams,
+)
 from rag.data.document_loader import DocumentLoader
 from rag.embeddings.batching import EmbeddingBatcher
 from rag.embeddings.embedding_provider import EmbeddingProvider
@@ -99,6 +103,40 @@ class DocumentIndexer:
 
         # Set up paths
         self.documents_dir = Path(self.config.documents_dir).resolve()
+
+    @classmethod
+    def from_dependencies(
+        cls,
+        config: RAGConfig,
+        runtime_options: RuntimeOptions,
+        dependencies: DocumentIndexerDependencies,
+    ) -> "DocumentIndexer":
+        """Create DocumentIndexer using dependency configuration object.
+
+        This is the preferred way to create a DocumentIndexer instance.
+
+        Args:
+            config: RAG configuration
+            runtime_options: Runtime options
+            dependencies: Grouped dependencies
+
+        Returns:
+            Configured DocumentIndexer instance
+        """
+        return cls(
+            config=config,
+            runtime_options=runtime_options,
+            filesystem_manager=dependencies.filesystem_manager,
+            cache_repository=dependencies.cache_repository,
+            vector_repository=dependencies.vector_repository,
+            document_loader=dependencies.document_loader,
+            ingest_manager=dependencies.ingest_manager,
+            embedding_provider=dependencies.embedding_provider,
+            embedding_batcher=dependencies.embedding_batcher,
+            embedding_model_map=dependencies.embedding_model_map,
+            embedding_model_version=dependencies.embedding_model_version,
+            log_callback=dependencies.log_callback,
+        )
 
     def _log(
         self, level: str, message: str, subsystem: str = "DocumentIndexer"
@@ -295,7 +333,7 @@ class DocumentIndexer:
                 progress_callback("error", file_path, error_message)
             return False, error_message
 
-    def _create_vectorstore_from_documents(  # noqa: PLR0913, PLR0912, PLR0915
+    def _create_vectorstore_from_documents(  # noqa: PLR0912, PLR0913, PLR0915
         self,
         file_path: Path,
         documents: list[Document],
@@ -472,6 +510,31 @@ class DocumentIndexer:
         except INDEXING_EXCEPTIONS as e:
             self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
             return False
+
+    def _create_vectorstore_from_params(
+        self, params: VectorstoreCreationParams
+    ) -> bool:
+        """Create or update a vectorstore using parameter object.
+
+        This is the preferred way to call this method when you have many parameters.
+
+        Args:
+            params: VectorstoreCreationParams object containing all parameters
+
+        Returns:
+            True if successful, False otherwise
+        """
+        return self._create_vectorstore_from_documents(
+            file_path=params.file_path,
+            documents=params.documents,
+            file_type=params.file_type,
+            vectorstores=params.vectorstores,
+            embedding_model=params.embedding_model,
+            loader_name=params.loader_name,
+            tokenizer_name=params.tokenizer_name,
+            text_splitter_name=params.text_splitter_name,
+            vectorstore_register_callback=params.vectorstore_register_callback,
+        )
 
     def index_directory(  # noqa: PLR0912, PLR0915
         self,

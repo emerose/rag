@@ -15,6 +15,7 @@ from typing import Any, Protocol
 
 from langchain_core.documents import Document
 
+from rag.config.dependencies import IngestManagerDependencies
 from rag.data.document_loader import DocumentLoader
 from rag.storage.filesystem import FilesystemManager
 from rag.utils.logging_utils import log_message
@@ -204,6 +205,31 @@ class IngestManager:
         self.document_loader = document_loader or DocumentLoader(
             filesystem_manager,
             log_callback,
+        )
+
+    @classmethod
+    def from_dependencies(
+        cls,
+        dependencies: IngestManagerDependencies,
+    ) -> "IngestManager":
+        """Create IngestManager using dependency configuration object.
+
+        This is the preferred way to create an IngestManager instance.
+
+        Args:
+            dependencies: Grouped dependencies
+
+        Returns:
+            Configured IngestManager instance
+        """
+        return cls(
+            filesystem_manager=dependencies.filesystem_manager,
+            chunking_strategy=dependencies.chunking_strategy,
+            preprocessor=dependencies.preprocessor,
+            document_loader=dependencies.document_loader,
+            log_callback=dependencies.log_callback,
+            progress_callback=dependencies.progress_callback,
+            file_filter=dependencies.file_filter,
         )
 
     def _log(self, level: str, message: str) -> None:

@@ -19,6 +19,7 @@ from rag.querying.query_engine import QueryEngine
 from rag.retrieval import KeywordReranker
 
 from .config import RAGConfig, RuntimeOptions
+from .config.dependencies import RAGEngineDependencies
 from .data.document_loader import DocumentLoader
 from .data.document_processor import DocumentProcessor
 from .data.text_splitter import TextSplitterFactory
@@ -120,6 +121,79 @@ class RAGEngine:
 
         # Initialize orchestrators
         self._initialize_orchestrators()
+
+    @classmethod
+    def from_dependencies(
+        cls,
+        config: RAGConfig,
+        runtime: RuntimeOptions,
+        dependencies: RAGEngineDependencies | None = None,
+    ) -> "RAGEngine":
+        """Create RAGEngine using dependency configuration object.
+
+        This is the preferred way to create a RAGEngine instance when you have
+        many dependencies to inject.
+
+        Args:
+            config: RAG configuration
+            runtime: Runtime options
+            dependencies: Optional grouped dependencies
+
+        Returns:
+            Configured RAGEngine instance
+        """
+        deps = dependencies or RAGEngineDependencies()
+
+        # Extract individual dependencies from groups
+        filesystem_manager = None
+        cache_manager = None
+        index_manager = None
+        vectorstore_manager = None
+
+        if deps.storage:
+            filesystem_manager = deps.storage.filesystem_manager
+            cache_manager = deps.storage.cache_manager
+            index_manager = deps.storage.index_manager
+            vectorstore_manager = deps.storage.vectorstore_manager
+
+        document_loader = None
+        document_processor = None
+        text_splitter_factory = None
+
+        if deps.document_processing:
+            document_loader = deps.document_processing.document_loader
+            document_processor = deps.document_processing.document_processor
+            text_splitter_factory = deps.document_processing.text_splitter_factory
+
+        embedding_provider = None
+        embedding_batcher = None
+
+        if deps.embeddings:
+            embedding_provider = deps.embeddings.embedding_provider
+            embedding_batcher = deps.embeddings.embedding_batcher
+
+        chat_model = None
+        reranker = None
+
+        if deps.retrieval:
+            chat_model = deps.retrieval.chat_model
+            reranker = deps.retrieval.reranker
+
+        return cls(
+            config=config,
+            runtime=runtime,
+            filesystem_manager=filesystem_manager,
+            document_loader=document_loader,
+            document_processor=document_processor,
+            text_splitter_factory=text_splitter_factory,
+            embedding_provider=embedding_provider,
+            embedding_batcher=embedding_batcher,
+            cache_manager=cache_manager,
+            index_manager=index_manager,
+            vectorstore_manager=vectorstore_manager,
+            reranker=reranker,
+            chat_model=chat_model,
+        )
 
     def _log(self, level: str, message: str) -> None:
         """Log a message.
