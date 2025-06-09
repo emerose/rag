@@ -3,6 +3,7 @@
 This module provides common fixtures and configuration for the RAG system tests.
 """
 
+import os
 import shutil
 import tempfile
 from collections.abc import Generator
@@ -10,6 +11,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from dotenv import load_dotenv
 from langchain_core.documents import Document
 from langchain_openai import OpenAIEmbeddings
 
@@ -24,6 +26,39 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "integration: mark test as integration test (not run by default)"
     )
+
+
+@pytest.fixture(autouse=True)
+def setup_openai_api_key() -> Generator[None, None, None]:
+    """Set up OpenAI API key for different test levels.
+    
+    - Unit tests: Set dummy API key
+    - Integration tests: Set dummy API key  
+    - E2E tests: Use .env file if not already set
+    """
+    # Store original value to restore later
+    original_key = os.environ.get("OPENAI_API_KEY")
+    
+    # Determine test type based on file path
+    test_path = os.environ.get("PYTEST_CURRENT_TEST", "")
+    
+    if "unit/" in test_path or "integration/" in test_path:
+        # Set dummy key for unit and integration tests
+        os.environ["OPENAI_API_KEY"] = "sk-dummy-key-for-testing"
+    elif "e2e/" in test_path:
+        # For e2e tests, load from .env if not already set
+        if not os.environ.get("OPENAI_API_KEY"):
+            env_file = Path(__file__).parent.parent / ".env"
+            if env_file.exists():
+                load_dotenv(env_file)
+    
+    yield
+    
+    # Restore original value
+    if original_key is not None:
+        os.environ["OPENAI_API_KEY"] = original_key
+    else:
+        os.environ.pop("OPENAI_API_KEY", None)
 
 
 @pytest.fixture(autouse=True)
