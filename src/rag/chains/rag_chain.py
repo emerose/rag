@@ -179,14 +179,14 @@ def build_rag_chain(
         """Similarity search with optional metadata filters and reranking."""
         clean_query, mfilters = _parse_metadata_filters(question)
         search_k = k * 3 if mfilters else k
-        
+
         # Debug: Log retrieval details
         logger.debug(f"Retrieving for query: '{clean_query}' (original: '{question}')")
         logger.debug(f"Search k: {search_k}, filters: {mfilters}")
         logger.debug(f"Merged vectorstore type: {type(merged_vs)}")
-        
+
         docs: list[Document] = merged_vs.similarity_search(clean_query, k=search_k)
-        
+
         if mfilters:
             docs = [d for d in docs if _doc_matches_filters(d, mfilters)]
             logger.debug(f"After filtering: {len(docs)} documents")

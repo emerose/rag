@@ -89,6 +89,24 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         # Initialize parent with fake overrides
         super().__init__(config, runtime_options, overrides)
 
+        # Override document source with fake implementation for new pipeline
+        if config.use_new_pipeline:
+            from rag.sources.fakes import FakeDocumentSource
+
+            fake_doc_source = FakeDocumentSource(root_path=config.documents_dir)
+
+            # Add initial files to the fake document source if provided
+            if self.test_options.initial_files:
+                for path, content in self.test_options.initial_files.items():
+                    fake_doc_source.add_document(
+                        source_id=path,
+                        content=content,
+                        metadata={"path": path},
+                        content_type="text/plain",
+                    )
+
+            self._document_source = fake_doc_source
+
     def _create_test_config(self) -> RAGConfig:
         """Create a default test configuration."""
         return RAGConfig(
@@ -405,6 +423,24 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
         # Add the file to the fake filesystem
         self.filesystem_manager.add_file(str(resolved_path), content)
+
+        # For new pipeline, also add to the fake document source
+        if self.config.use_new_pipeline and hasattr(self, "_document_source"):
+            from rag.sources.fakes import FakeDocumentSource
+
+            if isinstance(self._document_source, FakeDocumentSource):
+                # Use the relative path as source_id for consistency
+                source_id = (
+                    str(path_obj.relative_to(Path(self.config.documents_dir)))
+                    if path_obj.is_relative_to(Path(self.config.documents_dir))
+                    else path
+                )
+                self._document_source.add_document(
+                    source_id=source_id,
+                    content=content,
+                    metadata={"path": str(resolved_path), "mtime": fixed_mtime},
+                    content_type="text/plain",
+                )
 
         # Also add the file to the FakeIndexManager if it's being used
         if hasattr(self.cache_repository, "add_mock_file"):

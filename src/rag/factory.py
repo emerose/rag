@@ -265,18 +265,27 @@ class RAGComponentsFactory:
             # Create pipeline using adapter
             from rag.integration.pipeline_adapter import PipelineCreationConfig
 
+            # Use existing document source if already created (e.g., by test factory)
+            # Otherwise, use the documents_dir to create a new one
+            source_root = (
+                self.config.documents_dir if self._document_source is None else None
+            )
+
             pipeline_config = PipelineCreationConfig(
                 dependencies=dependencies,
                 document_store=document_store,
                 vector_store=vector_store,
                 config=self.config,
                 embedding_provider=self.embedding_service,
-                source_root=self.config.documents_dir,
+                source_root=source_root,
+                existing_source=self._document_source,  # Pass existing source
             )
             pipeline, source = create_pipeline_from_ingest_dependencies(pipeline_config)
 
             self._ingestion_pipeline = pipeline
-            self._document_source = source
+            # Only set the document source if we don't already have one
+            if self._document_source is None:
+                self._document_source = source
 
         return self._ingestion_pipeline
 

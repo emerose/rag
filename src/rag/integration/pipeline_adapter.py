@@ -103,21 +103,21 @@ class IngestManagerAdapter:
                 # Since the pipeline processes one file at a time in this adapter,
                 # we need to fall back to using the original document loading approach
                 # This maintains compatibility while the new pipeline matures
-                
+
                 # Use a legacy approach for now: re-load and process the document
                 # This ensures the existing indexing system gets the documents it expects
-                from rag.data.document_loader import DocumentLoader
                 from rag.data.chunking import DefaultChunkingStrategy
-                
+                from rag.data.document_loader import DocumentLoader
+
                 # Create temporary loader and chunking strategy
                 loader = DocumentLoader(
-                    filesystem_manager=getattr(self.source, 'filesystem_manager', None),
+                    filesystem_manager=getattr(self.source, "filesystem_manager", None),
                     log_callback=None,
                 )
-                
+
                 # Load the document
                 loaded_docs = loader.load_document(file_path)
-                
+
                 if loaded_docs:
                     # Create chunking strategy matching the pipeline configuration
                     chunking_strategy = DefaultChunkingStrategy(
@@ -126,18 +126,26 @@ class IngestManagerAdapter:
                         model_name="text-embedding-3-small",  # Default model
                         log_callback=None,
                     )
-                    
+
                     # Determine MIME type
-                    mime_type = getattr(document_source, 'mime_type', None) or "text/plain"
-                    
+                    mime_type = (
+                        getattr(document_source, "mime_type", None) or "text/plain"
+                    )
+
                     # Split into chunks
-                    documents = chunking_strategy.split_documents(loaded_docs, mime_type)
-                
+                    documents = chunking_strategy.split_documents(
+                        loaded_docs, mime_type
+                    )
+
                 # Set source metadata for compatibility
                 document_source.loader_name = loader.last_loader_name
-                document_source.text_splitter_name = getattr(chunking_strategy, 'last_splitter_name', None)
-                document_source.tokenizer_name = getattr(chunking_strategy, 'tokenizer_name', None)
-                
+                document_source.text_splitter_name = getattr(
+                    chunking_strategy, "last_splitter_name", None
+                )
+                document_source.tokenizer_name = getattr(
+                    chunking_strategy, "tokenizer_name", None
+                )
+
             except Exception as e:
                 return IngestResult(
                     document_source,
@@ -171,31 +179,30 @@ class IngestManagerAdapter:
             Dictionary mapping file paths to IngestResult objects
         """
         directory_path = Path(directory_path)
-        
+
         # Use individual file processing to maintain compatibility
         # This ensures each file gets proper document extraction
         if files is not None:
             file_list = files
-        else:
-            # Get list of files from the filesystem source
-            if isinstance(self.source, FilesystemDocumentSource):
-                try:
-                    file_list = []
-                    # Get all files in the directory that the source can handle
-                    for source_id in self.source.list_documents():
-                        # Convert source ID back to file path
-                        file_path = self.source.root_path / source_id
-                        if file_path.exists() and file_path.is_file():
-                            file_list.append(file_path)
-                except Exception:
-                    # Fallback to filesystem scanning
-                    file_list = list(directory_path.rglob("*"))
-                    file_list = [f for f in file_list if f.is_file()]
-            else:
-                # For non-filesystem sources, scan directory manually
+        # Get list of files from the filesystem source
+        elif isinstance(self.source, FilesystemDocumentSource):
+            try:
+                file_list = []
+                # Get all files in the directory that the source can handle
+                for source_id in self.source.list_documents():
+                    # Convert source ID back to file path
+                    file_path = self.source.root_path / source_id
+                    if file_path.exists() and file_path.is_file():
+                        file_list.append(file_path)
+            except Exception:
+                # Fallback to filesystem scanning
                 file_list = list(directory_path.rglob("*"))
                 file_list = [f for f in file_list if f.is_file()]
-        
+        else:
+            # For non-filesystem sources, scan directory manually
+            file_list = list(directory_path.rglob("*"))
+            file_list = [f for f in file_list if f.is_file()]
+
         # Process each file individually to ensure proper document extraction
         results = {}
         for file_path in file_list:
@@ -210,7 +217,7 @@ class IngestManagerAdapter:
                     IngestStatus.PROCESSING_ERROR,
                     error_message=str(e),
                 )
-        
+
         return results
 
 
@@ -282,6 +289,7 @@ class PipelineCreationConfig:
     config: RAGConfig
     embedding_provider: Any
     source_root: Path | str | None = None
+    existing_source: DocumentSourceProtocol | None = None
 
 
 def create_pipeline_from_ingest_dependencies(
@@ -296,7 +304,10 @@ def create_pipeline_from_ingest_dependencies(
         Tuple of (pipeline, source) ready for use
     """
     # Create document source
-    if pipeline_config.source_root:
+    if pipeline_config.existing_source:
+        # Use existing document source (e.g., from test factory)
+        source = pipeline_config.existing_source
+    elif pipeline_config.source_root:
         source = FilesystemDocumentSource(
             root_path=pipeline_config.source_root,
             filesystem_manager=pipeline_config.dependencies.filesystem_manager,

@@ -27,6 +27,7 @@ def _build_test_server(tmp_path: Path):
             documents_dir=str(tmp_path / "docs"),
             cache_dir=str(tmp_path / "cache"),
             openai_api_key="dummy",
+            use_new_pipeline=False,  # Use old pipeline for integration tests with mocked methods
         )
         runtime = RuntimeOptions()
         server = build_server(config, runtime)

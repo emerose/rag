@@ -2,22 +2,25 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
-from .base import SourceDocument
+from .base import DocumentSourceProtocol, SourceDocument
 
 
-class FakeDocumentSource:
+class FakeDocumentSource(DocumentSourceProtocol):
     """In-memory fake document source for testing.
 
     This source stores documents in memory and provides full
     DocumentSourceProtocol implementation for testing purposes.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, root_path: str | None = None) -> None:
         """Initialize the fake document source."""
+        from pathlib import Path
+
         self._documents: dict[str, SourceDocument] = {}
+        self.root_path = Path(root_path or "/fake/documents")
 
     def add_document(
         self,
@@ -193,3 +196,30 @@ class FakeDocumentSource:
             Dictionary of all documents
         """
         return self._documents.copy()
+
+    # Async methods required by protocol
+    async def get_document_async(self, source_id: str) -> SourceDocument | None:
+        """Asynchronously retrieve a document."""
+        return self.get_document(source_id)
+
+    async def get_documents_async(
+        self, source_ids: list[str]
+    ) -> dict[str, SourceDocument]:
+        """Asynchronously retrieve multiple documents."""
+        return self.get_documents(source_ids)
+
+    async def iter_documents_async(
+        self, **kwargs: Any
+    ) -> AsyncIterator[SourceDocument]:
+        """Asynchronously iterate over documents."""
+        document_ids = self.list_documents(**kwargs)
+        for source_id in document_ids:
+            yield self._documents[source_id]
+
+    async def document_exists_async(self, source_id: str) -> bool:
+        """Asynchronously check if a document exists."""
+        return self.document_exists(source_id)
+
+    async def get_metadata_async(self, source_id: str) -> dict[str, Any] | None:
+        """Asynchronously get document metadata."""
+        return self.get_metadata(source_id)

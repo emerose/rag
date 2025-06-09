@@ -7,6 +7,7 @@ from the RAGEngine.
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from langchain_openai import ChatOpenAI
@@ -106,7 +107,7 @@ class QueryEngine:
         if key not in self._rag_chain_cache:
             # Create a temporary engine-like object for build_rag_chain
             # This maintains compatibility with the existing chain builder
-            engine_proxy = QueryEngineProxy(
+            proxy_config = QueryEngineProxyConfig(
                 vectorstores=vectorstores,
                 chat_model=self.chat_model,
                 reranker=self.reranker,
@@ -114,6 +115,7 @@ class QueryEngine:
                 runtime_options=self.runtime,
                 vectorstore_manager=self.vectorstore_manager,
             )
+            engine_proxy = QueryEngineProxy(proxy_config)
             self._rag_chain_cache[key] = build_rag_chain(
                 engine_proxy, k=k, prompt_id=prompt_id, reranker=self.reranker
             )
@@ -300,6 +302,18 @@ class SimpleVectorStoreManager:
         return self._backend.merge_vectorstores(vectorstores)
 
 
+@dataclass
+class QueryEngineProxyConfig:
+    """Configuration for QueryEngineProxy."""
+
+    vectorstores: dict[str, VectorStoreProtocol]
+    chat_model: ChatOpenAI
+    reranker: BaseReranker | None = None
+    log_callback: Callable[[str, str, str], None] | None = None
+    runtime_options: RuntimeOptions | None = None
+    vectorstore_manager: Any | None = None
+
+
 class QueryEngineProxy:
     """Proxy object to maintain compatibility with build_rag_chain.
 
@@ -307,35 +321,24 @@ class QueryEngineProxy:
     a RAGEngine while allowing QueryEngine to operate independently.
     """
 
-    def __init__(
-        self,
-        vectorstores: dict[str, VectorStoreProtocol],
-        chat_model: ChatOpenAI,
-        reranker: BaseReranker | None = None,
-        log_callback: Callable[[str, str, str], None] | None = None,
-        runtime_options: RuntimeOptions | None = None,
-        vectorstore_manager: Any | None = None,
-    ) -> None:
+    def __init__(self, config: QueryEngineProxyConfig) -> None:
         """Initialize the proxy.
 
         Args:
-            vectorstores: Dictionary mapping file paths to vectorstores
-            chat_model: LangChain ChatOpenAI model
-            reranker: Optional reranker for retrieval results
-            log_callback: Optional logging callback
-            runtime_options: Runtime options for streaming and callbacks
-            vectorstore_manager: Real VectorStoreManager for proper merging
+            config: Configuration object containing all proxy parameters
         """
-        self.vectorstores = vectorstores
-        self.chat_model = chat_model
-        self.reranker = reranker
-        self.log_callback = log_callback
+        self.vectorstores = config.vectorstores
+        self.chat_model = config.chat_model
+        self.reranker = config.reranker
+        self.log_callback = config.log_callback
         # Use the real vectorstore manager if provided, otherwise fall back to simple one
-        self.vectorstore_manager = vectorstore_manager or SimpleVectorStoreManager(log_callback)
+        self.vectorstore_manager = (
+            config.vectorstore_manager or SimpleVectorStoreManager(config.log_callback)
+        )
 
         # Additional attributes expected by build_rag_chain
         self.system_prompt = ""  # Default empty system prompt
-        self.runtime = runtime_options or self._create_default_runtime()
+        self.runtime = config.runtime_options or self._create_default_runtime()
 
     def _create_default_runtime(self):
         """Create a default runtime options object for compatibility."""
