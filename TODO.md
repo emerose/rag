@@ -1,6 +1,16 @@
 ## 🚀 Next Priorities
 
-*All current priority tasks have been completed. See roadmap below for future work.*
+### DocumentSource/IngestionPipeline Integration
+- [#302] [P1] **Create integration adapter** – Build adapter layer to connect new IngestionPipeline with existing RAGEngine
+- [#302] [P1] **Update RAGComponentsFactory** – Modify factory to optionally create new pipeline architecture components
+- [#302] [P1] **Add configuration flag** – Add config option to switch between old IngestManager and new IngestionPipeline
+- [#302] [P1] **Update CLI integration** – Modify CLI commands to use new pipeline when enabled
+- [#302] [P1] **Create parallel integration tests** – Add integration tests that exercise new IngestionPipeline architecture
+- [#302] [P1] **Add e2e tests for new pipeline** – Ensure e2e tests cover new DocumentSource/IngestionPipeline flow
+- [#302] [P2] **Update documentation** – Document new architecture, migration guide, and configuration options
+- [#302] [P2] **Performance comparison** – Benchmark old vs new architecture performance
+- [#302] [P3] **Deprecate old architecture** – Add deprecation warnings to IngestManager and related components
+- [#302] [P3] **Remove old architecture** – Delete IngestManager, old DocumentLoader patterns after migration complete
 
 ---
 
