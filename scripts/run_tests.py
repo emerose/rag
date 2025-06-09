@@ -47,10 +47,24 @@ def run_e2e_tests() -> int:
 
 
 def run_all_tests() -> int:
-    """Run all tests."""
-    print(f"{BLUE}Running All Tests{RESET}")
-    cmd = ["python", "-m", "pytest", "-v", "--tb=short"]
-    return run_command(cmd)
+    """Run all tests in proper order: unit → integration → e2e."""
+    print(f"{BLUE}Running All Tests (unit → integration → e2e){RESET}")
+    
+    # Run unit tests first
+    print(f"{GREEN}Step 1/3: Running unit tests{RESET}")
+    unit_result = run_unit_tests()
+    if unit_result != 0:
+        return unit_result
+    
+    # Run integration tests second
+    print(f"{YELLOW}Step 2/3: Running integration tests{RESET}")
+    integration_result = run_integration_tests()
+    if integration_result != 0:
+        return integration_result
+    
+    # Run e2e tests last
+    print(f"{RED}Step 3/3: Running e2e tests{RESET}")
+    return run_e2e_tests()
 
 
 def run_quick_tests() -> int:
@@ -65,6 +79,30 @@ def run_coverage_tests() -> int:
     print(f"{BLUE}Running Tests with Coverage{RESET}")
     cmd = ["python", "-m", "pytest", "tests/unit/", "--cov=rag", "--cov-report=html", "--cov-report=term-missing"]
     return run_command(cmd)
+
+
+def run_lint() -> int:
+    """Run linting and formatting checks."""
+    print(f"{BLUE}Running Linting and Formatting{RESET}")
+    
+    # Format code
+    print(f"{GREEN}Formatting code{RESET}")
+    format_cmd = ["ruff", "format", "src/", "--line-length", "88"]
+    format_result = run_command(format_cmd)
+    if format_result != 0:
+        return format_result
+    
+    # Run linter
+    print(f"{GREEN}Linting code{RESET}")
+    lint_cmd = ["ruff", "check", "src/rag", "--fix", "--line-length", "88"]
+    lint_result = run_command(lint_cmd)
+    if lint_result != 0:
+        return lint_result
+    
+    # Format again after linting
+    print(f"{GREEN}Re-formatting after linting{RESET}")
+    reformat_cmd = ["ruff", "format", "src/", "--line-length", "88"]
+    return run_command(reformat_cmd)
 
 
 def main():
@@ -82,6 +120,7 @@ Commands:
   {RED}e2e{RESET}          Run end-to-end tests (complete workflows)
   {BLUE}all{RESET}          Run all tests
   {BLUE}coverage{RESET}     Run tests with coverage reporting
+  {BLUE}lint{RESET}         Run linting and formatting checks
 
 Test Categories:
   • Unit Tests: Fast, isolated, no external dependencies
@@ -92,6 +131,7 @@ Examples:
   python scripts/run_tests.py unit
   python scripts/run_tests.py integration  
   python scripts/run_tests.py coverage
+  python scripts/run_tests.py lint
         """)
         return 1
 
@@ -109,6 +149,8 @@ Examples:
         return run_all_tests()
     elif command == "coverage":
         return run_coverage_tests()
+    elif command == "lint":
+        return run_lint()
     else:
         print(f"{RED}Unknown command: {command}{RESET}")
         return 1

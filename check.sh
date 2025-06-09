@@ -39,22 +39,21 @@ python --version
 # Run all checks
 echo "🔍 Starting code quality checks..."
 
-# Run unit tests first
-run_check "python scripts/run_tests.py unit" "Running unit tests"
+# Run linting first
+run_check "python scripts/run_tests.py lint" "Running linting and formatting"
 
-# Run integration tests if unit tests passed
+# Run tests in order: unit → integration → e2e
+if [ $OVERALL_STATUS -eq 0 ]; then
+  run_check "python scripts/run_tests.py unit" "Running unit tests"
+fi
+
 if [ $OVERALL_STATUS -eq 0 ]; then
   run_check "python scripts/run_tests.py integration" "Running integration tests"
 fi
 
-# Format code (excluding tests)
-run_check "ruff format src/ --line-length 88" "Formatting code"
-
-# Run linter for main code
-run_check "ruff check src/rag --fix --line-length 88" "Linting main code"
-
-# Run format again to ensure any auto-fixes are properly formatted
-run_check "ruff format src/ --line-length 88" "Re-formatting code after linting"
+if [ $OVERALL_STATUS -eq 0 ]; then
+  run_check "python scripts/run_tests.py e2e" "Running e2e tests"
+fi
 
 # Final report
 if [ $OVERALL_STATUS -eq 0 ]; then
