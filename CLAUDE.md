@@ -107,7 +107,7 @@ The RAG system follows strict testing standards with three-tier architecture opt
 - **Integration tests** (`tests/integration/`): <500ms per test (automatically enforced), real filesystem + mocked external APIs, test component workflows  
 - **E2E tests** (`tests/e2e/`): <30s per test (automatically enforced), real CLI scenarios with mocked external APIs for cost control
 
-**CI Environment**: Timeouts are automatically multiplied by 3x (configurable via `CI_TIMEOUT_MULTIPLIER`) to account for slower CI resources while maintaining tight feedback loops locally.
+**CI Environment**: Timeouts are automatically multiplied by 5x (configurable via `CI_TIMEOUT_MULTIPLIER`) to account for slower CI resources while maintaining tight feedback loops locally.
 
 ### Testing Principles
 1. **No Real API Calls**: Unit and integration tests MUST use fake implementations, never call real external APIs
@@ -118,13 +118,13 @@ The RAG system follows strict testing standards with three-tier architecture opt
 
 ### Test Execution
 ```bash
-# Fast unit tests only (<100ms per test locally, 3x longer in CI)
+# Fast unit tests only (<100ms per test locally, 5x longer in CI)
 python -m pytest tests/unit/ -v --tb=short
 
-# Integration workflow tests (<500ms per test locally, 3x longer in CI) 
+# Integration workflow tests (<500ms per test locally, 5x longer in CI) 
 python -m pytest tests/integration/ -v --tb=short
 
-# E2E CLI tests (<30s per test locally, 3x longer in CI)
+# E2E CLI tests (<30s per test locally, 5x longer in CI)
 python -m pytest tests/e2e/ -v --tb=short
 
 # All tests with coverage
@@ -133,8 +133,8 @@ python -m pytest --cov=src/rag --cov-report=term-missing
 # Development workflow - stop on first failure
 python -m pytest -x
 
-# Override CI timeout multiplier (default 3.0x)
-CI_TIMEOUT_MULTIPLIER=5.0 python -m pytest tests/
+# Override CI timeout multiplier (default 5.0x)
+CI_TIMEOUT_MULTIPLIER=10.0 python -m pytest tests/
 ```
 
 ### Fake Implementation Pattern

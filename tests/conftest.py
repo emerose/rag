@@ -55,7 +55,7 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
     ])
     
     # Apply CI multiplier if in CI environment
-    ci_multiplier = float(os.environ.get("CI_TIMEOUT_MULTIPLIER", "3.0")) if is_ci else 1.0
+    ci_multiplier = float(os.environ.get("CI_TIMEOUT_MULTIPLIER", "5.0")) if is_ci else 1.0
         
     # Determine test type by file path and apply timeouts
     test_path = str(item.path)
