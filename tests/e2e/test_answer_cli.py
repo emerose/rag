@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 
 
-# Mark this test as integration test which should be run manually only
-pytestmark = pytest.mark.integration
+# Mark this test as e2e test which should be run manually only
+pytestmark = pytest.mark.e2e
 
 
 @pytest.fixture
