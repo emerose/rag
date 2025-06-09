@@ -94,7 +94,6 @@ class TestChunkingAlgorithms:
                 chunk_size=1000,
                 chunk_overlap=200,
                 model_name="text-embedding-3-small",
-                log_callback=None,
                 preserve_headings=True,
                 semantic_chunking=True
             )

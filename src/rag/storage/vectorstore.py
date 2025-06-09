@@ -19,6 +19,10 @@ from rag.storage.backends.factory import create_vectorstore_backend
 from rag.storage.protocols import VectorRepositoryProtocol, VectorStoreProtocol
 from rag.utils.logging_utils import log_message
 
+# Forward declarations for type checking
+if False:  # TYPE_CHECKING
+    from rag.config.components import VectorStoreManagerConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,29 +34,27 @@ class VectorStoreManager(VectorRepositoryProtocol):
     coupling to specific vector store implementations and improves testability.
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         cache_dir: Path | str,
         embeddings: Embeddings,
-        log_callback: Callable[[str, str, str], None] | None = None,
-        lock_timeout: int = 30,
         backend: str = "faiss",
         backend_config: dict[str, Any] | None = None,
+        lock_timeout: int = 30,
     ) -> None:
         """Initialize the vector store manager.
 
         Args:
             cache_dir: Directory for storing vector store cache files
             embeddings: Embedding provider
-            log_callback: Optional callback for logging
-            lock_timeout: Timeout in seconds for file locks
             backend: Backend name ("faiss", "fake", etc.)
             backend_config: Backend-specific configuration options
+            lock_timeout: Timeout in seconds for file locks
 
         """
         self.cache_dir = Path(cache_dir)
         self.embeddings = embeddings
-        self.log_callback = log_callback
+        self.log_callback = None
         self.lock_timeout = lock_timeout
         self.backend_name = backend
 
@@ -61,6 +63,49 @@ class VectorStoreManager(VectorRepositoryProtocol):
         self.backend = create_vectorstore_backend(backend, embeddings, **backend_config)
 
         self._log("DEBUG", f"Initialized VectorStoreManager with {backend} backend")
+
+    def set_log_callback(
+        self, log_callback: Callable[[str, str, str], None] | None
+    ) -> None:
+        """Set the log callback for this manager.
+
+        Args:
+            log_callback: Logging callback function
+        """
+        self.log_callback = log_callback
+
+    @classmethod
+    def from_config(
+        cls,
+        config: "VectorStoreManagerConfig",
+        embeddings: Embeddings,
+        log_callback: Callable[[str, str, str], None] | None = None,
+    ) -> "VectorStoreManager":
+        """Create VectorStoreManager from configuration object.
+
+        This is the preferred way to create a VectorStoreManager instance.
+
+        Args:
+            config: VectorStoreManagerConfig object with all parameters
+            embeddings: Embedding provider
+            log_callback: Optional callback for logging
+
+        Returns:
+            Configured VectorStoreManager instance
+        """
+
+        instance = cls(
+            cache_dir=config.cache_dir,
+            embeddings=embeddings,
+            backend=config.backend,
+            backend_config=config.backend_config,
+            lock_timeout=config.lock_timeout,
+        )
+
+        if log_callback is not None:
+            instance.set_log_callback(log_callback)
+
+        return instance
 
     def _log(self, level: str, message: str) -> None:
         """Log a message.

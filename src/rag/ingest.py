@@ -17,7 +17,6 @@ from langchain_core.documents import Document
 
 from rag.config.dependencies import IngestManagerDependencies
 from rag.data.document_loader import DocumentLoader
-from rag.storage.filesystem import FilesystemManager
 from rag.utils.logging_utils import log_message
 
 from .utils.progress_tracker import ProgressTracker
@@ -173,63 +172,31 @@ class IngestManager:
     including loading, preprocessing, chunking, and metadata enhancement.
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
-        filesystem_manager: FilesystemManager,
-        chunking_strategy: ChunkingStrategy,
+        dependencies: IngestManagerDependencies,
         preprocessor: Preprocessor | None = None,
-        *,
-        document_loader: DocumentLoader | None = None,
-        log_callback: Any | None = None,
-        progress_callback: Any | None = None,
         file_filter: Callable[[Path], bool] | None = None,
     ) -> None:
         """Initialize the ingest manager.
 
         Args:
-            filesystem_manager: Manager for filesystem operations
-            chunking_strategy: Strategy for document chunking
+            dependencies: Grouped dependencies
             preprocessor: Optional text preprocessor
-            document_loader: Optional ``DocumentLoader`` to reuse
-            log_callback: Optional callback for logging
-            progress_callback: Optional callback for progress tracking
             file_filter: Optional callable that takes a ``Path`` and returns
                 ``bool`` to filter files
         """
-        self.filesystem_manager = filesystem_manager
-        self.chunking_strategy = chunking_strategy
-        self.preprocessor = preprocessor or BasicPreprocessor()
-        self.log_callback = log_callback
-        self.progress_tracker = ProgressTracker(progress_callback)
-        self.file_filter = file_filter
-        self.document_loader = document_loader or DocumentLoader(
-            filesystem_manager,
-            log_callback,
+        self.filesystem_manager = dependencies.filesystem_manager
+        self.chunking_strategy = dependencies.chunking_strategy
+        self.preprocessor = (
+            preprocessor or dependencies.preprocessor or BasicPreprocessor()
         )
-
-    @classmethod
-    def from_dependencies(
-        cls,
-        dependencies: IngestManagerDependencies,
-    ) -> "IngestManager":
-        """Create IngestManager using dependency configuration object.
-
-        This is the preferred way to create an IngestManager instance.
-
-        Args:
-            dependencies: Grouped dependencies
-
-        Returns:
-            Configured IngestManager instance
-        """
-        return cls(
-            filesystem_manager=dependencies.filesystem_manager,
-            chunking_strategy=dependencies.chunking_strategy,
-            preprocessor=dependencies.preprocessor,
-            document_loader=dependencies.document_loader,
-            log_callback=dependencies.log_callback,
-            progress_callback=dependencies.progress_callback,
-            file_filter=dependencies.file_filter,
+        self.log_callback = dependencies.log_callback
+        self.progress_tracker = ProgressTracker(dependencies.progress_callback)
+        self.file_filter = file_filter or dependencies.file_filter
+        self.document_loader = dependencies.document_loader or DocumentLoader(
+            dependencies.filesystem_manager,
+            dependencies.log_callback,
         )
 
     def _log(self, level: str, message: str) -> None:

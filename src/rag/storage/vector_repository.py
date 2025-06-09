@@ -56,10 +56,10 @@ class VectorRepository(VectorRepositoryProtocol):
         self._manager = VectorStoreManager(
             cache_dir=cache_dir,
             embeddings=embeddings,
-            log_callback=log_callback,
             backend=backend,
             backend_config=backend_config or {},
         )
+        self._manager.set_log_callback(log_callback)
 
         self._log("DEBUG", f"Initialized VectorRepository with {backend} backend")
 

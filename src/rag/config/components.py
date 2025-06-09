@@ -35,6 +35,47 @@ class ChunkingConfig:
 
 
 @dataclass(frozen=True)
+class TextSplittingConfig:
+    """Configuration for text splitting operations.
+
+    This class contains all parameters related to how text is split
+    into chunks during document processing.
+
+    Attributes:
+        chunk_size: Size of chunks in tokens
+        chunk_overlap: Overlap between chunks in tokens
+        model_name: Name of the embedding model for tokenization
+        preserve_headings: Whether to preserve document heading structure in chunks
+        semantic_chunking: Whether to use semantic boundaries for chunking
+    """
+
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+    model_name: str = "text-embedding-3-small"
+    preserve_headings: bool = True
+    semantic_chunking: bool = True
+
+
+@dataclass(frozen=True)
+class SemanticSplitterConfig:
+    """Configuration for SemanticRecursiveCharacterTextSplitter.
+
+    This class contains all parameters related to the semantic text splitter.
+
+    Attributes:
+        chunk_size: Maximum chunk size (measured by length_function)
+        chunk_overlap: Amount of overlap between chunks
+        separators: List of separators to use (in order of priority)
+        keep_separator: Whether to keep separators in the chunks
+    """
+
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+    separators: list[str] | None = None
+    keep_separator: bool = True
+
+
+@dataclass(frozen=True)
 class EmbeddingConfig:
     """Configuration for embedding generation.
 
@@ -134,6 +175,25 @@ class StorageConfig:
     persist_data: bool = True
     memory_map: bool = False
     concurrent_access: bool = True
+
+
+@dataclass(frozen=True)
+class VectorStoreManagerConfig:
+    """Configuration for VectorStoreManager.
+
+    This class contains all parameters related to vector store management.
+
+    Attributes:
+        cache_dir: Directory for storing vector store cache files
+        lock_timeout: Timeout in seconds for file locks
+        backend: Backend name ("faiss", "fake", etc.)
+        backend_config: Backend-specific configuration options
+    """
+
+    cache_dir: str = ".cache"
+    lock_timeout: int = 30
+    backend: str = "faiss"
+    backend_config: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)

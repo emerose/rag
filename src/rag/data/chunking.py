@@ -21,6 +21,10 @@ from rag.utils.logging_utils import log_message
 
 from .text_splitter import TextSplitterFactory
 
+# Forward declarations for type checking
+if False:  # TYPE_CHECKING
+    from rag.config.components import TextSplittingConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -307,12 +311,11 @@ class SemanticChunkingStrategy(ChunkingStrategy):
     based on document MIME type, with support for semantic chunking and heading preservation.
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         model_name: str = "text-embedding-3-small",
-        log_callback: Any = None,
         preserve_headings: bool = True,
         semantic_chunking: bool = True,
     ) -> None:
@@ -322,14 +325,13 @@ class SemanticChunkingStrategy(ChunkingStrategy):
             chunk_size: Maximum chunk size in tokens
             chunk_overlap: Overlap between chunks in tokens
             model_name: Name of the embedding model to use for tokenization
-            log_callback: Optional callback for logging
             preserve_headings: Whether to preserve document heading structure
             semantic_chunking: Whether to use semantic boundaries for chunking
         """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.model_name = model_name
-        self.log_callback = log_callback
+        self.log_callback = None
         self.preserve_headings = preserve_headings
         self.semantic_chunking = semantic_chunking
 
@@ -338,13 +340,51 @@ class SemanticChunkingStrategy(ChunkingStrategy):
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             model_name=model_name,
-            log_callback=log_callback,
             preserve_headings=preserve_headings,
             semantic_chunking=semantic_chunking,
         )
 
         self.last_splitter_name: str | None = None
         self.tokenizer_name = self.splitter_factory.tokenizer_name
+
+    def set_log_callback(self, log_callback: Any) -> None:
+        """Set the log callback for this strategy and its components.
+
+        Args:
+            log_callback: Logging callback function
+        """
+        self.log_callback = log_callback
+        self.splitter_factory.log_callback = log_callback
+
+    @classmethod
+    def from_config(
+        cls,
+        config: "TextSplittingConfig",
+        log_callback: Any = None,
+    ) -> "SemanticChunkingStrategy":
+        """Create SemanticChunkingStrategy from configuration object.
+
+        This is the preferred way to create a SemanticChunkingStrategy instance.
+
+        Args:
+            config: TextSplittingConfig object with all parameters
+            log_callback: Optional logging callback
+
+        Returns:
+            Configured SemanticChunkingStrategy instance
+        """
+        instance = cls(
+            chunk_size=config.chunk_size,
+            chunk_overlap=config.chunk_overlap,
+            model_name=config.model_name,
+            preserve_headings=config.preserve_headings,
+            semantic_chunking=config.semantic_chunking,
+        )
+
+        if log_callback is not None:
+            instance.set_log_callback(log_callback)
+
+        return instance
 
     def _log(self, level: str, message: str) -> None:
         """Log a message.

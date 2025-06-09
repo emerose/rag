@@ -22,6 +22,10 @@ from rag.utils.logging_utils import log_message
 
 from .metadata_extractor import DocumentMetadataExtractor
 
+# Forward declarations for type checking
+if False:  # TYPE_CHECKING
+    from rag.config.components import SemanticSplitterConfig, TextSplittingConfig
+
 PDFMINER_AVAILABLE = True
 
 logger = logging.getLogger(__name__)
@@ -49,14 +53,13 @@ class SemanticRecursiveCharacterTextSplitter:
         "",  # Characters
     ]
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         length_function: Callable[[str], int] | None = None,
         separators: list[str] | None = None,
         keep_separator: bool = True,
-        is_separator_regex: bool = False,
     ) -> None:
         """Initialize the semantic text splitter.
 
@@ -66,14 +69,12 @@ class SemanticRecursiveCharacterTextSplitter:
             length_function: Function that measures text length
             separators: List of separators to use (in order of priority)
             keep_separator: Whether to keep separators in the chunks
-            is_separator_regex: Whether the separators are regex patterns
         """
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.length_function = length_function or len
         self.separators = separators or self.DEFAULT_SEPARATORS
         self.keep_separator = keep_separator
-        self.is_separator_regex = is_separator_regex
 
         # Create the underlying LangChain splitter
         self.splitter = RecursiveCharacterTextSplitter(
@@ -82,7 +83,6 @@ class SemanticRecursiveCharacterTextSplitter:
             length_function=self.length_function,
             separators=self.separators,
             keep_separator=keep_separator,
-            is_separator_regex=is_separator_regex,
         )
 
     def split_text(self, text: str) -> list[str]:
@@ -120,6 +120,32 @@ class SemanticRecursiveCharacterTextSplitter:
             List of documents
         """
         return self.splitter.create_documents(texts, metadatas=metadatas)
+
+    @classmethod
+    def from_config(
+        cls,
+        config: "SemanticSplitterConfig",
+        length_function: Callable[[str], int] | None = None,
+    ) -> "SemanticRecursiveCharacterTextSplitter":
+        """Create SemanticRecursiveCharacterTextSplitter from configuration object.
+
+        This is the preferred way to create a SemanticRecursiveCharacterTextSplitter instance.
+
+        Args:
+            config: SemanticSplitterConfig object with all parameters
+            length_function: Optional function that measures text length
+
+        Returns:
+            Configured SemanticRecursiveCharacterTextSplitter instance
+        """
+
+        return cls(
+            chunk_size=config.chunk_size,
+            chunk_overlap=config.chunk_overlap,
+            length_function=length_function,
+            separators=config.separators,
+            keep_separator=config.keep_separator,
+        )
 
     @classmethod
     def from_tiktoken_encoder(
@@ -311,12 +337,11 @@ class TextSplitterFactory:
         "description": "Token-based text splitter",
     }
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         chunk_size: int = 1000,
         chunk_overlap: int = 200,
         model_name: str = "text-embedding-3-small",
-        log_callback: Any | None = None,
         preserve_headings: bool = True,
         semantic_chunking: bool = True,
     ) -> None:
@@ -326,7 +351,6 @@ class TextSplitterFactory:
             chunk_size: Size of chunks in tokens
             chunk_overlap: Overlap between chunks in tokens
             model_name: Name of the embedding model for tokenization
-            log_callback: Optional callback for logging
             preserve_headings: Whether to preserve document heading structure in chunks
             semantic_chunking: Whether to use semantic boundaries for chunking
 
@@ -335,7 +359,7 @@ class TextSplitterFactory:
         self.chunk_size = int(os.environ.get("RAG_CHUNK_SIZE", chunk_size))
         self.chunk_overlap = int(os.environ.get("RAG_CHUNK_OVERLAP", chunk_overlap))
         self.model_name = model_name
-        self.log_callback = log_callback
+        self.log_callback = None
         self.preserve_headings = preserve_headings
         self.semantic_chunking = semantic_chunking
 
@@ -363,6 +387,45 @@ class TextSplitterFactory:
             f"Initialized with chunk_size={self.chunk_size}, chunk_overlap={self.chunk_overlap}, "
             f"preserve_headings={self.preserve_headings}, semantic_chunking={self.semantic_chunking}",
         )
+
+    def set_log_callback(self, log_callback: Any | None) -> None:
+        """Set the log callback for this factory.
+
+        Args:
+            log_callback: Logging callback function
+        """
+        self.log_callback = log_callback
+
+    @classmethod
+    def from_config(
+        cls,
+        config: "TextSplittingConfig",
+        log_callback: Any | None = None,
+    ) -> "TextSplitterFactory":
+        """Create TextSplitterFactory from configuration object.
+
+        This is the preferred way to create a TextSplitterFactory instance.
+
+        Args:
+            config: TextSplittingConfig object with all parameters
+            log_callback: Optional logging callback
+
+        Returns:
+            Configured TextSplitterFactory instance
+        """
+
+        instance = cls(
+            chunk_size=config.chunk_size,
+            chunk_overlap=config.chunk_overlap,
+            model_name=config.model_name,
+            preserve_headings=config.preserve_headings,
+            semantic_chunking=config.semantic_chunking,
+        )
+
+        if log_callback is not None:
+            instance.set_log_callback(log_callback)
+
+        return instance
 
     def _log(self, level: str, message: str) -> None:
         """Log a message.

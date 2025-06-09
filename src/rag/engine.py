@@ -4,7 +4,6 @@ This module provides the main RAGEngine class that orchestrates the entire
 RAG system through dependency injection pattern.
 """
 
-import asyncio
 import logging
 from collections.abc import Callable
 from pathlib import Path
@@ -58,39 +57,18 @@ class RAGEngine:
     interface for document ingestion, indexing, and querying.
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         config: RAGConfig,
         runtime: RuntimeOptions,
-        *,
-        filesystem_manager: FilesystemManager | None = None,
-        document_loader: DocumentLoader | None = None,
-        document_processor: DocumentProcessor | None = None,
-        text_splitter_factory: TextSplitterFactory | None = None,
-        embedding_provider: EmbeddingProvider | None = None,
-        embedding_batcher: EmbeddingBatcher | None = None,
-        cache_manager: CacheManager | None = None,
-        index_manager: CacheRepositoryProtocol | None = None,
-        vectorstore_manager: VectorStoreManager | None = None,
-        reranker: KeywordReranker | None = None,
-        chat_model: ChatOpenAI | None = None,
+        dependencies: RAGEngineDependencies | None = None,
     ) -> None:
         """Initialize the RAG engine.
 
         Args:
             config: RAG configuration
             runtime: Runtime options
-            filesystem_manager: Optional filesystem manager
-            document_loader: Optional document loader
-            document_processor: Optional document processor
-            text_splitter_factory: Optional text splitter factory
-            embedding_provider: Optional embedding provider
-            embedding_batcher: Optional embedding batcher
-            cache_manager: Optional cache manager
-            index_manager: Optional index manager implementing CacheRepositoryProtocol
-            vectorstore_manager: Optional vectorstore manager
-            reranker: Optional reranker
-            chat_model: Optional chat model
+            dependencies: Optional grouped dependencies
         """
         self.config = config
         self.runtime = runtime
@@ -106,45 +84,17 @@ class RAGEngine:
 
         # Initialize paths
         self.documents_dir = Path(config.documents_dir).resolve()
+        self.cache_dir = Path(config.cache_dir).absolute()
+
+        # Ensure cache directory exists
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Initialize missing components needed by indexer
         self.ingest_manager: IngestManager | None = None  # Will be initialized later
 
-        # Initialize components
-        self._initialize_filesystem(filesystem_manager)
-        self._initialize_document_processing(
-            document_loader, document_processor, text_splitter_factory
-        )
-        self._initialize_embeddings(embedding_provider, embedding_batcher)
-        self._initialize_storage(cache_manager, index_manager, vectorstore_manager)
-        self._initialize_retrieval(reranker, chat_model)
-
-        # Initialize orchestrators
-        self._initialize_orchestrators()
-
-    @classmethod
-    def from_dependencies(
-        cls,
-        config: RAGConfig,
-        runtime: RuntimeOptions,
-        dependencies: RAGEngineDependencies | None = None,
-    ) -> "RAGEngine":
-        """Create RAGEngine using dependency configuration object.
-
-        This is the preferred way to create a RAGEngine instance when you have
-        many dependencies to inject.
-
-        Args:
-            config: RAG configuration
-            runtime: Runtime options
-            dependencies: Optional grouped dependencies
-
-        Returns:
-            Configured RAGEngine instance
-        """
+        # Extract dependencies
         deps = dependencies or RAGEngineDependencies()
 
-        # Extract individual dependencies from groups
         filesystem_manager = None
         cache_manager = None
         index_manager = None
@@ -179,21 +129,17 @@ class RAGEngine:
             chat_model = deps.retrieval.chat_model
             reranker = deps.retrieval.reranker
 
-        return cls(
-            config=config,
-            runtime=runtime,
-            filesystem_manager=filesystem_manager,
-            document_loader=document_loader,
-            document_processor=document_processor,
-            text_splitter_factory=text_splitter_factory,
-            embedding_provider=embedding_provider,
-            embedding_batcher=embedding_batcher,
-            cache_manager=cache_manager,
-            index_manager=index_manager,
-            vectorstore_manager=vectorstore_manager,
-            reranker=reranker,
-            chat_model=chat_model,
+        # Initialize components
+        self._initialize_filesystem(filesystem_manager)
+        self._initialize_document_processing(
+            document_loader, document_processor, text_splitter_factory
         )
+        self._initialize_embeddings(embedding_provider, embedding_batcher)
+        self._initialize_storage(cache_manager, index_manager, vectorstore_manager)
+        self._initialize_retrieval(reranker, chat_model)
+
+        # Initialize orchestrators
+        self._initialize_orchestrators()
 
     def _log(self, level: str, message: str) -> None:
         """Log a message.
@@ -236,14 +182,17 @@ class RAGEngine:
         )
 
         # Initialize text splitter factory
-        self.text_splitter_factory = text_splitter_factory or TextSplitterFactory(
-            chunk_size=self.config.chunk_size,
-            chunk_overlap=self.config.chunk_overlap,
-            model_name=self.config.embedding_model,
-            log_callback=self.runtime.log_callback,
-            preserve_headings=self.runtime.preserve_headings,
-            semantic_chunking=self.runtime.semantic_chunking,
-        )
+        if text_splitter_factory is None:
+            self.text_splitter_factory = TextSplitterFactory(
+                chunk_size=self.config.chunk_size,
+                chunk_overlap=self.config.chunk_overlap,
+                model_name=self.config.embedding_model,
+                preserve_headings=self.runtime.preserve_headings,
+                semantic_chunking=self.runtime.semantic_chunking,
+            )
+            self.text_splitter_factory.set_log_callback(self.runtime.log_callback)
+        else:
+            self.text_splitter_factory = text_splitter_factory
 
         # Initialize document processor
         self.document_processor = document_processor or DocumentProcessor(
@@ -255,6 +204,7 @@ class RAGEngine:
         )
 
         # Initialize ingest manager (needed by document indexer)
+        from rag.config.dependencies import IngestManagerDependencies
         from rag.data.chunking import DefaultChunkingStrategy
 
         chunking_strategy = DefaultChunkingStrategy(
@@ -263,13 +213,14 @@ class RAGEngine:
             model_name=self.config.embedding_model,
             log_callback=self.runtime.log_callback,
         )
-        self.ingest_manager = IngestManager(
+        ingest_dependencies = IngestManagerDependencies(
             filesystem_manager=self.filesystem_manager,
             chunking_strategy=chunking_strategy,
             document_loader=self.document_loader,
             log_callback=self.runtime.log_callback,
             progress_callback=self.runtime.progress_callback,
         )
+        self.ingest_manager = IngestManager(dependencies=ingest_dependencies)
 
     def _initialize_embeddings(
         self,
@@ -334,12 +285,15 @@ class RAGEngine:
         )
 
         # Initialize vectorstore manager (needed by cache manager)
-        self.vectorstore_manager = vectorstore_manager or VectorStoreManager(
-            cache_dir=Path(self.config.cache_dir),
-            embeddings=self.embedding_provider.get_embeddings_model,
-            log_callback=self.runtime.log_callback,
-            backend=self.config.vectorstore_backend,
-        )
+        if vectorstore_manager is None:
+            self.vectorstore_manager = VectorStoreManager(
+                cache_dir=Path(self.config.cache_dir),
+                embeddings=self.embedding_provider.get_embeddings_model,
+                backend=self.config.vectorstore_backend,
+            )
+            self.vectorstore_manager.set_log_callback(self.runtime.log_callback)
+        else:
+            self.vectorstore_manager = vectorstore_manager
 
         # Initialize cache manager
         self.cache_manager = cache_manager or CacheManager(
@@ -382,9 +336,12 @@ class RAGEngine:
         )
 
         # Initialize document indexer
-        self.document_indexer = DocumentIndexer(
-            config=self.config,
-            runtime_options=self.runtime,
+        from rag.config.dependencies import (
+            DocumentIndexerDependencies,
+            QueryEngineDependencies,
+        )
+
+        indexer_dependencies = DocumentIndexerDependencies(
             filesystem_manager=self.filesystem_manager,
             cache_repository=self.index_manager,
             vector_repository=self.vectorstore_manager,
@@ -396,15 +353,23 @@ class RAGEngine:
             embedding_model_version=self._embedding_model_version,
             log_callback=self.runtime.log_callback,
         )
-
-        # Initialize query engine
-        self.query_engine = QueryEngine(
+        self.document_indexer = DocumentIndexer(
             config=self.config,
             runtime_options=self.runtime,
+            dependencies=indexer_dependencies,
+        )
+
+        # Initialize query engine
+        query_dependencies = QueryEngineDependencies(
             chat_model=self.chat_model,
             document_loader=self.document_loader,
             reranker=self.reranker,
             log_callback=self.runtime.log_callback,
+        )
+        self.query_engine = QueryEngine(
+            config=self.config,
+            runtime_options=self.runtime,
+            dependencies=query_dependencies,
         )
 
     @property
@@ -474,15 +439,14 @@ class RAGEngine:
             k: Number of documents to retrieve
 
         Returns:
-            Dictionary with answer, sources, and metadata. Same payload format
-            as the legacy implementation for backward compatibility.
+            Dictionary with answer, sources, and metadata.
         """
         return self.query_engine.answer(
             question, self.cache_orchestrator.get_vectorstores(), k
         )
 
     def query(self, query: str, k: int = 4) -> str:
-        """Return only the answer text for query (legacy helper).
+        """Return only the answer text for query.
 
         Args:
             query: Query string
@@ -563,66 +527,3 @@ class RAGEngine:
 
         """
         return self.cache_orchestrator.load_cached_vectorstore(file_path)
-
-    def _load_cache_metadata(self) -> dict[str, dict[str, Any]]:
-        """Backward compatibility: Load cache metadata.
-
-        Returns:
-            Cache metadata
-
-        """
-        return self.cache_orchestrator.load_cache_metadata()
-
-    def _load_cached_vectorstore(self, file_path: str) -> VectorStoreProtocol | None:
-        """Backward compatibility: Load vectorstore from cache.
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            Loaded vector store or ``None`` if not found
-
-        """
-        return self.cache_orchestrator.load_cached_vectorstore(file_path)
-
-    def _invalidate_cache(self, file_path: str) -> None:
-        """Backward compatibility: Invalidate cache for a specific file.
-
-        Args:
-            file_path: Path to the file to invalidate
-
-        """
-        self.invalidate_cache(file_path)
-
-    def _invalidate_all_caches(self) -> None:
-        """Backward compatibility: Invalidate all caches."""
-        self.invalidate_all_caches()
-
-    async def index_documents_async(self) -> None:
-        """Backward compatibility: Index all documents asynchronously.
-
-        This method indexes all documents in the configured directory.
-        """
-        self._log("INFO", "Starting asynchronous document indexing")
-
-        # Get all files to index
-        if not self.filesystem_manager.validate_documents_dir(self.documents_dir):
-            self._log("ERROR", f"Invalid documents directory: {self.documents_dir}")
-            return
-
-        # Get list of files to index
-        files = self.filesystem_manager.scan_directory(self.documents_dir)
-        self._log("INFO", f"Found {len(files)} files to index")
-
-        # Index each file
-        for file_path in files:
-            try:
-                await asyncio.sleep(0)  # Yield control back to event loop
-                self.index_file(file_path)[0]
-            except ENGINE_EXCEPTIONS as e:
-                self._log("ERROR", f"Error indexing {file_path}: {e}")
-
-        # Clean up invalid caches
-        self.cache_manager.cleanup_invalid_caches()
-
-        self._log("INFO", "Finished document indexing")

@@ -973,7 +973,7 @@ def list(
         rag_engine = create_rag_engine(config, runtime_options)
 
         # Get metadata directly from SQLite
-        index_metadata = rag_engine.index_meta
+        index_metadata = rag_engine.index_manager
         indexed_files = index_metadata.list_indexed_files()
 
         state.logger.debug(f"Found {len(indexed_files)} indexed documents")
@@ -1126,7 +1126,7 @@ def _initialize_rag_engine(runtime_options: RuntimeOptions | None = None) -> RAG
 
 def _load_vectorstores(rag_engine: RAGEngine) -> None:
     """Load cached vectorstores into the RAG engine."""
-    index_metadata = rag_engine.index_meta
+    index_metadata = rag_engine.index_manager
     indexed_files = index_metadata.list_indexed_files()
 
     if not indexed_files:

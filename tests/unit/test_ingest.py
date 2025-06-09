@@ -12,6 +12,7 @@ import pytest
 from langchain_core.documents import Document
 
 from rag.data.chunking import DefaultChunkingStrategy, SemanticChunkingStrategy
+from rag.config.dependencies import IngestManagerDependencies
 from rag.ingest import (
     BasicPreprocessor,
     DocumentSource,
@@ -271,10 +272,13 @@ class TestIngestManager(unittest.TestCase):
         self.chunking_strategy = MockChunkingStrategy()
 
         # Create ingest manager
-        self.ingest_manager = IngestManager(
+        from rag.config.dependencies import IngestManagerDependencies
+        
+        dependencies = IngestManagerDependencies(
             filesystem_manager=self.filesystem_manager,
             chunking_strategy=self.chunking_strategy,
         )
+        self.ingest_manager = IngestManager(dependencies=dependencies)
 
     def tearDown(self) -> None:
         """Tear down test fixtures."""
@@ -374,11 +378,12 @@ class TestIngestManager(unittest.TestCase):
         def file_filter(path: Path) -> bool:
             return path.suffix == ".md"
 
-        ingest_manager = IngestManager(
+        dependencies = IngestManagerDependencies(
             filesystem_manager=self.filesystem_manager,
             chunking_strategy=self.chunking_strategy,
             file_filter=file_filter,
         )
+        ingest_manager = IngestManager(dependencies=dependencies)
 
         # Mock necessary methods to avoid actual file loading
         with patch.object(ingest_manager, "ingest_file") as mock_ingest_file:
@@ -401,10 +406,11 @@ class TestIngestManager(unittest.TestCase):
         """Test with real chunking strategy."""
         # Create ingest manager with real chunking strategy
         chunking_strategy = DefaultChunkingStrategy(chunk_size=50, chunk_overlap=0)
-        ingest_manager = IngestManager(
+        dependencies = IngestManagerDependencies(
             filesystem_manager=self.filesystem_manager,
             chunking_strategy=chunking_strategy,
         )
+        ingest_manager = IngestManager(dependencies=dependencies)
 
         # Mock document loader to return known content with a sufficiently long text
         with patch(
@@ -434,11 +440,12 @@ class TestIngestManager(unittest.TestCase):
                 return text.upper()
 
         # Create ingest manager with custom preprocessor
-        ingest_manager = IngestManager(
+        dependencies = IngestManagerDependencies(
             filesystem_manager=self.filesystem_manager,
             chunking_strategy=self.chunking_strategy,
             preprocessor=UppercasePreprocessor(),
         )
+        ingest_manager = IngestManager(dependencies=dependencies)
 
         # Mock document loader
         with patch(

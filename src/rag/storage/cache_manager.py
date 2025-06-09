@@ -50,6 +50,9 @@ class CacheManager:
         self.filesystem_manager = filesystem_manager
         self.vector_repository = vector_repository
 
+        # Initialize cache metadata
+        self.cache_metadata: dict[str, dict[str, Any]] = {}
+
     def _log(self, level: str, message: str) -> None:
         """Log a message.
 

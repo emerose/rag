@@ -23,7 +23,6 @@ class TestSemanticRecursiveCharacterTextSplitter:
         assert splitter.chunk_overlap == 200
         assert splitter.separators == splitter.DEFAULT_SEPARATORS
         assert splitter.keep_separator is True
-        assert splitter.is_separator_regex is False
         assert splitter.splitter is not None
 
     def test_split_text(self) -> None:

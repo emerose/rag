@@ -104,6 +104,7 @@ class RAGComponentsFactory:
         self._document_indexer: DocumentIndexer | None = None
         self._query_engine: QueryEngine | None = None
         self._cache_orchestrator: CacheOrchestrator | None = None
+        self._embedding_batcher: EmbeddingBatcher | None = None
 
         # Load embedding model map
         self._embedding_model_map: dict[str, str] | None = None
@@ -135,8 +136,8 @@ class RAGComponentsFactory:
             self._vector_repository = VectorStoreManager(
                 cache_dir=cache_dir,
                 embeddings=embedding_service,
-                log_callback=self.runtime.log_callback,
             )
+            self._vector_repository.set_log_callback(self.runtime.log_callback)
         return self._vector_repository
 
     @property
@@ -183,6 +184,7 @@ class RAGComponentsFactory:
     def ingest_manager(self) -> IngestManager:
         """Get or create ingest manager."""
         if self._ingest_manager is None:
+            from rag.config.dependencies import IngestManagerDependencies
             from rag.data.chunking import DefaultChunkingStrategy
 
             chunking_strategy = DefaultChunkingStrategy(
@@ -191,13 +193,14 @@ class RAGComponentsFactory:
                 model_name=self.config.embedding_model,
                 log_callback=self.runtime.log_callback,
             )
-            self._ingest_manager = IngestManager(
+            dependencies = IngestManagerDependencies(
                 filesystem_manager=self.filesystem_manager,
                 chunking_strategy=chunking_strategy,
                 document_loader=self.document_loader,
                 log_callback=self.runtime.log_callback,
                 progress_callback=self.runtime.progress_callback,
             )
+            self._ingest_manager = IngestManager(dependencies=dependencies)
         return self._ingest_manager
 
     @property
@@ -234,10 +237,10 @@ class RAGComponentsFactory:
                 self._embedding_model_map = {}
         return self._embedding_model_map
 
-    def create_document_indexer(self) -> DocumentIndexer:
-        """Create a DocumentIndexer with all dependencies wired."""
-        if self._document_indexer is None:
-            # Create config for embedding batcher
+    @property
+    def embedding_batcher(self) -> EmbeddingBatcher:
+        """Get or create embedding batcher."""
+        if self._embedding_batcher is None:
             from rag.config.components import EmbeddingConfig
 
             embedding_config = EmbeddingConfig(
@@ -245,40 +248,54 @@ class RAGComponentsFactory:
                 batch_size=128,
                 max_workers=self.runtime.max_workers,
             )
-            embedding_batcher = EmbeddingBatcher(
+            self._embedding_batcher = EmbeddingBatcher(
                 embedding_provider=self.embedding_service,
                 config=embedding_config,
                 log_callback=self.runtime.log_callback,
-                progress_callback=self.runtime.progress_callback,
             )
+        return self._embedding_batcher
 
-            self._document_indexer = DocumentIndexer(
-                config=self.config,
-                runtime_options=self.runtime,
+    def create_document_indexer(self) -> DocumentIndexer:
+        """Create a DocumentIndexer with all dependencies wired."""
+        if self._document_indexer is None:
+            from rag.config.dependencies import DocumentIndexerDependencies
+
+            dependencies = DocumentIndexerDependencies(
                 filesystem_manager=self.filesystem_manager,
                 cache_repository=self.cache_repository,
                 vector_repository=self.vector_repository,
                 document_loader=self.document_loader,
                 ingest_manager=self.ingest_manager,
                 embedding_provider=self.embedding_service,
-                embedding_batcher=embedding_batcher,
+                embedding_batcher=self.embedding_batcher,
                 embedding_model_map=self.embedding_model_map,
                 embedding_model_version=self._embedding_model_version,
                 log_callback=self.runtime.log_callback,
+            )
+
+            self._document_indexer = DocumentIndexer(
+                config=self.config,
+                runtime_options=self.runtime,
+                dependencies=dependencies,
             )
         return self._document_indexer
 
     def create_query_engine(self) -> QueryEngine:
         """Create a QueryEngine with all dependencies wired."""
         if self._query_engine is None:
-            self._query_engine = QueryEngine(
-                config=self.config,
-                runtime_options=self.runtime,
+            from rag.config.dependencies import QueryEngineDependencies
+
+            dependencies = QueryEngineDependencies(
                 chat_model=self.chat_model,
                 document_loader=self.document_loader,
                 reranker=self.reranker,
-                default_prompt_id="default",
                 log_callback=self.runtime.log_callback,
+            )
+            self._query_engine = QueryEngine(
+                config=self.config,
+                runtime_options=self.runtime,
+                dependencies=dependencies,
+                default_prompt_id="default",
             )
         return self._query_engine
 
@@ -316,72 +333,72 @@ class RAGComponentsFactory:
     def create_rag_engine(self) -> RAGEngine:
         """Create a RAGEngine with all dependencies injected from the factory.
 
-        This method creates a RAGEngine instance but bypasses its normal
-        component initialization, instead injecting pre-built components
+        This method creates a RAGEngine instance with pre-built components
         from this factory.
 
         Returns:
             RAGEngine instance with factory-injected dependencies
         """
         # Import here to avoid circular imports
+        from rag.config.dependencies import (
+            DocumentProcessingDependencies,
+            EmbeddingDependencies,
+            RAGEngineDependencies,
+            RetrievalDependencies,
+            StorageDependencies,
+        )
         from rag.engine import RAGEngine
 
-        # Create RAGEngine instance without component initialization
-        engine = object.__new__(RAGEngine)
+        # Create dependency configuration
+        storage_deps = StorageDependencies(
+            filesystem_manager=self.filesystem_manager,
+            cache_manager=self.cache_manager,
+            index_manager=self.cache_repository,
+            vectorstore_manager=self.vector_repository,
+        )
 
-        # Set up configuration - same as normal RAGEngine.__init__
-        engine.config = self.config
-        engine.runtime = self.runtime
-        engine.embedding_model_map = self.embedding_model_map
-        engine.default_prompt_id = "default"
-        engine.system_prompt = ""
+        document_processing_deps = DocumentProcessingDependencies(
+            document_loader=self.document_loader,
+            document_processor=None,  # Not used in factory
+            text_splitter_factory=self._create_text_splitter_factory(),
+            ingest_manager=self.ingest_manager,
+        )
 
-        # Inject pre-built components from factory instead of creating new ones
-        engine.documents_dir = Path(self.config.documents_dir).resolve()
-        engine.cache_dir = Path(self.config.cache_dir).absolute()
+        embedding_deps = EmbeddingDependencies(
+            embedding_provider=self.embedding_service,
+            embedding_batcher=self.embedding_batcher,
+            embedding_model_map=self.embedding_model_map,
+            embedding_model_version="1.0",
+        )
 
-        # Ensure cache directory exists
-        engine.cache_dir.mkdir(parents=True, exist_ok=True)
+        retrieval_deps = RetrievalDependencies(
+            chat_model=self.chat_model,
+            reranker=self.reranker,
+        )
 
-        # Inject components from factory
-        engine.filesystem_manager = self.filesystem_manager
-        engine.index_manager = (
-            self.cache_repository
-        )  # IndexManager implements CacheRepositoryProtocol
-        engine.cache_manager = self.cache_manager
-        engine.embedding_provider = (
-            self.embedding_service
-        )  # Keep as EmbeddingServiceProtocol interface
-        engine.vectorstore_manager = (
-            self.vector_repository
-        )  # VectorStoreManager implements VectorRepositoryProtocol
-        engine.text_splitter_factory = self._create_text_splitter_factory()
-        engine.document_loader = self.document_loader
-        engine.ingest_manager = self.ingest_manager
-        engine.reranker = self.reranker
-        engine.chat_model = self.chat_model
+        dependencies = RAGEngineDependencies(
+            storage=storage_deps,
+            document_processing=document_processing_deps,
+            embeddings=embedding_deps,
+            retrieval=retrieval_deps,
+        )
 
-        # Create high-level components
-        engine.document_indexer = self.create_document_indexer()
-        engine.query_engine = self.create_query_engine()
-        engine.cache_orchestrator = self.create_cache_orchestrator()
-
-        # Backward compatibility
-        engine.index_meta = engine.index_manager
-
-        # Initialize vectorstores for already processed files
-        engine.cache_orchestrator.initialize_vectorstores()
-
-        return engine
+        # Create RAGEngine with dependencies
+        return RAGEngine(
+            config=self.config,
+            runtime=self.runtime,
+            dependencies=dependencies,
+        )
 
     def _create_text_splitter_factory(self) -> TextSplitterFactory:
         """Create TextSplitterFactory for RAGEngine compatibility."""
         from rag.data.text_splitter import TextSplitterFactory
 
-        return TextSplitterFactory(
+        factory = TextSplitterFactory(
             chunk_size=self.config.chunk_size,
             chunk_overlap=self.config.chunk_overlap,
             model_name=self.config.embedding_model,
-            log_callback=self.runtime.log_callback,
             preserve_headings=self.runtime.preserve_headings,
         )
+        factory.set_log_callback(self.runtime.log_callback)
+        return factory

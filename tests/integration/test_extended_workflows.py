@@ -13,6 +13,7 @@ from langchain_core.embeddings import FakeEmbeddings
 
 from rag.cli.cli import app, state
 from rag.config import RAGConfig, RuntimeOptions
+from rag.config.dependencies import VectorstoreCreationParams
 from rag.engine import RAGEngine
 from rag.prompts import list_prompts
 from rag.mcp import build_server, create_http_app
@@ -88,18 +89,26 @@ def test_incremental_indexing_workflow(tmp_path: Path) -> None:
         )
         engine = RAGEngine(config, RuntimeOptions(async_batching=False))
         docs1 = [Document(page_content="alpha"), Document(page_content="bravo")]
-        assert engine.document_indexer._create_vectorstore_from_documents(
-            tmp_path / "doc.txt", docs1, "text/plain", {}
+        params1 = VectorstoreCreationParams(
+            file_path=tmp_path / "doc.txt",
+            documents=docs1,
+            file_type="text/plain",
+            vectorstores={},
         )
+        assert engine.document_indexer._create_vectorstore_from_documents(params1)
         docs2 = [Document(page_content="alpha changed"), Document(page_content="bravo")]
         with patch.object(
             engine.embedding_batcher,
             "process_embeddings",
             wraps=engine.embedding_batcher.process_embeddings,
         ) as mock_embed:
-            assert engine.document_indexer._create_vectorstore_from_documents(
-                tmp_path / "doc.txt", docs2, "text/plain", {}
+            params2 = VectorstoreCreationParams(
+                file_path=tmp_path / "doc.txt",
+                documents=docs2,
+                file_type="text/plain",
+                vectorstores={},
             )
+            assert engine.document_indexer._create_vectorstore_from_documents(params2)
             mock_embed.assert_called_once()
             assert len(mock_embed.call_args[0][0]) == 1
 

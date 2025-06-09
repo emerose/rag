@@ -17,16 +17,11 @@ from rag.config.dependencies import (
     DocumentIndexerDependencies,
     VectorstoreCreationParams,
 )
-from rag.data.document_loader import DocumentLoader
 from rag.embeddings.batching import EmbeddingBatcher
 from rag.embeddings.embedding_provider import EmbeddingProvider
 from rag.embeddings.model_map import get_model_for_path
-from rag.ingest import IngestManager
 from rag.storage.metadata import DocumentMetadata, FileMetadata
 from rag.storage.protocols import (
-    CacheRepositoryProtocol,
-    FileSystemProtocol,
-    VectorRepositoryProtocol,
     VectorStoreProtocol,
 )
 from rag.utils.async_utils import run_coro_sync
@@ -57,86 +52,34 @@ class DocumentIndexer:
     It implements single responsibility principle by focusing solely on indexing.
     """
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         config: RAGConfig,
         runtime_options: RuntimeOptions,
-        filesystem_manager: FileSystemProtocol,
-        cache_repository: CacheRepositoryProtocol,
-        vector_repository: VectorRepositoryProtocol,
-        document_loader: DocumentLoader,
-        ingest_manager: IngestManager,
-        embedding_provider: EmbeddingProvider,
-        embedding_batcher: EmbeddingBatcher,
-        embedding_model_map: dict[str, str],
-        embedding_model_version: str,
-        log_callback: Callable[[str, str, str], None] | None = None,
+        dependencies: DocumentIndexerDependencies,
     ) -> None:
         """Initialize the DocumentIndexer.
 
         Args:
             config: RAG configuration
             runtime_options: Runtime options
-            filesystem_manager: Filesystem operations
-            cache_repository: Cache and metadata operations
-            vector_repository: Vector storage operations
-            document_loader: Document loading component
-            ingest_manager: Document ingestion component
-            embedding_provider: Embedding generation service
-            embedding_batcher: Batch embedding processing
-            embedding_model_map: Per-file embedding model mapping
-            embedding_model_version: Current embedding model version
-            log_callback: Optional logging callback
+            dependencies: Grouped dependencies
         """
         self.config = config
         self.runtime = runtime_options
-        self.filesystem_manager = filesystem_manager
-        self.cache_repository = cache_repository
-        self.vector_repository = vector_repository
-        self.document_loader = document_loader
-        self.ingest_manager = ingest_manager
-        self.embedding_provider = embedding_provider
-        self.embedding_batcher = embedding_batcher
-        self.embedding_model_map = embedding_model_map
-        self.embedding_model_version = embedding_model_version
-        self.log_callback = log_callback
+        self.filesystem_manager = dependencies.filesystem_manager
+        self.cache_repository = dependencies.cache_repository
+        self.vector_repository = dependencies.vector_repository
+        self.document_loader = dependencies.document_loader
+        self.ingest_manager = dependencies.ingest_manager
+        self.embedding_provider = dependencies.embedding_provider
+        self.embedding_batcher = dependencies.embedding_batcher
+        self.embedding_model_map = dependencies.embedding_model_map
+        self.embedding_model_version = dependencies.embedding_model_version
+        self.log_callback = dependencies.log_callback
 
         # Set up paths
         self.documents_dir = Path(self.config.documents_dir).resolve()
-
-    @classmethod
-    def from_dependencies(
-        cls,
-        config: RAGConfig,
-        runtime_options: RuntimeOptions,
-        dependencies: DocumentIndexerDependencies,
-    ) -> "DocumentIndexer":
-        """Create DocumentIndexer using dependency configuration object.
-
-        This is the preferred way to create a DocumentIndexer instance.
-
-        Args:
-            config: RAG configuration
-            runtime_options: Runtime options
-            dependencies: Grouped dependencies
-
-        Returns:
-            Configured DocumentIndexer instance
-        """
-        return cls(
-            config=config,
-            runtime_options=runtime_options,
-            filesystem_manager=dependencies.filesystem_manager,
-            cache_repository=dependencies.cache_repository,
-            vector_repository=dependencies.vector_repository,
-            document_loader=dependencies.document_loader,
-            ingest_manager=dependencies.ingest_manager,
-            embedding_provider=dependencies.embedding_provider,
-            embedding_batcher=dependencies.embedding_batcher,
-            embedding_model_map=dependencies.embedding_model_map,
-            embedding_model_version=dependencies.embedding_model_version,
-            log_callback=dependencies.log_callback,
-        )
 
     def _log(
         self, level: str, message: str, subsystem: str = "DocumentIndexer"
@@ -309,7 +252,7 @@ class DocumentIndexer:
                 self._log("DEBUG", f"First document metadata: {first_doc.metadata}")
 
             # Generate embeddings and create vectorstore
-            success = self._create_vectorstore_from_documents(
+            params = VectorstoreCreationParams(
                 file_path=file_path,
                 documents=documents,
                 file_type=ingest_result.source.mime_type or "text/plain",
@@ -320,6 +263,7 @@ class DocumentIndexer:
                 vectorstores=vectorstores,
                 vectorstore_register_callback=vectorstore_register_callback,
             )
+            success = self._create_vectorstore_from_documents(params)
             if progress_callback:
                 event = "indexed" if success else "error"
                 progress_callback(
@@ -333,63 +277,47 @@ class DocumentIndexer:
                 progress_callback("error", file_path, error_message)
             return False, error_message
 
-    def _create_vectorstore_from_documents(  # noqa: PLR0912, PLR0913, PLR0915
+    def _create_vectorstore_from_documents(  # noqa: PLR0912, PLR0915
         self,
-        file_path: Path,
-        documents: list[Document],
-        file_type: str,
-        vectorstores: dict[str, VectorStoreProtocol],
-        embedding_model: str | None = None,
-        loader_name: str | None = None,
-        tokenizer_name: str | None = None,
-        text_splitter_name: str | None = None,
-        vectorstore_register_callback: Callable[[str, VectorStoreProtocol], None]
-        | None = None,
+        params: VectorstoreCreationParams,
     ) -> bool:
         """Create or update a vectorstore from documents.
 
         Args:
-            file_path: Path to the file
-            documents: List of documents to add to the vectorstore
-            file_type: MIME type of the file
-            vectorstores: Dictionary mapping file paths to vectorstores
-            embedding_model: Embedding model to use (optional)
-            loader_name: Document loader used (optional)
-            tokenizer_name: Tokenizer used (optional)
-            text_splitter_name: Text splitter used (optional)
+            params: Parameters for vectorstore creation
 
         Returns:
             True if successful, False otherwise
         """
         try:
             # Load existing vectorstore if available
-            existing_vectorstore = vectorstores.get(str(file_path))
+            existing_vectorstore = params.vectorstores.get(str(params.file_path))
             if not existing_vectorstore:
                 self._log(
                     "DEBUG",
-                    f"No existing vectorstore for {file_path}, "
+                    f"No existing vectorstore for {params.file_path}, "
                     "loading from cache if available",
                 )
                 existing_vectorstore = self.vector_repository.load_vectorstore(
-                    str(file_path)
+                    str(params.file_path)
                 )
                 if existing_vectorstore:
                     self._log("DEBUG", "Loaded existing vectorstore from cache")
 
-            old_hashes = self.cache_repository.get_chunk_hashes(file_path)
+            old_hashes = self.cache_repository.get_chunk_hashes(params.file_path)
             new_hashes: list[str] = []
 
             # Create a new vectorstore and process chunks sequentially
             vectorstore = self.vector_repository.create_empty_vectorstore()
 
             provider, batcher = self._get_embedding_tools(
-                embedding_model or self.config.embedding_model
+                params.embedding_model or self.config.embedding_model
             )
 
             docs_to_embed: list[Document] = []
             embed_indices: list[int] = []
 
-            for idx, doc in enumerate(documents):
+            for idx, doc in enumerate(params.documents):
                 chunk_hash = self.cache_repository.compute_text_hash(doc.page_content)
                 new_hashes.append(chunk_hash)
 
@@ -429,7 +357,7 @@ class DocumentIndexer:
                 for pos, idx in enumerate(embed_indices):
                     if pos >= len(embeddings):
                         break
-                    doc = documents[idx]
+                    doc = params.documents[idx]
                     self.vector_repository.add_documents_to_vectorstore(
                         vectorstore,
                         [doc],
@@ -439,76 +367,82 @@ class DocumentIndexer:
             # Save vectorstore
             self._log("DEBUG", "Saving vectorstore to cache")
             save_result = self.vector_repository.save_vectorstore(
-                str(file_path), vectorstore
+                str(params.file_path), vectorstore
             )
             self._log("DEBUG", f"Vectorstore save result: {save_result}")
 
             # Update metadata
             self._log("DEBUG", "Updating index metadata")
-            used_model = embedding_model or self.config.embedding_model
-            if self.filesystem_manager.exists(file_path):
-                file_metadata = self.filesystem_manager.get_file_metadata(file_path)
+            used_model = params.embedding_model or self.config.embedding_model
+            if self.filesystem_manager.exists(params.file_path):
+                file_metadata = self.filesystem_manager.get_file_metadata(
+                    params.file_path
+                )
                 document_metadata = DocumentMetadata(
-                    file_path=file_path,
-                    file_hash=self.cache_repository.compute_file_hash(file_path),
+                    file_path=params.file_path,
+                    file_hash=self.cache_repository.compute_file_hash(params.file_path),
                     chunk_size=self.config.chunk_size,
                     chunk_overlap=self.config.chunk_overlap,
                     last_modified=file_metadata.get("mtime", 0.0),
                     indexed_at=time.time(),
                     embedding_model=used_model,
                     embedding_model_version=self.embedding_model_version,
-                    file_type=file_type,
-                    num_chunks=len(documents),
+                    file_type=params.file_type,
+                    num_chunks=len(params.documents),
                     file_size=file_metadata.get("size", 0),
-                    document_loader=loader_name,
-                    tokenizer=tokenizer_name,
-                    text_splitter=text_splitter_name,
+                    document_loader=params.loader_name,
+                    tokenizer=params.tokenizer_name,
+                    text_splitter=params.text_splitter_name,
                 )
                 self.cache_repository.update_metadata(document_metadata)
             else:
                 self._log(
                     "DEBUG",
-                    f"File {file_path} does not exist, skipping metadata update",
+                    f"File {params.file_path} does not exist, skipping metadata update",
                 )
 
             # Store chunk hashes for incremental indexing
-            self.cache_repository.update_chunk_hashes(file_path, new_hashes)
+            self.cache_repository.update_chunk_hashes(params.file_path, new_hashes)
 
             # Update file metadata
-            if self.filesystem_manager.exists(file_path):
+            if self.filesystem_manager.exists(params.file_path):
                 self._log("DEBUG", "Getting file metadata")
-                raw_file_metadata = self.filesystem_manager.get_file_metadata(file_path)
+                raw_file_metadata = self.filesystem_manager.get_file_metadata(
+                    params.file_path
+                )
                 self._log("DEBUG", "Updating file metadata")
                 file_metadata = FileMetadata(
-                    file_path=str(file_path),
+                    file_path=str(params.file_path),
                     size=raw_file_metadata.get("size", 0),
                     mtime=raw_file_metadata.get("mtime", 0.0),
                     content_hash=raw_file_metadata.get("content_hash", ""),
                     source_type=raw_file_metadata.get("source_type"),
-                    chunks_total=len(documents),
+                    chunks_total=len(params.documents),
                 )
                 self.cache_repository.update_file_metadata(file_metadata)
             else:
                 self._log(
                     "DEBUG",
-                    f"File {file_path} does not exist, skipping file metadata update",
+                    f"File {params.file_path} does not exist, skipping file metadata update",
                 )
 
             # Add vectorstore to memory cache
             self._log("DEBUG", "Adding vectorstore to memory cache")
-            if vectorstore_register_callback:
-                vectorstore_register_callback(str(file_path), vectorstore)
+            if params.vectorstore_register_callback:
+                params.vectorstore_register_callback(str(params.file_path), vectorstore)
             else:
-                vectorstores[str(file_path)] = vectorstore
+                params.vectorstores[str(params.file_path)] = vectorstore
 
             self._log(
                 "INFO",
-                f"Successfully indexed {file_path} with {len(documents)} chunks",
+                f"Successfully indexed {params.file_path} with {len(params.documents)} chunks",
             )
 
             return True
         except INDEXING_EXCEPTIONS as e:
-            self._log("ERROR", f"Failed to create vectorstore for {file_path}: {e}")
+            self._log(
+                "ERROR", f"Failed to create vectorstore for {params.file_path}: {e}"
+            )
             return False
 
     def _create_vectorstore_from_params(
@@ -524,17 +458,7 @@ class DocumentIndexer:
         Returns:
             True if successful, False otherwise
         """
-        return self._create_vectorstore_from_documents(
-            file_path=params.file_path,
-            documents=params.documents,
-            file_type=params.file_type,
-            vectorstores=params.vectorstores,
-            embedding_model=params.embedding_model,
-            loader_name=params.loader_name,
-            tokenizer_name=params.tokenizer_name,
-            text_splitter_name=params.text_splitter_name,
-            vectorstore_register_callback=params.vectorstore_register_callback,
-        )
+        return self._create_vectorstore_from_documents(params)
 
     def index_directory(  # noqa: PLR0912, PLR0915
         self,
@@ -647,7 +571,7 @@ class DocumentIndexer:
 
             try:
                 model_name = self._embedding_model_for_file(Path(file_path))
-                success = self._create_vectorstore_from_documents(
+                params = VectorstoreCreationParams(
                     file_path=Path(file_path),
                     documents=documents,
                     file_type=result.source.mime_type or "text/plain",
@@ -658,6 +582,7 @@ class DocumentIndexer:
                     vectorstores=vectorstores,
                     vectorstore_register_callback=vectorstore_register_callback,
                 )
+                success = self._create_vectorstore_from_documents(params)
                 results[file_path] = {"success": success}
                 if progress_callback:
                     event = "indexed" if success else "error"

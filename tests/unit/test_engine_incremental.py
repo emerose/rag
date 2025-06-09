@@ -4,6 +4,7 @@ import os
 from langchain_core.documents import Document
 
 from rag.config import RAGConfig
+from rag.config.dependencies import VectorstoreCreationParams
 from rag.engine import RAGEngine
 
 
@@ -53,9 +54,13 @@ def test_create_vectorstore_from_documents_incremental() -> None:
     indexer.filesystem_manager = engine.filesystem_manager
     indexer._get_embedding_tools = MagicMock(return_value=(MagicMock(), engine.embedding_batcher))
     
-    indexer._create_vectorstore_from_documents(
-        Path("f.txt"), docs, "text/plain", engine.cache_orchestrator.get_vectorstores()
+    params = VectorstoreCreationParams(
+        file_path=Path("f.txt"),
+        documents=docs,
+        file_type="text/plain",
+        vectorstores=engine.cache_orchestrator.get_vectorstores(),
     )
+    indexer._create_vectorstore_from_documents(params)
 
     # first chunk reused existing embedding, second embedded anew
     engine.embedding_batcher.process_embeddings.assert_called_once_with([docs[1]])
@@ -107,8 +112,12 @@ def test_async_batching_uses_async_method() -> None:
     indexer.filesystem_manager = engine.filesystem_manager
     indexer._get_embedding_tools = MagicMock(return_value=(MagicMock(), engine.embedding_batcher))
     
-    indexer._create_vectorstore_from_documents(
-        Path("f.txt"), docs, "text/plain", engine.cache_orchestrator.get_vectorstores()
+    params = VectorstoreCreationParams(
+        file_path=Path("f.txt"),
+        documents=docs,
+        file_type="text/plain",
+        vectorstores=engine.cache_orchestrator.get_vectorstores(),
     )
+    indexer._create_vectorstore_from_documents(params)
 
     engine.embedding_batcher.process_embeddings_async.assert_called_once_with(docs)
