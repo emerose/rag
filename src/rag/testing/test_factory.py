@@ -89,23 +89,22 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         # Initialize parent with fake overrides
         super().__init__(config, runtime_options, overrides)
 
-        # Override document source with fake implementation for new pipeline
-        if config.use_new_pipeline:
-            from rag.sources.fakes import FakeDocumentSource
+        # Override document source with fake implementation
+        from rag.sources.fakes import FakeDocumentSource
 
-            fake_doc_source = FakeDocumentSource(root_path=config.documents_dir)
+        fake_doc_source = FakeDocumentSource(root_path=config.documents_dir)
 
-            # Add initial files to the fake document source if provided
-            if self.test_options.initial_files:
-                for path, content in self.test_options.initial_files.items():
-                    fake_doc_source.add_document(
-                        source_id=path,
-                        content=content,
-                        metadata={"path": path},
-                        content_type="text/plain",
-                    )
+        # Add initial files to the fake document source if provided
+        if self.test_options.initial_files:
+            for path, content in self.test_options.initial_files.items():
+                fake_doc_source.add_document(
+                    source_id=path,
+                    content=content,
+                    metadata={"path": path},
+                    content_type="text/plain",
+                )
 
-            self._document_source = fake_doc_source
+        self._document_source = fake_doc_source
 
     def _create_test_config(self) -> RAGConfig:
         """Create a default test configuration."""
@@ -424,8 +423,8 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         # Add the file to the fake filesystem
         self.filesystem_manager.add_file(str(resolved_path), content)
 
-        # For new pipeline, also add to the fake document source
-        if self.config.use_new_pipeline and hasattr(self, "_document_source"):
+        # Also add to the fake document source
+        if hasattr(self, "_document_source"):
             from rag.sources.fakes import FakeDocumentSource
 
             if isinstance(self._document_source, FakeDocumentSource):

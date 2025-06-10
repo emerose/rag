@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from rag.data.text_splitter import TextSplitterFactory
     from rag.embeddings.batching import EmbeddingBatcher
     from rag.embeddings.embedding_provider import EmbeddingProvider
-    from rag.ingest import IngestManager
     from rag.retrieval import KeywordReranker
     from rag.storage.cache_manager import CacheManager
     from rag.storage.filesystem import FilesystemManager
@@ -53,7 +52,7 @@ class DocumentProcessingDependencies:
     document_loader: DocumentLoader
     document_processor: DocumentProcessor
     text_splitter_factory: TextSplitterFactory
-    ingest_manager: IngestManager
+    # IngestManager removed - using IngestionPipeline instead
 
 
 @dataclass
@@ -92,7 +91,7 @@ class DocumentIndexerDependencies:
     cache_repository: CacheRepositoryProtocol
     vector_repository: VectorRepositoryProtocol
     document_loader: DocumentLoader
-    ingest_manager: IngestManager
+    # IngestManager removed - using IngestionPipeline instead
     embedding_provider: EmbeddingProvider
     embedding_batcher: EmbeddingBatcher
     embedding_model_map: dict[str, str]

@@ -27,7 +27,6 @@ from rag.embeddings.embedding_provider import EmbeddingProvider
 from rag.embeddings.model_map import load_model_map
 from rag.embeddings.protocols import EmbeddingServiceProtocol
 from rag.indexing.document_indexer import DocumentIndexer
-from rag.ingest import IngestManager
 from rag.querying.query_engine import QueryEngine
 from rag.retrieval import BaseReranker
 from rag.storage.cache_manager import CacheManager
@@ -96,14 +95,12 @@ class RAGComponentsFactory:
         self._chat_model = self.overrides.chat_model
 
         # Initialize core dependencies first (that aren't overridden)
-        self._ingest_manager: IngestManager | None = None
         self._cache_manager: CacheManager | None = None
         self._reranker: BaseReranker | None = None
 
-        # New pipeline components
+        # Pipeline components
         self._ingestion_pipeline: Any | None = None
         self._document_source: Any | None = None
-        self._ingest_manager_adapter: Any | None = None
 
         # Initialize component caches
         self._document_indexer: DocumentIndexer | None = None
@@ -187,32 +184,9 @@ class RAGComponentsFactory:
         return self._document_loader
 
     @property
-    def ingest_manager(self) -> IngestManager:
-        """Get or create ingest manager or adapter."""
-        # Use new pipeline architecture if enabled
-        if self.config.use_new_pipeline:
-            return self.ingest_manager_adapter
-
-        # Use legacy architecture
-        if self._ingest_manager is None:
-            from rag.config.dependencies import IngestManagerDependencies
-            from rag.data.chunking import DefaultChunkingStrategy
-
-            chunking_strategy = DefaultChunkingStrategy(
-                chunk_size=self.config.chunk_size,
-                chunk_overlap=self.config.chunk_overlap,
-                model_name=self.config.embedding_model,
-                log_callback=self.runtime.log_callback,
-            )
-            dependencies = IngestManagerDependencies(
-                filesystem_manager=self.filesystem_manager,
-                chunking_strategy=chunking_strategy,
-                document_loader=self.document_loader,
-                log_callback=self.runtime.log_callback,
-                progress_callback=self.runtime.progress_callback,
-            )
-            self._ingest_manager = IngestManager(dependencies=dependencies)
-        return self._ingest_manager
+    def ingest_manager(self) -> Any:
+        """Get the ingestion pipeline (renamed for compatibility)."""
+        return self.ingestion_pipeline
 
     @property
     def document_source(self) -> Any:
@@ -230,9 +204,7 @@ class RAGComponentsFactory:
     def ingestion_pipeline(self) -> Any:
         """Get or create ingestion pipeline."""
         if self._ingestion_pipeline is None:
-            from rag.integration.pipeline_adapter import (
-                create_pipeline_from_ingest_dependencies,
-            )
+            from rag.pipeline import IngestionPipeline
             from rag.storage.document_store import SQLiteDocumentStore
 
             # Create document store
@@ -241,65 +213,31 @@ class RAGComponentsFactory:
             )
 
             # Create a simple vector store for the pipeline
-            # For now, use the repository to create an empty vector store
             vector_store = self.vector_repository.create_empty_vectorstore()
 
-            # Create dependencies for legacy adapter
-            from rag.config.dependencies import IngestManagerDependencies
-            from rag.data.chunking import DefaultChunkingStrategy
+            # Create transformer and embedder
+            from rag.pipeline import DefaultDocumentTransformer, DefaultEmbedder
 
-            chunking_strategy = DefaultChunkingStrategy(
+            transformer = DefaultDocumentTransformer(
                 chunk_size=self.config.chunk_size,
                 chunk_overlap=self.config.chunk_overlap,
-                model_name=self.config.embedding_model,
-                log_callback=self.runtime.log_callback,
             )
-            dependencies = IngestManagerDependencies(
-                filesystem_manager=self.filesystem_manager,
-                chunking_strategy=chunking_strategy,
-                document_loader=self.document_loader,
-                log_callback=self.runtime.log_callback,
+
+            embedder = DefaultEmbedder(
+                embedding_service=self.embedding_service,
+            )
+
+            # Create the ingestion pipeline
+            self._ingestion_pipeline = IngestionPipeline(
+                source=self.document_source,
+                transformer=transformer,
+                document_store=document_store,
+                embedder=embedder,
+                vector_store=vector_store,
                 progress_callback=self.runtime.progress_callback,
             )
 
-            # Create pipeline using adapter
-            from rag.integration.pipeline_adapter import PipelineCreationConfig
-
-            # Use existing document source if already created (e.g., by test factory)
-            # Otherwise, use the documents_dir to create a new one
-            source_root = (
-                self.config.documents_dir if self._document_source is None else None
-            )
-
-            pipeline_config = PipelineCreationConfig(
-                dependencies=dependencies,
-                document_store=document_store,
-                vector_store=vector_store,
-                config=self.config,
-                embedding_provider=self.embedding_service,
-                source_root=source_root,
-                existing_source=self._document_source,  # Pass existing source
-            )
-            pipeline, source = create_pipeline_from_ingest_dependencies(pipeline_config)
-
-            self._ingestion_pipeline = pipeline
-            # Only set the document source if we don't already have one
-            if self._document_source is None:
-                self._document_source = source
-
         return self._ingestion_pipeline
-
-    @property
-    def ingest_manager_adapter(self) -> Any:
-        """Get or create ingest manager adapter."""
-        if self._ingest_manager_adapter is None:
-            from rag.integration.pipeline_adapter import IngestManagerAdapter
-
-            self._ingest_manager_adapter = IngestManagerAdapter(
-                pipeline=self.ingestion_pipeline,
-                source=self.document_source,
-            )
-        return self._ingest_manager_adapter
 
     @property
     def cache_manager(self) -> CacheManager:
@@ -363,7 +301,7 @@ class RAGComponentsFactory:
                 cache_repository=self.cache_repository,
                 vector_repository=self.vector_repository,
                 document_loader=self.document_loader,
-                ingest_manager=self.ingest_manager,
+                ingest_manager=self.ingestion_pipeline,  # Pass pipeline as ingest_manager for compatibility
                 embedding_provider=self.embedding_service,
                 embedding_batcher=self.embedding_batcher,
                 embedding_model_map=self.embedding_model_map,
@@ -421,10 +359,10 @@ class RAGComponentsFactory:
             "embedding_service": self.embedding_service,
             "chat_model": self.chat_model,
             "document_loader": self.document_loader,
-            "ingest_manager": self.ingest_manager,
+            "ingestion_pipeline": self.ingestion_pipeline,
             "cache_manager": self.cache_manager,
             "reranker": self.reranker,
-            "document_indexer": self.create_document_indexer(),
+            # "document_indexer": self.create_document_indexer(),  # Not used in new architecture
             "query_engine": self.create_query_engine(),
             "cache_orchestrator": self.create_cache_orchestrator(),
         }
@@ -460,7 +398,7 @@ class RAGComponentsFactory:
             document_loader=self.document_loader,
             document_processor=None,  # Not used in factory
             text_splitter_factory=self._create_text_splitter_factory(),
-            ingest_manager=self.ingest_manager,
+            # ingest_manager=self.ingest_manager,  # Not needed for new architecture
         )
 
         embedding_deps = EmbeddingDependencies(

@@ -1,4 +1,4 @@
-"""End-to-end tests for the new IngestionPipeline architecture.
+"""End-to-end tests for the IngestionPipeline architecture.
 
 Tests the complete workflow using DocumentSource/IngestionPipeline system
 with real file operations and real embeddings (when API key available).
@@ -19,8 +19,8 @@ load_dotenv()
 
 
 @pytest.mark.e2e
-class TestNewPipelineE2E:
-    """End-to-end tests for new DocumentSource/IngestionPipeline architecture."""
+class TestPipelineE2E:
+    """End-to-end tests for DocumentSource/IngestionPipeline architecture."""
     
     @pytest.fixture(autouse=True)
     def check_openai_key(self):
@@ -98,8 +98,8 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
         
         return documents
 
-    def test_new_pipeline_complete_workflow(self):
-        """Test complete workflow using new IngestionPipeline architecture."""
+    def test_complete_workflow(self):
+        """Test complete workflow using IngestionPipeline architecture."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
@@ -114,7 +114,6 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
                 cache_dir=str(cache_dir),
                 vectorstore_backend="faiss",
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
-                use_new_pipeline=True  # Enable new pipeline architecture
             )
             runtime = RuntimeOptions()
             engine = RAGEngine(config, runtime)
@@ -182,7 +181,6 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
                 cache_dir=str(cache_dir),
                 vectorstore_backend="faiss",
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
-                use_new_pipeline=True
             )
             runtime = RuntimeOptions()
             engine = RAGEngine(config, runtime)
@@ -243,7 +241,6 @@ This document covers advanced topics in software development.
                 cache_dir=str(cache_dir),
                 vectorstore_backend="fake",  # Use fake for predictable testing
                 openai_api_key="sk-test",
-                use_new_pipeline=True
             )
             runtime = RuntimeOptions()
             engine = RAGEngine(config, runtime)
@@ -279,7 +276,6 @@ This document covers advanced topics in software development.
                 cache_dir=str(cache_dir),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
-                use_new_pipeline=True
             )
             
             # Use fake components to avoid API calls
@@ -332,7 +328,6 @@ This document covers advanced topics in software development.
                 cache_dir=str(cache_dir_old),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
-                use_new_pipeline=False  # Use old pipeline
             )
             
             factory_old = FakeRAGComponentsFactory(config=config_old)
@@ -391,7 +386,6 @@ and the DocumentStore system.
                 cache_dir=str(cache_dir),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
-                use_new_pipeline=True
             )
             
             # Use fake components for testing
@@ -429,7 +423,6 @@ and the DocumentStore system.
                 cache_dir=str(cache_dir),
                 vectorstore_backend="faiss",
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
-                use_new_pipeline=True
             )
             runtime = RuntimeOptions()
             

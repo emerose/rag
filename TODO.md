@@ -1,8 +1,8 @@
 ## 🚀 Next Priorities
 
 ### DocumentSource/IngestionPipeline Integration
-- [#302] [P2] **Update documentation** – Document new architecture, migration guide, and configuration options
-- [#302] [P3] **Remove old architecture** – Delete IngestManager, old DocumentLoader patterns after migration complete
+- [#302] [P2] **Update documentation** – Document new architecture, migration guide, and configuration options  
+- [#302] ✅ **COMPLETED** – Remove old architecture (IngestManager, backwards compatibility layers)
 
 ---
 
