@@ -126,5 +126,3 @@ class VectorstoreCreationParams:
     vectorstore_register_callback: Callable[[str, VectorStoreProtocol], None] | None = (
         None
     )
-
-

@@ -42,7 +42,7 @@ class RAGEngine:
         self.cache_dir = Path(config.cache_dir).absolute()
 
         # Use provided factory or create a new one
-        if hasattr(dependencies, 'create_query_engine'):  # Duck-type check for factory
+        if hasattr(dependencies, "create_query_engine"):  # Duck-type check for factory
             self._factory = dependencies
         else:
             self._factory = RAGComponentsFactory(config, runtime)
@@ -203,13 +203,28 @@ class RAGEngine:
             }
 
     def list_indexed_files(self) -> list[dict[str, Any]]:
-        """List all indexed files with metadata.
+        """List all indexed files with basic information.
 
         Returns:
             List of dictionaries with file information
+            Note: Metadata tracking will be re-added in future version
         """
         try:
-            return self.index_manager.list_indexed_files()
+            # Use the DocumentStore from the new IngestionPipeline
+            document_store = self.ingestion_pipeline.document_store
+            doc_ids = document_store.list_document_ids()
+
+            # Return basic file info without metadata (to be re-added later)
+            indexed_files = []
+            for doc_id in doc_ids:
+                file_info = {
+                    "file_path": doc_id,  # Use doc_id as placeholder for file_path
+                    "file_type": "text/plain",  # Default type
+                    "num_chunks": 1,
+                }
+                indexed_files.append(file_info)
+
+            return indexed_files
         except Exception as e:
             logger.error(f"Error listing indexed files: {e}")
             return []

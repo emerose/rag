@@ -289,7 +289,6 @@ class RAGComponentsFactory:
             )
         return self._embedding_batcher
 
-
     def create_query_engine(self) -> QueryEngine:
         """Create a QueryEngine with all dependencies wired."""
         if self._query_engine is None:
@@ -351,50 +350,10 @@ class RAGComponentsFactory:
             RAGEngine instance with factory-injected dependencies
         """
         # Import here to avoid circular imports
-        from rag.config.dependencies import (
-            DocumentProcessingDependencies,
-            EmbeddingDependencies,
-            RAGEngineDependencies,
-            RetrievalDependencies,
-            StorageDependencies,
-        )
         from rag.engine import RAGEngine
 
-        # Create dependency configuration
-        storage_deps = StorageDependencies(
-            filesystem_manager=self.filesystem_manager,
-            cache_manager=self.cache_manager,
-            index_manager=self.cache_repository,
-            vectorstore_manager=self.vector_repository,
-        )
-
-        document_processing_deps = DocumentProcessingDependencies(
-            document_loader=self.document_loader,
-            document_processor=None,  # Not used in factory
-            text_splitter_factory=self._create_text_splitter_factory(),
-            # ingest_manager=self.ingest_manager,  # Not needed for new architecture
-        )
-
-        embedding_deps = EmbeddingDependencies(
-            embedding_provider=self.embedding_service,
-            embedding_batcher=self.embedding_batcher,
-            embedding_model_map=self.embedding_model_map,
-            embedding_model_version="1.0",
-        )
-
-        retrieval_deps = RetrievalDependencies(
-            chat_model=self.chat_model,
-            reranker=self.reranker,
-        )
-
-        dependencies = RAGEngineDependencies(
-            storage=storage_deps,
-            document_processing=document_processing_deps,
-            embeddings=embedding_deps,
-            retrieval=retrieval_deps,
-        )
-
         # Create RAGEngine with factory as dependencies
+        # Factory provides all components through dependency injection
         return RAGEngine(
             config=self.config,
             runtime=self.runtime,

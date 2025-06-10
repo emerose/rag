@@ -309,6 +309,14 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 filesystem_manager=factory._filesystem_manager,
                 log_callback=runtime.log_callback,
             )
+
+            # Override document source to use real filesystem
+            from rag.sources.filesystem import FilesystemDocumentSource
+
+            factory._document_source = FilesystemDocumentSource(
+                root_path=config.documents_dir,
+                filesystem_manager=factory._filesystem_manager,
+            )
         else:
             # For tests that want fake filesystem, use all fake components
             test_options = FakeComponentOptions()
