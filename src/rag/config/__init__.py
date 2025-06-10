@@ -12,7 +12,10 @@ from .components import (
     IndexingConfig,
     QueryConfig,
     QueryProcessingConfig,
+    SemanticSplitterConfig,
     StorageConfig,
+    TextSplittingConfig,
+    VectorStoreManagerConfig,
 )
 
 # Re-export main config classes for convenience
@@ -28,5 +31,8 @@ __all__ = [
     "QueryProcessingConfig",
     "RAGConfig",
     "RuntimeOptions",
+    "SemanticSplitterConfig",
     "StorageConfig",
+    "TextSplittingConfig",
+    "VectorStoreManagerConfig",
 ]

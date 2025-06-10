@@ -18,13 +18,10 @@ from langchain_text_splitters import (
 )
 
 # Import pdfminer dependencies (required for PDF processing)
+from rag.config.components import SemanticSplitterConfig, TextSplittingConfig
 from rag.utils.logging_utils import log_message
 
 from .metadata_extractor import DocumentMetadataExtractor
-
-# Forward declarations for type checking
-if False:  # TYPE_CHECKING
-    from rag.config.components import SemanticSplitterConfig, TextSplittingConfig
 
 PDFMINER_AVAILABLE = True
 

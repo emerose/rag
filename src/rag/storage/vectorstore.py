@@ -13,15 +13,11 @@ from typing import Any
 
 from filelock import FileLock
 from langchain_core.documents import Document
-from langchain_core.embeddings import Embeddings
 
+from rag.config.components import VectorStoreManagerConfig
 from rag.storage.backends.factory import create_vectorstore_backend
 from rag.storage.protocols import VectorRepositoryProtocol, VectorStoreProtocol
 from rag.utils.logging_utils import log_message
-
-# Forward declarations for type checking
-if False:  # TYPE_CHECKING
-    from rag.config.components import VectorStoreManagerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +33,7 @@ class VectorStoreManager(VectorRepositoryProtocol):
     def __init__(
         self,
         cache_dir: Path | str,
-        embeddings: Embeddings,
+        embeddings: Any,  # Can be Embeddings or EmbeddingServiceProtocol
         backend: str = "faiss",
         backend_config: dict[str, Any] | None = None,
         lock_timeout: int = 30,
@@ -78,7 +74,7 @@ class VectorStoreManager(VectorRepositoryProtocol):
     def from_config(
         cls,
         config: "VectorStoreManagerConfig",
-        embeddings: Embeddings,
+        embeddings: Any,  # Can be Embeddings or EmbeddingServiceProtocol
         log_callback: Callable[[str, str, str], None] | None = None,
     ) -> "VectorStoreManager":
         """Create VectorStoreManager from configuration object.

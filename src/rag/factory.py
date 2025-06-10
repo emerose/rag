@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from rag.engine import RAGEngine
 
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from rag.caching.cache_orchestrator import CacheOrchestrator
 from rag.config import RAGConfig, RuntimeOptions
@@ -164,10 +165,14 @@ class RAGComponentsFactory:
     def chat_model(self) -> ChatOpenAI:
         """Get or create chat model."""
         if self._chat_model is None:
+            api_key_secret = None
+            if self.config.openai_api_key:
+                api_key_secret = SecretStr(self.config.openai_api_key)
+
             self._chat_model = ChatOpenAI(
                 model=self.config.chat_model,
                 temperature=self.config.temperature,
-                api_key=self.config.openai_api_key,
+                api_key=api_key_secret,
             )
         return self._chat_model
 
@@ -176,7 +181,7 @@ class RAGComponentsFactory:
         """Get or create document loader."""
         if self._document_loader is None:
             self._document_loader = DocumentLoader(
-                filesystem_manager=self.filesystem_manager,
+                filesystem_manager=self.filesystem_manager,  # type: ignore[arg-type]
                 log_callback=self.runtime.log_callback,
             )
         return self._document_loader
@@ -194,7 +199,7 @@ class RAGComponentsFactory:
 
             self._document_source = FilesystemDocumentSource(
                 root_path=self.config.documents_dir,
-                filesystem_manager=self.filesystem_manager,
+                filesystem_manager=self.filesystem_manager,  # type: ignore[arg-type]
             )
         return self._document_source
 
@@ -291,10 +296,18 @@ class RAGComponentsFactory:
         if self._query_engine is None:
             from rag.config.dependencies import QueryEngineDependencies
 
+            # Import here to get the specific type for type checker
+            from rag.retrieval.reranker import KeywordReranker
+
+            reranker = self.reranker
+            typed_reranker = None
+            if reranker and isinstance(reranker, KeywordReranker):
+                typed_reranker = reranker
+
             dependencies = QueryEngineDependencies(
                 chat_model=self.chat_model,
                 document_loader=self.document_loader,
-                reranker=self.reranker,
+                reranker=typed_reranker,
                 log_callback=self.runtime.log_callback,
                 vectorstore_manager=self.vector_repository,
             )
