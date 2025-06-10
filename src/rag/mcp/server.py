@@ -219,7 +219,6 @@ class RAGMCPServer(FastMCP):
 # ----------------------------------------------------------------------
 
 # --- Module-level FastAPI route handlers ---
-from fastapi import Request
 
 
 async def handle_query(server: RAGMCPServer, req: QueryRequest) -> dict[str, Any]:
@@ -227,7 +226,9 @@ async def handle_query(server: RAGMCPServer, req: QueryRequest) -> dict[str, Any
     return await server.tool_query(req.question, req.top_k)
 
 
-async def handle_search(server: RAGMCPServer, req: SearchRequest) -> list[dict[str, Any]]:
+async def handle_search(
+    server: RAGMCPServer, req: SearchRequest
+) -> list[dict[str, Any]]:
     """Handle /search requests."""
     return await server.tool_search(req.query, req.top_k)
 
@@ -242,7 +243,9 @@ async def handle_documents(server: RAGMCPServer) -> list[dict[str, Any]]:
     return await server.tool_documents()
 
 
-async def handle_get_document(server: RAGMCPServer, doc_id: str) -> dict[str, Any] | None:
+async def handle_get_document(
+    server: RAGMCPServer, doc_id: str
+) -> dict[str, Any] | None:
     """Handle /documents/{doc_id} GET requests."""
     return await server.tool_get_document(doc_id)
 
