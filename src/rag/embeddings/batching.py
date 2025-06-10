@@ -139,8 +139,9 @@ class EmbeddingBatcher(EmbeddingServiceProtocol):
         mapped = stream.map(stream_batches, embed_batch, task_limit=self.concurrency)
         pipeline = stream.flatmap(mapped, lambda result: stream.iterate(result))
 
-        async for embedding in pipeline:
-            yield embedding
+        async with pipeline.stream() as streamer:
+            async for embedding in streamer:
+                yield embedding
 
         self.progress_tracker.complete_task("embedding")
 
