@@ -16,9 +16,9 @@ BLUE = "\033[94m"
 RESET = "\033[0m"
 
 # Type checking baseline - lower this as we fix more errors!
-# Current progress: 696 errors (down from 815 after Phase 3 data layer fixes)
+# Current progress: 653 errors (down from 696 after removing DocumentIndexer dead code)
 # Target: 0 errors for full strict type safety
-MAX_TYPE_ERRORS = 696
+MAX_TYPE_ERRORS = 653
 
 
 def run_command(cmd: list[str]) -> int:

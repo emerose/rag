@@ -11,10 +11,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from pathlib import Path
     from typing import Any
 
-    from langchain_core.documents import Document
     from langchain_openai import ChatOpenAI
 
     from rag.data.document_loader import DocumentLoader
@@ -27,9 +25,6 @@ if TYPE_CHECKING:
     from rag.storage.filesystem import FilesystemManager
     from rag.storage.protocols import (
         CacheRepositoryProtocol,
-        FileSystemProtocol,
-        VectorRepositoryProtocol,
-        VectorStoreProtocol,
     )
     from rag.storage.vectorstore import VectorStoreManager
 
@@ -83,22 +78,6 @@ class RAGEngineDependencies:
 
 
 @dataclass
-class DocumentIndexerDependencies:
-    """Groups dependencies for DocumentIndexer initialization."""
-
-    filesystem_manager: FileSystemProtocol
-    cache_repository: CacheRepositoryProtocol
-    vector_repository: VectorRepositoryProtocol
-    document_loader: DocumentLoader
-    # IngestManager removed - using IngestionPipeline instead
-    embedding_provider: EmbeddingProvider
-    embedding_batcher: EmbeddingBatcher
-    embedding_model_map: dict[str, str]
-    embedding_model_version: str
-    log_callback: Callable[[str, str, str], None] | None = None
-
-
-@dataclass
 class QueryEngineDependencies:
     """Groups dependencies for QueryEngine initialization."""
 
@@ -108,21 +87,4 @@ class QueryEngineDependencies:
     log_callback: Callable[[str, str, str], None] | None = None
     vectorstore_manager: Any | None = (
         None  # VectorStoreManager for proper vectorstore merging
-    )
-
-
-@dataclass
-class VectorstoreCreationParams:
-    """Parameters for creating or updating a vectorstore."""
-
-    file_path: Path
-    documents: list[Document]
-    file_type: str
-    vectorstores: dict[str, VectorStoreProtocol]
-    embedding_model: str | None = None
-    loader_name: str | None = None
-    tokenizer_name: str | None = None
-    text_splitter_name: str | None = None
-    vectorstore_register_callback: Callable[[str, VectorStoreProtocol], None] | None = (
-        None
     )

@@ -13,7 +13,6 @@ from langchain_core.embeddings import FakeEmbeddings
 
 from rag.cli.cli import app, state
 from rag.config import RAGConfig, RuntimeOptions
-from rag.config.dependencies import VectorstoreCreationParams
 from rag.engine import RAGEngine
 from rag.prompts import list_prompts
 from rag.mcp import build_server, create_http_app
