@@ -39,12 +39,10 @@ def test_factory_creates_real_components(temp_dir: Path) -> None:
     assert isinstance(factory.embedding_service, FakeEmbeddingService)
     assert factory.chat_model is not None
     assert factory.document_loader is not None
-    assert factory.ingest_manager is not None
+    assert factory.ingestion_pipeline is not None
     assert factory.cache_manager is not None
     
     # Test component creation
-    document_indexer = factory.create_document_indexer()
-    assert document_indexer is not None
     
     query_engine = factory.create_query_engine()
     assert query_engine is not None
@@ -94,13 +92,13 @@ def test_factory_singleton_behavior(temp_dir: Path) -> None:
     factory._chat_model = fake_chat_model
     
     # Test singleton behavior for components
-    indexer1 = factory.create_document_indexer()
-    indexer2 = factory.create_document_indexer()
-    assert indexer1 is indexer2
-    
     query1 = factory.create_query_engine()
     query2 = factory.create_query_engine()
     assert query1 is query2
+    
+    pipeline1 = factory.ingestion_pipeline
+    pipeline2 = factory.ingestion_pipeline
+    assert pipeline1 is pipeline2
     
     orchestrator1 = factory.create_cache_orchestrator()
     orchestrator2 = factory.create_cache_orchestrator()
@@ -132,10 +130,9 @@ def test_factory_create_all_components(temp_dir: Path) -> None:
         "embedding_service",
         "chat_model",
         "document_loader",
-        "ingest_manager", 
+        "ingestion_pipeline", 
         "cache_manager",
         "reranker",
-        "document_indexer",
         "query_engine",
         "cache_orchestrator",
     }
@@ -173,12 +170,10 @@ def test_factory_creates_rag_engine(temp_dir: Path) -> None:
     assert hasattr(engine, "index_directory")
     assert hasattr(engine, "answer")
     
-    # Verify components are injected
-    assert engine.filesystem_manager is not None
+    # Verify components are accessible through proper interfaces
     assert engine.index_manager is not None
     assert engine.cache_manager is not None
-    assert engine.embedding_provider is not None
     assert engine.vectorstore_manager is not None
-    assert engine.document_indexer is not None
     assert engine.query_engine is not None
     assert engine.cache_orchestrator is not None
+    assert engine.ingestion_pipeline is not None

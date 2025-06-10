@@ -26,7 +26,6 @@ from rag.embeddings.batching import EmbeddingBatcher
 from rag.embeddings.embedding_provider import EmbeddingProvider
 from rag.embeddings.model_map import load_model_map
 from rag.embeddings.protocols import EmbeddingServiceProtocol
-from rag.indexing.document_indexer import DocumentIndexer
 from rag.querying.query_engine import QueryEngine
 from rag.retrieval import BaseReranker
 from rag.storage.cache_manager import CacheManager
@@ -103,7 +102,6 @@ class RAGComponentsFactory:
         self._document_source: Any | None = None
 
         # Initialize component caches
-        self._document_indexer: DocumentIndexer | None = None
         self._query_engine: QueryEngine | None = None
         self._cache_orchestrator: CacheOrchestrator | None = None
         self._embedding_batcher: EmbeddingBatcher | None = None
@@ -291,30 +289,6 @@ class RAGComponentsFactory:
             )
         return self._embedding_batcher
 
-    def create_document_indexer(self) -> DocumentIndexer:
-        """Create a DocumentIndexer with all dependencies wired."""
-        if self._document_indexer is None:
-            from rag.config.dependencies import DocumentIndexerDependencies
-
-            dependencies = DocumentIndexerDependencies(
-                filesystem_manager=self.filesystem_manager,
-                cache_repository=self.cache_repository,
-                vector_repository=self.vector_repository,
-                document_loader=self.document_loader,
-                ingest_manager=self.ingestion_pipeline,  # Pass pipeline as ingest_manager for compatibility
-                embedding_provider=self.embedding_service,
-                embedding_batcher=self.embedding_batcher,
-                embedding_model_map=self.embedding_model_map,
-                embedding_model_version=self._embedding_model_version,
-                log_callback=self.runtime.log_callback,
-            )
-
-            self._document_indexer = DocumentIndexer(
-                config=self.config,
-                runtime_options=self.runtime,
-                dependencies=dependencies,
-            )
-        return self._document_indexer
 
     def create_query_engine(self) -> QueryEngine:
         """Create a QueryEngine with all dependencies wired."""
@@ -420,11 +394,11 @@ class RAGComponentsFactory:
             retrieval=retrieval_deps,
         )
 
-        # Create RAGEngine with dependencies
+        # Create RAGEngine with factory as dependencies
         return RAGEngine(
             config=self.config,
             runtime=self.runtime,
-            dependencies=dependencies,
+            dependencies=self,  # Pass the factory with all its overrides
         )
 
     def _create_text_splitter_factory(self) -> TextSplitterFactory:

@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 
     from rag.data.document_loader import DocumentLoader
     from rag.data.document_processor import DocumentProcessor
-    from rag.data.protocols import ChunkingStrategy, Preprocessor
     from rag.data.text_splitter import TextSplitterFactory
     from rag.embeddings.batching import EmbeddingBatcher
     from rag.embeddings.embedding_provider import EmbeddingProvider
@@ -129,14 +128,3 @@ class VectorstoreCreationParams:
     )
 
 
-@dataclass
-class IngestManagerDependencies:
-    """Groups dependencies for IngestManager initialization."""
-
-    filesystem_manager: FilesystemManager
-    chunking_strategy: ChunkingStrategy
-    preprocessor: Preprocessor | None = None
-    document_loader: DocumentLoader | None = None
-    log_callback: Any | None = None
-    progress_callback: Any | None = None
-    file_filter: Callable[[Path], bool] | None = None

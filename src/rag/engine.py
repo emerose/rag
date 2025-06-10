@@ -25,14 +25,14 @@ class RAGEngine:
         self,
         config: RAGConfig,
         runtime: RuntimeOptions,
-        dependencies: Any = None,  # Kept for backward compatibility, ignored
+        dependencies: Any = None,  # Legacy parameter, can be RAGComponentsFactory
     ) -> None:
         """Initialize the RAG engine.
 
         Args:
             config: RAG system configuration
             runtime: Runtime options and callbacks
-            dependencies: Legacy parameter, ignored (uses factory instead)
+            dependencies: Legacy parameter, can be RAGComponentsFactory or None
         """
         self.config = config
         self.runtime = runtime
@@ -41,8 +41,11 @@ class RAGEngine:
         self.documents_dir = Path(config.documents_dir).resolve()
         self.cache_dir = Path(config.cache_dir).absolute()
 
-        # Use factory to create all components
-        self._factory = RAGComponentsFactory(config, runtime)
+        # Use provided factory or create a new one
+        if hasattr(dependencies, 'create_query_engine'):  # Duck-type check for factory
+            self._factory = dependencies
+        else:
+            self._factory = RAGComponentsFactory(config, runtime)
 
         # Cache the main components we need
         self._query_engine = None
