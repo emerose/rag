@@ -201,6 +201,7 @@ class RAGEngine:
                     "question": question,
                     "answer": "No indexed documents found. Please index some documents first.",
                     "sources": [],
+                    "num_documents_retrieved": 0,
                 }
 
             return self.query_engine.answer(question, vectorstores, k=k)
@@ -210,6 +211,7 @@ class RAGEngine:
                 "question": question,
                 "answer": f"Error processing question: {e!s}",
                 "sources": [],
+                "num_documents_retrieved": 0,
             }
 
     def _load_vectorstores_from_document_store(self) -> dict[str, Any]:
@@ -310,8 +312,8 @@ class RAGEngine:
             for source_doc in sorted_docs[:k]:
                 summaries.append(
                     {
-                        "source": source_doc.location,
-                        "source_type": source_doc.content_type or "text/plain",
+                        "file_path": source_doc.location,
+                        "file_type": source_doc.content_type or "text/plain",
                         "summary": f"Document with {source_doc.chunk_count} chunks",
                         "num_chunks": source_doc.chunk_count,
                     }

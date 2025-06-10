@@ -10,6 +10,7 @@ class DummyEngine:
     def __init__(self, base: Path) -> None:
         self.documents_dir = base
         self.filesystem_manager = self
+        self._factory = self  # Add factory attribute for MCP server compatibility
 
     def scan_directory(self, path: Path):
         return [path / "a.txt", path / "b.txt"]
@@ -27,6 +28,14 @@ class DummyEngine:
 
     def invalidate_all_caches(self) -> None:
         pass
+
+    @property
+    def document_source(self):
+        """Mock document source for MCP server compatibility."""
+        class MockSource:
+            def list_documents(self):
+                return ["a.txt", "b.txt"]
+        return MockSource()
 
 
 class DummyContext:

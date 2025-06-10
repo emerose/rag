@@ -272,8 +272,9 @@ class TestQueryWorkflow:
         
         # Index documents
         results = engine.index_directory(Path(config.documents_dir))
-        assert len(results) == 2
-        assert all(result.get("success") for result in results.values())
+        assert len(results) == 1  # Pipeline returns single result
+        assert results["pipeline"]["success"] is True
+        assert results["pipeline"]["documents_processed"] == 2
         
         # Query with metadata filter (if supported by implementation)
         # Note: This tests the workflow even if filtering isn't fully implemented

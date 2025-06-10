@@ -23,9 +23,14 @@ def _build_test_server(tmp_path: Path):
         ),
         patch.object(EmbeddingProvider, "embedding_dimension", 32),
     ):
+        docs_dir = tmp_path / "docs"
+        cache_dir = tmp_path / "cache"
+        docs_dir.mkdir(exist_ok=True)
+        cache_dir.mkdir(exist_ok=True)
+        
         config = RAGConfig(
-            documents_dir=str(tmp_path / "docs"),
-            cache_dir=str(tmp_path / "cache"),
+            documents_dir=str(docs_dir),
+            cache_dir=str(cache_dir),
             openai_api_key="dummy",
         )
         runtime = RuntimeOptions()
@@ -42,9 +47,6 @@ def _build_test_server(tmp_path: Path):
     engine.index_directory = lambda path, progress_callback=None: {"indexed": True}
     engine.index_file = lambda path, progress_callback=None: (True, "")
     engine.invalidate_all_caches = lambda: None
-    engine.list_indexed_files = lambda: [
-        {"file_path": "sample.txt", "num_chunks": 1, "file_size": 1}
-    ]
     engine.invalidate_cache = lambda path: None
     engine.get_document_summaries = lambda k=5: [
         {"path": "sample.txt", "summary": "dummy"}

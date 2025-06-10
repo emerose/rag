@@ -262,6 +262,15 @@ class IngestionPipeline:
                 if doc:
                     source_documents.append(doc)
                     result.documents_loaded += 1
+                else:
+                    # Document couldn't be loaded (file doesn't exist, unsupported format, etc.)
+                    result.add_error(
+                        PipelineStage.LOADING,
+                        FileNotFoundError(
+                            f"Document not found or not readable: {source_id}"
+                        ),
+                        {"source_id": source_id},
+                    )
             except Exception as e:
                 result.add_error(PipelineStage.LOADING, e, {"source_id": source_id})
 
@@ -414,34 +423,11 @@ class IngestionPipeline:
             source_documents = self.document_store.list_source_documents()
             for source_doc in source_documents:
                 source_location = source_doc.location
-                cache_path = self._get_vectorstore_cache_path(source_location)
-                self.vector_store.save_vectorstore(cache_path, vectorstore)
+                self.vector_store.save_vectorstore(source_location, vectorstore)
 
             result.vectors_stored = len(embeddings)
         except Exception as e:
             result.add_error(PipelineStage.STORING_VECTORS, e)
-
-    def _get_vectorstore_cache_path(self, source_location: str) -> str:
-        """Get cache path for vectorstore based on source location.
-
-        Uses the same hashing strategy as the existing cache orchestrator:
-        SHA-256 hash of the source file path.
-        """
-        import hashlib
-        from pathlib import Path
-
-        # Use the same hashing strategy as VectorStoreManager._get_cache_base_name()
-        location_hash = hashlib.sha256(str(source_location).encode()).hexdigest()
-
-        # Try to get cache directory from document store if available
-        if hasattr(self.document_store, "db_path"):
-            cache_dir = Path(self.document_store.db_path).parent
-        else:
-            # Fallback to current working directory
-            cache_dir = Path.cwd() / ".rag_cache"
-            cache_dir.mkdir(exist_ok=True)
-
-        return str(cache_dir / location_hash)
 
     def ingest_document(self, source_id: str) -> PipelineResult:
         """Ingest a single document.

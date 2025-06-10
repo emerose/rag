@@ -57,6 +57,27 @@ class RAGMCPServer(FastMCP):
         self.engine = engine
         self._register_tools()
 
+    def _get_indexed_files(self) -> list[dict]:
+        """Get list of indexed files from the document store."""
+        try:
+            document_store = self.engine.ingestion_pipeline.document_store
+            source_documents = document_store.list_source_documents()
+
+            indexed_files = []
+            for source_doc in source_documents:
+                indexed_files.append(
+                    {
+                        "file_path": source_doc.location,
+                        "file_type": source_doc.content_type or "text/plain",
+                        "num_chunks": source_doc.chunk_count,
+                        "file_size": source_doc.size_bytes or 0,
+                    }
+                )
+
+            return indexed_files
+        except Exception:
+            return []
+
     @property
     def tools(self) -> list[Tool]:
         """List tools registered with the server."""
@@ -90,7 +111,9 @@ class RAGMCPServer(FastMCP):
         loop = asyncio.get_running_loop()
 
         if p.is_dir():
-            files = self.engine.filesystem_manager.scan_directory(p)
+            # Get files from document source
+            source = self.engine._factory.document_source
+            files = source.list_documents() if hasattr(source, "list_documents") else []
             total = len(files) if files else 1
             count = 0
 
@@ -135,7 +158,7 @@ class RAGMCPServer(FastMCP):
         )
 
     async def tool_index_stats(self) -> dict[str, Any]:
-        files = self.engine.list_indexed_files()
+        files = self._get_indexed_files()
         total_size = sum(f.get("file_size", 0) for f in files)
         chunk_count = sum(f.get("num_chunks", 0) for f in files)
         return {
@@ -145,10 +168,10 @@ class RAGMCPServer(FastMCP):
         }
 
     async def tool_documents(self) -> list[dict[str, Any]]:
-        return self.engine.list_indexed_files()
+        return self._get_indexed_files()
 
     async def tool_get_document(self, path: str) -> dict[str, Any] | None:
-        files = self.engine.list_indexed_files()
+        files = self._get_indexed_files()
         for info in files:
             if info.get("file_path") == path:
                 return info

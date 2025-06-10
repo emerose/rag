@@ -756,37 +756,12 @@ def query(  # noqa: PLR0913
         # Set the chosen prompt template
         rag_engine.default_prompt_id = prompt
 
-        # Load cache metadata to check if we have any documents
-        cache_metadata = rag_engine.load_cache_metadata()
-        if not cache_metadata:
+        # Check if we have any vectorstores available
+        vectorstores = rag_engine.vectorstores
+        if not vectorstores:
             write(
                 Error(
                     "No indexed documents found in cache. Please run 'rag index' first."
-                )
-            )
-            sys.exit(1)
-
-        # Load cached vectorstores
-        state.logger.info("Loading cached vectorstores from .cache directory...")
-        for file_path in cache_metadata:
-            try:
-                cached_store = rag_engine.load_cached_vectorstore(file_path)
-                if cached_store is not None:
-                    rag_engine.vectorstores[file_path] = cached_store
-                    state.logger.info(f"Loaded vectorstore for: {file_path}")
-            except (
-                exceptions.RAGError,
-                exceptions.VectorstoreError,
-                OSError,
-                KeyError,
-                TypeError,
-            ) as e:
-                state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
-
-        if not rag_engine.vectorstores:
-            write(
-                Error(
-                    "No valid vectorstores found in cache. Please run 'rag index' first."
                 )
             )
             sys.exit(1)
@@ -863,37 +838,12 @@ def summarize(
         runtime_options = RuntimeOptions(max_workers=state.max_workers)
         rag_engine = create_rag_engine(config, runtime_options)
 
-        # Load cache metadata to check if we have any documents
-        cache_metadata = rag_engine.load_cache_metadata()
-        if not cache_metadata:
+        # Check if we have any vectorstores available
+        vectorstores = rag_engine.vectorstores
+        if not vectorstores:
             write(
                 Error(
                     "No indexed documents found in cache. Please run 'rag index' first."
-                )
-            )
-            sys.exit(1)
-
-        # Load cached vectorstores
-        state.logger.info("Loading cached vectorstores from .cache directory...")
-        for file_path in cache_metadata:
-            try:
-                cached_store = rag_engine.load_cached_vectorstore(file_path)
-                if cached_store is not None:
-                    rag_engine.vectorstores[file_path] = cached_store
-                    state.logger.info(f"Loaded vectorstore for: {file_path}")
-            except (
-                exceptions.RAGError,
-                exceptions.VectorstoreError,
-                OSError,
-                KeyError,
-                TypeError,
-            ) as e:
-                state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
-
-        if not rag_engine.vectorstores:
-            write(
-                Error(
-                    "No valid vectorstores found in cache. Please run 'rag index' first."
                 )
             )
             sys.exit(1)
