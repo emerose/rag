@@ -88,7 +88,7 @@ class DefaultMetadataExtractor(BaseMetadataExtractor):
         metadata = {}
 
         # Extract title from content if not already in metadata
-        if "title" not in document.metadata and document.page_content:
+        if "title" not in document.metadata and document.page_content:  # type: ignore[operator]
             title = self._extract_title_from_content(document.page_content)
             if title:
                 metadata["title"] = title
@@ -112,7 +112,7 @@ class MarkdownMetadataExtractor(BaseMetadataExtractor):
         content = document.page_content
 
         # Extract title (usually the first heading)
-        if "title" not in document.metadata and content:
+        if "title" not in document.metadata and content:  # type: ignore[operator]
             # Look for the first heading
             heading_match = re.search(r"^\s*#\s+(.+?)$", content, re.MULTILINE)
             if heading_match:
@@ -124,7 +124,7 @@ class MarkdownMetadataExtractor(BaseMetadataExtractor):
                     metadata["title"] = title
 
         # Extract all headings
-        headings = []
+        headings: list[dict[str, Any]] = []
         heading_regex = r"^(#+)\s+(.+?)$"
         heading_matches = re.finditer(heading_regex, content, re.MULTILINE)
 
@@ -138,8 +138,8 @@ class MarkdownMetadataExtractor(BaseMetadataExtractor):
 
             # Create a hierarchical path for each heading
             if len(headings) > 0:
-                heading_hierarchy = []
-                current_path = []
+                heading_hierarchy: list[dict[str, Any]] = []
+                current_path: list[str] = []
 
                 for heading in headings:
                     level = heading["level"]
@@ -181,19 +181,19 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         metadata = {}
 
         # Extract title from existing metadata or content
-        if "title" not in document.metadata and document.page_content:
+        if "title" not in document.metadata and document.page_content:  # type: ignore[operator]
             # Try to find PDF title in content
             title = self._extract_title_from_content(document.page_content)
             if title:
                 metadata["title"] = title
 
         # Page numbers - should be preserved from PDF loader
-        if "page" in document.metadata:
-            metadata["page_num"] = document.metadata["page"]
+        if "page" in document.metadata:  # type: ignore[operator]
+            metadata["page_num"] = document.metadata["page"]  # type: ignore[misc]
 
         # Try to extract PDF headings from the source file
-        source_path = document.metadata.get("source")
-        if source_path and os.path.isfile(source_path):
+        source_path = document.metadata.get("source")  # type: ignore[misc]
+        if source_path and isinstance(source_path, str) and os.path.isfile(source_path):
             try:
                 headings = self.extract_pdf_headings(source_path)
                 if headings:

@@ -105,7 +105,7 @@ class SemanticRecursiveCharacterTextSplitter:
         return self.splitter.split_documents(documents)
 
     def create_documents(
-        self, texts: list[str], metadatas: list[dict] | None = None
+        self, texts: list[str], metadatas: list[dict[str, Any]] | None = None
     ) -> list[Document]:
         """Create documents from texts.
 
@@ -464,16 +464,19 @@ class TextSplitterFactory:
             return self._create_markdown_splitter()
         elif splitter_name == "html_splitter":
             self.last_splitter_name = splitter_name
-            return self._create_splitter_with_separators(config["separators"])
+            separators = config.get("separators", [])
+            return self._create_splitter_with_separators(separators)  # type: ignore[arg-type]
         elif splitter_name == "pdf_splitter":
             self.last_splitter_name = splitter_name
-            return self._create_splitter_with_separators(config["separators"])
+            separators = config.get("separators", [])
+            return self._create_splitter_with_separators(separators)  # type: ignore[arg-type]
         elif splitter_name == "token_splitter":
             self.last_splitter_name = splitter_name
             return self._create_token_splitter()
         elif splitter_name == "document_splitter":
             self.last_splitter_name = splitter_name
-            return self._create_splitter_with_separators(config["separators"])
+            separators = config.get("separators", [])
+            return self._create_splitter_with_separators(separators)  # type: ignore[arg-type]
         else:
             # Default to semantic recursive character splitter
             self.last_splitter_name = "semantic_splitter"
@@ -614,7 +617,11 @@ class TextSplitterFactory:
             and self.preserve_headings
         ):
             source_path = documents[0].metadata.get("source")
-            if source_path and os.path.isfile(source_path):
+            if (
+                source_path
+                and isinstance(source_path, str)
+                and os.path.isfile(source_path)
+            ):
                 try:
                     # Use PDFMetadataExtractor to extract headings
                     pdf_extractor = self.metadata_extractor.get_extractor(mime_type)
@@ -627,7 +634,7 @@ class TextSplitterFactory:
                             "DEBUG", f"Extracted {len(headings)} headings from PDF"
                         )
                         # Store heading hierarchy in document metadata
-                        documents[0].metadata["heading_hierarchy"] = headings
+                        documents[0].metadata["heading_hierarchy"] = headings  # type: ignore[misc]
                 except (
                     OSError,
                     ValueError,
@@ -641,7 +648,7 @@ class TextSplitterFactory:
         return documents
 
     def _split_markdown_documents(
-        self, documents: list[Document], splitters: list
+        self, documents: list[Document], splitters: list[Any]
     ) -> list[Document]:
         """Handle the special case of markdown documents with header splitting.
 
@@ -675,7 +682,7 @@ class TextSplitterFactory:
         return chunked_docs
 
     def _process_md_header_splits(
-        self, header_splits: list, doc: Document
+        self, header_splits: list[Any], doc: Document
     ) -> list[Document]:
         """Process markdown header splits into Documents with enriched metadata.
 
@@ -686,10 +693,10 @@ class TextSplitterFactory:
         Returns:
             List of Documents with header metadata
         """
-        header_docs = []
+        header_docs: list[Document] = []
         for split in header_splits:
             # Enrich metadata with heading path
-            split_metadata = {**doc.metadata, **split.metadata}
+            split_metadata = {**doc.metadata, **split.metadata}  # type: ignore[misc]
 
             # Build heading path if needed
             if "Heading" in split_metadata and self.preserve_headings:
@@ -703,7 +710,7 @@ class TextSplitterFactory:
 
         return header_docs
 
-    def _enrich_heading_metadata(self, metadata: dict) -> None:
+    def _enrich_heading_metadata(self, metadata: dict[str, Any]) -> None:
         """Enrich document metadata with heading information.
 
         Args:
@@ -774,9 +781,9 @@ class TextSplitterFactory:
             and len(documents) == 1
             and "heading_hierarchy" in documents[0].metadata
         ):
-            heading_hierarchy = documents[0].metadata["heading_hierarchy"]
+            heading_hierarchy = documents[0].metadata["heading_hierarchy"]  # type: ignore[misc]
             for chunk in chunked_docs:
-                chunk.metadata["heading_hierarchy"] = heading_hierarchy
+                chunk.metadata["heading_hierarchy"] = heading_hierarchy  # type: ignore[misc]
 
         return chunked_docs
 
@@ -794,8 +801,8 @@ class TextSplitterFactory:
         """
         for i, chunk in enumerate(chunked_docs):
             # Add chunk index information
-            chunk.metadata["chunk_index"] = i
-            chunk.metadata["chunk_total"] = len(chunked_docs)
+            chunk.metadata["chunk_index"] = i  # type: ignore[misc]
+            chunk.metadata["chunk_total"] = len(chunked_docs)  # type: ignore[misc]
 
             # Add character position information if possible
             if len(original_docs) == 1:  # Only track position for single document
@@ -803,8 +810,8 @@ class TextSplitterFactory:
                 if chunk.page_content and chunk.page_content in original_text:
                     start_pos = original_text.find(chunk.page_content)
                     if start_pos != -1:
-                        chunk.metadata["chunk_start_char"] = start_pos
-                        chunk.metadata["chunk_end_char"] = start_pos + len(
+                        chunk.metadata["chunk_start_char"] = start_pos  # type: ignore[misc]
+                        chunk.metadata["chunk_end_char"] = start_pos + len(  # type: ignore[misc]
                             chunk.page_content
                         )
 
@@ -856,7 +863,7 @@ class TextSplitterFactory:
         base_metadata = {}
         for field in metadata_to_preserve:
             if field in doc.metadata:
-                base_metadata[field] = doc.metadata[field]
+                base_metadata[field] = doc.metadata[field]  # type: ignore[misc]
 
         return base_metadata
 

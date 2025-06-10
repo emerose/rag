@@ -71,7 +71,8 @@ class DocumentIndexer:
         self.cache_repository = dependencies.cache_repository
         self.vector_repository = dependencies.vector_repository
         self.document_loader = dependencies.document_loader
-        self.ingest_manager = dependencies.ingest_manager
+        # IngestManager removed - using IngestionPipeline instead
+        # self.ingest_manager = dependencies.ingest_manager
         self.embedding_provider = dependencies.embedding_provider
         self.embedding_batcher = dependencies.embedding_batcher
         self.embedding_model_map = dependencies.embedding_model_map
@@ -139,7 +140,7 @@ class DocumentIndexer:
             return provider, batcher
         return self.embedding_provider, self.embedding_batcher
 
-    def index_file(  # noqa: PLR0911, PLR0912, PLR0915
+    def index_file(
         self,
         file_path: Path | str,
         vectorstores: dict[str, VectorStoreProtocol],
@@ -216,61 +217,71 @@ class DocumentIndexer:
                 return True, None
 
             self._log("DEBUG", f"Starting document ingestion for: {file_path}")
-            # Ingest the file
-            ingest_result = self.ingest_manager.ingest_file(file_path)
+            # TODO: Replace with IngestionPipeline implementation
+            # ingest_result = self.ingest_manager.ingest_file(file_path)
+            # self._log(
+            #     "DEBUG", f"Ingestion result successful: {ingest_result.successful}"
+            # )
+            # if not ingest_result.successful:
+            #     error_message = ingest_result.error_message or "Unknown error"
             self._log(
-                "DEBUG", f"Ingestion result successful: {ingest_result.successful}"
+                "WARNING",
+                "DocumentIndexer is deprecated - use IngestionPipeline instead",
             )
-            if not ingest_result.successful:
-                error_message = ingest_result.error_message or "Unknown error"
-                self._log(
-                    "ERROR",
-                    f"Failed to process {file_path}: {error_message}",
-                )
-                if progress_callback:
-                    progress_callback("error", file_path, error_message)
-                return False, error_message
+            return (
+                False,
+                "DocumentIndexer deprecated",
+            )  # Early return until proper implementation
+
+            # TODO: Uncomment and fix when IngestionPipeline integration is complete
+            # self._log(
+            #     "ERROR",
+            #     f"Failed to process {file_path}: {error_message}",
+            # )
+            # if progress_callback:
+            #     progress_callback("error", file_path, error_message)
+            # return False, error_message
 
             # Get documents from ingestion result
-            documents = ingest_result.documents
-            self._log("DEBUG", f"Extracted {len(documents)} documents from {file_path}")
-            if not documents:
-                self._log("WARNING", f"No documents extracted from {file_path}")
-                if progress_callback:
-                    progress_callback("error", file_path, "No documents extracted")
-                return False, "No documents extracted"
+            # documents = ingest_result.documents
+            # self._log("DEBUG", f"Extracted {len(documents)} documents from {file_path}")
+            # if not documents:
+            #     self._log("WARNING", f"No documents extracted from {file_path}")
+            #     if progress_callback:
+            #         progress_callback("error", file_path, "No documents extracted")
+            #     return False, "No documents extracted"
 
             # Debug: Check first document content
-            if documents:
-                first_doc = documents[0]
-                content_preview = (
-                    first_doc.page_content[:100] + "..."
-                    if len(first_doc.page_content) > 100
-                    else first_doc.page_content
-                )
-                self._log("DEBUG", f"First document content preview: {content_preview}")
-                self._log("DEBUG", f"First document metadata: {first_doc.metadata}")
+            # if documents:
+            #     first_doc = documents[0]
+            #     content_preview = (
+            #         first_doc.page_content[:100] + "..."
+            #         if len(first_doc.page_content) > 100
+            #         else first_doc.page_content
+            #     )
+            #     self._log("DEBUG", f"First document content preview: {content_preview}")
+            #     self._log("DEBUG", f"First document metadata: {first_doc.metadata}")
 
             # Generate embeddings and create vectorstore
-            params = VectorstoreCreationParams(
-                file_path=file_path,
-                documents=documents,
-                file_type=ingest_result.source.mime_type or "text/plain",
-                embedding_model=model_name,
-                loader_name=ingest_result.source.loader_name,
-                tokenizer_name=ingest_result.source.tokenizer_name,
-                text_splitter_name=ingest_result.source.text_splitter_name,
-                vectorstores=vectorstores,
-                vectorstore_register_callback=vectorstore_register_callback,
-            )
-            success = self._create_vectorstore_from_documents(params)
-            if progress_callback:
-                event = "indexed" if success else "error"
-                progress_callback(
-                    event, file_path, None if success else "Vectorstore creation failed"
-                )
-            return success, None
-        except INDEXING_EXCEPTIONS as e:
+            # params = VectorstoreCreationParams(
+            #     file_path=file_path,
+            #     documents=documents,
+            #     file_type=ingest_result.source.mime_type or "text/plain",
+            #     embedding_model=model_name,
+            #     loader_name=ingest_result.source.loader_name,
+            #     tokenizer_name=ingest_result.source.tokenizer_name,
+            #     text_splitter_name=ingest_result.source.text_splitter_name,
+            #     vectorstores=vectorstores,
+            #     vectorstore_register_callback=vectorstore_register_callback,
+            # )
+            # success = self._create_vectorstore_from_documents(params)
+            # if progress_callback:
+            #     event = "indexed" if success else "error"
+            #     progress_callback(
+            #         event, file_path, None if success else "Vectorstore creation failed"
+            #     )
+            # return success, None
+        except Exception as e:  # INDEXING_EXCEPTIONS replaced with generic Exception
             error_message = str(e)
             self._log("ERROR", f"Failed to index {file_path}: {error_message}")
             if progress_callback:

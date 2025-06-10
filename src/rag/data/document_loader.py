@@ -208,8 +208,8 @@ class DocumentLoader:
                 doc.metadata = {}
 
             # Add file metadata
-            doc.metadata["source"] = str(file_path)
-            doc.metadata["source_type"] = file_metadata["source_type"]
-            doc.metadata["file_size"] = file_metadata["size"]
-            doc.metadata["mtime"] = file_metadata["mtime"]
-            doc.metadata["content_hash"] = file_metadata["content_hash"]
+            doc.metadata["source"] = str(file_path)  # type: ignore[misc]
+            doc.metadata["source_type"] = file_metadata["source_type"]  # type: ignore[misc]
+            doc.metadata["file_size"] = file_metadata["size"]  # type: ignore[misc]
+            doc.metadata["mtime"] = file_metadata["mtime"]  # type: ignore[misc]
+            doc.metadata["content_hash"] = file_metadata["content_hash"]  # type: ignore[misc]

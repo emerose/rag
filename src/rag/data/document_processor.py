@@ -161,8 +161,8 @@ class DocumentProcessor(DocumentProcessorProtocol):
         self.progress_tracker.complete_task("process_files")
 
         # Summary log
-        processed_files = len(results)
-        total_chunks = sum(len(docs) for docs in results.values())
+        processed_files = len(results)  # type: ignore[arg-type]
+        total_chunks = sum(len(docs) for docs in results.values())  # type: ignore[misc]
         self._log(
             "INFO",
             f"Processed {processed_files}/{len(files)} files, generated {total_chunks} chunks",
@@ -189,21 +189,23 @@ class DocumentProcessor(DocumentProcessorProtocol):
                 doc.metadata = {}
 
             # Add processing metadata
-            doc.metadata["processed_at"] = timestamp_now()
-            doc.metadata["mime_type"] = mime_type
-            doc.metadata["text_splitter"] = (
+            doc.metadata["processed_at"] = timestamp_now()  # type: ignore[misc]
+            doc.metadata["mime_type"] = mime_type  # type: ignore[misc]
+            doc.metadata["text_splitter"] = (  # type: ignore[misc]
                 self.text_splitter_factory.last_splitter_name
             )
-            doc.metadata["tokenizer"] = self.text_splitter_factory.tokenizer_name
+            doc.metadata["tokenizer"] = self.text_splitter_factory.tokenizer_name  # type: ignore[misc]
 
             # Add chunk metadata
-            doc.metadata["chunk_index"] = i
-            doc.metadata["chunk_total"] = len(documents)
+            doc.metadata["chunk_index"] = i  # type: ignore[misc]
+            doc.metadata["chunk_total"] = len(documents)  # type: ignore[misc]
 
             # Add token count if available
             try:
-                doc.metadata["token_count"] = self.text_splitter_factory._token_length(
-                    doc.page_content
+                doc.metadata["token_count"] = (
+                    self.text_splitter_factory.get_token_length(  # type: ignore[misc]
+                        doc.page_content
+                    )
                 )
             except (AttributeError, ValueError, TypeError):
                 # If token counting fails, set to 0

@@ -16,9 +16,9 @@ BLUE = "\033[94m"
 RESET = "\033[0m"
 
 # Type checking baseline - lower this as we fix more errors!
-# Current progress: 815 errors (down from 851 after Phase 2.2 dependency injection fixes)
+# Current progress: 696 errors (down from 815 after Phase 3 data layer fixes)
 # Target: 0 errors for full strict type safety
-MAX_TYPE_ERRORS = 815
+MAX_TYPE_ERRORS = 696
 
 
 def run_command(cmd: list[str]) -> int:

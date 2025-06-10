@@ -178,7 +178,7 @@ def test_enhance_documents() -> None:
     # Mock the token length function to avoid external calls
     # and set a fixed timestamp to make tests deterministic
     with (
-        patch.object(processor.text_splitter_factory, "_token_length", return_value=10),
+        patch.object(processor.text_splitter_factory, "get_token_length", return_value=10),
         patch("datetime.datetime", mock_datetime),
     ):
         # Enhance documents
