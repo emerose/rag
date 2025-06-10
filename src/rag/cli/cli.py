@@ -330,14 +330,27 @@ def main(  # noqa: PLR0913
     state.chat_model = chat_model
 
 
-def create_console_progress_callback(progress: Progress) -> Callable[[str, int], None]:
+def create_console_progress_callback(progress: Progress) -> Callable[[dict], None]:
     """Create a progress callback that updates the console progress bars."""
     tasks = {}
 
-    def update_progress(name: str, value: int) -> None:
-        if name not in tasks:
-            tasks[name] = progress.add_task(f"[cyan]{name}", total=100)
-        progress.update(tasks[name], completed=value)
+    def update_progress(progress_info: dict) -> None:
+        stage = progress_info.get("stage", "processing")
+        current = progress_info.get("current", 0)
+        total = progress_info.get("total", 100)
+        message = progress_info.get("message", "")
+        
+        # Create task key combining stage and message
+        task_key = f"{stage}_{message}" if message else stage
+        
+        if task_key not in tasks:
+            display_name = f"[cyan]{stage}[/cyan]"
+            if message:
+                display_name += f": {message}"
+            tasks[task_key] = progress.add_task(display_name, total=total)
+        
+        # Update progress with current value
+        progress.update(tasks[task_key], completed=current)
 
     return update_progress
 
@@ -756,6 +769,9 @@ def query(  # noqa: PLR0913
         # Set the chosen prompt template
         rag_engine.default_prompt_id = prompt
 
+        # Load vectorstores from DocumentStore
+        _load_vectorstores(rag_engine)
+
         # Check if we have any vectorstores available
         vectorstores = rag_engine.vectorstores
         if not vectorstores:
@@ -1104,7 +1120,9 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
     for source_doc in source_documents:
         file_path = source_doc.location
         try:
-            cached_store = rag_engine.load_cached_vectorstore(file_path)
+            # Use the vector repository to load vectorstore for new pipeline
+            vector_repo = rag_engine._factory.vector_repository
+            cached_store = vector_repo.load_vectorstore(file_path)
             if cached_store is not None:
                 rag_engine.vectorstores[file_path] = cached_store
                 state.logger.info(f"Loaded vectorstore for: {file_path}")

@@ -275,6 +275,15 @@ class RAGEngine:
             file_path: Path to the file to invalidate
         """
         try:
+            # Remove from DocumentStore (new architecture)
+            document_store = self.ingestion_pipeline.document_store
+            document_store.remove_source_document(str(file_path))
+            
+            # Remove vectorstore (new architecture)
+            vector_repo = self._factory.vector_repository
+            vector_repo.remove_vectorstore(str(file_path))
+            
+            # Also invalidate old cache system for compatibility
             self.cache_manager.invalidate_cache(Path(file_path))
         except Exception as e:
             logger.error(f"Error invalidating cache for {file_path}: {e}")
