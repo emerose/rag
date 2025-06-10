@@ -972,11 +972,11 @@ def list(
         runtime_options = RuntimeOptions(max_workers=state.max_workers)
         rag_engine = create_rag_engine(config, runtime_options)
 
-        # Get metadata directly from SQLite
-        index_metadata = rag_engine.index_manager
-        indexed_files = index_metadata.list_indexed_files()
+        # Get source documents from DocumentStore
+        document_store = rag_engine.ingestion_pipeline.document_store
+        source_documents = document_store.list_source_documents()
 
-        state.logger.debug(f"Found {len(indexed_files)} indexed documents")
+        state.logger.debug(f"Found {len(source_documents)} indexed documents")
 
         # Prepare table data
         table_data = TableData(
@@ -985,17 +985,27 @@ def list(
             rows=[],
         )
 
-        for file_info in indexed_files:
-            file_path = file_info["file_path"]
+        for source_doc in source_documents:
+            file_path = source_doc.location
             state.logger.debug(f"Processing file: {file_path}")
 
-            # Get file stats
+            # Use stored metadata when available, fall back to file stats
             try:
-                stats = Path(file_path).stat()
-                size = f"{stats.st_size / 1024:.1f} KB"
-                modified = datetime.fromtimestamp(stats.st_mtime).strftime(
-                    "%Y-%m-%d %H:%M:%S",
-                )
+                if source_doc.size_bytes is not None:
+                    size = f"{source_doc.size_bytes / 1024:.1f} KB"
+                else:
+                    stats = Path(file_path).stat()
+                    size = f"{stats.st_size / 1024:.1f} KB"
+                
+                if source_doc.last_modified is not None:
+                    modified = datetime.fromtimestamp(source_doc.last_modified).strftime(
+                        "%Y-%m-%d %H:%M:%S",
+                    )
+                else:
+                    stats = Path(file_path).stat()
+                    modified = datetime.fromtimestamp(stats.st_mtime).strftime(
+                        "%Y-%m-%d %H:%M:%S",
+                    )
                 state.logger.debug(f"File stats - size: {size}, modified: {modified}")
             except (FileNotFoundError, PermissionError, OSError) as e:
                 state.logger.debug(f"Failed to get file stats: {e}")
@@ -1003,8 +1013,8 @@ def list(
                 modified = "N/A"
 
             # Get file metadata
-            file_type = file_info["file_type"]
-            chunks = file_info["num_chunks"]
+            file_type = source_doc.content_type or "text/plain"
+            chunks = source_doc.chunk_count
 
             state.logger.debug(f"File type: {file_type}, Chunks: {chunks}")
 
@@ -1126,10 +1136,10 @@ def _initialize_rag_engine(runtime_options: RuntimeOptions | None = None) -> RAG
 
 def _load_vectorstores(rag_engine: RAGEngine) -> None:
     """Load cached vectorstores into the RAG engine."""
-    index_metadata = rag_engine.index_manager
-    indexed_files = index_metadata.list_indexed_files()
+    document_store = rag_engine.ingestion_pipeline.document_store
+    source_documents = document_store.list_source_documents()
 
-    if not indexed_files:
+    if not source_documents:
         state.logger.error(
             "No indexed documents found in cache. Please run 'rag index' first.",
         )

@@ -270,7 +270,7 @@ class IngestionPipeline:
             result.add_error(PipelineStage.TRANSFORMING, e)
             return result
 
-        # Stage 3: Store documents
+        # Stage 3: Store source documents and their chunks
         self._report_progress(
             PipelineStage.STORING_DOCUMENTS,
             0,
@@ -279,11 +279,52 @@ class IngestionPipeline:
         )
         all_documents = []
 
+        # First, store source document metadata
+        for source_doc in source_documents:
+            try:
+                # Extract metadata for source document tracking
+                location = source_doc.source_path or source_doc.source_id
+                content_size = (
+                    len(source_doc.content)
+                    if source_doc.content
+                    else None
+                )
+                
+                # Get content hash if available from metadata
+                content_hash = source_doc.metadata.get('content_hash')
+                last_modified = source_doc.metadata.get('mtime')
+                
+                self.document_store.add_source_document(
+                    source_id=source_doc.source_id,
+                    location=location,
+                    content_type=source_doc.content_type,
+                    content_hash=content_hash,
+                    size_bytes=content_size,
+                    last_modified=last_modified,
+                    metadata=source_doc.metadata,
+                )
+            except Exception as e:
+                result.add_error(
+                    PipelineStage.STORING_DOCUMENTS, 
+                    e, 
+                    {"source_id": source_doc.source_id, "stage": "source_metadata"}
+                )
+
+        # Then, store document chunks and link them to sources
         for source_id, docs in transformed_docs.items():
             for idx, doc in enumerate(docs):
                 doc_id = f"{source_id}#chunk{idx}"
                 try:
+                    # Store the document chunk
                     self.document_store.add_document(doc_id, doc)
+                    
+                    # Link chunk to its source document
+                    self.document_store.add_document_to_source(
+                        document_id=doc_id,
+                        source_id=source_id,
+                        chunk_order=idx
+                    )
+                    
                     all_documents.append(doc)
                     result.documents_stored += 1
                 except Exception as e:

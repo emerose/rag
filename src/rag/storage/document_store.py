@@ -8,12 +8,28 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 from langchain_core.documents import Document
 
 from rag.utils.exceptions import DocumentStoreError
+
+
+@dataclass
+class SourceDocumentMetadata:
+    """Metadata for a source document."""
+    source_id: str
+    location: str
+    content_type: str | None
+    content_hash: str | None
+    size_bytes: int | None
+    last_modified: float | None
+    indexed_at: float
+    metadata: dict[str, Any]
+    chunk_count: int
 
 
 @runtime_checkable
@@ -158,6 +174,91 @@ class DocumentStoreProtocol(Protocol):
             DocumentStoreError: If search fails
         """
 
+    def add_source_document(
+        self,
+        source_id: str,
+        location: str,
+        content_type: str | None = None,
+        content_hash: str | None = None,
+        size_bytes: int | None = None,
+        last_modified: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Add a source document to tracking.
+
+        Args:
+            source_id: Unique identifier for the source document
+            location: File path, URL, or other identifier
+            content_type: MIME type or document type
+            content_hash: SHA-256 for change detection
+            size_bytes: Document size if applicable
+            last_modified: Timestamp (could be mtime or last-updated)
+            metadata: Arbitrary metadata as dictionary
+
+        Raises:
+            DocumentStoreError: If source document cannot be stored
+        """
+
+    def list_source_documents(self) -> list[SourceDocumentMetadata]:
+        """List all tracked source documents with metadata.
+
+        Returns:
+            List of source document metadata objects
+
+        Raises:
+            DocumentStoreError: If listing fails
+        """
+
+    def get_source_document(self, source_id: str) -> SourceDocumentMetadata | None:
+        """Get metadata for a specific source document.
+
+        Args:
+            source_id: Unique identifier for the source document
+
+        Returns:
+            Source document metadata if found, None otherwise
+
+        Raises:
+            DocumentStoreError: If retrieval fails
+        """
+
+    def get_source_document_chunks(self, source_id: str) -> list[Document]:
+        """Get all chunks for a source document in order.
+
+        Args:
+            source_id: Unique identifier for the source document
+
+        Returns:
+            List of document chunks in order
+
+        Raises:
+            DocumentStoreError: If retrieval fails
+        """
+
+    def remove_source_document(self, source_id: str) -> None:
+        """Remove source document and all its chunks.
+
+        Args:
+            source_id: Unique identifier for the source document
+
+        Raises:
+            DocumentStoreError: If removal fails
+        """
+
+    def add_document_to_source(
+        self, document_id: str, source_id: str, chunk_order: int
+    ) -> None:
+        """Link a document chunk to its source document.
+
+        Args:
+            document_id: Unique identifier for the document chunk
+            source_id: Unique identifier for the source document
+            chunk_order: Order of this chunk within the source document
+
+        Raises:
+            DocumentStoreError: If linking fails
+        """
+
 
 class SQLiteDocumentStore:
     """SQLite-based document store implementation.
@@ -219,6 +320,41 @@ class SQLiteDocumentStore:
                     INSERT INTO documents_fts(rowid, doc_id, content) 
                     VALUES (new.rowid, new.doc_id, new.content);
                 END
+            """)
+
+            # Create source_documents table for tracking source documents
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS source_documents (
+                    id TEXT PRIMARY KEY,              
+                    location TEXT NOT NULL,           
+                    content_type TEXT,                
+                    content_hash TEXT,                
+                    size_bytes INTEGER,               
+                    last_modified REAL,               
+                    indexed_at REAL NOT NULL,         
+                    metadata_json TEXT,               
+                    created_at REAL NOT NULL,
+                    updated_at REAL NOT NULL
+                )
+            """)
+
+            # Create join table for linking source documents to their chunks
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS source_document_chunks (
+                    source_document_id TEXT NOT NULL,
+                    document_id TEXT NOT NULL,
+                    chunk_order INTEGER NOT NULL,     
+                    created_at REAL NOT NULL,
+                    PRIMARY KEY (source_document_id, document_id),
+                    FOREIGN KEY (source_document_id) REFERENCES source_documents(id) ON DELETE CASCADE,
+                    FOREIGN KEY (document_id) REFERENCES documents(doc_id) ON DELETE CASCADE
+                )
+            """)
+
+            # Create index for efficient chunk ordering queries
+            conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_source_chunks_order 
+                ON source_document_chunks(source_document_id, chunk_order)
             """)
 
             conn.commit()
@@ -543,6 +679,177 @@ class SQLiteDocumentStore:
                 "Failed to search documents", {"error": str(e)}
             ) from e
 
+    def add_source_document(
+        self,
+        source_id: str,
+        location: str,
+        content_type: str | None = None,
+        content_hash: str | None = None,
+        size_bytes: int | None = None,
+        last_modified: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Add a source document to tracking."""
+        try:
+            current_time = time.time()
+            metadata_json = json.dumps(metadata or {})
+            
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    INSERT OR REPLACE INTO source_documents 
+                    (id, location, content_type, content_hash, size_bytes, 
+                     last_modified, indexed_at, metadata_json, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    source_id, location, content_type, content_hash, size_bytes,
+                    last_modified, current_time, metadata_json, current_time, current_time
+                ))
+                conn.commit()
+        except Exception as e:
+            raise DocumentStoreError(
+                "Failed to add source document", 
+                {"source_id": source_id, "error": str(e)}
+            ) from e
+
+    def list_source_documents(self) -> list[SourceDocumentMetadata]:
+        """List all tracked source documents with metadata."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                # Get source documents with chunk counts
+                cursor = conn.execute("""
+                    SELECT s.id, s.location, s.content_type, s.content_hash, 
+                           s.size_bytes, s.last_modified, s.indexed_at, s.metadata_json,
+                           COUNT(c.document_id) as chunk_count
+                    FROM source_documents s
+                    LEFT JOIN source_document_chunks c ON s.id = c.source_document_id
+                    GROUP BY s.id, s.location, s.content_type, s.content_hash, 
+                             s.size_bytes, s.last_modified, s.indexed_at, s.metadata_json
+                    ORDER BY s.indexed_at DESC
+                """)
+                
+                results = []
+                for row in cursor.fetchall():
+                    metadata = json.loads(row[7]) if row[7] else {}
+                    results.append(SourceDocumentMetadata(
+                        source_id=row[0],
+                        location=row[1],
+                        content_type=row[2],
+                        content_hash=row[3],
+                        size_bytes=row[4],
+                        last_modified=row[5],
+                        indexed_at=row[6],
+                        metadata=metadata,
+                        chunk_count=row[8]
+                    ))
+                return results
+        except Exception as e:
+            raise DocumentStoreError(
+                "Failed to list source documents", {"error": str(e)}
+            ) from e
+
+    def get_source_document(self, source_id: str) -> SourceDocumentMetadata | None:
+        """Get metadata for a specific source document."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute("""
+                    SELECT s.id, s.location, s.content_type, s.content_hash, 
+                           s.size_bytes, s.last_modified, s.indexed_at, s.metadata_json,
+                           COUNT(c.document_id) as chunk_count
+                    FROM source_documents s
+                    LEFT JOIN source_document_chunks c ON s.id = c.source_document_id
+                    WHERE s.id = ?
+                    GROUP BY s.id, s.location, s.content_type, s.content_hash, 
+                             s.size_bytes, s.last_modified, s.indexed_at, s.metadata_json
+                """, (source_id,))
+                
+                row = cursor.fetchone()
+                if row:
+                    metadata = json.loads(row[7]) if row[7] else {}
+                    return SourceDocumentMetadata(
+                        source_id=row[0],
+                        location=row[1],
+                        content_type=row[2],
+                        content_hash=row[3],
+                        size_bytes=row[4],
+                        last_modified=row[5],
+                        indexed_at=row[6],
+                        metadata=metadata,
+                        chunk_count=row[8]
+                    )
+                return None
+        except Exception as e:
+            raise DocumentStoreError(
+                "Failed to get source document", 
+                {"source_id": source_id, "error": str(e)}
+            ) from e
+
+    def get_source_document_chunks(self, source_id: str) -> list[Document]:
+        """Get all chunks for a source document in order."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.execute("""
+                    SELECT d.doc_id, d.content, d.metadata
+                    FROM documents d
+                    JOIN source_document_chunks c ON d.doc_id = c.document_id
+                    WHERE c.source_document_id = ?
+                    ORDER BY c.chunk_order
+                """, (source_id,))
+                
+                results = []
+                for row in cursor.fetchall():
+                    metadata = json.loads(row[2])
+                    document = Document(page_content=row[1], metadata=metadata)
+                    results.append(document)
+                return results
+        except Exception as e:
+            raise DocumentStoreError(
+                "Failed to get source document chunks", 
+                {"source_id": source_id, "error": str(e)}
+            ) from e
+
+    def remove_source_document(self, source_id: str) -> None:
+        """Remove source document and all its chunks."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                # First get all document IDs for this source
+                cursor = conn.execute("""
+                    SELECT document_id FROM source_document_chunks 
+                    WHERE source_document_id = ?
+                """, (source_id,))
+                document_ids = [row[0] for row in cursor.fetchall()]
+                
+                # Delete the chunks (join table entries will be deleted by CASCADE)
+                for doc_id in document_ids:
+                    conn.execute("DELETE FROM documents WHERE doc_id = ?", (doc_id,))
+                
+                # Delete the source document (CASCADE will handle join table)
+                conn.execute("DELETE FROM source_documents WHERE id = ?", (source_id,))
+                conn.commit()
+        except Exception as e:
+            raise DocumentStoreError(
+                "Failed to remove source document", 
+                {"source_id": source_id, "error": str(e)}
+            ) from e
+
+    def add_document_to_source(
+        self, document_id: str, source_id: str, chunk_order: int
+    ) -> None:
+        """Link a document chunk to its source document."""
+        try:
+            current_time = time.time()
+            with sqlite3.connect(self.db_path) as conn:
+                conn.execute("""
+                    INSERT OR REPLACE INTO source_document_chunks 
+                    (source_document_id, document_id, chunk_order, created_at)
+                    VALUES (?, ?, ?, ?)
+                """, (source_id, document_id, chunk_order, current_time))
+                conn.commit()
+        except Exception as e:
+            raise DocumentStoreError(
+                "Failed to link document to source", 
+                {"document_id": document_id, "source_id": source_id, "error": str(e)}
+            ) from e
+
 
 class FakeDocumentStore:
     """In-memory fake document store for testing.
@@ -554,6 +861,8 @@ class FakeDocumentStore:
     def __init__(self) -> None:
         """Initialize the fake document store."""
         self._documents: dict[str, Document] = {}
+        self._source_documents: dict[str, SourceDocumentMetadata] = {}
+        self._source_document_chunks: dict[str, list[tuple[str, int]]] = {}
 
     def add_document(self, doc_id: str, document: Document) -> None:
         """Add a document to the store.
@@ -711,3 +1020,122 @@ class FakeDocumentStore:
                 break
 
         return results
+
+    def add_source_document(
+        self,
+        source_id: str,
+        location: str,
+        content_type: str | None = None,
+        content_hash: str | None = None,
+        size_bytes: int | None = None,
+        last_modified: float | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Add a source document to tracking."""
+        current_time = time.time()
+        chunk_count = len(self._source_document_chunks.get(source_id, []))
+        
+        self._source_documents[source_id] = SourceDocumentMetadata(
+            source_id=source_id,
+            location=location,
+            content_type=content_type,
+            content_hash=content_hash,
+            size_bytes=size_bytes,
+            last_modified=last_modified,
+            indexed_at=current_time,
+            metadata=metadata or {},
+            chunk_count=chunk_count
+        )
+
+    def list_source_documents(self) -> list[SourceDocumentMetadata]:
+        """List all tracked source documents with metadata."""
+        # Update chunk counts
+        for source_id, source_doc in self._source_documents.items():
+            chunk_count = len(self._source_document_chunks.get(source_id, []))
+            # Create a new instance with updated chunk count
+            self._source_documents[source_id] = SourceDocumentMetadata(
+                source_id=source_doc.source_id,
+                location=source_doc.location,
+                content_type=source_doc.content_type,
+                content_hash=source_doc.content_hash,
+                size_bytes=source_doc.size_bytes,
+                last_modified=source_doc.last_modified,
+                indexed_at=source_doc.indexed_at,
+                metadata=source_doc.metadata,
+                chunk_count=chunk_count
+            )
+        
+        # Return sorted by indexed_at (newest first)
+        return sorted(
+            self._source_documents.values(), 
+            key=lambda x: x.indexed_at, 
+            reverse=True
+        )
+
+    def get_source_document(self, source_id: str) -> SourceDocumentMetadata | None:
+        """Get metadata for a specific source document."""
+        if source_id in self._source_documents:
+            source_doc = self._source_documents[source_id]
+            chunk_count = len(self._source_document_chunks.get(source_id, []))
+            
+            # Return with updated chunk count
+            return SourceDocumentMetadata(
+                source_id=source_doc.source_id,
+                location=source_doc.location,
+                content_type=source_doc.content_type,
+                content_hash=source_doc.content_hash,
+                size_bytes=source_doc.size_bytes,
+                last_modified=source_doc.last_modified,
+                indexed_at=source_doc.indexed_at,
+                metadata=source_doc.metadata,
+                chunk_count=chunk_count
+            )
+        return None
+
+    def get_source_document_chunks(self, source_id: str) -> list[Document]:
+        """Get all chunks for a source document in order."""
+        if source_id not in self._source_document_chunks:
+            return []
+        
+        # Get chunks sorted by order
+        chunks = sorted(self._source_document_chunks[source_id], key=lambda x: x[1])
+        
+        results = []
+        for doc_id, _ in chunks:
+            if doc_id in self._documents:
+                # Return a copy to avoid mutations
+                document = self._documents[doc_id]
+                result_doc = Document(
+                    page_content=document.page_content,
+                    metadata=document.metadata.copy() if document.metadata else {},
+                )
+                results.append(result_doc)
+        
+        return results
+
+    def remove_source_document(self, source_id: str) -> None:
+        """Remove source document and all its chunks."""
+        # Remove all chunks
+        if source_id in self._source_document_chunks:
+            for doc_id, _ in self._source_document_chunks[source_id]:
+                self._documents.pop(doc_id, None)
+            del self._source_document_chunks[source_id]
+        
+        # Remove source document
+        self._source_documents.pop(source_id, None)
+
+    def add_document_to_source(
+        self, document_id: str, source_id: str, chunk_order: int
+    ) -> None:
+        """Link a document chunk to its source document."""
+        if source_id not in self._source_document_chunks:
+            self._source_document_chunks[source_id] = []
+        
+        # Remove existing entry if present (to handle re-ordering)
+        self._source_document_chunks[source_id] = [
+            (doc_id, order) for doc_id, order in self._source_document_chunks[source_id]
+            if doc_id != document_id
+        ]
+        
+        # Add new entry
+        self._source_document_chunks[source_id].append((document_id, chunk_order))
