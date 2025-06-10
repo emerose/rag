@@ -345,7 +345,6 @@ class RAGComponentsFactory:
             "ingestion_pipeline": self.ingestion_pipeline,
             "cache_manager": self.cache_manager,
             "reranker": self.reranker,
-            # "document_indexer": self.create_document_indexer(),  # Not used in new architecture
             "query_engine": self.create_query_engine(),
             "cache_orchestrator": self.create_cache_orchestrator(),
         }
