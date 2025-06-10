@@ -310,7 +310,7 @@ class DocumentIndexer:
             # Create a new vectorstore and process chunks sequentially
             vectorstore = self.vector_repository.create_empty_vectorstore()
 
-            provider, batcher = self._get_embedding_tools(
+            _, batcher = self._get_embedding_tools(
                 params.embedding_model or self.config.embedding_model
             )
 

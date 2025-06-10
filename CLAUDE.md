@@ -30,8 +30,14 @@ ruff format src/ --line-length 88
 # Lint and auto-fix
 ruff check src/rag --fix --line-length 88
 
-# Type checking
-mypy src/rag
+# Type checking (with baseline limit)
+python scripts/run_tests.py lint
+
+# Type checking (no baseline limit) 
+python scripts/run_tests.py typecheck
+
+# Type checking (direct pyright)
+pyright src/rag
 ```
 
 ### RAG CLI Usage

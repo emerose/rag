@@ -203,8 +203,8 @@ class FakeVectorStoreBackend(VectorStoreBackend):
                     # Update the mappings for the new documents
                     for i, doc in enumerate(vs.documents):
                         doc_id = str(start_idx + i)
-                        merged._docstore[doc_id] = doc
-                        merged._index_to_docstore_id[start_idx + i] = doc_id
+                        merged.docstore[doc_id] = doc
+                        merged.index_to_docstore_id[start_idx + i] = doc_id
             else:
                 logger.warning(f"Cannot merge non-InMemoryVectorStore: {type(vs)}")
 

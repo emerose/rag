@@ -683,11 +683,11 @@ class InMemoryVectorRepository(VectorRepositoryProtocol):
                 merged.embeddings.extend(vs.embeddings)
 
                 # Update mappings
-                start_idx = len(merged._index_to_docstore_id)
+                start_idx = len(merged.index_to_docstore_id)
                 for i, doc in enumerate(vs.documents):
                     doc_id = str(start_idx + i)
-                    merged._docstore[doc_id] = doc
-                    merged._index_to_docstore_id[start_idx + i] = doc_id
+                    merged.docstore[doc_id] = doc
+                    merged.index_to_docstore_id[start_idx + i] = doc_id
 
         return merged
 

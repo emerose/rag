@@ -95,6 +95,16 @@ class RAGEngine:
         """Get the ingestion pipeline."""
         return self._factory.ingestion_pipeline
 
+    @property
+    def vector_repository(self):
+        """Get the vector repository."""
+        return self._factory.vector_repository
+
+    @property
+    def document_source(self):
+        """Get the document source."""
+        return self._factory.document_source
+
     def index_directory(
         self, directory_path: Path | str, progress_callback=None
     ) -> dict[str, Any]:
@@ -278,11 +288,11 @@ class RAGEngine:
             # Remove from DocumentStore (new architecture)
             document_store = self.ingestion_pipeline.document_store
             document_store.remove_source_document(str(file_path))
-            
+
             # Remove vectorstore (new architecture)
             vector_repo = self._factory.vector_repository
             vector_repo.remove_vectorstore(str(file_path))
-            
+
             # Also invalidate old cache system for compatibility
             self.cache_manager.invalidate_cache(Path(file_path))
         except Exception as e:

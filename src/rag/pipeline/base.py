@@ -398,7 +398,7 @@ class IngestionPipeline:
         )
 
         try:
-            embeddings, metadata_list = self.embedder.embed_with_metadata(all_documents)
+            embeddings, _ = self.embedder.embed_with_metadata(all_documents)
             result.embeddings_generated = len(embeddings)
         except Exception as e:
             result.add_error(PipelineStage.EMBEDDING, e)

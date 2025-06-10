@@ -45,7 +45,7 @@ rag = "rag.cli.cli:run_cli"
 [project.optional-dependencies]
 dev = [
     "ruff>=0.3.0",
-    "mypy>=1.8.0",
+    "pyright>=1.1.390",
     "pre-commit>=3.6.0",
     "pytest>=8.3.0",
     "pytest-asyncio>=1.0.0",
@@ -193,17 +193,40 @@ exclude_lines = [
 show_missing = true
 skip_covered = false
 
-[tool.mypy]
-python_version = "3.10"
-strict = true
-show_error_codes = true
-ignore_missing_imports = true
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "strict"
+reportMissingImports = true
+reportMissingTypeStubs = false
+reportImportCycles = true
+reportUnusedImport = true
+reportUnusedClass = true
+reportUnusedFunction = true
+reportUnusedVariable = true
+reportDuplicateImport = true
+reportUnnecessaryTypeIgnoreComment = true
+reportUnnecessaryCast = true
+reportUnnecessaryComparison = false
+reportUnnecessaryContains = true
+reportAssertAlwaysTrue = true
+reportSelfClsParameterName = true
+reportImplicitStringConcatenation = false
+reportMissingTypeArgument = true
+reportOptionalMemberAccess = true
+reportGeneralTypeIssues = true
+reportIndexIssue = true
+stubPath = "typings"
+venvPath = "."
+venv = ".venv"
 exclude = [
     "build/",
     "dist/",
     ".venv/",
-    ".mypy_cache/",
+    "**/__pycache__",
     "tests/",
+]
+executionEnvironments = [
+    { root = "src", pythonVersion = "3.10", pythonPlatform = "All", extraPaths = [] }
 ]
 
 [dependency-groups]

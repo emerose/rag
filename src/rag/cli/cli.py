@@ -339,16 +339,16 @@ def create_console_progress_callback(progress: Progress) -> Callable[[dict], Non
         current = progress_info.get("current", 0)
         total = progress_info.get("total", 100)
         message = progress_info.get("message", "")
-        
+
         # Create task key combining stage and message
         task_key = f"{stage}_{message}" if message else stage
-        
+
         if task_key not in tasks:
             display_name = f"[cyan]{stage}[/cyan]"
             if message:
                 display_name += f": {message}"
             tasks[task_key] = progress.add_task(display_name, total=total)
-        
+
         # Update progress with current value
         progress.update(tasks[task_key], completed=current)
 
@@ -1121,7 +1121,7 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
         file_path = source_doc.location
         try:
             # Use the vector repository to load vectorstore for new pipeline
-            vector_repo = rag_engine._factory.vector_repository
+            vector_repo = rag_engine.vector_repository
             cached_store = vector_repo.load_vectorstore(file_path)
             if cached_store is not None:
                 rag_engine.vectorstores[file_path] = cached_store

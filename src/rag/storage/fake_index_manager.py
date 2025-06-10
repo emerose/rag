@@ -172,6 +172,24 @@ class FakeIndexManager(CacheRepositoryProtocol):
             "text_splitter": metadata.text_splitter,
         }
 
+    def set_metadata_dict(self, file_path: str, metadata: dict[str, Any]) -> None:
+        """Set metadata from a dictionary (for testing purposes).
+
+        Args:
+            file_path: Path to the file
+            metadata: Metadata dictionary
+        """
+        self._document_metadata[file_path] = metadata
+
+    @property
+    def document_metadata(self) -> dict[str, dict[str, Any]]:
+        """Get all document metadata (for testing purposes).
+
+        Returns:
+            Dictionary mapping file paths to metadata dictionaries
+        """
+        return self._document_metadata
+
     def get_metadata(self, file_path: Path) -> dict[str, Any] | None:
         """Get metadata for a file."""
         path_str = str(file_path)

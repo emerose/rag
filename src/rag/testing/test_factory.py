@@ -142,7 +142,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         if self.test_options.initial_metadata:
             # Directly populate the internal storage for testing
             for file_path, metadata in self.test_options.initial_metadata.items():
-                cache_repo._document_metadata[file_path] = metadata
+                cache_repo.set_metadata_dict(file_path, metadata)
 
         # Create fake vector repository with initial vectors if provided
         vector_repo = InMemoryVectorRepository()
@@ -237,7 +237,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         manager = FakeIndexManager(cache_dir=cache_dir)
         if initial_metadata:
             for file_path, metadata in initial_metadata.items():
-                manager._document_metadata[file_path] = metadata
+                manager.set_metadata_dict(file_path, metadata)
         return manager
 
     @classmethod
@@ -467,7 +467,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             if isinstance(self.cache_repository, InMemoryCacheRepository):
                 self.cache_repository.document_metadata[file_path] = metadata
             else:
-                self.cache_repository._document_metadata[file_path] = metadata
+                self.cache_repository.set_metadata_dict(file_path, metadata)
         else:
             raise ConfigurationError(
                 "Can only add test metadata to InMemoryCacheRepository or FakeIndexManager, "
@@ -508,7 +508,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         if isinstance(self.cache_repository, InMemoryCacheRepository):
             return dict(self.cache_repository.document_metadata)
         else:
-            return dict(self.cache_repository._document_metadata)
+            return dict(self.cache_repository.document_metadata)
 
     def inject_fake_openai(self) -> FakeOpenAI:
         """Inject and return a FakeOpenAI instance for the factory.
