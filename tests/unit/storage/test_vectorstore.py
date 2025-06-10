@@ -236,10 +236,10 @@ def test_add_documents_to_vectorstore(
     fake_embeddings = [[0.1, 0.2, 0.3] * 128]  # 384-dim fake embedding
 
     # Add documents using real fake backend
-    success = manager.add_documents_to_vectorstore(vectorstore, new_documents, fake_embeddings)
+    updated_vectorstore = manager.add_documents_to_vectorstore(vectorstore, new_documents, fake_embeddings)
 
-    # Verify the operation succeeded
-    assert success is True
+    # Verify the operation succeeded (returns updated vectorstore)
+    assert updated_vectorstore is not None
     
     # Test that vectorstore now has more content
     results = vectorstore.similarity_search("document", k=5)

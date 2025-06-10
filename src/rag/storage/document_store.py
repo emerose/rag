@@ -74,6 +74,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If document cannot be stored
         """
+        ...
 
     def add_documents(self, documents: dict[str, Document]) -> None:
         """Add multiple documents to the store.
@@ -84,6 +85,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If documents cannot be stored
         """
+        ...
 
     def get_document(self, doc_id: str) -> Document | None:
         """Retrieve a document by ID.
@@ -97,6 +99,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If retrieval fails
         """
+        ...
 
     def get_documents(self, doc_ids: list[str]) -> dict[str, Document]:
         """Retrieve multiple documents by their IDs.
@@ -110,6 +113,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If retrieval fails
         """
+        ...
 
     def delete_document(self, doc_id: str) -> bool:
         """Delete a document from the store.
@@ -123,6 +127,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If deletion fails
         """
+        ...
 
     def delete_documents(self, doc_ids: list[str]) -> dict[str, bool]:
         """Delete multiple documents from the store.
@@ -136,6 +141,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If deletion fails
         """
+        ...
 
     def document_exists(self, doc_id: str) -> bool:
         """Check if a document exists in the store.
@@ -149,6 +155,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If check fails
         """
+        ...
 
     def list_document_ids(self) -> list[str]:
         """List all document IDs in the store.
@@ -159,6 +166,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If listing fails
         """
+        ...
 
     def count_documents(self) -> int:
         """Count the number of documents in the store.
@@ -169,6 +177,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If counting fails
         """
+        ...
 
     def clear(self) -> None:
         """Remove all documents from the store.
@@ -176,6 +185,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If clearing fails
         """
+        ...
 
     def search_documents(
         self,
@@ -196,6 +206,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If search fails
         """
+        ...
 
     def add_source_document(self, source_metadata: SourceDocumentMetadata) -> None:
         """Add a source document to tracking.
@@ -212,6 +223,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If source document cannot be stored
         """
+        ...
 
     def list_source_documents(self) -> list[SourceDocumentMetadata]:
         """List all tracked source documents with metadata.
@@ -222,6 +234,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If listing fails
         """
+        ...
 
     def get_source_document(self, source_id: str) -> SourceDocumentMetadata | None:
         """Get metadata for a specific source document.
@@ -235,6 +248,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If retrieval fails
         """
+        ...
 
     def get_source_document_chunks(self, source_id: str) -> list[Document]:
         """Get all chunks for a source document in order.
@@ -248,6 +262,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If retrieval fails
         """
+        ...
 
     def remove_source_document(self, source_id: str) -> None:
         """Remove source document and all its chunks.
@@ -258,6 +273,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If removal fails
         """
+        ...
 
     def add_document_to_source(
         self, document_id: str, source_id: str, chunk_order: int
@@ -272,6 +288,7 @@ class DocumentStoreProtocol(Protocol):
         Raises:
             DocumentStoreError: If linking fails
         """
+        ...
 
 
 class SQLiteDocumentStore:

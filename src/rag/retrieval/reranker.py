@@ -30,7 +30,7 @@ class KeywordReranker(BaseReranker):
 
     def rerank(self, query: str, documents: Sequence[Document]) -> list[Document]:
         tokens = [t for t in self._tokenize(query) if t not in self.stopwords]
-        scored = []
+        scored: list[tuple[int, Document]] = []
         for doc in documents:
             doc_tokens = self._tokenize(doc.page_content)
             score = sum(doc_tokens.count(t) for t in tokens)

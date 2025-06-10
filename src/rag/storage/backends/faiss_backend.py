@@ -19,6 +19,7 @@ from langchain_community.docstore.in_memory import InMemoryDocstore
 from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
+from numpy.typing import NDArray
 
 from rag.storage.backends.base import VectorStoreBackend
 from rag.storage.protocols import VectorStoreProtocol
@@ -110,7 +111,7 @@ class FAISSBackend(VectorStoreBackend):
         docstore = InMemoryDocstore({})
 
         # Create empty index_to_docstore_id mapping
-        index_to_docstore_id = {}
+        index_to_docstore_id: dict[int, str] = {}
 
         # Create FAISS vector store
         return FAISS(
@@ -141,7 +142,7 @@ class FAISSBackend(VectorStoreBackend):
             logger.debug(f"Loading FAISS vector store from {cache_path}")
 
             # Load the FAISS index
-            index = faiss.read_index(str(faiss_file))
+            index: Any = faiss.read_index(str(faiss_file))
 
             # Load the pickle file containing docstore and metadata
             with open(pkl_file, "rb") as f:
@@ -160,8 +161,10 @@ class FAISSBackend(VectorStoreBackend):
             # The pickle file structure varies based on how it was saved
             # It might be a tuple with docstore and index_to_docstore_id
             # Or it might just be the docstore with index_to_docstore_id as an attribute
+            docstore: Any
+            index_to_docstore_id: dict[int, str]
             if isinstance(data, tuple) and len(data) == 2:
-                docstore, index_to_docstore_id = data
+                docstore, index_to_docstore_id = data  # type: ignore[misc]
             else:
                 docstore = data
                 index_to_docstore_id = getattr(docstore, "index_to_docstore_id", {})
@@ -307,7 +310,9 @@ class FAISSBackend(VectorStoreBackend):
         logger.debug("Successfully merged FAISS vector stores")
         return merged
 
-    def _merge_single_vectorstore(self, merged: FAISS, vs: FAISS) -> None:
+    def _merge_single_vectorstore(
+        self, merged: VectorStoreProtocol, vs: VectorStoreProtocol
+    ) -> None:
         """Merge a single FAISS vector store into the target vector store.
 
         Args:
@@ -354,7 +359,7 @@ class FAISSBackend(VectorStoreBackend):
             logger.error(f"Failed to merge FAISS vector store: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
 
-    def _find_index_for_doc(self, vs: FAISS, doc_id: str) -> int | None:
+    def _find_index_for_doc(self, vs: VectorStoreProtocol, doc_id: str) -> int | None:
         """Find the index for a document in a FAISS vector store.
 
         Args:
@@ -383,7 +388,7 @@ class FAISSBackend(VectorStoreBackend):
         self,
         documents: list[Document],
         embeddings: list[list[float]],
-    ) -> tuple[list[Document], np.ndarray] | None:
+    ) -> tuple[list[Document], NDArray[Any]] | None:
         """Validate and prepare documents and their embeddings for FAISS.
 
         Args:
@@ -406,7 +411,7 @@ class FAISSBackend(VectorStoreBackend):
 
         try:
             # Convert embeddings to numpy array
-            embeddings_array = np.array(embeddings, dtype=np.float32)
+            embeddings_array: NDArray[Any] = np.array(embeddings, dtype=np.float32)
 
             # Validate embedding dimensions
             expected_dim = self.get_embedding_dimension()

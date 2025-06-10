@@ -255,30 +255,44 @@ class VectorStoreManager(VectorRepositoryProtocol):
 
     def add_documents_to_vectorstore(
         self,
-        vectorstore: VectorStoreProtocol,
+        vectorstore: VectorStoreProtocol | None,
         documents: list[Document],
         embeddings: list[list[float]],
-    ) -> bool:
+    ) -> VectorStoreProtocol:
         """Add documents and their embeddings to an existing vector store.
 
         Args:
-            vectorstore: Vector store to add documents to
+            vectorstore: Vector store to add documents to (or None to create new)
             documents: List of documents to add
             embeddings: Corresponding embeddings for the documents
 
         Returns:
-            True if successful, False otherwise
+            Updated vector store
 
         """
         self._log("DEBUG", f"Adding {len(documents)} documents to vector store")
 
         try:
-            return self.backend.add_documents_to_vectorstore(
+            # If no vectorstore provided, create a new one
+            if vectorstore is None:
+                return self.backend.create_vectorstore(documents)
+
+            # Try to add to existing vectorstore
+            success = self.backend.add_documents_to_vectorstore(
                 vectorstore, documents, embeddings
             )
+            if success:
+                return vectorstore
+            else:
+                # If adding failed, create a new vectorstore
+                self._log(
+                    "WARNING", "Failed to add to existing vectorstore, creating new one"
+                )
+                return self.backend.create_vectorstore(documents)
         except Exception as e:
             self._log("ERROR", f"Failed to add documents to vector store: {e}")
-            return False
+            # Fallback: create new vectorstore
+            return self.backend.create_vectorstore(documents)
 
     def merge_vectorstores(
         self, vectorstores: list[VectorStoreProtocol]
@@ -351,7 +365,8 @@ class VectorStoreManager(VectorRepositoryProtocol):
         """
         # Delegate to backend if it has this method
         if hasattr(self.backend, "_get_docstore_items"):
-            return self.backend._get_docstore_items(docstore)
+            method = self.backend._get_docstore_items
+            return method(docstore)  # type: ignore[misc]
 
         # Fallback implementation
         items = []
@@ -359,12 +374,14 @@ class VectorStoreManager(VectorRepositoryProtocol):
         # Try to use a public API first if available
         if hasattr(docstore, "items") and callable(docstore.items):
             try:
-                return list(docstore.items())
+                items_method = docstore.items
+                return list(items_method())  # type: ignore[misc]
             except (AttributeError, TypeError):
                 pass
 
         # If the above fails, try using the private attribute
         if hasattr(docstore, "_dict"):
-            return list(docstore._dict.items())
+            private_dict = docstore._dict
+            return list(private_dict.items())  # type: ignore[misc]
 
         return items
