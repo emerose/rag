@@ -272,7 +272,7 @@ class SimpleVectorStoreManager:
     def __init__(
         self,
         log_callback: Callable[[str, str, str], None] | None = None,
-        embeddings=None,
+        embeddings: Any = None,
     ) -> None:
         """Initialize the simple manager.
 

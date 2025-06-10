@@ -106,7 +106,7 @@ class RAGEngine:
         return self._factory.document_source
 
     def index_directory(
-        self, directory_path: Path | str, progress_callback=None
+        self, directory_path: Path | str, progress_callback: Any = None
     ) -> dict[str, Any]:
         """Index all documents in a directory.
 
@@ -153,7 +153,7 @@ class RAGEngine:
             return {"pipeline": {"success": False, "error": str(e)}}
 
     def index_file(
-        self, file_path: Path | str, progress_callback=None
+        self, file_path: Path | str, progress_callback: Any = None
     ) -> tuple[bool, str]:
         """Index a single file.
 

@@ -21,6 +21,7 @@ class EmbeddingServiceProtocol(Protocol):
         Returns:
             Dimension of the embeddings
         """
+        ...
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for a list of texts.
@@ -34,6 +35,7 @@ class EmbeddingServiceProtocol(Protocol):
         Raises:
             ValueError: If embedding generation fails
         """
+        ...
 
     def embed_query(self, query: str) -> list[float]:
         """Generate embedding for a query.
@@ -47,6 +49,7 @@ class EmbeddingServiceProtocol(Protocol):
         Raises:
             ValueError: If embedding generation fails
         """
+        ...
 
     def get_model_info(self) -> dict[str, str]:
         """Get information about the embeddings model.
@@ -54,3 +57,4 @@ class EmbeddingServiceProtocol(Protocol):
         Returns:
             Dictionary with embedding model information
         """
+        ...

@@ -194,7 +194,7 @@ class FakeChatModel(BaseChatModel):
 
     model_name: str = "fake-chat-model"
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         """Initialize the fake chat model."""
         super().__init__(**kwargs)
 

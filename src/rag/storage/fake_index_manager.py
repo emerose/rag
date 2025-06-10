@@ -21,7 +21,7 @@ class FakeIndexManager(CacheRepositoryProtocol):
     with all the heavy patching. All data is stored in memory dictionaries.
     """
 
-    def __init__(self, cache_dir: Path | str | None = None, log_callback=None):
+    def __init__(self, cache_dir: Path | str | None = None, log_callback: Any = None):
         """Initialize the fake index manager.
 
         Args:

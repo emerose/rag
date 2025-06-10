@@ -239,7 +239,7 @@ def configure_logging(
     return get_logger()
 
 
-def signal_handler(_signum, _frame):
+def signal_handler(_signum: Any, _frame: Any) -> None:
     """Handle interrupt signals gracefully."""
     if state.is_processing:
         write(Error("Interrupt received. Cleaning up..."))
@@ -252,7 +252,7 @@ def signal_handler(_signum, _frame):
 def async_signal_handler(loop: asyncio.AbstractEventLoop):
     """Create an async-aware signal handler that can properly terminate async operations."""
 
-    def handler(_signum, _frame):
+    def handler(_signum: Any, _frame: Any) -> None:
         write(Error("Interrupt received. Exiting..."))
         # Cancel all running tasks
         for task in asyncio.all_tasks(loop):
@@ -1066,7 +1066,7 @@ def prompt_list(json_output: bool = JSON_OUTPUT_OPTION) -> None:
 _engine_factory_provider = RAGComponentsFactory
 
 
-def set_engine_factory_provider(factory_class):
+def set_engine_factory_provider(factory_class: Any) -> None:
     """Set the factory provider for creating RAG engines (used for testing)."""
     global _engine_factory_provider  # noqa: PLW0603
     _engine_factory_provider = factory_class
