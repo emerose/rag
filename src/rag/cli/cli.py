@@ -996,9 +996,11 @@ def list(
                 else:
                     stats = Path(file_path).stat()
                     size = f"{stats.st_size / 1024:.1f} KB"
-                
+
                 if source_doc.last_modified is not None:
-                    modified = datetime.fromtimestamp(source_doc.last_modified).strftime(
+                    modified = datetime.fromtimestamp(
+                        source_doc.last_modified
+                    ).strftime(
                         "%Y-%m-%d %H:%M:%S",
                     )
                 else:
@@ -1031,7 +1033,7 @@ def list(
 
         # Write output
         write(table_data)
-        state.logger.info(f"Found {len(indexed_files)} indexed documents.")
+        state.logger.info(f"Found {len(source_documents)} indexed documents.")
 
     except (exceptions.RAGError, OSError, KeyError, ValueError, TypeError) as e:
         write(Error(f"Error listing indexed documents: {e}"))
@@ -1149,8 +1151,8 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
         sys.exit(1)
 
     state.logger.info("Loading cached vectorstores from .cache directory...")
-    for file_info in indexed_files:
-        file_path = file_info["file_path"]
+    for source_doc in source_documents:
+        file_path = source_doc.location
         try:
             cached_store = rag_engine.load_cached_vectorstore(file_path)
             if cached_store is not None:

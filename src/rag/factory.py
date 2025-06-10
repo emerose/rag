@@ -210,9 +210,6 @@ class RAGComponentsFactory:
                 db_path=Path(self.config.cache_dir) / "documents.db"
             )
 
-            # Create a simple vector store for the pipeline
-            vector_store = self.vector_repository.create_empty_vectorstore()
-
             # Create transformer and embedder
             from rag.pipeline import DefaultDocumentTransformer, DefaultEmbedder
 
@@ -231,7 +228,7 @@ class RAGComponentsFactory:
                 transformer=transformer,
                 document_store=document_store,
                 embedder=embedder,
-                vector_store=vector_store,
+                vector_store=self.vector_repository,
                 progress_callback=self.runtime.progress_callback,
             )
 

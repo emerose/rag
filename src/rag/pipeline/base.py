@@ -10,7 +10,7 @@ from langchain_core.documents import Document
 
 from rag.sources.base import DocumentSourceProtocol, SourceDocument
 from rag.storage.document_store import DocumentStoreProtocol
-from rag.storage.protocols import VectorStoreProtocol
+from rag.storage.protocols import VectorRepositoryProtocol
 
 
 class PipelineStage(Enum):
@@ -142,7 +142,7 @@ class IngestionPipeline:
         transformer: DocumentTransformer,
         document_store: DocumentStoreProtocol,
         embedder: Embedder,
-        vector_store: VectorStoreProtocol,
+        vector_store: VectorRepositoryProtocol,
         **options: Any,
     ) -> None:
         """Initialize the ingestion pipeline.
@@ -152,7 +152,7 @@ class IngestionPipeline:
             transformer: Transformer for processing documents
             document_store: Store for processed documents
             embedder: Component for generating embeddings
-            vector_store: Store for embedding vectors
+            vector_store: Repository for managing vectorstores
             **options: Configuration options:
                 - batch_size: Number of documents to process in each batch (default 100)
                 - progress_callback: Optional callback for progress updates
@@ -232,7 +232,25 @@ class IngestionPipeline:
         """
         result = PipelineResult()
 
-        # Stage 1: Load documents from source
+        # Stage 1: Load documents
+        source_documents = self._load_documents(source_ids, result)
+        if not source_documents:
+            return result
+
+        # Stage 2: Transform documents
+        transformed_docs = self._transform_documents(source_documents, result)
+        if not transformed_docs:
+            return result
+
+        # Stage 3: Store documents
+        self._store_documents_and_chunks(transformed_docs, result)
+
+        return result
+
+    def _load_documents(
+        self, source_ids: list[str], result: PipelineResult
+    ) -> list[SourceDocument]:
+        """Load documents from source."""
         self._report_progress(
             PipelineStage.LOADING, 0, len(source_ids), "Loading documents..."
         )
@@ -249,92 +267,122 @@ class IngestionPipeline:
 
             self._report_progress(PipelineStage.LOADING, idx + 1, len(source_ids))
 
-        if not source_documents:
-            return result
+        return source_documents
 
-        # Stage 2: Transform documents
+    def _transform_documents(
+        self, source_documents: list[SourceDocument], result: PipelineResult
+    ) -> dict[str, list[Document]]:
+        """Transform documents into chunks."""
         self._report_progress(
             PipelineStage.TRANSFORMING,
             0,
             len(source_documents),
             "Transforming documents...",
         )
-        transformed_docs = {}
 
         try:
             transformed_docs = self.transformer.transform_batch(source_documents)
             result.documents_transformed = sum(
                 len(docs) for docs in transformed_docs.values()
             )
+            return transformed_docs
         except Exception as e:
             result.add_error(PipelineStage.TRANSFORMING, e)
-            return result
+            return {}
 
-        # Stage 3: Store source documents and their chunks
+    def _store_documents_and_chunks(
+        self, transformed_docs: dict[str, list[Document]], result: PipelineResult
+    ) -> None:
+        """Store source documents and their chunks."""
         self._report_progress(
             PipelineStage.STORING_DOCUMENTS,
             0,
             len(transformed_docs),
             "Storing documents...",
         )
+
+        # Store source metadata and chunks
+        all_documents = self._store_source_metadata_and_chunks(transformed_docs, result)
+        if not all_documents:
+            return
+
+        # Generate and store embeddings
+        self._generate_and_store_embeddings(all_documents, result)
+
+    def _store_source_metadata_and_chunks(
+        self, transformed_docs: dict[str, list[Document]], result: PipelineResult
+    ) -> list[Document]:
+        """Store source document metadata and chunks."""
         all_documents = []
 
-        # First, store source document metadata
-        for source_doc in source_documents:
-            try:
-                # Extract metadata for source document tracking
-                location = source_doc.source_path or source_doc.source_id
-                content_size = (
-                    len(source_doc.content)
-                    if source_doc.content
-                    else None
-                )
-                
-                # Get content hash if available from metadata
-                content_hash = source_doc.metadata.get('content_hash')
-                last_modified = source_doc.metadata.get('mtime')
-                
-                self.document_store.add_source_document(
-                    source_id=source_doc.source_id,
-                    location=location,
-                    content_type=source_doc.content_type,
-                    content_hash=content_hash,
-                    size_bytes=content_size,
-                    last_modified=last_modified,
-                    metadata=source_doc.metadata,
-                )
-            except Exception as e:
-                result.add_error(
-                    PipelineStage.STORING_DOCUMENTS, 
-                    e, 
-                    {"source_id": source_doc.source_id, "stage": "source_metadata"}
-                )
+        # First, store source document metadata for each source
+        for source_id in transformed_docs:
+            self._store_source_metadata(source_id, result)
 
         # Then, store document chunks and link them to sources
         for source_id, docs in transformed_docs.items():
             for idx, doc in enumerate(docs):
                 doc_id = f"{source_id}#chunk{idx}"
-                try:
-                    # Store the document chunk
-                    self.document_store.add_document(doc_id, doc)
-                    
-                    # Link chunk to its source document
-                    self.document_store.add_document_to_source(
-                        document_id=doc_id,
-                        source_id=source_id,
-                        chunk_order=idx
-                    )
-                    
+                if self._store_document_chunk(doc_id, doc, source_id, idx, result):
                     all_documents.append(doc)
-                    result.documents_stored += 1
-                except Exception as e:
-                    result.add_error(
-                        PipelineStage.STORING_DOCUMENTS, e, {"doc_id": doc_id}
-                    )
 
-        if not all_documents:
-            return result
+        return all_documents
 
+    def _store_source_metadata(self, source_id: str, result: PipelineResult) -> None:
+        """Store metadata for a source document."""
+        try:
+            source_doc = self.source.get_document(source_id)
+            if not source_doc:
+                return
+
+            location = source_doc.source_path or source_doc.source_id
+            content_size = len(source_doc.content) if source_doc.content else None
+            content_hash = source_doc.metadata.get("content_hash")
+            last_modified = source_doc.metadata.get("mtime")
+
+            from rag.storage.document_store import SourceDocumentMetadata
+
+            source_metadata = SourceDocumentMetadata.create(
+                source_id=source_doc.source_id,
+                location=location,
+                content_type=source_doc.content_type,
+                content_hash=content_hash,
+                size_bytes=content_size,
+                last_modified=last_modified,
+                metadata=source_doc.metadata,
+            )
+            self.document_store.add_source_document(source_metadata)
+        except Exception as e:
+            result.add_error(
+                PipelineStage.STORING_DOCUMENTS,
+                e,
+                {"source_id": source_id, "stage": "source_metadata"},
+            )
+
+    def _store_document_chunk(
+        self,
+        doc_id: str,
+        doc: Document,
+        source_id: str,
+        idx: int,
+        result: PipelineResult,
+    ) -> bool:
+        """Store a document chunk and link it to its source."""
+        try:
+            self.document_store.add_document(doc_id, doc)
+            self.document_store.add_document_to_source(
+                document_id=doc_id, source_id=source_id, chunk_order=idx
+            )
+            result.documents_stored += 1
+            return True
+        except Exception as e:
+            result.add_error(PipelineStage.STORING_DOCUMENTS, e, {"doc_id": doc_id})
+            return False
+
+    def _generate_and_store_embeddings(
+        self, all_documents: list[Document], result: PipelineResult
+    ) -> None:
+        """Generate embeddings and store vectors."""
         # Stage 4: Generate embeddings
         self._report_progress(
             PipelineStage.EMBEDDING, 0, len(all_documents), "Generating embeddings..."
@@ -345,7 +393,7 @@ class IngestionPipeline:
             result.embeddings_generated = len(embeddings)
         except Exception as e:
             result.add_error(PipelineStage.EMBEDDING, e)
-            return result
+            return
 
         # Stage 5: Store vectors
         self._report_progress(
@@ -353,19 +401,47 @@ class IngestionPipeline:
         )
 
         try:
-            # Add documents with embeddings to vector store
-            # This assumes the vector store can accept pre-computed embeddings
-            # In practice, this might need adaptation based on the vector store interface
-            for _doc, _embedding in zip(all_documents, embeddings, strict=False):
-                # Vector stores typically handle this internally
-                # This is a simplified representation
-                pass
+            # Create a new vectorstore and add documents with embeddings
+            vectorstore = self.vector_store.create_empty_vectorstore()
+
+            # Add documents with pre-computed embeddings to the vectorstore
+            self.vector_store.add_documents_to_vectorstore(
+                vectorstore, all_documents, embeddings
+            )
+
+            # Save vectorstore to cache for QueryEngine to load later
+            # Use the document store to get source locations for caching
+            source_documents = self.document_store.list_source_documents()
+            for source_doc in source_documents:
+                source_location = source_doc.location
+                cache_path = self._get_vectorstore_cache_path(source_location)
+                self.vector_store.save_vectorstore(cache_path, vectorstore)
 
             result.vectors_stored = len(embeddings)
         except Exception as e:
             result.add_error(PipelineStage.STORING_VECTORS, e)
 
-        return result
+    def _get_vectorstore_cache_path(self, source_location: str) -> str:
+        """Get cache path for vectorstore based on source location.
+
+        Uses the same hashing strategy as the existing cache orchestrator:
+        SHA-256 hash of the source file path.
+        """
+        import hashlib
+        from pathlib import Path
+
+        # Use the same hashing strategy as VectorStoreManager._get_cache_base_name()
+        location_hash = hashlib.sha256(str(source_location).encode()).hexdigest()
+
+        # Try to get cache directory from document store if available
+        if hasattr(self.document_store, "db_path"):
+            cache_dir = Path(self.document_store.db_path).parent
+        else:
+            # Fallback to current working directory
+            cache_dir = Path.cwd() / ".rag_cache"
+            cache_dir.mkdir(exist_ok=True)
+
+        return str(cache_dir / location_hash)
 
     def ingest_document(self, source_id: str) -> PipelineResult:
         """Ingest a single document.

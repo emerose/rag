@@ -21,6 +21,7 @@ from rag.utils.exceptions import DocumentStoreError
 @dataclass
 class SourceDocumentMetadata:
     """Metadata for a source document."""
+
     source_id: str
     location: str
     content_type: str | None
@@ -30,6 +31,28 @@ class SourceDocumentMetadata:
     indexed_at: float
     metadata: dict[str, Any]
     chunk_count: int
+
+    @classmethod
+    def create(
+        cls,
+        source_id: str,
+        location: str,
+        **kwargs: Any,
+    ) -> SourceDocumentMetadata:
+        """Create SourceDocumentMetadata with current timestamp."""
+        import time
+
+        return cls(
+            source_id=source_id,
+            location=location,
+            content_type=kwargs.get("content_type"),
+            content_hash=kwargs.get("content_hash"),
+            size_bytes=kwargs.get("size_bytes"),
+            last_modified=kwargs.get("last_modified"),
+            indexed_at=time.time(),
+            metadata=kwargs.get("metadata", {}),
+            chunk_count=0,  # Will be updated when chunks are added
+        )
 
 
 @runtime_checkable
@@ -174,16 +197,7 @@ class DocumentStoreProtocol(Protocol):
             DocumentStoreError: If search fails
         """
 
-    def add_source_document(
-        self,
-        source_id: str,
-        location: str,
-        content_type: str | None = None,
-        content_hash: str | None = None,
-        size_bytes: int | None = None,
-        last_modified: float | None = None,
-        metadata: dict[str, Any] | None = None,
-    ) -> None:
+    def add_source_document(self, source_metadata: SourceDocumentMetadata) -> None:
         """Add a source document to tracking.
 
         Args:
@@ -450,7 +464,7 @@ class SQLiteDocumentStore:
             DocumentStoreError: If retrieval fails
         """
         try:
-            result = {}
+            result: dict[str, Document] = {}
             if not doc_ids:
                 return result
 
@@ -578,7 +592,8 @@ class SQLiteDocumentStore:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.execute("SELECT COUNT(*) FROM documents")
-                return cursor.fetchone()[0]
+                count = cursor.fetchone()
+                return count[0] if count else 0
         except Exception as e:
             raise DocumentStoreError(
                 "Failed to count documents", {"error": str(e)}
@@ -679,36 +694,38 @@ class SQLiteDocumentStore:
                 "Failed to search documents", {"error": str(e)}
             ) from e
 
-    def add_source_document(
-        self,
-        source_id: str,
-        location: str,
-        content_type: str | None = None,
-        content_hash: str | None = None,
-        size_bytes: int | None = None,
-        last_modified: float | None = None,
-        metadata: dict[str, Any] | None = None,
-    ) -> None:
+    def add_source_document(self, source_metadata: SourceDocumentMetadata) -> None:
         """Add a source document to tracking."""
         try:
             current_time = time.time()
-            metadata_json = json.dumps(metadata or {})
-            
+            metadata_json = json.dumps(source_metadata.metadata)
+
             with sqlite3.connect(self.db_path) as conn:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO source_documents 
                     (id, location, content_type, content_hash, size_bytes, 
                      last_modified, indexed_at, metadata_json, created_at, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    source_id, location, content_type, content_hash, size_bytes,
-                    last_modified, current_time, metadata_json, current_time, current_time
-                ))
+                """,
+                    (
+                        source_metadata.source_id,
+                        source_metadata.location,
+                        source_metadata.content_type,
+                        source_metadata.content_hash,
+                        source_metadata.size_bytes,
+                        source_metadata.last_modified,
+                        source_metadata.indexed_at,
+                        metadata_json,
+                        current_time,
+                        current_time,
+                    ),
+                )
                 conn.commit()
         except Exception as e:
             raise DocumentStoreError(
-                "Failed to add source document", 
-                {"source_id": source_id, "error": str(e)}
+                "Failed to add source document",
+                {"source_id": source_metadata.source_id, "error": str(e)},
             ) from e
 
     def list_source_documents(self) -> list[SourceDocumentMetadata]:
@@ -726,21 +743,23 @@ class SQLiteDocumentStore:
                              s.size_bytes, s.last_modified, s.indexed_at, s.metadata_json
                     ORDER BY s.indexed_at DESC
                 """)
-                
+
                 results = []
                 for row in cursor.fetchall():
                     metadata = json.loads(row[7]) if row[7] else {}
-                    results.append(SourceDocumentMetadata(
-                        source_id=row[0],
-                        location=row[1],
-                        content_type=row[2],
-                        content_hash=row[3],
-                        size_bytes=row[4],
-                        last_modified=row[5],
-                        indexed_at=row[6],
-                        metadata=metadata,
-                        chunk_count=row[8]
-                    ))
+                    results.append(
+                        SourceDocumentMetadata(
+                            source_id=row[0],
+                            location=row[1],
+                            content_type=row[2],
+                            content_hash=row[3],
+                            size_bytes=row[4],
+                            last_modified=row[5],
+                            indexed_at=row[6],
+                            metadata=metadata,
+                            chunk_count=row[8],
+                        )
+                    )
                 return results
         except Exception as e:
             raise DocumentStoreError(
@@ -751,7 +770,8 @@ class SQLiteDocumentStore:
         """Get metadata for a specific source document."""
         try:
             with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT s.id, s.location, s.content_type, s.content_hash, 
                            s.size_bytes, s.last_modified, s.indexed_at, s.metadata_json,
                            COUNT(c.document_id) as chunk_count
@@ -760,8 +780,10 @@ class SQLiteDocumentStore:
                     WHERE s.id = ?
                     GROUP BY s.id, s.location, s.content_type, s.content_hash, 
                              s.size_bytes, s.last_modified, s.indexed_at, s.metadata_json
-                """, (source_id,))
-                
+                """,
+                    (source_id,),
+                )
+
                 row = cursor.fetchone()
                 if row:
                     metadata = json.loads(row[7]) if row[7] else {}
@@ -774,27 +796,30 @@ class SQLiteDocumentStore:
                         last_modified=row[5],
                         indexed_at=row[6],
                         metadata=metadata,
-                        chunk_count=row[8]
+                        chunk_count=row[8],
                     )
                 return None
         except Exception as e:
             raise DocumentStoreError(
-                "Failed to get source document", 
-                {"source_id": source_id, "error": str(e)}
+                "Failed to get source document",
+                {"source_id": source_id, "error": str(e)},
             ) from e
 
     def get_source_document_chunks(self, source_id: str) -> list[Document]:
         """Get all chunks for a source document in order."""
         try:
             with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT d.doc_id, d.content, d.metadata
                     FROM documents d
                     JOIN source_document_chunks c ON d.doc_id = c.document_id
                     WHERE c.source_document_id = ?
                     ORDER BY c.chunk_order
-                """, (source_id,))
-                
+                """,
+                    (source_id,),
+                )
+
                 results = []
                 for row in cursor.fetchall():
                     metadata = json.loads(row[2])
@@ -803,8 +828,8 @@ class SQLiteDocumentStore:
                 return results
         except Exception as e:
             raise DocumentStoreError(
-                "Failed to get source document chunks", 
-                {"source_id": source_id, "error": str(e)}
+                "Failed to get source document chunks",
+                {"source_id": source_id, "error": str(e)},
             ) from e
 
     def remove_source_document(self, source_id: str) -> None:
@@ -812,23 +837,26 @@ class SQLiteDocumentStore:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 # First get all document IDs for this source
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT document_id FROM source_document_chunks 
                     WHERE source_document_id = ?
-                """, (source_id,))
+                """,
+                    (source_id,),
+                )
                 document_ids = [row[0] for row in cursor.fetchall()]
-                
+
                 # Delete the chunks (join table entries will be deleted by CASCADE)
                 for doc_id in document_ids:
                     conn.execute("DELETE FROM documents WHERE doc_id = ?", (doc_id,))
-                
+
                 # Delete the source document (CASCADE will handle join table)
                 conn.execute("DELETE FROM source_documents WHERE id = ?", (source_id,))
                 conn.commit()
         except Exception as e:
             raise DocumentStoreError(
-                "Failed to remove source document", 
-                {"source_id": source_id, "error": str(e)}
+                "Failed to remove source document",
+                {"source_id": source_id, "error": str(e)},
             ) from e
 
     def add_document_to_source(
@@ -838,16 +866,19 @@ class SQLiteDocumentStore:
         try:
             current_time = time.time()
             with sqlite3.connect(self.db_path) as conn:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO source_document_chunks 
                     (source_document_id, document_id, chunk_order, created_at)
                     VALUES (?, ?, ?, ?)
-                """, (source_id, document_id, chunk_order, current_time))
+                """,
+                    (source_id, document_id, chunk_order, current_time),
+                )
                 conn.commit()
         except Exception as e:
             raise DocumentStoreError(
-                "Failed to link document to source", 
-                {"document_id": document_id, "source_id": source_id, "error": str(e)}
+                "Failed to link document to source",
+                {"document_id": document_id, "source_id": source_id, "error": str(e)},
             ) from e
 
 
@@ -1021,31 +1052,25 @@ class FakeDocumentStore:
 
         return results
 
-    def add_source_document(
-        self,
-        source_id: str,
-        location: str,
-        content_type: str | None = None,
-        content_hash: str | None = None,
-        size_bytes: int | None = None,
-        last_modified: float | None = None,
-        metadata: dict[str, Any] | None = None,
-    ) -> None:
+    def add_source_document(self, source_metadata: SourceDocumentMetadata) -> None:
         """Add a source document to tracking."""
-        current_time = time.time()
-        chunk_count = len(self._source_document_chunks.get(source_id, []))
-        
-        self._source_documents[source_id] = SourceDocumentMetadata(
-            source_id=source_id,
-            location=location,
-            content_type=content_type,
-            content_hash=content_hash,
-            size_bytes=size_bytes,
-            last_modified=last_modified,
-            indexed_at=current_time,
-            metadata=metadata or {},
-            chunk_count=chunk_count
+        chunk_count = len(
+            self._source_document_chunks.get(source_metadata.source_id, [])
         )
+
+        # Update chunk count and store
+        updated_metadata = SourceDocumentMetadata(
+            source_id=source_metadata.source_id,
+            location=source_metadata.location,
+            content_type=source_metadata.content_type,
+            content_hash=source_metadata.content_hash,
+            size_bytes=source_metadata.size_bytes,
+            last_modified=source_metadata.last_modified,
+            indexed_at=source_metadata.indexed_at,
+            metadata=source_metadata.metadata,
+            chunk_count=chunk_count,
+        )
+        self._source_documents[source_metadata.source_id] = updated_metadata
 
     def list_source_documents(self) -> list[SourceDocumentMetadata]:
         """List all tracked source documents with metadata."""
@@ -1062,14 +1087,12 @@ class FakeDocumentStore:
                 last_modified=source_doc.last_modified,
                 indexed_at=source_doc.indexed_at,
                 metadata=source_doc.metadata,
-                chunk_count=chunk_count
+                chunk_count=chunk_count,
             )
-        
+
         # Return sorted by indexed_at (newest first)
         return sorted(
-            self._source_documents.values(), 
-            key=lambda x: x.indexed_at, 
-            reverse=True
+            self._source_documents.values(), key=lambda x: x.indexed_at, reverse=True
         )
 
     def get_source_document(self, source_id: str) -> SourceDocumentMetadata | None:
@@ -1077,7 +1100,7 @@ class FakeDocumentStore:
         if source_id in self._source_documents:
             source_doc = self._source_documents[source_id]
             chunk_count = len(self._source_document_chunks.get(source_id, []))
-            
+
             # Return with updated chunk count
             return SourceDocumentMetadata(
                 source_id=source_doc.source_id,
@@ -1088,7 +1111,7 @@ class FakeDocumentStore:
                 last_modified=source_doc.last_modified,
                 indexed_at=source_doc.indexed_at,
                 metadata=source_doc.metadata,
-                chunk_count=chunk_count
+                chunk_count=chunk_count,
             )
         return None
 
@@ -1096,10 +1119,10 @@ class FakeDocumentStore:
         """Get all chunks for a source document in order."""
         if source_id not in self._source_document_chunks:
             return []
-        
+
         # Get chunks sorted by order
         chunks = sorted(self._source_document_chunks[source_id], key=lambda x: x[1])
-        
+
         results = []
         for doc_id, _ in chunks:
             if doc_id in self._documents:
@@ -1110,7 +1133,7 @@ class FakeDocumentStore:
                     metadata=document.metadata.copy() if document.metadata else {},
                 )
                 results.append(result_doc)
-        
+
         return results
 
     def remove_source_document(self, source_id: str) -> None:
@@ -1120,7 +1143,7 @@ class FakeDocumentStore:
             for doc_id, _ in self._source_document_chunks[source_id]:
                 self._documents.pop(doc_id, None)
             del self._source_document_chunks[source_id]
-        
+
         # Remove source document
         self._source_documents.pop(source_id, None)
 
@@ -1130,12 +1153,13 @@ class FakeDocumentStore:
         """Link a document chunk to its source document."""
         if source_id not in self._source_document_chunks:
             self._source_document_chunks[source_id] = []
-        
+
         # Remove existing entry if present (to handle re-ordering)
         self._source_document_chunks[source_id] = [
-            (doc_id, order) for doc_id, order in self._source_document_chunks[source_id]
+            (doc_id, order)
+            for doc_id, order in self._source_document_chunks[source_id]
             if doc_id != document_id
         ]
-        
+
         # Add new entry
         self._source_document_chunks[source_id].append((document_id, chunk_order))

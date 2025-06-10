@@ -193,7 +193,17 @@ class RAGEngine:
             Dictionary with question, answer, and sources
         """
         try:
-            return self.query_engine.answer(question, k=k)
+            # Load vectorstores from DocumentStore
+            vectorstores = self._load_vectorstores_from_document_store()
+
+            if not vectorstores:
+                return {
+                    "question": question,
+                    "answer": "No indexed documents found. Please index some documents first.",
+                    "sources": [],
+                }
+
+            return self.query_engine.answer(question, vectorstores, k=k)
         except Exception as e:
             logger.error(f"Error answering question: {e}")
             return {
@@ -202,6 +212,47 @@ class RAGEngine:
                 "sources": [],
             }
 
+    def _load_vectorstores_from_document_store(self) -> dict[str, Any]:
+        """Load vectorstores for all source documents from DocumentStore.
+
+        Returns:
+            Dictionary mapping source locations to loaded vectorstores
+        """
+        vectorstores = {}
+
+        try:
+            # Get source documents from DocumentStore
+            document_store = self.ingestion_pipeline.document_store
+            source_documents = document_store.list_source_documents()
+
+            if not source_documents:
+                logger.debug("No source documents found in DocumentStore")
+                return vectorstores
+
+            # Load vectorstore for each source document
+            for source_doc in source_documents:
+                source_path = source_doc.location
+                try:
+                    # Try to load vectorstore using the cache orchestrator
+                    vectorstore = self.cache_orchestrator.load_cached_vectorstore(
+                        source_path
+                    )
+                    if vectorstore:
+                        vectorstores[source_path] = vectorstore
+                        logger.debug(f"Loaded vectorstore for: {source_path}")
+                    else:
+                        logger.warning(
+                            f"No cached vectorstore found for: {source_path}"
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to load vectorstore for {source_path}: {e}")
+
+            logger.info(f"Loaded {len(vectorstores)} vectorstores for querying")
+            return vectorstores
+
+        except Exception as e:
+            logger.error(f"Error loading vectorstores from DocumentStore: {e}")
+            return {}
 
     def cleanup_orphaned_chunks(self) -> dict[str, int]:
         """Clean up orphaned chunks from deleted files.
@@ -243,25 +294,26 @@ class RAGEngine:
             List of document summaries
         """
         try:
-            # Get indexed files and sort by size
-            files = self.list_indexed_files()
-            if not files:
+            # Get source documents from DocumentStore
+            document_store = self.ingestion_pipeline.document_store
+            source_documents = document_store.list_source_documents()
+            if not source_documents:
                 return []
 
             # Sort by file size (largest first)
-            sorted_files = sorted(
-                files, key=lambda x: x.get("file_size", 0), reverse=True
+            sorted_docs = sorted(
+                source_documents, key=lambda x: x.size_bytes or 0, reverse=True
             )
 
             # Return top k files with basic summary info
             summaries = []
-            for file_info in sorted_files[:k]:
+            for source_doc in sorted_docs[:k]:
                 summaries.append(
                     {
-                        "file_path": file_info["file_path"],
-                        "file_type": "text/plain",  # Default type
-                        "summary": f"Document with {file_info.get('num_chunks', 0)} chunks",
-                        "num_chunks": file_info.get("num_chunks", 0),
+                        "source": source_doc.location,
+                        "source_type": source_doc.content_type or "text/plain",
+                        "summary": f"Document with {source_doc.chunk_count} chunks",
+                        "num_chunks": source_doc.chunk_count,
                     }
                 )
 
