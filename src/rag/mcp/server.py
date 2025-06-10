@@ -57,13 +57,13 @@ class RAGMCPServer(FastMCP):
         self.engine = engine
         self._register_tools()
 
-    def _get_indexed_files(self) -> list[dict]:
+    def _get_indexed_files(self) -> list[dict[str, Any]]:
         """Get list of indexed files from the document store."""
         try:
             document_store = self.engine.ingestion_pipeline.document_store
             source_documents = document_store.list_source_documents()
 
-            indexed_files = []
+            indexed_files: list[dict[str, Any]] = []
             for source_doc in source_documents:
                 indexed_files.append(
                     {
@@ -104,16 +104,18 @@ class RAGMCPServer(FastMCP):
             return []
         merged = self.engine.vectorstore_manager.merge_vectorstores(vectorstores)
         docs = self.engine.vectorstore_manager.similarity_search(merged, query, k=top_k)
-        return [doc.dict() for doc in docs]
+        return [doc.model_dump() for doc in docs]
 
-    async def tool_index(self, path: str, ctx: Context) -> dict[str, Any]:
+    async def tool_index(self, path: str, ctx: Context[Any, Any]) -> dict[str, Any]:
         p = Path(path)
         loop = asyncio.get_running_loop()
 
         if p.is_dir():
             # Get files from document source
             source = self.engine.document_source
-            files = source.list_documents() if hasattr(source, "list_documents") else []
+            files: list[str] = (
+                source.list_documents() if hasattr(source, "list_documents") else []
+            )
             total = len(files) if files else 1
             count = 0
 

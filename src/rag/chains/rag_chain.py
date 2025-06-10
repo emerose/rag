@@ -94,9 +94,9 @@ def _value_matches_filter(doc_value: Any, filter_value: Any) -> bool:
 
 def _doc_matches_filters(doc: Document, filters: _FilterDict) -> bool:
     for key, expected in filters.items():
-        if key not in doc.metadata:
+        if key not in doc.metadata:  # type: ignore[misc]
             return False
-        if not _value_matches_filter(doc.metadata[key], expected):
+        if not _value_matches_filter(doc.metadata[key], expected):  # type: ignore[misc]
             return False
     return True
 
@@ -111,7 +111,7 @@ def _pack_documents(
 
     for doc in docs:
         token_count = int(
-            doc.metadata.get("token_count", len(_tokenizer.encode(doc.page_content)))
+            doc.metadata.get("token_count", len(_tokenizer.encode(doc.page_content)))  # type: ignore[misc]
         )
         if tokens_used + token_count > max_tokens:
             break
@@ -131,7 +131,7 @@ def build_rag_chain(
     k: int = 4,
     prompt_id: str = "default",
     reranker: BaseReranker | None = None,
-) -> RunnableLambda:
+) -> RunnableLambda[Any, Any]:
     """Return an LCEL pipeline implementing the RAG flow.
 
     Parameters

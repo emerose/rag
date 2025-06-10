@@ -16,9 +16,9 @@ BLUE = "\033[94m"
 RESET = "\033[0m"
 
 # Type checking baseline - lower this as we fix more errors!
-# Current progress: 606 errors (35 errors fixed in Phase 5: Pipeline & Embeddings)
+# Current progress: 550 errors (56 errors fixed in Phase 6: CLI & Integration - partial)
 # Target: 0 errors for full strict type safety
-MAX_TYPE_ERRORS = 606
+MAX_TYPE_ERRORS = 550
 
 
 def run_command(cmd: list[str]) -> int:

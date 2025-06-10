@@ -330,11 +330,13 @@ def main(  # noqa: PLR0913
     state.chat_model = chat_model
 
 
-def create_console_progress_callback(progress: Progress) -> Callable[[dict], None]:
+def create_console_progress_callback(
+    progress: Progress,
+) -> Callable[[dict[str, Any]], None]:
     """Create a progress callback that updates the console progress bars."""
-    tasks = {}
+    tasks: dict[str, Any] = {}
 
-    def update_progress(progress_info: dict) -> None:
+    def update_progress(progress_info: dict[str, Any]) -> None:
         stage = progress_info.get("stage", "processing")
         current = progress_info.get("current", 0)
         total = progress_info.get("total", 100)
