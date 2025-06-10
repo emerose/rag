@@ -218,6 +218,75 @@ class RAGMCPServer(FastMCP):
 # FastAPI HTTP application
 # ----------------------------------------------------------------------
 
+# --- Module-level FastAPI route handlers ---
+from fastapi import Request
+
+
+async def handle_query(server: RAGMCPServer, req: QueryRequest) -> dict[str, Any]:
+    """Handle /query requests."""
+    return await server.tool_query(req.question, req.top_k)
+
+
+async def handle_search(server: RAGMCPServer, req: SearchRequest) -> list[dict[str, Any]]:
+    """Handle /search requests."""
+    return await server.tool_search(req.query, req.top_k)
+
+
+async def handle_chat(server: RAGMCPServer, req: ChatRequest) -> dict[str, Any]:
+    """Handle /chat requests (basic QA as chat)."""
+    return await server.tool_query(req.message, 4)
+
+
+async def handle_documents(server: RAGMCPServer) -> list[dict[str, Any]]:
+    """Handle /documents GET requests."""
+    return await server.tool_documents()
+
+
+async def handle_get_document(server: RAGMCPServer, doc_id: str) -> dict[str, Any] | None:
+    """Handle /documents/{doc_id} GET requests."""
+    return await server.tool_get_document(doc_id)
+
+
+async def handle_delete_document(server: RAGMCPServer, doc_id: str) -> bool:
+    """Handle /documents/{doc_id} DELETE requests."""
+    return await server.tool_delete_document(doc_id)
+
+
+async def handle_index(server: RAGMCPServer, req: IndexRequest) -> dict[str, Any]:
+    """Handle /index POST requests."""
+    ctx = server.get_context()
+    return await server.tool_index(req.path, ctx)
+
+
+async def handle_rebuild(server: RAGMCPServer) -> dict[str, Any]:
+    """Handle /index/rebuild POST requests."""
+    return await server.tool_rebuild()
+
+
+async def handle_index_stats(server: RAGMCPServer) -> dict[str, Any]:
+    """Handle /index/stats GET requests."""
+    return await server.tool_index_stats()
+
+
+async def handle_summaries(server: RAGMCPServer, k: int = 5) -> list[dict[str, Any]]:
+    """Handle /summaries GET requests."""
+    return await server.tool_summaries(k)
+
+
+async def handle_chunks(server: RAGMCPServer, req: ChunksRequest) -> list[str]:
+    """Handle /chunks POST requests."""
+    return await server.tool_chunks(req.path)
+
+
+async def handle_invalidate(server: RAGMCPServer, req: InvalidateRequest) -> bool:
+    """Handle /invalidate POST requests."""
+    return await server.tool_invalidate(req.path, req.all)
+
+
+async def handle_cleanup(server: RAGMCPServer) -> dict[str, Any]:
+    """Handle /cleanup POST requests."""
+    return await server.tool_cleanup()
+
 
 def create_http_app(server: RAGMCPServer, api_key: str | None = None) -> FastAPI:
     app = FastAPI()
@@ -226,58 +295,56 @@ def create_http_app(server: RAGMCPServer, api_key: str | None = None) -> FastAPI
         app.add_middleware(APIKeyAuthMiddleware, api_key=api_key)
 
     @app.post("/query")
-    async def query(req: QueryRequest) -> dict[str, Any]:  # pyright: ignore[reportUnusedFunction]
-        return await server.tool_query(req.question, req.top_k)
+    async def query(req: QueryRequest) -> dict[str, Any]:
+        return await handle_query(server, req)
 
     @app.post("/search")
-    async def search(req: SearchRequest) -> list[dict[str, Any]]:  # pyright: ignore[reportUnusedFunction]
-        return await server.tool_search(req.query, req.top_k)
+    async def search(req: SearchRequest) -> list[dict[str, Any]]:
+        return await handle_search(server, req)
 
     @app.post("/chat")
-    async def chat(req: ChatRequest) -> dict[str, Any]:  # pyright: ignore[reportUnusedFunction]
-        # Basic chat implementation using question answering
-        return await server.tool_query(req.message, 4)
+    async def chat(req: ChatRequest) -> dict[str, Any]:
+        return await handle_chat(server, req)
 
     @app.get("/documents")
-    async def documents() -> list[dict[str, Any]]:  # pyright: ignore[reportUnusedFunction]
-        return await server.tool_documents()
+    async def documents() -> list[dict[str, Any]]:
+        return await handle_documents(server)
 
     @app.get("/documents/{doc_id}")
-    async def get_document(doc_id: str) -> dict[str, Any] | None:  # pyright: ignore[reportUnusedFunction]
-        return await server.tool_get_document(doc_id)
+    async def get_document(doc_id: str) -> dict[str, Any] | None:
+        return await handle_get_document(server, doc_id)
 
     @app.delete("/documents/{doc_id}")
-    async def delete_document(doc_id: str) -> bool:  # pyright: ignore[reportUnusedFunction]
-        return await server.tool_delete_document(doc_id)
+    async def delete_document(doc_id: str) -> bool:
+        return await handle_delete_document(server, doc_id)
 
     @app.post("/index")
-    async def index(req: IndexRequest) -> dict[str, Any]:  # pyright: ignore[reportUnusedFunction]
-        ctx = server.get_context()
-        return await server.tool_index(req.path, ctx)
+    async def index(req: IndexRequest) -> dict[str, Any]:
+        return await handle_index(server, req)
 
     @app.post("/index/rebuild")
-    async def rebuild() -> dict[str, Any]:  # pyright: ignore[reportUnusedFunction]
-        return await server.tool_rebuild()
+    async def rebuild() -> dict[str, Any]:
+        return await handle_rebuild(server)
 
     @app.get("/index/stats")
-    async def index_stats() -> dict[str, Any]:  # pyright: ignore[reportUnusedFunction]
-        return await server.tool_index_stats()
+    async def index_stats() -> dict[str, Any]:
+        return await handle_index_stats(server)
 
     @app.get("/summaries")
-    async def summaries(k: int = 5) -> list[dict[str, Any]]:  # pyright: ignore[reportUnusedFunction]
-        return await server.tool_summaries(k)
+    async def summaries(k: int = 5) -> list[dict[str, Any]]:
+        return await handle_summaries(server, k)
 
     @app.post("/chunks")
-    async def chunks(req: ChunksRequest) -> list[str]:  # pyright: ignore[reportUnusedFunction]
-        return await server.tool_chunks(req.path)
+    async def chunks(req: ChunksRequest) -> list[str]:
+        return await handle_chunks(server, req)
 
     @app.post("/invalidate")
-    async def invalidate(req: InvalidateRequest) -> bool:  # pyright: ignore[reportUnusedFunction]
-        return await server.tool_invalidate(req.path, req.all)
+    async def invalidate(req: InvalidateRequest) -> bool:
+        return await handle_invalidate(server, req)
 
     @app.post("/cleanup")
-    async def cleanup() -> dict[str, Any]:  # pyright: ignore[reportUnusedFunction]
-        return await server.tool_cleanup()
+    async def cleanup() -> dict[str, Any]:
+        return await handle_cleanup(server)
 
     return app
 
