@@ -36,10 +36,10 @@ class PipelineResult:
     vectors_stored: int = 0
 
     # Errors encountered
-    errors: list[dict[str, Any]] = field(default_factory=list)
+    errors: list[dict[str, Any]] = field(default_factory=lambda: [])
 
     # Processing metadata
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=lambda: {})
 
     @property
     def success(self) -> bool:

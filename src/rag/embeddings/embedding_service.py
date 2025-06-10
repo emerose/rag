@@ -8,7 +8,7 @@ by higher-level components like EmbeddingProvider.
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TypeAlias
+from typing import Any, TypeAlias
 
 from langchain_openai import OpenAIEmbeddings
 
@@ -152,7 +152,9 @@ class OpenAIEmbeddingService:
             "provider": "openai",
         }
 
-    def _create_retry_decorator(self) -> Callable[[Callable], Callable]:
+    def _create_retry_decorator(
+        self,
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         """Create a retry decorator with the configured parameters."""
         return retry(
             retry=retry_if_exception_type(

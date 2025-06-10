@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TypeAlias
 
 from langchain_core.documents import Document
 
 from rag.embeddings.protocols import EmbeddingServiceProtocol
+
+# Type aliases for common metadata patterns
+DocumentMetadata: TypeAlias = dict[str, Any]
+EmbeddingMetadata: TypeAlias = dict[str, str | int | float | None]
 
 
 class DefaultEmbedder:
@@ -41,12 +45,12 @@ class DefaultEmbedder:
         """
         if self.include_metadata_in_embedding and document.metadata:
             # Include select metadata in the embedding
-            metadata_parts = []
+            metadata_parts: list[str] = []
 
             # Add important metadata fields
             for key in ["title", "author", "source", "category", "tags"]:
                 if key in document.metadata:
-                    value = document.metadata[key]
+                    value = document.metadata[key]  # type: ignore[misc]
                     if isinstance(value, list):
                         value = ", ".join(str(v) for v in value)
                     metadata_parts.append(f"{key}: {value}")
@@ -79,7 +83,7 @@ class DefaultEmbedder:
 
     def embed_with_metadata(
         self, documents: list[Document]
-    ) -> tuple[list[list[float]], list[dict[str, Any]]]:
+    ) -> tuple[list[list[float]], list[EmbeddingMetadata]]:
         """Generate embeddings and extract metadata.
 
         Args:
@@ -95,21 +99,21 @@ class DefaultEmbedder:
         embeddings = self.embed(documents)
 
         # Extract metadata for each document
-        metadata_list = []
+        metadata_list: list[EmbeddingMetadata] = []
         for doc in documents:
             # Create metadata for vector storage
-            vector_metadata = {
+            vector_metadata: EmbeddingMetadata = {
                 "text": doc.page_content[:1000],  # Store first 1000 chars
-                "source": doc.metadata.get("source", ""),
-                "source_id": doc.metadata.get("source_id", ""),
-                "chunk_index": doc.metadata.get("chunk_index", 0),
-                "total_chunks": doc.metadata.get("total_chunks", 1),
+                "source": doc.metadata.get("source", ""),  # type: ignore[misc]
+                "source_id": doc.metadata.get("source_id", ""),  # type: ignore[misc]
+                "chunk_index": doc.metadata.get("chunk_index", 0),  # type: ignore[misc]
+                "total_chunks": doc.metadata.get("total_chunks", 1),  # type: ignore[misc]
             }
 
             # Add other relevant metadata
             for key in ["title", "author", "date", "category", "content_type"]:
-                if key in doc.metadata:
-                    vector_metadata[key] = doc.metadata[key]
+                if key in doc.metadata:  # type: ignore[misc]
+                    vector_metadata[key] = doc.metadata[key]  # type: ignore[misc]
 
             metadata_list.append(vector_metadata)
 

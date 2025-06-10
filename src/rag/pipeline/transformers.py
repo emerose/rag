@@ -79,7 +79,7 @@ class DefaultDocumentTransformer:
 
         # Enhance chunk metadata
         for idx, chunk in enumerate(chunks):
-            chunk.metadata.update(
+            chunk.metadata.update(  # type: ignore[misc]
                 {
                     "chunk_index": idx,
                     "total_chunks": len(chunks),
@@ -100,7 +100,7 @@ class DefaultDocumentTransformer:
         Returns:
             Dictionary mapping source IDs to lists of chunks
         """
-        results = {}
+        results: dict[str, list[Document]] = {}
 
         for source_doc in source_documents:
             try:

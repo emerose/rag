@@ -6,8 +6,8 @@ including adaptive batch sizing and parallel processing.
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
-from typing import Any, TypeVar
+from collections.abc import AsyncIterator, Callable
+from typing import TypeVar
 
 from langchain.schema import Document
 
@@ -37,8 +37,8 @@ class EmbeddingBatcher(EmbeddingServiceProtocol):
         embedding_provider: EmbeddingServiceProtocol,
         config: EmbeddingConfig,
         *,
-        log_callback: Any | None = None,
-        progress_callback: Any | None = None,
+        log_callback: Callable[[str, str, str], None] | None = None,
+        progress_callback: Callable[[str, int, int | None], None] | None = None,
     ) -> None:
         """Initialize the embedding batcher.
 
@@ -139,8 +139,8 @@ class EmbeddingBatcher(EmbeddingServiceProtocol):
         mapped = stream.map(stream_batches, embed_batch, task_limit=self.concurrency)
         pipeline = stream.flatmap(mapped, lambda result: stream.iterate(result))
 
-        async with pipeline.stream() as streamer:
-            async for embedding in streamer:
+        async with pipeline.stream() as streamer:  # type: ignore[misc]
+            async for embedding in streamer:  # type: ignore[misc]
                 yield embedding
 
         self.progress_tracker.complete_task("embedding")
