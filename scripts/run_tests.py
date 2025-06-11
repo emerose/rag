@@ -26,7 +26,7 @@ BLUE = "\033[94m"
 RESET = "\033[0m"
 
 # Type checking configuration
-MAX_TYPE_ERRORS = 261  # Updated after fixing HeadingData and type inference issues
+MAX_TYPE_ERRORS = 260  # Updated after fixing HeadingData and type inference issues
 
 
 def run_command(cmd: list[str]) -> int:
