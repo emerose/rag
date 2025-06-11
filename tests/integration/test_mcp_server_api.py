@@ -54,7 +54,6 @@ def _build_test_server(tmp_path: Path):
     engine.get_document_summaries = lambda k=5: [
         {"path": "sample.txt", "summary": "dummy"}
     ]
-    engine.index_manager.get_chunk_hashes = lambda path: ["chunk1"]
     return server
 
 
@@ -73,7 +72,6 @@ async def test_stdio_transport(tmp_path: Path) -> None:
         await client.call_tool("tool_get_document", {"path": "sample.txt"})
         await client.call_tool("tool_delete_document", {"path": "sample.txt"})
         await client.call_tool("tool_summaries")
-        await client.call_tool("tool_chunks", {"path": "sample.txt"})
         await client.call_tool("tool_invalidate", {"all": True})
 
 
@@ -96,5 +94,4 @@ def test_http_transport(tmp_path: Path) -> None:
     assert client.post("/index/rebuild").status_code == 200
     assert client.get("/index/stats").status_code == 200
     assert client.get("/summaries").status_code == 200
-    assert client.post("/chunks", json={"path": "sample.txt"}).status_code == 200
     assert client.post("/invalidate", json={"all": True}).status_code == 200

@@ -40,10 +40,6 @@ class IndexRequest(BaseModel):
     path: str
 
 
-class ChunksRequest(BaseModel):
-    path: str
-
-
 class InvalidateRequest(BaseModel):
     path: str | None = None
     all: bool = False
@@ -185,9 +181,6 @@ class RAGMCPServer(FastMCP):
     async def tool_summaries(self, k: int = 5) -> list[dict[str, Any]]:
         return self.engine.get_document_summaries(k)
 
-    async def tool_chunks(self, path: str) -> list[str]:
-        return self.engine.index_manager.get_chunk_hashes(Path(path))
-
     async def tool_invalidate(self, path: str | None = None, all: bool = False) -> bool:
         if all:
             self.engine.invalidate_all_caches()
@@ -207,7 +200,6 @@ class RAGMCPServer(FastMCP):
         self.add_tool(self.tool_get_document)
         self.add_tool(self.tool_delete_document)
         self.add_tool(self.tool_summaries)
-        self.add_tool(self.tool_chunks)
         self.add_tool(self.tool_invalidate)
 
 
@@ -273,11 +265,6 @@ async def handle_summaries(server: RAGMCPServer, k: int = 5) -> list[dict[str, A
     return await server.tool_summaries(k)
 
 
-async def handle_chunks(server: RAGMCPServer, req: ChunksRequest) -> list[str]:
-    """Handle /chunks POST requests."""
-    return await server.tool_chunks(req.path)
-
-
 async def handle_invalidate(server: RAGMCPServer, req: InvalidateRequest) -> bool:
     """Handle /invalidate POST requests."""
     return await server.tool_invalidate(req.path, req.all)
@@ -328,10 +315,6 @@ def create_http_app(server: RAGMCPServer, api_key: str | None = None) -> FastAPI
     @app.get("/summaries")
     async def summaries(k: int = 5) -> list[dict[str, Any]]:
         return await handle_summaries(server, k)
-
-    @app.post("/chunks")
-    async def chunks(req: ChunksRequest) -> list[str]:
-        return await handle_chunks(server, req)
 
     @app.post("/invalidate")
     async def invalidate(req: InvalidateRequest) -> bool:

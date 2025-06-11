@@ -195,16 +195,6 @@ INVALIDATE_PATH_ARG = typer.Argument(
     resolve_path=True,
 )
 
-# Path argument for the chunks command
-CHUNKS_PATH_ARG = typer.Argument(
-    ...,  # File path is required
-    help="Indexed file to dump stored chunks for",
-    exists=True,
-    dir_okay=False,
-    file_okay=True,
-    resolve_path=True,
-)
-
 
 def update_console_for_json_mode(json_mode: bool) -> None:
     """Update the global console based on JSON mode."""
@@ -1008,63 +998,6 @@ def list(
     except (exceptions.RAGError, OSError, KeyError, ValueError, TypeError) as e:
         write(Error(f"Error listing indexed documents: {e}"))
         sys.exit(1)
-
-
-@app.command()
-def chunks(
-    path: Path = CHUNKS_PATH_ARG,
-    cache_dir: str = typer.Option(
-        None,
-        "--cache-dir",
-        "-c",
-        help="Directory for caching embeddings and vector stores",
-    ),
-    json_output: bool = JSON_OUTPUT_OPTION,
-) -> None:
-    """Dump stored chunks for an indexed file."""
-    try:
-        config = RAGConfig(
-            documents_dir=str(path.parent),
-            embedding_model=state.embedding_model,
-            chat_model=state.chat_model,
-            temperature=0.0,
-            cache_dir=cache_dir or state.cache_dir,
-            vectorstore_backend=state.vectorstore_backend,
-        )
-        rag_engine = create_rag_engine(config)
-
-        # With new architecture, get chunks from vectorstore
-        vectorstore = rag_engine.vectorstore
-        if vectorstore is None:
-            write(Error("No cached vectorstore found"))
-            raise typer.Exit(1)
-
-        # For the new architecture, we need to get documents that match the file
-        # This is a simplified implementation - in reality we'd need to filter by source
-        try:
-            # Get all documents and filter by source path
-            all_docs = vectorstore.similarity_search("", k=1000)  # Get many docs
-            file_docs = [
-                doc for doc in all_docs if doc.metadata.get("source") == str(path)
-            ]
-
-            chunks: list[dict[str, Any]] = [
-                {
-                    "index": idx,
-                    "text": doc.page_content,
-                    "metadata": dict(doc.metadata),
-                }
-                for idx, doc in enumerate(file_docs)
-            ]
-        except Exception as e:
-            write(Error(f"Error retrieving chunks: {e}"))
-            raise typer.Exit(1) from e
-
-        write({"chunks": chunks})
-
-    except (exceptions.RAGError, OSError, KeyError, ValueError, TypeError) as e:
-        write(Error(f"Error dumping chunks: {e}"))
-        raise typer.Exit(1) from e
 
 
 @prompt_app.command("list")
