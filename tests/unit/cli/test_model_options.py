@@ -60,7 +60,7 @@ def test_custom_models_passed_to_engine(tmp_path: Path) -> None:
                 "--chat-model",
                 "custom-chat",
                 "list",
-                "--cache-dir",
+                "--data-dir",
                 str(tmp_path),
             ],
         )

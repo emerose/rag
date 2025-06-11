@@ -20,12 +20,12 @@ def test_config(tmp_path: Path) -> RAGConfig:
     """Create a test configuration with temporary directories."""
     docs_dir = tmp_path / "docs"
     docs_dir.mkdir()
-    cache_dir = tmp_path / ".cache"
-    cache_dir.mkdir()
+    data_dir = tmp_path / ".rag"
+    data_dir.mkdir()
     
     return RAGConfig(
         documents_dir=str(docs_dir),
-        cache_dir=str(cache_dir),
+        data_dir=str(data_dir),
         vectorstore_backend="fake",
         openai_api_key="sk-test"
     )
@@ -53,11 +53,11 @@ def run_cli_command(cmd: list[str], config: RAGConfig) -> dict[str, Any]:
     runner = CliRunner()
     
     # Add required flags
-    full_cmd = cmd + ["--json", "--cache-dir", config.cache_dir]
+    full_cmd = cmd + ["--json", "--data-dir", config.data_dir]
     
     # Set up environment variables for the test
     env = {
-        "RAG_CACHE_DIR": config.cache_dir,
+        "RAG_DATA_DIR": config.data_dir,
         "RAG_DOCUMENTS_DIR": config.documents_dir,
         "RAG_VECTORSTORE_BACKEND": config.vectorstore_backend,
         "RAG_OPENAI_API_KEY": config.openai_api_key,

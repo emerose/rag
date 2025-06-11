@@ -44,7 +44,7 @@ def mock_engine_factory(engine_mock=None):
 
 def _run_cli(runner: CliRunner, opts: list[str], tmp_path: Path) -> None:
     with mock_engine_factory():
-        result = runner.invoke(app, [*opts, "--cache-dir", str(tmp_path), "list"])
+        result = runner.invoke(app, [*opts, "--data-dir", str(tmp_path), "list"])
     assert result.exit_code == 0
 
 
