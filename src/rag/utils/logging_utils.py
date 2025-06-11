@@ -19,7 +19,7 @@ from structlog.processors import CallsiteParameter, CallsiteParameterAdder
 logging.getLogger().addHandler(logging.NullHandler())
 
 
-class RAGLogger:
+class RAGLogger(logging.LoggerAdapter[logging.Logger]):
     """Simple logger adapter that supports structured extras."""
 
     def __init__(self, base_logger: logging.Logger) -> None:
@@ -28,6 +28,7 @@ class RAGLogger:
         Args:
             base_logger: The underlying logger instance.
         """
+        super().__init__(base_logger, {})
         self._base_logger = base_logger
 
     def log(

@@ -220,3 +220,5 @@ Types: feat, fix, docs, style, refactor, test, chore
 
 ### Workflow Memory
 - When wrapping up a task, please update TODO.md by removing the tasks you have completed
+
+- Always run check.sh before staging a commit

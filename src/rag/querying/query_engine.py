@@ -12,7 +12,6 @@ from typing import Any
 
 from langchain_openai import ChatOpenAI
 
-from rag.chains.rag_chain import build_rag_chain
 from rag.config import RAGConfig, RuntimeOptions
 from rag.config.dependencies import QueryEngineDependencies
 from rag.retrieval import BaseReranker
@@ -103,6 +102,9 @@ class QueryEngine:
 
         key = (k, prompt_id)
         if key not in self._rag_chain_cache:
+            # Import here to avoid circular dependency
+            from rag.chains.rag_chain import build_rag_chain
+
             # Create a temporary engine-like object for build_rag_chain
             # This maintains compatibility with the existing chain builder
             proxy_config = QueryEngineProxyConfig(

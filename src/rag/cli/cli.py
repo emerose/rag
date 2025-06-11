@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import asyncio
+import builtins
 import logging
 import sys
 import traceback
@@ -39,7 +40,7 @@ from rag.mcp import build_server, run_http_server, run_stdio_server
 from rag.prompts import list_prompts
 from rag.utils import exceptions
 from rag.utils.async_utils import get_optimal_concurrency
-from rag.utils.logging_utils import get_logger, setup_logging
+from rag.utils.logging_utils import RAGLogger, get_logger, setup_logging
 
 # Module-level logger - always available, never None
 # Use get_logger() to get the properly configured RAGLogger with structlog integration
@@ -210,7 +211,7 @@ def configure_logging(
     json_logs: bool,
     log_file: str | None,
     debug_modules: list[str] | None = None,
-) -> logging.Logger:
+) -> RAGLogger:
     """Configure logging based on CLI options."""
     level = logging.INFO if verbose else getattr(logging, log_level.value)
     setup_logging(log_file=log_file, log_level=level, json_logs=json_logs)
@@ -264,6 +265,19 @@ def validate_path(path: Path) -> Path:
     return path
 
 
+def _build_debug_modules_list(
+    debug: bool, debug_modules: str | None
+) -> list[str] | None:
+    """Build debug modules list from CLI options."""
+    modules: builtins.list[str] = []
+    if debug:
+        modules.append("rag")
+    if debug_modules:
+        module_names = [m.strip() for m in debug_modules.split(",")]
+        modules.extend(module_names)
+    return modules or None
+
+
 @app.callback(rich_help_panel="Global Options")
 def main(  # noqa: PLR0913
     verbose: bool = typer.Option(
@@ -303,18 +317,16 @@ def main(  # noqa: PLR0913
 
     # Configure logging
     state.log_file = log_file
-    modules: list[str] = []
-    if debug:
-        modules.append("rag")
-    if debug_modules:
-        module_names: list[str] = [m.strip() for m in debug_modules.split(",")]
-        modules.extend(module_names)
+
+    # Build debug modules list
+    debug_module_list = _build_debug_modules_list(debug, debug_modules)
+
     configure_logging(
         verbose,
         log_level,
         False,  # Never use JSON logs for CLI - we want console logs to stderr
         log_file,
-        modules or None,
+        debug_module_list,
     )
 
     # Set cache directory
