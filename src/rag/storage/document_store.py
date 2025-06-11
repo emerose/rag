@@ -444,66 +444,61 @@ class SQLiteDocumentStore:
         Raises:
             DocumentStoreError: If search fails
         """
-        try:
-            results = []
+        results: list[tuple[str, Document]] = []
 
-            with sqlite3.connect(self.db_path) as conn:
-                if query and metadata_filter:
-                    # Both text search and metadata filtering
-                    sql = """
-                        SELECT d.doc_id, d.content, d.metadata 
-                        FROM documents d
-                        JOIN documents_fts fts ON d.rowid = fts.rowid
-                        WHERE documents_fts MATCH ?
-                    """
-                    params = [query]
+        with sqlite3.connect(self.db_path) as conn:
+            if query and metadata_filter:
+                # Both text search and metadata filtering
+                sql = """
+                    SELECT d.doc_id, d.content, d.metadata 
+                    FROM documents d
+                    JOIN documents_fts fts ON d.rowid = fts.rowid
+                    WHERE documents_fts MATCH ?
+                """
+                params = [query]
 
-                elif query:
-                    # Text search only
-                    sql = """
-                        SELECT d.doc_id, d.content, d.metadata 
-                        FROM documents d
-                        JOIN documents_fts fts ON d.rowid = fts.rowid
-                        WHERE documents_fts MATCH ?
-                    """
-                    params = [query]
+            elif query:
+                # Text search only
+                sql = """
+                    SELECT d.doc_id, d.content, d.metadata 
+                    FROM documents d
+                    JOIN documents_fts fts ON d.rowid = fts.rowid
+                    WHERE documents_fts MATCH ?
+                """
+                params = [query]
 
-                elif metadata_filter:
-                    # Metadata filtering only
-                    sql = "SELECT doc_id, content, metadata FROM documents"
-                    params = []
+            elif metadata_filter:
+                # Metadata filtering only
+                sql = "SELECT doc_id, content, metadata FROM documents"
+                params = []
 
-                else:
-                    # No filters, return all
-                    sql = "SELECT doc_id, content, metadata FROM documents"
-                    params = []
+            else:
+                # No filters, return all
+                sql = "SELECT doc_id, content, metadata FROM documents"
+                params = []
 
-                if limit:
-                    sql += f" LIMIT {limit}"
+            if limit:
+                sql += f" LIMIT {limit}"
 
-                cursor = conn.execute(sql, params)
+            cursor = conn.execute(sql, params)
 
-                for doc_id, content, metadata_json in cursor.fetchall():
-                    metadata = json.loads(metadata_json)
+            for doc_id, content, metadata_json in cursor.fetchall():
+                metadata = json.loads(metadata_json)
 
-                    # Apply metadata filtering if specified (for cases where we couldn't do it in SQL)
-                    if metadata_filter:
-                        if not all(
-                            metadata.get(k) == v for k, v in metadata_filter.items()
-                        ):
-                            continue
+                # Apply metadata filtering if specified (for cases where we couldn't do it in SQL)
+                if metadata_filter:
+                    if not all(
+                        metadata.get(k) == v for k, v in metadata_filter.items()
+                    ):
+                        continue
 
-                    document = Document(page_content=content, metadata=metadata)
-                    results.append((doc_id, document))
+                document = Document(page_content=content, metadata=metadata)
+                results.append((doc_id, document))
 
-                    if limit and len(results) >= limit:
-                        break
+                if limit and len(results) >= limit:
+                    break
 
-            return results
-        except Exception as e:
-            raise DocumentStoreError(
-                "Failed to search documents", {"error": str(e)}
-            ) from e
+        return results
 
     def add_source_document(self, source_metadata: SourceDocumentMetadata) -> None:
         """Add a source document to tracking."""
@@ -555,7 +550,7 @@ class SQLiteDocumentStore:
                     ORDER BY s.indexed_at DESC
                 """)
 
-                results = []
+                results: list[SourceDocumentMetadata] = []
                 for row in cursor.fetchall():
                     metadata = json.loads(row[7]) if row[7] else {}
                     results.append(
@@ -631,7 +626,7 @@ class SQLiteDocumentStore:
                     (source_id,),
                 )
 
-                results = []
+                results: list[Document] = []
                 for row in cursor.fetchall():
                     metadata = json.loads(row[2])
                     document = Document(page_content=row[1], metadata=metadata)
@@ -783,7 +778,7 @@ class SQLiteDocumentStore:
 
     def list_indexed_files(self) -> list[dict[str, Any]]:
         """List all indexed files."""
-        results = []
+        results: list[dict[str, Any]] = []
         for source_doc in self.list_source_documents():
             results.append(
                 {
@@ -960,7 +955,7 @@ class FakeDocumentStore:
         Returns:
             List of (document_id, document) tuples matching the search criteria
         """
-        results = []
+        results: list[tuple[str, Document]] = []
 
         for doc_id, document in self._documents.items():
             # Apply text query filter
@@ -1059,7 +1054,7 @@ class FakeDocumentStore:
         # Get chunks sorted by order
         chunks = sorted(self._source_document_chunks[source_id], key=lambda x: x[1])
 
-        results = []
+        results: list[Document] = []
         for doc_id, _ in chunks:
             if doc_id in self._documents:
                 # Return a copy to avoid mutations

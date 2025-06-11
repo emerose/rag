@@ -176,7 +176,7 @@ class AdvancedDocumentTransformer:
                 doc.metadata.update(extracted_metadata)
 
         # Apply content filters
-        filtered_documents = []
+        filtered_documents: list[Document] = []
         for doc in documents:
             include = True
             for filter_func in self.content_filters:
@@ -189,7 +189,7 @@ class AdvancedDocumentTransformer:
         # Deduplicate if enabled
         if self.enable_deduplication and filtered_documents:
             seen_content = set()
-            unique_documents = []
+            unique_documents: list[Document] = []
 
             for doc in filtered_documents:
                 content_hash = hash(doc.page_content)
