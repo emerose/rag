@@ -54,7 +54,6 @@ def _build_test_server(tmp_path: Path):
     engine.get_document_summaries = lambda k=5: [
         {"path": "sample.txt", "summary": "dummy"}
     ]
-    engine.index_manager.get_chunk_hashes = lambda path: ["chunk1"]
     return server
 
 
