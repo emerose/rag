@@ -1,0 +1,72 @@
+[tool.vulture]
+# Paths to scan for dead code
+paths = ["src/rag"]
+
+# Minimum confidence level to report (default: 80)
+# Set to 80 to reduce false positives
+min_confidence = 80
+
+# Ignore certain patterns that are commonly false positives
+# CLI entry points and protocol methods should not be flagged
+ignore_names = [
+    # CLI entry points (typer commands)
+    "main",
+    "run_cli", 
+    "index",
+    "query",
+    "list",
+    "clear",
+    "debug",
+    "repl",
+    "eval_command",
+    "mcp",
+    "prompt_list",
+    "summarize",
+    
+    # Protocol method names that may not be used directly
+    "process_directory",
+    "validate_and_scan_documents_dir",
+    "store_documents",
+    "needs_reindexing",
+    "update_metadata",
+    "remove_metadata",
+    "update_chunk_hashes",
+    "get_chunk_hashes",
+    "update_file_metadata",
+    "get_all_file_metadata",
+    "set_global_setting",
+    "get_global_setting",
+    "create_from_documents",
+    
+    # Protocol method parameters (not used in protocol definitions)
+    "chunk_hashes",
+    
+    # Factory methods for testing
+    "create_minimal",
+    "create_for_integration_tests",
+    "create_with_sample_data",
+    
+    # Signal handlers
+    "signal_handler",
+    "async_signal_handler",
+    
+    # Magic methods and properties commonly flagged
+    "_llm_type",
+    "_agenerate",
+    "ntotal",
+    "reconstruct",
+    
+    # Configuration and utility methods
+    "from_config",
+    "from_environment",
+    "to_dict",
+]
+
+# Ignore decorators that indicate methods are used via frameworks
+ignore_decorators = [
+    "@property",
+    "@abstractmethod", 
+    "@typer.main",
+    "@click.command",
+    "@pytest.fixture",
+]
