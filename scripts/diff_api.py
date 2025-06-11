@@ -10,9 +10,9 @@ This tool creates a diff showing the changes to the public API of a Python packa
 between the current working tree and any git reference.
 """
 
-import difflib
 import importlib
 import inspect
+import os
 import pkgutil
 import shutil
 import subprocess
@@ -21,12 +21,8 @@ import tempfile
 from pathlib import Path
 from types import ModuleType
 
-# ANSI color codes
-RESET = "\033[0m"
-GREEN = "\033[32m"
-RED = "\033[31m"
-YELLOW = "\033[33m"
-BLUE = "\033[94m"
+from rich.console import Console
+from rich.text import Text
 
 
 class APIDumper:
@@ -226,45 +222,107 @@ class GitWorktree:
 
 
 class APIDiffRenderer:
-    """Renders colorized diffs between API dumps."""
+    """Renders the diff between two API dumps using Rich formatting."""
 
     def __init__(self, base: str, current: str, base_ref: str):
         """Initialize the diff renderer.
 
         Args:
-            base: Base API dump (old version)
-            current: Current API dump (new version)
-            base_ref: Name of the base reference for labeling
+            base: Base API dump string
+            current: Current API dump string
+            base_ref: Git reference name for the base
         """
-        self.base = base.strip().splitlines(keepends=True)
-        self.current = current.strip().splitlines(keepends=True)
+        self.base = base
+        self.current = current
         self.base_ref = base_ref
+        self.console = Console()
 
     def render(self) -> str:
-        """Render a colorized unified diff."""
-        diff = difflib.unified_diff(
-            self.base,
-            self.current,
-            fromfile=f"{self.base_ref} (old)",
-            tofile="HEAD (new)",
-            lineterm="",
-        )
+        """Render the API diff with Rich formatting."""
+        base_api = self._parse_api_dump(self.base)
+        current_api = self._parse_api_dump(self.current)
 
-        return self._colorize_diff(diff)
+        # Find additions, removals, and modifications
+        base_items = set(base_api.keys())
+        current_items = set(current_api.keys())
 
-    def _colorize_diff(self, diff_lines) -> str:
-        """Apply ANSI color codes to diff lines."""
-        output = []
-        for line in diff_lines:
-            if line.startswith("+") and not line.startswith("+++"):
-                output.append(f"{GREEN}{line}{RESET}")
-            elif line.startswith("-") and not line.startswith("---"):
-                output.append(f"{RED}{line}{RESET}")
-            elif line.startswith("@@"):
-                output.append(f"{YELLOW}{line}{RESET}")
-            else:
-                output.append(line)
-        return "\n".join(output)
+        added = current_items - base_items
+        removed = base_items - current_items
+        common = base_items & current_items
+        modified = {item for item in common if base_api[item] != current_api[item]}
+
+        if not (added or removed or modified):
+            return ""  # No differences
+
+        # Build rich output
+        output_parts = []
+
+        # Show removals
+        if removed:
+            for item in sorted(removed):
+                text = Text()
+                text.append("- ", style="red bold")
+                text.append(base_api[item], style="red")
+                output_parts.append(text)
+
+        # Show additions
+        if added:
+            for item in sorted(added):
+                text = Text()
+                text.append("+ ", style="green bold")
+                text.append(current_api[item], style="green")
+                output_parts.append(text)
+
+        # Show modifications
+        if modified:
+            for item in sorted(modified):
+                # Show old version
+                text_old = Text()
+                text_old.append("- ", style="red bold")
+                text_old.append(base_api[item], style="red")
+                output_parts.append(text_old)
+
+                # Show new version
+                text_new = Text()
+                text_new.append("+ ", style="green bold")
+                text_new.append(current_api[item], style="green")
+                output_parts.append(text_new)
+
+        # Render all parts to string
+        with self.console.capture() as capture:
+            for part in output_parts:
+                self.console.print(part)
+
+        return capture.get()
+
+    def _parse_api_dump(self, api_dump: str) -> dict[str, str]:
+        """Parse an API dump string into a dictionary of API items.
+
+        Returns:
+            Dict mapping fully qualified names to their descriptions
+        """
+        api_items = {}
+        lines = api_dump.strip().split("\n")
+
+        for line in lines:
+            line = line.strip()
+            if line.startswith("- `") and "`:" in line:
+                # Extract function/method signature
+                # Format: - `fully.qualified.name(args) -> return`: Description
+                try:
+                    # Find the closing backtick for the signature
+                    end_backtick = line.find("`:")
+                    if end_backtick != -1:
+                        signature = line[
+                            3:end_backtick
+                        ]  # Extract between "- `" and "`:"
+                        # Use the full line as the value for comparison
+                        api_items[signature] = line
+                except Exception:
+                    # If parsing fails, use the whole line as both key and value
+                    api_items[line] = line
+
+        return api_items
 
 
 def check_git_repository() -> None:
@@ -277,7 +335,8 @@ def check_git_repository() -> None:
             stderr=subprocess.DEVNULL,
         )
     except subprocess.CalledProcessError:
-        print(f"{RED}Error: Not in a git repository{RESET}")
+        console = Console()
+        console.print("Error: Not in a git repository", style="red")
         sys.exit(1)
 
 
@@ -291,7 +350,8 @@ def check_git_ref_exists(ref: str) -> None:
             stderr=subprocess.DEVNULL,
         )
     except subprocess.CalledProcessError:
-        print(f"{RED}Error: Git reference '{ref}' does not exist{RESET}")
+        console = Console()
+        console.print(f"Error: Git reference '{ref}' does not exist", style="red")
         sys.exit(1)
 
 
@@ -300,9 +360,14 @@ def run_api_dump_subprocess(package: str, root_path: Path) -> str:
     # Create a temporary Python script to run the API dump
     script_content = f'''
 import sys
-# Keep essential Python paths but prioritize the target directory
-original_paths = sys.path[:]
-sys.path = ["{root_path}"] + [p for p in original_paths if not p.endswith("/src") and "{root_path}" not in p]
+from pathlib import Path
+# Clear sys.path completely and only add essential paths plus target directory
+essential_paths = [p for p in sys.path if any(essential in p for essential in ['python3.', 'lib-dynload', '.zip'])]
+src_path = Path("{root_path}") / "src"
+if src_path.exists():
+    sys.path = [str(src_path)] + essential_paths
+else:
+    sys.path = ["{root_path}"] + essential_paths
 
 import importlib
 import inspect
@@ -387,6 +452,7 @@ print(walk_package())
             text=True,
             check=True,
             cwd=root_path,
+            env={**os.environ, "PYTHONPATH": ""},  # Clear PYTHONPATH
         )
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
@@ -396,15 +462,22 @@ print(walk_package())
 
 def main():
     """Main entry point."""
+    console = Console()
+
     if len(sys.argv) < 3:
-        print(f"{BLUE}Usage: python {sys.argv[0]} <package_name> <git_ref>{RESET}")
-        print(f"{BLUE}Example: python {sys.argv[0]} rag main{RESET}")
+        console.print(
+            f"Usage: python {sys.argv[0]} <package_name> <git_ref>", style="blue"
+        )
+        console.print(f"Example: python {sys.argv[0]} rag main", style="blue")
         sys.exit(1)
 
     package = sys.argv[1]
     ref = sys.argv[2]
 
-    print(f"{BLUE}🔍 Diffing public API of `{package}` against `{ref}`...{RESET}\n")
+    console.print(
+        f"🔍 Diffing public API of `{package}` against `{ref}`...", style="blue"
+    )
+    console.print()
 
     # Validate git environment
     check_git_repository()
@@ -412,34 +485,37 @@ def main():
 
     try:
         # Dump current (HEAD) API
-        print(f"{YELLOW}📊 Analyzing current API...{RESET}")
+        console.print("📊 Analyzing current API...", style="yellow")
         current_api = run_api_dump_subprocess(package, Path.cwd())
 
         # Dump base (target ref) API
-        print(f"{YELLOW}📊 Analyzing API at {ref}...{RESET}")
+        console.print(f"📊 Analyzing API at {ref}...", style="yellow")
         with GitWorktree(ref) as tmpdir:
             base_api = run_api_dump_subprocess(package, tmpdir)
 
         # Render and show diff
-        print(f"{YELLOW}🔄 Computing diff...{RESET}\n")
+        console.print("🔄 Computing diff...", style="yellow")
+        console.print()
         diff = APIDiffRenderer(base_api, current_api, ref).render()
 
         if not diff.strip():
-            print(
-                f"{GREEN}✅ No public API differences between HEAD and `{ref}`.{RESET}"
+            console.print(
+                f"✅ No public API differences between HEAD and `{ref}`.", style="green"
             )
         else:
             print(diff)
 
     except ImportError as e:
-        print(f"{RED}❌ Import Error: {e}{RESET}")
-        print(f"{YELLOW}💡 Make sure the package is installed and importable.{RESET}")
+        console.print(f"❌ Import Error: {e}", style="red")
+        console.print(
+            "💡 Make sure the package is installed and importable.", style="yellow"
+        )
         sys.exit(1)
     except RuntimeError as e:
-        print(f"{RED}❌ Git Error: {e}{RESET}")
+        console.print(f"❌ Git Error: {e}", style="red")
         sys.exit(1)
     except Exception as e:
-        print(f"{RED}❌ Unexpected Error: {e}{RESET}")
+        console.print(f"❌ Unexpected Error: {e}", style="red")
         sys.exit(1)
 
 

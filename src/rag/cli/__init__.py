@@ -12,13 +12,14 @@ from rag.cli.output import Error, TableData, set_json_mode, write
 __all__ = ["Error", "TableData", "app", "run_cli", "set_json_mode", "write"]
 
 
-def test_function_for_api_diff(test_param: str) -> bool:
-    """Test function to verify API diff detection.
+def test_rich_diff_function(param: int, optional: str = "default") -> dict[str, bool]:
+    """Test function to verify Rich-based API diff detection.
 
     Args:
-        test_param: A test parameter
+        param: An integer parameter
+        optional: An optional string parameter with default
 
     Returns:
-        Always returns True
+        Dictionary with boolean values
     """
-    return True
+    return {"success": True, "tested": True}
