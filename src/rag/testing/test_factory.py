@@ -13,8 +13,8 @@ from typing import TYPE_CHECKING
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.config.components import (
-    CacheConfig,
     ChunkingConfig,
+    DataConfig,
     EmbeddingConfig,
     IndexingConfig,
     StorageConfig,
@@ -25,9 +25,8 @@ if TYPE_CHECKING:
 from rag.embeddings.fake_openai import FakeOpenAI
 from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
 from rag.factory import ComponentOverrides, RAGComponentsFactory
-from rag.storage.fake_index_manager import FakeIndexManager
+from rag.storage.document_store import FakeDocumentStore
 from rag.storage.fakes import (
-    InMemoryCacheRepository,
     InMemoryFileSystem,
 )
 from rag.utils.exceptions import ConfigurationError
@@ -118,7 +117,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             temperature=0.0,
             chunk_size=500,
             chunk_overlap=50,
-            cache_dir="/tmp/test_cache",
+            data_dir="/tmp/test_cache",
             vectorstore_backend="faiss",
         )
 
@@ -140,8 +139,8 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             for path, content in self.test_options.initial_files.items():
                 filesystem.add_file(path, content)
 
-        # Create fake cache repository with initial metadata if provided
-        cache_repo = FakeIndexManager(cache_dir="/fake/cache")
+        # Create fake document store with initial metadata if provided
+        cache_repo = FakeDocumentStore()
         if self.test_options.initial_metadata:
             # Directly populate the internal storage for testing
             for file_path, metadata in self.test_options.initial_metadata.items():
@@ -178,7 +177,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
         return ComponentOverrides(
             filesystem_manager=filesystem,
-            cache_repository=cache_repo,
+            document_store=cache_repo,
             vectorstore_factory=vectorstore_factory,
             embedding_service=embedding_service,
             document_loader=document_loader,
@@ -223,19 +222,19 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
     @classmethod
     def create_fake_index_manager(
         cls,
-        cache_dir: str = "/fake/cache",
+        data_dir: str = "/fake/cache",
         initial_metadata: dict[str, dict[str, Any]] | None = None,
-    ) -> FakeIndexManager:
-        """Create a standalone FakeIndexManager for testing.
+    ) -> FakeDocumentStore:
+        """Create a standalone FakeDocumentStore for testing.
 
         Args:
-            cache_dir: Cache directory for the manager
+            data_dir: Data directory for the manager
             initial_metadata: Initial metadata to populate
 
         Returns:
-            Configured FakeIndexManager instance
+            Configured FakeDocumentStore instance
         """
-        manager = FakeIndexManager(cache_dir=cache_dir)
+        manager = FakeDocumentStore()
         if initial_metadata:
             for file_path, metadata in initial_metadata.items():
                 manager.set_metadata_dict(file_path, metadata)
@@ -273,7 +272,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         if config is None:
             config = RAGConfig(
                 documents_dir="/tmp/test_docs",
-                cache_dir="/tmp/test_cache",
+                data_dir="/tmp/test_cache",
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
             )
@@ -294,17 +293,16 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 config=config, runtime_options=runtime, test_options=test_options
             )
 
-            # Override filesystem, cache repository, and document loader for real file operations
+            # Override filesystem, document store, and document loader for real file operations
             from pathlib import Path
 
             from rag.data.document_loader import DocumentLoader
+            from rag.storage.document_store import SQLiteDocumentStore
             from rag.storage.filesystem import FilesystemManager
-            from rag.storage.index_manager import IndexManager
 
             factory._filesystem_manager = FilesystemManager()
-            factory._cache_repository = IndexManager(
-                cache_dir=Path(config.cache_dir),
-                log_callback=runtime.log_callback,
+            factory._document_store = SQLiteDocumentStore(
+                Path(config.data_dir) / "documents.db"
             )
             factory._document_loader = DocumentLoader(
                 filesystem_manager=factory._filesystem_manager,
@@ -353,7 +351,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 max_retries=1,  # Fewer retries for faster test failures
                 timeout_seconds=5,  # Short timeout for fast test failures
             ),
-            cache=CacheConfig(
+            cache=DataConfig(
                 enabled=False,  # Disable caching for tests to avoid side effects
                 cache_dir="/tmp/test_cache",
                 ttl_hours=1,  # Short TTL for tests
@@ -395,7 +393,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 timeout_seconds=30,  # Standard timeout
                 rate_limit_rpm=3000,
             ),
-            cache=CacheConfig(
+            cache=DataConfig(
                 enabled=True,
                 cache_dir=".cache",
                 ttl_hours=24 * 7,  # 1 week
@@ -450,9 +448,9 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                     content_type="text/plain",
                 )
 
-        # Also add the file to the FakeIndexManager if it's being used
-        if hasattr(self.cache_repository, "add_mock_file"):
-            self.cache_repository.add_mock_file(resolved_path, content, fixed_mtime)
+        # Also add the file to the FakeDocumentStore if it's being used
+        if hasattr(self.document_store, "add_mock_file"):
+            self.document_store.add_mock_file(resolved_path, content, fixed_mtime)
 
     def add_test_metadata(self, file_path: str, metadata: dict[str, Any]) -> None:
         """Add test metadata to the fake cache repository.
@@ -462,17 +460,12 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             metadata: Metadata dictionary
         """
         # Directly add to internal storage for testing
-        if isinstance(
-            self.cache_repository, InMemoryCacheRepository | FakeIndexManager
-        ):
-            if isinstance(self.cache_repository, InMemoryCacheRepository):
-                self.cache_repository.document_metadata[file_path] = metadata
-            else:
-                self.cache_repository.set_metadata_dict(file_path, metadata)
+        if isinstance(self.document_store, FakeDocumentStore):
+            self.document_store.set_metadata_dict(file_path, metadata)
         else:
             raise ConfigurationError(
-                "Can only add test metadata to InMemoryCacheRepository or FakeIndexManager, "
-                f"got {type(self.cache_repository).__name__}"
+                "Can only add test metadata to FakeDocumentStore, "
+                f"got {type(self.document_store).__name__}"
             )
 
     def get_test_files(self) -> dict[str, str]:
@@ -498,18 +491,13 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         Returns:
             Dictionary mapping file paths to their metadata
         """
-        if not isinstance(
-            self.cache_repository, InMemoryCacheRepository | FakeIndexManager
-        ):
+        if not isinstance(self.document_store, FakeDocumentStore):
             raise ConfigurationError(
-                "Can only get test metadata from InMemoryCacheRepository or FakeIndexManager, "
-                f"got {type(self.cache_repository).__name__}"
+                "Can only get test metadata from FakeDocumentStore, "
+                f"got {type(self.document_store).__name__}"
             )
 
-        if isinstance(self.cache_repository, InMemoryCacheRepository):
-            return dict(self.cache_repository.document_metadata)
-        else:
-            return dict(self.cache_repository.document_metadata)
+        return dict(self.document_store.document_metadata)
 
     def inject_fake_openai(self) -> FakeOpenAI:
         """Inject and return a FakeOpenAI instance for the factory.
