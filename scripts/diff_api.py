@@ -56,6 +56,13 @@ class APIDumper:
         original_path = sys.path[:]
         sys.path.insert(0, str(self.root_path))
 
+        # Clear any existing modules from the package to ensure fresh imports
+        modules_to_clear = [
+            mod for mod in sys.modules.keys() if mod.startswith(self.package_name)
+        ]
+        for mod in modules_to_clear:
+            del sys.modules[mod]
+
         try:
             return self._walk_package()
         except ImportError as e:
