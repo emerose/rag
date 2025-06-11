@@ -292,7 +292,7 @@ class RAGComponentsFactory:
             )
         return self._embedding_batcher
 
-    def create_query_engine(self) -> "QueryEngine":
+    def create_query_engine(self) -> QueryEngine:
         """Create a QueryEngine with all dependencies wired."""
         if self._query_engine is None:
             from rag.config.dependencies import QueryEngineDependencies

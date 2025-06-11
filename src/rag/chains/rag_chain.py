@@ -126,6 +126,80 @@ def _pack_documents(
 # ---------------------------------------------------------------------------
 
 
+def _get_prompt_template(prompt_id: str):
+    """Get prompt template with fallback to default."""
+    try:
+        return get_prompt(prompt_id)
+    except KeyError as e:
+        logger.warning(f"{e!s}")
+        return get_prompt("default")
+
+
+def _create_retrieval_function(
+    vs: VectorStoreProtocol, k: int, reranker: BaseReranker | None
+):
+    """Create retrieval function with filtering and reranking."""
+
+    def _retrieve(question: str) -> list[Document]:
+        """Similarity search with optional metadata filters and reranking."""
+        clean_query, mfilters = _parse_metadata_filters(question)
+        search_k = k * 3 if mfilters else k
+
+        # Debug: Log retrieval details
+        logger.debug(f"Retrieving for query: '{clean_query}' (original: '{question}')")
+        logger.debug(f"Search k: {search_k}, filters: {mfilters}")
+        logger.debug(f"Vectorstore type: {type(vs)}")
+
+        docs: list[Document] = vs.similarity_search(clean_query, k=search_k)
+
+        if mfilters:
+            docs = [d for d in docs if _doc_matches_filters(d, mfilters)]
+            logger.debug(f"After filtering: {len(docs)} documents")
+        if reranker:
+            docs = reranker.rerank(clean_query, docs)
+            logger.debug(f"After reranking: {len(docs)} documents")
+        return docs[:k]
+
+    return _retrieve
+
+
+def _create_llm_function(engine: RAGEngine):
+    """Create LLM invocation function with streaming support."""
+
+    def _invoke_llm(prompt_text: str) -> str:
+        if engine.system_prompt:
+            messages: Any = [
+                SystemMessage(content=engine.system_prompt),
+                HumanMessage(content=prompt_text),
+            ]
+        else:
+            messages = prompt_text
+
+        streaming = getattr(engine.runtime, "stream", False) is True
+        if streaming:
+            parts: list[str] = []
+            for chunk in engine.chat_model.stream(messages):
+                token = getattr(chunk, "content", str(chunk))
+                callback = getattr(engine.runtime, "stream_callback", None)
+                if callback:
+                    callback(token)
+                parts.append(token)
+            return "".join(parts)
+
+        response = engine.chat_model.invoke(messages)
+        # Handle multimodal content - extract string content for text-only RAG
+        content: Any = response.content
+        if isinstance(content, str):
+            return content
+        elif isinstance(content, list):
+            # Extract text content from list format (multimodal)
+            return " ".join(str(item) for item in content if isinstance(item, str))
+        else:
+            return str(content)
+
+    return _invoke_llm
+
+
 def build_rag_chain(
     engine: RAGEngine,
     k: int = 4,
