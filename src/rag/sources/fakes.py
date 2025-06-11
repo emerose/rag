@@ -92,7 +92,7 @@ class FakeDocumentSource(DocumentSourceProtocol):
         content_type = kwargs.get("content_type")
         metadata_filter = kwargs.get("metadata_filter", {})
 
-        document_ids = []
+        document_ids: list[str] = []
 
         for source_id, doc in self._documents.items():
             # Apply prefix filter

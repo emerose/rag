@@ -83,7 +83,7 @@ class FilesystemDocumentSource:
         file_types = kwargs.get("file_types", None)
         exclude_patterns = kwargs.get("exclude_patterns", [])
 
-        document_ids = []
+        document_ids: list[str] = []
 
         # Use filesystem manager to scan for supported files
         files = self.filesystem_manager.scan_directory(self.root_path)
