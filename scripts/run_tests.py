@@ -8,6 +8,17 @@ to the testing strategy.
 import subprocess
 import sys
 
+import typer
+from typing_extensions import Annotated
+
+# Create the Typer CLI app
+app = typer.Typer(
+    name="run_tests",
+    help="Test runner for the RAG project with different test suites",
+    add_completion=False,
+    rich_markup_mode="rich",
+)
+
 # Colors for output
 RED = "\033[91m"
 GREEN = "\033[92m"
@@ -253,74 +264,319 @@ def run_check() -> int:
     return 0
 
 
-def main():
-    """Main entry point."""
-    if len(sys.argv) < 2:
-        print(f"""
-{BLUE}RAG Test Runner{RESET}
+@app.callback()
+def main(
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose output")] = False,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Suppress output")] = False,
+) -> None:
+    """RAG Test Runner - Convenient commands for running different test suites.
+    
+    Provides commands for unit tests, integration tests, E2E tests, and static analysis.
+    Each test category is optimized for different use cases:
+    
+    • [green]Unit Tests[/green]: Fast, isolated, no external dependencies
+    • [yellow]Integration Tests[/yellow]: Component interactions with controlled dependencies
+    • [red]E2E Tests[/red]: Complete user workflows with real environment
+    • [blue]Static Analysis[/blue]: Code quality checks (ruff, pyright, vulture)
+    """
+    if verbose:
+        typer.echo("Verbose mode enabled", color=typer.colors.BLUE)
+    if quiet:
+        typer.echo("Quiet mode enabled", color=typer.colors.BLUE)
 
-Usage: python scripts/run_tests.py <command>
 
-Commands:
-  {GREEN}unit{RESET}         Run unit tests only (fast, <100ms per test)
-  {GREEN}quick{RESET}        Run unit tests with fail-fast (for development)
-  {YELLOW}integration{RESET}  Run integration tests (component interactions)
-  {RED}e2e{RESET}          Run end-to-end tests (complete workflows)
-  {BLUE}all{RESET}          Run all tests
-  {BLUE}coverage{RESET}     Run tests with coverage reporting
-  {BLUE}lint{RESET}         Run linting and formatting only (ruff)
-  {BLUE}typecheck{RESET}    Run type checking only (no baseline limit)
-  {BLUE}vulture{RESET}      Run dead code detection (vulture)
-  {BLUE}static{RESET}       Run all static analysis (ruff + pyright + vulture)
-  {BLUE}check{RESET}        Run complete check workflow (static → unit → integration)
+@app.command()
+def unit(
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Verbose output")] = False,
+    fail_fast: Annotated[bool, typer.Option("--fail-fast", "-x", help="Stop on first failure")] = False,
+    pattern: Annotated[str, typer.Option("--pattern", "-k", help="Test name pattern")] = None,
+) -> None:
+    """Run unit tests only (fast, <100ms per test).
+    
+    Unit tests are fast, isolated tests with no external dependencies.
+    They test individual components in isolation.
+    
+    Examples:
+        run_tests.py unit                     # Run all unit tests
+        run_tests.py unit --verbose           # Run with verbose output
+        run_tests.py unit -k "test_cache"     # Run tests matching pattern
+        run_tests.py unit --fail-fast         # Stop on first failure
+    """
+    typer.echo("Running Unit Tests (fast, isolated, no external deps)", color=typer.colors.GREEN)
+    cmd = ["python", "-m", "pytest", "tests/unit/", "--tb=short"]
+    if verbose:
+        cmd.append("-v")
+    if fail_fast:
+        cmd.append("-x")
+    if pattern:
+        cmd.extend(["-k", pattern])
+    
+    raise typer.Exit(run_command(cmd))
 
-Test Categories:
-  • Unit Tests: Fast, isolated, no external dependencies
-  • Integration Tests: Component interactions with controlled dependencies  
-  • E2E Tests: Complete user workflows with real environment
 
-Static Analysis:
-  • lint: Formatting and linting with ruff
-  • typecheck: Type checking with pyright
-  • vulture: Dead code detection
-  • static: All static analysis checks
+@app.command()
+def quick() -> None:
+    """Run unit tests with fail-fast for quick development feedback.
+    
+    This is equivalent to 'unit --fail-fast' but shorter for development workflows.
+    """
+    typer.echo("Running Quick Tests (unit tests only)", color=typer.colors.GREEN)
+    cmd = ["python", "-m", "pytest", "tests/unit/", "-x", "--tb=short"]
+    raise typer.Exit(run_command(cmd))
 
-Examples:
-  python scripts/run_tests.py unit
-  python scripts/run_tests.py integration  
-  python scripts/run_tests.py static
-  python scripts/run_tests.py vulture
-        """)
-        return 1
 
-    command = sys.argv[1]
+@app.command()
+def integration(
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Verbose output")] = False,
+    pattern: Annotated[str, typer.Option("--pattern", "-k", help="Test name pattern")] = None,
+) -> None:
+    """Run integration tests (component interactions with controlled deps).
+    
+    Integration tests verify that components work together correctly
+    using controlled dependencies (no real external APIs).
+    
+    Examples:
+        run_tests.py integration              # Run all integration tests
+        run_tests.py integration --verbose    # Run with verbose output
+        run_tests.py integration -k "workflow" # Run workflow tests only
+    """
+    typer.echo("Running Integration Tests (component interactions with controlled deps)", color=typer.colors.YELLOW)
+    cmd = ["python", "-m", "pytest", "-m", "integration", "--tb=short"]
+    if verbose:
+        cmd.append("-v")
+    if pattern:
+        cmd.extend(["-k", pattern])
+    
+    raise typer.Exit(run_command(cmd))
 
-    if command == "unit":
-        return run_unit_tests()
-    elif command == "quick":
-        return run_quick_tests()
-    elif command == "integration":
-        return run_integration_tests()
-    elif command == "e2e":
-        return run_e2e_tests()
-    elif command == "all":
-        return run_all_tests()
-    elif command == "coverage":
-        return run_coverage_tests()
-    elif command == "lint":
-        return run_lint()
-    elif command == "typecheck":
-        return run_typecheck_only()
-    elif command == "vulture":
-        return run_vulture()
-    elif command == "static":
-        return run_static()
-    elif command == "check":
-        return run_check()
+
+@app.command()
+def e2e(
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Verbose output")] = False,
+    pattern: Annotated[str, typer.Option("--pattern", "-k", help="Test name pattern")] = None,
+) -> None:
+    """Run end-to-end tests (complete workflows with real environment).
+    
+    E2E tests verify complete user workflows using the real environment
+    with mocked external APIs for cost control.
+    
+    Examples:
+        run_tests.py e2e                      # Run all E2E tests  
+        run_tests.py e2e --verbose            # Run with verbose output
+        run_tests.py e2e -k "cli"             # Run CLI E2E tests only
+    """
+    typer.echo("Running E2E Tests (complete workflows with real environment)", color=typer.colors.RED)
+    cmd = ["python", "-m", "pytest", "-m", "e2e", "--tb=short"]
+    if verbose:
+        cmd.append("-v")
+    if pattern:
+        cmd.extend(["-k", pattern])
+    
+    raise typer.Exit(run_command(cmd))
+
+
+@app.command()
+def coverage(
+    html: Annotated[bool, typer.Option("--html", help="Generate HTML coverage report")] = True,
+    min_coverage: Annotated[int, typer.Option("--min-coverage", help="Minimum coverage percentage")] = None,
+) -> None:
+    """Run tests with coverage reporting.
+    
+    Generates coverage reports to analyze test coverage across the codebase.
+    
+    Examples:
+        run_tests.py coverage                 # Run with HTML and term reports
+        run_tests.py coverage --no-html       # Skip HTML report generation
+        run_tests.py coverage --min-coverage 85 # Fail if coverage < 85%
+    """
+    typer.echo("Running Tests with Coverage", color=typer.colors.BLUE)
+    cmd = [
+        "python", "-m", "pytest", "tests/unit/",
+        "--cov=rag", "--cov-report=term-missing"
+    ]
+    if html:
+        cmd.append("--cov-report=html")
+    if min_coverage:
+        cmd.append(f"--cov-fail-under={min_coverage}")
+    
+    raise typer.Exit(run_command(cmd))
+
+
+@app.command()
+def lint(
+    skip_format: Annotated[bool, typer.Option("--skip-format", help="Skip code formatting")] = False,
+) -> None:
+    """Run linting and formatting only (ruff).
+    
+    Runs ruff for code formatting and linting without type checking.
+    
+    Examples:
+        run_tests.py lint                     # Run formatting and linting
+        run_tests.py lint --skip-format       # Skip formatting, lint only
+    """
+    if skip_format:
+        typer.echo("Running Linting Only", color=typer.colors.BLUE)
+        raise typer.Exit(run_command(["ruff", "check", "src/rag", "--fix", "--line-length", "88"]))
     else:
-        print(f"{RED}Unknown command: {command}{RESET}")
-        return 1
+        raise typer.Exit(run_lint())
+
+
+@app.command()
+def typecheck(
+    baseline: Annotated[bool, typer.Option("--baseline", help="Use baseline error limit")] = False,
+    max_errors: Annotated[int, typer.Option("--max-errors", help="Maximum allowed errors")] = MAX_TYPE_ERRORS,
+) -> None:
+    """Run type checking only.
+    
+    Runs pyright type checking with optional baseline error limit.
+    
+    Examples:
+        run_tests.py typecheck                # Run without baseline limit
+        run_tests.py typecheck --baseline     # Use baseline limit (375 errors)
+        run_tests.py typecheck --baseline --max-errors 300 # Custom limit
+    """
+    if baseline:
+        raise typer.Exit(run_pyright_with_baseline(max_errors))
+    else:
+        raise typer.Exit(run_typecheck_only())
+
+
+@app.command()
+def vulture() -> None:
+    """Run dead code detection (vulture).
+    
+    Uses vulture to find unused/dead code with minimal false positives.
+    
+    Examples:
+        run_tests.py vulture                  # Run dead code detection
+    """
+    raise typer.Exit(run_vulture())
+
+
+@app.command()
+def static(
+    max_errors: Annotated[int, typer.Option("--max-errors", help="Maximum allowed type errors")] = MAX_TYPE_ERRORS,
+) -> None:
+    """Run all static analysis (ruff + pyright + vulture).
+    
+    Comprehensive static analysis including formatting, linting,
+    type checking, and dead code detection.
+    
+    Examples:
+        run_tests.py static                   # Run all static analysis
+        run_tests.py static --max-errors 300  # Custom type error limit
+    """
+    # Temporarily modify the global max errors for this run
+    original_max = MAX_TYPE_ERRORS
+    globals()["MAX_TYPE_ERRORS"] = max_errors
+    try:
+        raise typer.Exit(run_static())
+    finally:
+        globals()["MAX_TYPE_ERRORS"] = original_max
+
+
+@app.command()
+def check(
+    max_errors: Annotated[int, typer.Option("--max-errors", help="Maximum allowed type errors")] = MAX_TYPE_ERRORS,
+    skip_integration: Annotated[bool, typer.Option("--skip-integration", help="Skip integration tests")] = False,
+) -> None:
+    """Run complete check workflow (static → unit → integration).
+    
+    Runs the complete quality check workflow used by CI/CD.
+    Equivalent to running: static, unit, integration (in order).
+    
+    Examples:
+        run_tests.py check                    # Full check workflow
+        run_tests.py check --skip-integration # Skip integration tests
+        run_tests.py check --max-errors 300   # Custom type error limit
+    """
+    # Temporarily modify the global max errors for this run
+    original_max = MAX_TYPE_ERRORS
+    globals()["MAX_TYPE_ERRORS"] = max_errors
+    try:
+        if skip_integration:
+            # Modified check workflow without integration tests
+            typer.echo("🔍 Starting code quality checks (without integration)...", color=typer.colors.BLUE)
+            
+            # Run static analysis
+            typer.echo("Step 1/2: Running static analysis", color=typer.colors.GREEN)
+            static_result = run_static()
+            if static_result != 0:
+                typer.echo("❌ Failed: Running static analysis", color=typer.colors.RED)
+                raise typer.Exit(static_result)
+            typer.echo("✅ Passed: Running static analysis", color=typer.colors.GREEN)
+            
+            # Run unit tests
+            typer.echo("Step 2/2: Running unit tests", color=typer.colors.GREEN)
+            unit_result = run_unit_tests()
+            if unit_result != 0:
+                typer.echo("❌ Failed: Running unit tests", color=typer.colors.RED)
+                raise typer.Exit(unit_result)
+            typer.echo("✅ Passed: Running unit tests", color=typer.colors.GREEN)
+            
+            typer.echo("✨ All checks passed successfully! ✨", color=typer.colors.GREEN)
+            raise typer.Exit(0)
+        else:
+            raise typer.Exit(run_check())
+    finally:
+        globals()["MAX_TYPE_ERRORS"] = original_max
+
+
+@app.command(name="all")
+def all_tests(
+    max_errors: Annotated[int, typer.Option("--max-errors", help="Maximum allowed type errors")] = MAX_TYPE_ERRORS,
+    skip_e2e: Annotated[bool, typer.Option("--skip-e2e", help="Skip E2E tests")] = False,
+) -> None:
+    """Run all tests in order: static → unit → integration → e2e.
+    
+    Runs the complete test suite including all test categories.
+    
+    Examples:
+        run_tests.py all                      # Run complete test suite
+        run_tests.py all --skip-e2e           # Skip E2E tests
+        run_tests.py all --max-errors 300     # Custom type error limit
+    """
+    # Temporarily modify the global max errors for this run
+    original_max = MAX_TYPE_ERRORS
+    globals()["MAX_TYPE_ERRORS"] = max_errors
+    try:
+        if skip_e2e:
+            # Run check workflow (static + unit + integration)
+            raise typer.Exit(run_check())
+        else:
+            raise typer.Exit(run_all_tests())
+    finally:
+        globals()["MAX_TYPE_ERRORS"] = original_max
+
+
+@app.command()
+def info() -> None:
+    """Show information about the test suite.
+    
+    Displays configuration and statistics about the test suite.
+    """
+    typer.echo("RAG Test Suite Information", color=typer.colors.BLUE)
+    typer.echo(f"Current type error baseline: {MAX_TYPE_ERRORS}")
+    typer.echo("")
+    typer.echo("Test Categories:", color=typer.colors.CYAN)
+    typer.echo("  • Unit Tests: Fast (<100ms), isolated, no external deps")
+    typer.echo("  • Integration Tests: Component interactions (<500ms)")
+    typer.echo("  • E2E Tests: Complete workflows (<30s)")
+    typer.echo("")
+    typer.echo("Static Analysis Tools:", color=typer.colors.CYAN)
+    typer.echo("  • ruff: Code formatting and linting")
+    typer.echo("  • pyright: Type checking with baseline")
+    typer.echo("  • vulture: Dead code detection")
+    typer.echo("")
+    typer.echo("Available Commands:", color=typer.colors.CYAN)
+    typer.echo("  • Use --help with any command for detailed information")
+    typer.echo("  • Example: run_tests.py unit --help")
+
+
+def main() -> None:
+    """Entry point for the CLI."""
+    app()
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()
