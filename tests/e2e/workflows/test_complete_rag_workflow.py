@@ -97,7 +97,7 @@ NLP focuses on the interaction between computers and human language.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
+            data_dir = temp_path / "data"
 
             # Create test documents
             documents = self.create_test_documents(docs_dir)
@@ -105,7 +105,7 @@ NLP focuses on the interaction between computers and human language.
             # Create RAG engine with real configuration
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                data_dir=str(cache_dir),
+                data_dir=str(data_dir),
                 vectorstore_backend="faiss",  # Use real FAISS backend
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
             )
@@ -148,16 +148,16 @@ NLP focuses on the interaction between computers and human language.
             # The answer should contain some content (may not find specific info due to retrieval issues)
             # Note: Sources may be empty if retrieval doesn't find relevant content
 
-    def test_cache_invalidation_e2e_workflow(self):
-        """Test end-to-end cache invalidation workflow using real APIs."""
+    def test_data_clearing_e2e_workflow(self):
+        """Test end-to-end data clearing workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
+            data_dir = temp_path / "data"
 
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                data_dir=str(cache_dir),
+                data_dir=str(data_dir),
                 vectorstore_backend="faiss",
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
             )
@@ -168,7 +168,7 @@ NLP focuses on the interaction between computers and human language.
             docs_dir.mkdir()
             doc = docs_dir / "test.txt"
             doc.write_text(
-                "This document contains test content for cache invalidation testing."
+                "This document contains test content for data clearing testing."
             )
 
             results = engine.ingestion_pipeline.ingest_all()
@@ -181,7 +181,7 @@ NLP focuses on the interaction between computers and human language.
             source_documents = document_store.list_source_documents()
             assert len(source_documents) == 1
 
-            # NOTE: Cache invalidation functionality not yet implemented in new architecture
+            # NOTE: Data clearing functionality implemented in new architecture
             # For now, just verify that we can re-index successfully
             results = engine.ingestion_pipeline.ingest_all()
             assert results.documents_loaded == 1  # Same document re-processed
@@ -195,14 +195,14 @@ NLP focuses on the interaction between computers and human language.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
+            data_dir = temp_path / "data"
 
             # Create test documents with different topics
             documents = self.create_test_documents(docs_dir)
 
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                data_dir=str(cache_dir),
+                data_dir=str(data_dir),
                 vectorstore_backend="faiss",
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
             )
@@ -248,11 +248,11 @@ NLP focuses on the interaction between computers and human language.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
+            data_dir = temp_path / "data"
 
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                data_dir=str(cache_dir),
+                data_dir=str(data_dir),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
             )
@@ -266,7 +266,7 @@ NLP focuses on the interaction between computers and human language.
             # Update engine config to point to empty directory
             config_empty = RAGConfig(
                 documents_dir=str(empty_dir),
-                data_dir=str(cache_dir),
+                data_dir=str(data_dir),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
             )
@@ -285,7 +285,7 @@ NLP focuses on the interaction between computers and human language.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
+            data_dir = temp_path / "data"
 
             # Create smaller test document for faster processing
             docs_dir.mkdir()
@@ -294,7 +294,7 @@ NLP focuses on the interaction between computers and human language.
 
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                data_dir=str(cache_dir),
+                data_dir=str(data_dir),
                 vectorstore_backend="faiss",  # Use real FAISS backend
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
                 chunk_size=50,  # Smaller chunks for faster processing

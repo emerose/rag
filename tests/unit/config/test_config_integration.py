@@ -124,7 +124,7 @@ class TestConfigIntegrationWithComponents:
         assert config.embedding.batch_size == 64  # Efficient batch size
         assert config.embedding.max_retries == 3  # Reasonable retry count
 
-        # Cache defaults
+        # Data defaults
         assert config.data.enabled is True  # Caching should be on by default
         assert config.data.ttl_hours == 24 * 7  # 1 week is reasonable
 

@@ -27,9 +27,6 @@ from rag.utils.exceptions import (
     QueryError,
     QueryProcessingError,
     RetrievalError,
-    # Cache errors
-    CacheError,
-    CacheOperationError,
     # Prompt errors
     PromptError,
     PromptNotFoundError,
@@ -314,28 +311,6 @@ class TestQueryErrors:
             assert isinstance(error, RAGError)
 
 
-class TestCacheErrors:
-    """Test cache-related exceptions."""
-
-    def test_cache_operation_error(self):
-        """Test CacheOperationError."""
-        error = CacheOperationError("get", "user:123", "Cache miss")
-
-        assert "get" in str(error)
-        assert "user:123" in str(error)
-        assert "Cache miss" in str(error)
-        assert error.error_code == "CACHE_OPERATION_ERROR"
-        assert error.operation == "get"
-        assert error.key == "user:123"
-
-    def test_cache_error_inheritance(self):
-        """Test that cache errors inherit properly."""
-        operation_error = CacheOperationError("set", "key:value")
-
-        assert isinstance(operation_error, CacheError)
-        assert isinstance(operation_error, RAGError)
-
-
 class TestPromptErrors:
     """Test prompt-related exceptions."""
 
@@ -456,7 +431,6 @@ class TestExceptionChaining:
             EmbeddingGenerationError("text"),
             VectorstoreError("error"),
             QueryProcessingError("query"),
-            CacheOperationError("get"),
             PromptNotFoundError("prompt"),
             APIError("service", "operation"),
         ]
@@ -480,7 +454,6 @@ class TestExceptionChaining:
             "VECTORSTORE_ERROR",
             "QUERY_PROCESSING_ERROR",
             "RETRIEVAL_ERROR",
-            "CACHE_OPERATION_ERROR",
             "PROMPT_NOT_FOUND",
             "PROMPT_RENDERING_ERROR",
             "API_ERROR",

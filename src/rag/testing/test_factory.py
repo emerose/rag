@@ -48,7 +48,7 @@ class FakeComponentOptions:
     # File system options
     initial_files: dict[str, str] | None = None
 
-    # Cache repository options
+    # Document store options
     initial_metadata: dict[str, dict[str, Any]] | None = None
 
     # Vector repository options
@@ -117,7 +117,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             temperature=0.0,
             chunk_size=500,
             chunk_overlap=50,
-            data_dir="/tmp/test_cache",
+            data_dir="/tmp/test_data",
             vectorstore_backend="faiss",
         )
 
@@ -140,11 +140,11 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 filesystem.add_file(path, content)
 
         # Create fake document store with initial metadata if provided
-        cache_repo = FakeDocumentStore()
+        document_store = FakeDocumentStore()
         if self.test_options.initial_metadata:
             # Directly populate the internal storage for testing
             for file_path, metadata in self.test_options.initial_metadata.items():
-                cache_repo.set_metadata_dict(file_path, metadata)
+                document_store.set_metadata_dict(file_path, metadata)
 
         # Create fake embedding service
         if self.test_options.use_deterministic_embeddings:
@@ -177,7 +177,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
         return ComponentOverrides(
             filesystem_manager=filesystem,
-            document_store=cache_repo,
+            document_store=document_store,
             vectorstore_factory=vectorstore_factory,
             embedding_service=embedding_service,
             document_loader=document_loader,
@@ -222,7 +222,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
     @classmethod
     def create_fake_index_manager(
         cls,
-        data_dir: str = "/fake/cache",
+        data_dir: str = "/fake/data",
         initial_metadata: dict[str, dict[str, Any]] | None = None,
     ) -> FakeDocumentStore:
         """Create a standalone FakeDocumentStore for testing.
@@ -272,7 +272,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         if config is None:
             config = RAGConfig(
                 documents_dir="/tmp/test_docs",
-                data_dir="/tmp/test_cache",
+                data_dir="/tmp/test_data",
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
             )
@@ -353,7 +353,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             ),
             data=DataConfig(
                 enabled=False,  # Disable data storage for tests to avoid side effects
-                data_dir="/tmp/test_cache",
+                data_dir="/tmp/test_data",
                 ttl_hours=1,  # Short TTL for tests
                 max_data_size_mb=10,  # Small data storage for tests
                 cleanup_on_startup=True,
@@ -453,7 +453,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             self.document_store.add_mock_file(resolved_path, content, fixed_mtime)
 
     def add_test_metadata(self, file_path: str, metadata: dict[str, Any]) -> None:
-        """Add test metadata to the fake cache repository.
+        """Add test metadata to the fake document store.
 
         Args:
             file_path: Path to the file
@@ -486,7 +486,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         }
 
     def get_test_metadata(self) -> dict[str, dict[str, Any]]:
-        """Get all metadata from the fake cache repository.
+        """Get all metadata from the fake document store.
 
         Returns:
             Dictionary mapping file paths to their metadata

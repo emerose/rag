@@ -246,7 +246,7 @@ class RAGEngine:
             vectorstore = vectorstore_factory.load_from_path(str(self.data_dir))
 
             if vectorstore:
-                logger.debug("Loaded vectorstore from cache")
+                logger.debug("Loaded vectorstore")
                 return vectorstore
             else:
                 logger.debug("No vectorstore found, will create when needed")

@@ -670,18 +670,18 @@ def clear(
 
         if all_data:
             if not typer.confirm(
-                "This will clear all caches. Continue?",
+                "This will clear all data. Continue?",
                 default=False,
             ):
-                write("Cache clearing cancelled")
+                write("Data clearing cancelled")
                 raise typer.Exit()
 
-            # Clear all caches
-            logger.info("Clearing all caches...")
+            # Clear all data
+            logger.info("Clearing all data...")
             rag_engine.clear_all_data()
             write(
                 {
-                    "message": "All caches cleared successfully",
+                    "message": "All data cleared successfully",
                     "summary": {
                         "total": 1,
                         "successful": 1,
@@ -690,11 +690,11 @@ def clear(
                 }
             )
         elif path.is_file():
-            logger.info(f"Clearing cache for: {path.name}")
+            logger.info(f"Clearing data for: {path.name}")
             rag_engine.clear_data(str(path))
             write(
                 {
-                    "message": f"Cache cleared for {path.name}",
+                    "message": f"Data cleared for {path.name}",
                     "summary": {
                         "total": 1,
                         "successful": 1,
@@ -758,7 +758,7 @@ def query(  # noqa: PLR0913
         # Use the provided data_dir if specified, otherwise use the global state
         data_directory = data_dir if data_dir is not None else state.data_dir
 
-        # Initialize RAG engine using RAGConfig with specified cache directory
+        # Initialize RAG engine using RAGConfig with specified data directory
         logger.debug("Initializing RAG engine...")
         config = RAGConfig(
             documents_dir=".",  # Not used for querying
@@ -853,7 +853,7 @@ def summarize(
     concise summaries of their content.
     """
     try:
-        # Initialize RAG engine using RAGConfig with default cache directory
+        # Initialize RAG engine using RAGConfig with default data directory
         logger.debug("Initializing RAG engine...")
         config = RAGConfig(
             documents_dir=".",  # Not used for summarization
@@ -1069,7 +1069,7 @@ def _initialize_rag_engine(runtime_options: RuntimeOptions | None = None) -> RAG
 
 
 def _load_vectorstore(rag_engine: RAGEngine) -> None:
-    """Load cached vectorstore into the RAG engine."""
+    """Load vectorstore into the RAG engine."""
     document_store = rag_engine.ingestion_pipeline.document_store
     source_documents = document_store.list_source_documents()
 

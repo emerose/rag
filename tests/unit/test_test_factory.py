@@ -42,7 +42,7 @@ class TestFakeRAGComponentsFactory:
             temperature=0.5,
             chunk_size=1000,
             chunk_overlap=100,
-            data_dir="/custom/cache",
+            data_dir="/custom/data",
             vectorstore_backend="qdrant",
         )
 
@@ -200,7 +200,7 @@ class TestFakeRAGComponentsFactory:
             document_store=SQLiteDocumentStore(Path("/tmp/test") / "test.db"),
         )
 
-        config = RAGConfig(documents_dir="/tmp/test", data_dir="/tmp/cache")
+        config = RAGConfig(documents_dir="/tmp/test", data_dir="/tmp/data")
         runtime = RuntimeOptions()
 
         # Create FakeRAGComponentsFactory with real component overrides
