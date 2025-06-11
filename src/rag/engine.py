@@ -280,10 +280,7 @@ class RAGEngine:
             vector_repo.remove_vectorstore(str(file_path))
 
             # Also invalidate document store for compatibility
-            if hasattr(self.document_store, "invalidate_data"):
-                self.document_store.invalidate_data(Path(file_path))
-            else:
-                self.document_store.remove_metadata(Path(file_path))
+            self.document_store.remove_metadata(Path(file_path))
         except Exception as e:
             logger.error(f"Error invalidating data for {file_path}: {e}")
 
