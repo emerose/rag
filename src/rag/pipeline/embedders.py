@@ -239,7 +239,7 @@ class CachedEmbedder:
         import hashlib
 
         content_hash = hashlib.sha256(document.page_content.encode()).hexdigest()
-        source = document.metadata.get("source", "unknown")
+        source: str = document.metadata.get("source", "unknown")  # type: ignore[misc]
         chunk_index = document.metadata.get("chunk_index", 0)
 
         return f"{source}:{chunk_index}:{content_hash[:16]}"
