@@ -10,7 +10,7 @@ from langchain_core.documents import Document
 
 from rag.sources.base import DocumentSourceProtocol, SourceDocument
 from rag.storage.document_store import DocumentStoreProtocol
-from rag.storage.protocols import VectorRepositoryProtocol
+from rag.storage.vector_store import VectorStoreFactory, VectorStoreProtocol
 
 
 class PipelineStage(Enum):
@@ -142,7 +142,7 @@ class IngestionPipeline:
         transformer: DocumentTransformer,
         document_store: DocumentStoreProtocol,
         embedder: Embedder,
-        vector_store: VectorRepositoryProtocol,
+        vector_store: VectorStoreFactory,
         **options: Any,
     ) -> None:
         """Initialize the ingestion pipeline.
@@ -152,10 +152,11 @@ class IngestionPipeline:
             transformer: Transformer for processing documents
             document_store: Store for processed documents
             embedder: Component for generating embeddings
-            vector_store: Repository for managing vectorstores
+            vector_store: Repository for managing vectorstores OR vectorstore factory
             **options: Configuration options:
                 - batch_size: Number of documents to process in each batch (default 100)
                 - progress_callback: Optional callback for progress updates
+                - workspace_path: Path for the workspace vectorstore
         """
         self.source = source
         self.transformer = transformer
@@ -164,6 +165,7 @@ class IngestionPipeline:
         self.vector_store = vector_store
         self.batch_size = options.get("batch_size", 100)
         self.progress_callback = options.get("progress_callback")
+        self.workspace_path = options.get("workspace_path")
 
     def _report_progress(
         self, stage: PipelineStage, current: int, total: int, message: str = ""
@@ -410,24 +412,34 @@ class IngestionPipeline:
         )
 
         try:
-            # Create a new vectorstore and add documents with embeddings
-            vectorstore = self.vector_store.create_empty_vectorstore()
+            # Load or create the workspace vectorstore
+            workspace_vectorstore = self._get_or_create_workspace_vectorstore()
 
-            # Add documents with pre-computed embeddings to the vectorstore
-            self.vector_store.add_documents_to_vectorstore(
-                vectorstore, all_documents, embeddings
-            )
+            # Add new documents to the workspace vectorstore
+            workspace_vectorstore.add_documents(all_documents)
 
-            # Save vectorstore to cache for QueryEngine to load later
-            # Use the document store to get source locations for caching
-            source_documents = self.document_store.list_source_documents()
-            for source_doc in source_documents:
-                source_location = source_doc.location
-                self.vector_store.save_vectorstore(source_location, vectorstore)
+            # Save the updated workspace vectorstore
+            self._save_workspace_vectorstore(workspace_vectorstore)
 
             result.vectors_stored = len(embeddings)
         except Exception as e:
             result.add_error(PipelineStage.STORING_VECTORS, e)
+
+    def _get_or_create_workspace_vectorstore(self) -> VectorStoreProtocol:
+        """Get or create the workspace vectorstore."""
+        if self.workspace_path:
+            # Try to load existing workspace vectorstore
+            existing = self.vector_store.load_from_path(self.workspace_path)
+            if existing is not None:
+                return existing
+
+        # Create new empty vectorstore
+        return self.vector_store.create_empty()
+
+    def _save_workspace_vectorstore(self, vectorstore: VectorStoreProtocol) -> None:
+        """Save the workspace vectorstore."""
+        if self.workspace_path:
+            vectorstore.save(self.workspace_path)
 
     def ingest_document(self, source_id: str) -> PipelineResult:
         """Ingest a single document.

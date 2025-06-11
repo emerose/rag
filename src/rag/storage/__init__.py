@@ -12,34 +12,36 @@ from .document_store import (
 from .fakes import (
     InMemoryCacheRepository,
     InMemoryFileSystem,
-    InMemoryVectorRepository,
-    InMemoryVectorStore,
 )
 from .filesystem import FilesystemManager
 from .index_manager import IndexManager
 from .protocols import (
     CacheRepositoryProtocol,
     FileSystemProtocol,
-    VectorRepositoryProtocol,
     VectorStoreProtocol,
 )
-from .vector_repository import VectorRepository
-from .vectorstore import VectorStoreManager
+from .vector_store import (
+    FAISSVectorStore,
+    FAISSVectorStoreFactory,
+    InMemoryVectorStore,
+    InMemoryVectorStoreFactory,
+    VectorStoreFactory,
+)
 
 __all__ = [
     "CacheRepositoryProtocol",
     "DocumentStoreProtocol",
+    "FAISSVectorStore",
+    "FAISSVectorStoreFactory",
     "FakeDocumentStore",
     "FileSystemProtocol",
     "FilesystemManager",
     "InMemoryCacheRepository",
     "InMemoryFileSystem",
-    "InMemoryVectorRepository",
     "InMemoryVectorStore",
+    "InMemoryVectorStoreFactory",
     "IndexManager",
     "SQLiteDocumentStore",
-    "VectorRepository",
-    "VectorRepositoryProtocol",
-    "VectorStoreManager",
+    "VectorStoreFactory",
     "VectorStoreProtocol",
 ]

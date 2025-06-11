@@ -178,25 +178,6 @@ class StorageConfig:
 
 
 @dataclass(frozen=True)
-class VectorStoreManagerConfig:
-    """Configuration for VectorStoreManager.
-
-    This class contains all parameters related to vector store management.
-
-    Attributes:
-        cache_dir: Directory for storing vector store cache files
-        lock_timeout: Timeout in seconds for file locks
-        backend: Backend name ("faiss", "fake", etc.)
-        backend_config: Backend-specific configuration options
-    """
-
-    cache_dir: str = ".cache"
-    lock_timeout: int = 30
-    backend: str = "faiss"
-    backend_config: dict[str, Any] | None = None
-
-
-@dataclass(frozen=True)
 class IndexingConfig:
     """Combined configuration for indexing operations.
 

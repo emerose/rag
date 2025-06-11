@@ -99,11 +99,10 @@ class RAGMCPServer(FastMCP):
         return self.engine.answer(question, k=top_k)
 
     async def tool_search(self, query: str, top_k: int = 4) -> list[dict[str, Any]]:
-        vectorstores = list(self.engine.vectorstores.values())
-        if not vectorstores:
+        vectorstore = self.engine.vectorstore
+        if not vectorstore:
             return []
-        merged = self.engine.vectorstore_manager.merge_vectorstores(vectorstores)
-        docs = self.engine.vectorstore_manager.similarity_search(merged, query, k=top_k)
+        docs = vectorstore.similarity_search(query, k=top_k)
         return [doc.model_dump() for doc in docs]
 
     async def tool_index(self, path: str, ctx: Context[Any, Any]) -> dict[str, Any]:

@@ -150,16 +150,17 @@ def build_rag_chain(
     """
 
     # ---------------------------------------------------------------------
-    # Merge vectorstores and build retriever
+    # Get the single workspace vectorstore
     # ---------------------------------------------------------------------
-    if not engine.vectorstores:
-        raise VectorstoreError()
+    # Get the single workspace vectorstore
+    if hasattr(engine, "vectorstore") and engine.vectorstore:
+        workspace_vs: VectorStoreProtocol = engine.vectorstore
+    else:
+        raise VectorstoreError("No vectorstore available")
 
-    merged_vs: VectorStoreProtocol = engine.vectorstore_manager.merge_vectorstores(  # type: ignore[arg-type]
-        list(engine.vectorstores.values())
+    retriever = workspace_vs.as_retriever(
+        search_type="similarity", search_kwargs={"k": k}
     )
-
-    retriever = merged_vs.as_retriever(search_type="similarity", search_kwargs={"k": k})
 
     # ---------------------------------------------------------------------
     # Get prompt template from registry
@@ -183,9 +184,9 @@ def build_rag_chain(
         # Debug: Log retrieval details
         logger.debug(f"Retrieving for query: '{clean_query}' (original: '{question}')")
         logger.debug(f"Search k: {search_k}, filters: {mfilters}")
-        logger.debug(f"Merged vectorstore type: {type(merged_vs)}")
+        logger.debug(f"Workspace vectorstore type: {type(workspace_vs)}")
 
-        docs: list[Document] = merged_vs.similarity_search(clean_query, k=search_k)
+        docs: list[Document] = workspace_vs.similarity_search(clean_query, k=search_k)
 
         if mfilters:
             docs = [d for d in docs if _doc_matches_filters(d, mfilters)]

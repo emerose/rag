@@ -25,13 +25,19 @@ class MockEngineFactory:
     
     def _create_default_mock(self):
         """Create a default mock engine."""
-        doc = Document(page_content="Hello", metadata={"source": "doc.txt"})
+        # We need to create the document metadata with the actual path that will be passed
+        # The mock will be called with the full path, so we need to handle this dynamically
         vectorstore = MagicMock()
-        vectorstore.docstore = InMemoryDocstore({"0": doc})
+        
+        def mock_similarity_search(query, k=None):
+            # Return documents that match any reasonable path ending in doc.txt
+            doc = Document(page_content="Hello", metadata={"source": "doc.txt"})  
+            return [doc]
+        
+        vectorstore.similarity_search = mock_similarity_search
         
         engine_instance = MagicMock()
-        engine_instance.load_cached_vectorstore.return_value = vectorstore
-        engine_instance.vectorstore_manager._get_docstore_items.return_value = [("0", doc)]
+        engine_instance.vectorstore = vectorstore
         return engine_instance
 
 
@@ -39,7 +45,10 @@ class MockEngineFactory:
 def mock_engine_factory(engine_mock=None):
     """Context manager for temporarily setting a mock engine factory."""
     def factory_provider(config, runtime_options):
-        return MockEngineFactory(config, runtime_options, engine_mock)
+        factory = MockEngineFactory(config, runtime_options, engine_mock)
+        # Store the config so we can access the path in our mock
+        factory._config = config
+        return factory
     
     original_provider = set_engine_factory_provider(factory_provider)
     try:
@@ -54,12 +63,20 @@ def test_chunks_command_json(tmp_path: Path) -> None:
     file_path = tmp_path / "doc.txt"
     file_path.write_text("dummy")
 
-    with mock_engine_factory():
+    # Create a mock engine that returns a document with the correct source path
+    doc = Document(page_content="Hello", metadata={"source": str(file_path)})
+    vectorstore = MagicMock()
+    vectorstore.similarity_search.return_value = [doc]
+    
+    engine_mock = MagicMock()
+    engine_mock.vectorstore = vectorstore
+
+    with mock_engine_factory(engine_mock):
         result = runner.invoke(app, ["chunks", str(file_path), "--json"])
         
     assert result.exit_code == 0
     data = json.loads(result.stdout)
-    assert data == {"chunks": [{"index": 0, "text": "Hello", "metadata": {"source": "doc.txt"}}]}
+    assert data == {"chunks": [{"index": 0, "text": "Hello", "metadata": {"source": str(file_path)}}]}
 
 
 def test_chunks_no_vectorstore(tmp_path: Path) -> None:
@@ -69,7 +86,7 @@ def test_chunks_no_vectorstore(tmp_path: Path) -> None:
 
     # Create mock engine with no vectorstore
     engine_mock = MagicMock()
-    engine_mock.load_cached_vectorstore.return_value = None
+    engine_mock.vectorstore = None
 
     with mock_engine_factory(engine_mock):
         result = runner.invoke(app, ["chunks", str(file_path), "--json"])

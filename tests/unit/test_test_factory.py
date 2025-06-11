@@ -10,7 +10,6 @@ from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingSer
 from rag.storage.fakes import (
     InMemoryCacheRepository,
     InMemoryFileSystem,
-    InMemoryVectorRepository,
 )
 from rag.storage.fake_index_manager import FakeIndexManager
 from rag.testing import FakeRAGComponentsFactory
@@ -27,7 +26,8 @@ class TestFakeRAGComponentsFactory:
         # Check that all components are fake implementations
         assert isinstance(factory.filesystem_manager, InMemoryFileSystem)
         assert isinstance(factory.cache_repository, (InMemoryCacheRepository, FakeIndexManager))
-        assert isinstance(factory.vector_repository, InMemoryVectorRepository)
+        from rag.storage.vector_store import InMemoryVectorStoreFactory
+        assert isinstance(factory.vectorstore_factory, InMemoryVectorStoreFactory)
         assert isinstance(
             factory.embedding_service,
             (FakeEmbeddingService, DeterministicEmbeddingService),
@@ -180,7 +180,7 @@ class TestFakeRAGComponentsFactory:
         assert engine is not None
         assert hasattr(engine, 'ingestion_pipeline')
         assert isinstance(engine.index_manager, (InMemoryCacheRepository, FakeIndexManager))
-        assert isinstance(engine.vectorstore_manager, InMemoryVectorRepository)
+        # Note: vectorstore_manager was removed in the new architecture
 
         # Check that the engine has the right configuration
         assert engine.config.documents_dir == "/tmp/test_docs"

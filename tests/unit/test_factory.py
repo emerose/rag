@@ -10,7 +10,6 @@ from rag.factory import RAGComponentsFactory, ComponentOverrides
 from rag.storage.fakes import (
     InMemoryCacheRepository,
     InMemoryFileSystem,
-    InMemoryVectorRepository,
 )
 from rag.embeddings.fakes import FakeEmbeddingService
 from langchain_core.language_models import FakeListChatModel
@@ -35,20 +34,15 @@ def test_factory_creates_real_components(temp_dir: Path) -> None:
     # Test that properties create real implementations (except embeddings)
     assert factory.filesystem_manager is not None
     assert factory.cache_repository is not None
-    assert factory.vector_repository is not None
+    assert factory.vectorstore_factory is not None
     assert isinstance(factory.embedding_service, FakeEmbeddingService)
     assert factory.chat_model is not None
     assert factory.document_loader is not None
     assert factory.ingestion_pipeline is not None
-    assert factory.cache_manager is not None
     
     # Test component creation
-    
     query_engine = factory.create_query_engine()
     assert query_engine is not None
-    
-    cache_orchestrator = factory.create_cache_orchestrator()
-    assert cache_orchestrator is not None
 
 
 def test_factory_uses_injected_dependencies(temp_dir: Path) -> None:
@@ -59,12 +53,16 @@ def test_factory_uses_injected_dependencies(temp_dir: Path) -> None:
     # Create fake implementations
     fake_filesystem = InMemoryFileSystem()
     fake_cache = InMemoryCacheRepository()
-    fake_vector_repo = InMemoryVectorRepository()
+    fake_embedding_service = FakeEmbeddingService()
+    
+    from rag.storage.vector_store import InMemoryVectorStoreFactory
+    fake_vectorstore_factory = InMemoryVectorStoreFactory(fake_embedding_service)
     
     overrides = ComponentOverrides(
         filesystem_manager=fake_filesystem,
         cache_repository=fake_cache,
-        vector_repository=fake_vector_repo,
+        vectorstore_factory=fake_vectorstore_factory,
+        embedding_service=fake_embedding_service,
     )
     
     factory = RAGComponentsFactory(config, runtime, overrides)
@@ -72,7 +70,8 @@ def test_factory_uses_injected_dependencies(temp_dir: Path) -> None:
     # Test that injected dependencies are used
     assert factory.filesystem_manager is fake_filesystem
     assert factory.cache_repository is fake_cache
-    assert factory.vector_repository is fake_vector_repo
+    assert factory.vectorstore_factory is fake_vectorstore_factory
+    assert factory.embedding_service is fake_embedding_service
 
 
 def test_factory_singleton_behavior(temp_dir: Path) -> None:
@@ -99,10 +98,6 @@ def test_factory_singleton_behavior(temp_dir: Path) -> None:
     pipeline1 = factory.ingestion_pipeline
     pipeline2 = factory.ingestion_pipeline
     assert pipeline1 is pipeline2
-    
-    orchestrator1 = factory.create_cache_orchestrator()
-    orchestrator2 = factory.create_cache_orchestrator()
-    assert orchestrator1 is orchestrator2
 
 
 def test_factory_create_all_components(temp_dir: Path) -> None:
@@ -126,15 +121,13 @@ def test_factory_create_all_components(temp_dir: Path) -> None:
     expected_keys = {
         "filesystem_manager",
         "cache_repository", 
-        "vector_repository",
+        "vectorstore_factory",
         "embedding_service",
         "chat_model",
         "document_loader",
         "ingestion_pipeline", 
-        "cache_manager",
         "reranker",
         "query_engine",
-        "cache_orchestrator",
     }
     
     assert set(components.keys()) == expected_keys
@@ -166,14 +159,11 @@ def test_factory_creates_rag_engine(temp_dir: Path) -> None:
     # Verify key attributes are set
     assert engine.config == config
     assert engine.runtime == runtime
-    assert hasattr(engine, "vectorstores")
+    assert hasattr(engine, "vectorstore")  # Single vectorstore property
     assert hasattr(engine, "index_directory")
     assert hasattr(engine, "answer")
     
     # Verify components are accessible through proper interfaces
     assert engine.index_manager is not None
-    assert engine.cache_manager is not None
-    assert engine.vectorstore_manager is not None
-    assert engine.query_engine is not None
-    assert engine.cache_orchestrator is not None
     assert engine.ingestion_pipeline is not None
+    assert hasattr(engine, "vectorstore")  # Property exists, but may be None if no documents
