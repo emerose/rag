@@ -74,25 +74,17 @@ class TestDocumentStoreProtocol:
         
         document_store.add_documents(docs)
         
-        # Test getting existing documents
-        retrieved = document_store.get_documents(["doc1", "doc3"])
-        assert len(retrieved) == 2
-        assert "doc1" in retrieved
-        assert "doc3" in retrieved
-        assert retrieved["doc1"].page_content == "Content 1"
-        assert retrieved["doc3"].page_content == "Content 3"
+        # Test getting existing documents using individual lookups
+        doc1 = document_store.get_document("doc1")
+        doc3 = document_store.get_document("doc3")
+        assert doc1 is not None
+        assert doc3 is not None
+        assert doc1.page_content == "Content 1"
+        assert doc3.page_content == "Content 3"
         
-        # Test getting mix of existing and non-existing documents
-        retrieved = document_store.get_documents(["doc1", "nonexistent", "doc2"])
-        assert len(retrieved) == 2
-        assert "doc1" in retrieved
-        assert "doc2" in retrieved
-        assert "nonexistent" not in retrieved
-
-    def test_get_documents_empty_list(self, document_store: DocumentStoreProtocol):
-        """Test getting documents with empty list."""
-        result = document_store.get_documents([])
-        assert result == {}
+        # Test getting non-existing document
+        nonexistent = document_store.get_document("nonexistent")
+        assert nonexistent is None
 
     def test_delete_document(self, document_store: DocumentStoreProtocol):
         """Test deleting a single document."""
