@@ -70,7 +70,7 @@ def test_repl_session(tmp_path: Path) -> None:
         patch("rag.cli.cli._initialize_rag_engine", return_value=engine),
         patch("rag.cli.cli._load_vectorstore"),
     ):
-        result = runner.invoke(app, ["repl", "--cache-dir", str(tmp_path)])
+        result = runner.invoke(app, ["repl", "--data-dir", str(tmp_path)])
     assert result.exit_code == 0
     assert "Set k to 2" in result.stdout
     assert "ok" in result.stdout
@@ -92,7 +92,7 @@ def test_json_output_piping(tmp_path: Path) -> None:
     # Create test configuration
     test_config = RAGConfig(
         documents_dir=str(docs_dir),
-        cache_dir=str(tmp_path),
+        data_dir=str(tmp_path),
         vectorstore_backend="fake",
         openai_api_key="sk-test",
         chunk_size=100,
@@ -116,12 +116,12 @@ def test_json_output_piping(tmp_path: Path) -> None:
         ))
         
         result_index = runner.invoke(
-            app, ["index", str(file_path), "--cache-dir", str(tmp_path)]
+            app, ["index", str(file_path), "--data-dir", str(tmp_path)]
         )
         assert result_index.exit_code == 0
         result_query = runner.invoke(
             app,
-            ["query", "hello", "--cache-dir", str(tmp_path)],
+            ["query", "hello", "--data-dir", str(tmp_path)],
         )
     finally:
         # Restore the original factory

@@ -68,8 +68,8 @@ Use the CLI to index documents and ask questions.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
-            cache_dir.mkdir()
+            data_dir = temp_path / "data"
+            data_dir.mkdir()
             
             # Create test documents
             documents = self.create_test_documents(docs_dir)
@@ -78,7 +78,7 @@ Use the CLI to index documents and ask questions.
             result = subprocess.run([
                 "python", "-m", "rag",
                 "--vectorstore-backend", "faiss",
-                "--cache-dir", str(cache_dir),
+                "--data-dir", str(data_dir),
                 "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
@@ -86,9 +86,9 @@ Use the CLI to index documents and ask questions.
             assert result.returncode == 0, f"Index command failed: {result.stderr}"
             
             # Verify cache files were created
-            cache_files = list(cache_dir.glob("**/*"))
-            cache_files = [f for f in cache_files if f.is_file()]
-            assert len(cache_files) > 0, "No cache files were created"
+            data_files = list(data_dir.glob("**/*"))
+            data_files = [f for f in data_files if f.is_file()]
+            assert len(data_files) > 0, "No data files were created"
 
     @pytest.mark.timeout(60)  # E2E test with real OpenAI API calls
     def test_cli_list_command_workflow(self):
@@ -96,8 +96,8 @@ Use the CLI to index documents and ask questions.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
-            cache_dir.mkdir()
+            data_dir = temp_path / "data"
+            data_dir.mkdir()
             
             # Create test documents
             documents = self.create_test_documents(docs_dir)
@@ -106,7 +106,7 @@ Use the CLI to index documents and ask questions.
             index_result = subprocess.run([
                 "python", "-m", "rag",
                 "--vectorstore-backend", "faiss",
-                "--cache-dir", str(cache_dir),
+                "--data-dir", str(data_dir),
                 "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
@@ -115,7 +115,7 @@ Use the CLI to index documents and ask questions.
             # Then list indexed documents
             list_result = subprocess.run([
                 "python", "-m", "rag",
-                "--cache-dir", str(cache_dir),
+                "--data-dir", str(data_dir),
                 "list", "--json"
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
@@ -147,8 +147,8 @@ Use the CLI to index documents and ask questions.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
-            cache_dir.mkdir()
+            data_dir = temp_path / "data"
+            data_dir.mkdir()
             
             # Create test documents
             documents = self.create_test_documents(docs_dir)
@@ -157,7 +157,7 @@ Use the CLI to index documents and ask questions.
             index_result = subprocess.run([
                 "python", "-m", "rag",
                 "--vectorstore-backend", "faiss",
-                "--cache-dir", str(cache_dir),
+                "--data-dir", str(data_dir),
                 "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
@@ -166,7 +166,7 @@ Use the CLI to index documents and ask questions.
             # Then ask a question
             answer_result = subprocess.run([
                 "python", "-m", "rag",
-                "--cache-dir", str(cache_dir),
+                "--data-dir", str(data_dir),
                 "query", "What is important for software?",
                 "--json"
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
@@ -193,8 +193,8 @@ Use the CLI to index documents and ask questions.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
-            cache_dir.mkdir()
+            data_dir = temp_path / "data"
+            data_dir.mkdir()
             
             # Create test document
             documents = self.create_test_documents(docs_dir)
@@ -203,7 +203,7 @@ Use the CLI to index documents and ask questions.
             index_result = subprocess.run([
                 "python", "-m", "rag",
                 "--vectorstore-backend", "faiss",
-                "--cache-dir", str(cache_dir),
+                "--data-dir", str(data_dir),
                 "index", str(docs_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
@@ -212,7 +212,7 @@ Use the CLI to index documents and ask questions.
             # Verify documents are indexed
             list_result = subprocess.run([
                 "python", "-m", "rag",
-                "--cache-dir", str(cache_dir),
+                "--data-dir", str(data_dir),
                 "list", "--json"
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
@@ -228,7 +228,7 @@ Use the CLI to index documents and ask questions.
             # Invalidate the stored file
             invalidate_result = subprocess.run([
                 "python", "-m", "rag",
-                "--cache-dir", str(cache_dir),
+                "--data-dir", str(data_dir),
                 "invalidate", stored_file_path
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
@@ -237,7 +237,7 @@ Use the CLI to index documents and ask questions.
             # Verify file was removed from index
             list_result2 = subprocess.run([
                 "python", "-m", "rag",
-                "--cache-dir", str(cache_dir),
+                "--data-dir", str(data_dir),
                 "list", "--json"
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
@@ -255,15 +255,15 @@ Use the CLI to index documents and ask questions.
         """Test CLI error handling in real scenarios using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
-            cache_dir = temp_path / "cache"
-            cache_dir.mkdir()
+            data_dir = temp_path / "data"
+            data_dir.mkdir()
             
             # Test indexing non-existent directory
             non_existent_dir = temp_path / "missing"
             result = subprocess.run([
                 "python", "-m", "rag",
                 "--vectorstore-backend", "faiss",
-                "--cache-dir", str(cache_dir),
+                "--data-dir", str(data_dir),
                 "index", str(non_existent_dir)
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")
             
@@ -274,7 +274,7 @@ Use the CLI to index documents and ask questions.
             # Test querying with empty cache
             answer_result = subprocess.run([
                 "python", "-m", "rag",
-                "--cache-dir", str(cache_dir),
+                "--data-dir", str(data_dir),
                 "query", "What is testing?",
                 "--json"
             ], capture_output=True, text=True, cwd="/Users/sq/Development/rag")

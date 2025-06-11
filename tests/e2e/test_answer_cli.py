@@ -92,7 +92,7 @@ def test_cli_error_handling(test_environment):
             [
                 "python", "-m", "rag", "query",
                 "What is RAG?",
-                "--cache-dir", test_environment["cache_dir"],
+                "--data-dir", test_environment["cache_dir"],
             ],
             check=False,
             capture_output=True,
@@ -104,7 +104,7 @@ def test_cli_error_handling(test_environment):
         assert answer_result.returncode != 0
         # Check both stdout and stderr since error could appear in either
         output_text = answer_result.stdout + answer_result.stderr
-        assert "No indexed documents found in cache" in output_text
+        assert "No indexed documents found in data store" in output_text
         
         print("CLI error handling test passed!")
         

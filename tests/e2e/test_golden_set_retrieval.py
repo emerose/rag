@@ -26,7 +26,7 @@ def test_golden_set_retrieval_e2e(tmp_path: Path) -> None:
     This test uses real OpenAI API calls to properly evaluate retrieval quality.
     It should only be run manually when needed, not in CI.
     """
-    cache_dir = tmp_path / "cache"
+    data_dir = tmp_path / "data"
     docs_dir = tmp_path / "docs"
     docs_dir.mkdir()
     
@@ -38,7 +38,7 @@ def test_golden_set_retrieval_e2e(tmp_path: Path) -> None:
     # Use real configuration for proper E2E testing
     config = RAGConfig(
         documents_dir=str(docs_dir), 
-        cache_dir=str(cache_dir),
+        data_dir=str(data_dir),
         # Note: This test requires a real OpenAI API key in environment
         # openai_api_key should be set via environment variable
     )
@@ -94,7 +94,7 @@ def test_golden_set_retrieval_e2e(tmp_path: Path) -> None:
     answer_rate = contains_answer / total
 
     # Clean up
-    shutil.rmtree(cache_dir)
+    shutil.rmtree(data_dir)
 
     # For E2E testing, we expect high accuracy with real retrieval
     assert hit_rate >= 0.8, f"Hit rate too low: {hit_rate}"

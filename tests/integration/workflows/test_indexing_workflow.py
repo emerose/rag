@@ -18,13 +18,13 @@ class TestIndexingWorkflow:
     def create_test_config(self, tmp_path: Path) -> RAGConfig:
         """Create test configuration with temp directories."""
         docs_dir = tmp_path / "docs"
-        cache_dir = tmp_path / "cache"
+        data_dir = tmp_path / "data"
         docs_dir.mkdir()
-        cache_dir.mkdir()
+        data_dir.mkdir()
         
         return RAGConfig(
             documents_dir=str(docs_dir),
-            cache_dir=str(cache_dir),
+            data_dir=str(data_dir),
             vectorstore_backend="fake",
             openai_api_key="sk-test"
         )
@@ -63,10 +63,10 @@ class TestIndexingWorkflow:
         assert success is True
         assert "Successfully indexed" in message
         
-        # Verify persistence - check cache files exist
-        cache_files = list(Path(config.cache_dir).glob("**/*"))
-        cache_files = [f for f in cache_files if f.is_file()]
-        assert len(cache_files) > 0
+        # Verify persistence - check data files exist
+        data_files = list(Path(config.data_dir).glob("**/*"))
+        data_files = [f for f in data_files if f.is_file()]
+        assert len(data_files) > 0
         
         # Verify document appears in index via DocumentStore
         document_store = engine.ingestion_pipeline.document_store

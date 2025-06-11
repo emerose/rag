@@ -40,8 +40,8 @@ class TestRAGWorkflow:
         return CliRunner()
 
     @pytest.fixture
-    def test_cache_dir(self):
-        """Create a temporary directory for caching."""
+    def test_data_dir(self):
+        """Create a temporary directory for data storage."""
         temp_dir = tempfile.mkdtemp(prefix="rag_integration_test_")
         yield temp_dir
         # Clean up after test completes
@@ -52,18 +52,18 @@ class TestRAGWorkflow:
         """Return the path to the sample file."""
         return Path(__file__).parent / "sample.txt"
         
-    def run_rag_command(self, runner, cmd_args, temp_cache_dir):
+    def run_rag_command(self, runner, cmd_args, temp_data_dir):
         """Run a RAG command with the given arguments using the CliRunner."""
-        # Patch the cache_dir in state
-        original_cache_dir = state.cache_dir
+        # Patch the data_dir in state
+        original_data_dir = state.data_dir
         try:
-            # Set the cache directory for this test
-            state.cache_dir = temp_cache_dir
+            # Set the data directory for this test
+            state.data_dir = temp_data_dir
             
-            # Always add --cache-dir explicitly to each command
+            # Always add --data-dir explicitly to each command
             if cmd_args and cmd_args[0] in ["index", "query", "list", "invalidate"]:
-                if "--cache-dir" not in " ".join(cmd_args):
-                    cmd_args = cmd_args + ["--cache-dir", temp_cache_dir]
+                if "--data-dir" not in " ".join(cmd_args):
+                    cmd_args = cmd_args + ["--data-dir", temp_data_dir]
             
             # Run the command 
             print(f"Running command: {' '.join(str(arg) for arg in cmd_args)}")
@@ -75,32 +75,32 @@ class TestRAGWorkflow:
             
             return result
         finally:
-            # Restore the original cache directory
-            state.cache_dir = original_cache_dir
+            # Restore the original data directory
+            state.data_dir = original_data_dir
 
     @pytest.mark.timeout(30)  # CLI option consistency test with subprocess calls
-    def test_cli_option_consistency(self, runner, test_cache_dir):
-        """Test that all major commands support the --cache-dir option."""
+    def test_cli_option_consistency(self, runner, test_data_dir):
+        """Test that all major commands support the --data-dir option."""
         commands = [
-            ["list", "--cache-dir", test_cache_dir],
-            ["index", "/nonexistent/path", "--cache-dir", test_cache_dir],
-            ["query", "test query", "--cache-dir", test_cache_dir],
-            ["invalidate", "--all", "--cache-dir", test_cache_dir]
+            ["list", "--data-dir", test_data_dir],
+            ["index", "/nonexistent/path", "--data-dir", test_data_dir],
+            ["query", "test query", "--data-dir", test_data_dir],
+            ["invalidate", "--all", "--data-dir", test_data_dir]
         ]
         
         for cmd in commands:
             result = runner.invoke(app, cmd)
             # We expect some commands to fail due to missing files or other reasons
-            # But they should not fail specifically due to the --cache-dir option not being recognized
-            assert "No such option: --cache-dir" not in result.stdout, (
-                f"Command '{cmd[0]}' does not support --cache-dir option.\n"
+            # But they should not fail specifically due to the --data-dir option not being recognized
+            assert "No such option: --data-dir" not in result.stdout, (
+                f"Command '{cmd[0]}' does not support --data-dir option.\n"
                 f"Error: {result.stdout}"
             )
-            print(f"Command '{cmd[0]}' handles --cache-dir option correctly")
+            print(f"Command '{cmd[0]}' handles --data-dir option correctly")
         
-        print("\nAll commands handle cache-dir option consistently")
+        print("\nAll commands handle data-dir option consistently")
         
-    def test_rag_workflow(self, runner, test_cache_dir, sample_file_path):
+    def test_rag_workflow(self, runner, test_data_dir, sample_file_path):
         """Test the end-to-end RAG workflow with mocked components.
         
         This test verifies that the CLI commands work together correctly, by:
@@ -124,28 +124,28 @@ class TestRAGWorkflow:
             ))
             
             # Print some debug information about the test environment
-            print(f"\nRunning workflow test with cache dir: {test_cache_dir}")
+            print(f"\nRunning workflow test with data dir: {test_data_dir}")
             print(f"Sample file: {sample_file_path}")
             
-            # Step 1: Invalidate all caches
-            print(f"Invalidating caches in {test_cache_dir}")
-            result = self.run_rag_command(runner, ["invalidate", "--all"], test_cache_dir)
-            assert result.exit_code == 0, f"Failed to invalidate caches: {result.stdout}"
+            # Step 1: Invalidate all data
+            print(f"Invalidating data in {test_data_dir}")
+            result = self.run_rag_command(runner, ["invalidate", "--all"], test_data_dir)
+            assert result.exit_code == 0, f"Failed to invalidate data: {result.stdout}"
 
-            # Step 2: Verify the cache directory exists
-            cache_dir = Path(test_cache_dir)
-            assert cache_dir.exists(), f"Cache directory does not exist: {cache_dir}"
-            print(f"Cache directory verified: {cache_dir}")
+            # Step 2: Verify the data directory exists
+            data_dir = Path(test_data_dir)
+            assert data_dir.exists(), f"Data directory does not exist: {data_dir}"
+            print(f"Data directory verified: {data_dir}")
             
             # Create the necessary directory structure
-            metadata_dir = cache_dir / "metadata"
+            metadata_dir = data_dir / "metadata"
             metadata_dir.mkdir(exist_ok=True)
             db_file = metadata_dir / "index_metadata.db"
             db_file.touch()  # Create an empty file
             
-            # Step 3: Run 'list' to verify the cache is empty
-            print("Checking if the cache is empty")
-            result = self.run_rag_command(runner, ["list"], test_cache_dir)
+            # Step 3: Run 'list' to verify the data store is empty
+            print("Checking if the data store is empty")
+            result = self.run_rag_command(runner, ["list"], test_data_dir)
             assert result.exit_code == 0, f"Failed to list files: {result.stdout}"
             
             # Step 4: Index the sample file - use a smaller chunk size for faster processing
@@ -168,50 +168,41 @@ class TestRAGWorkflow:
                         "--chunk-size", "100",  # Smaller chunks for faster processing
                         "--chunk-overlap", "10",
                     ], 
-                    test_cache_dir
+                    test_data_dir
                 )
                 assert result.exit_code == 0, f"Failed to index sample file: {result.stdout}"
             
-            # Verify files were created in the cache directory
-            files_created = list(cache_dir.glob("**/*"))
-            print(f"Files in cache: {[str(f.relative_to(cache_dir)) for f in files_created]}")
-            assert len(files_created) > 1, "No files were created in the cache directory"
+            # Verify files were created in the data directory
+            files_created = list(data_dir.glob("**/*"))
+            print(f"Files in data dir: {[str(f.relative_to(data_dir)) for f in files_created]}")
+            assert len(files_created) > 1, "No files were created in the data directory"
             
             # Step 5: Run 'list' to verify the file is indexed
-            # Need to mock the index manager since we're not actually writing a proper DB
-            with patch('rag.storage.index_manager.IndexManager.list_indexed_files') as mock_list_files:
-                mock_list_files.return_value = [{
-                    'file_path': str(sample_file_path),
-                    'file_type': 'text/plain',
-                    'last_indexed': '2023-01-01',
-                    'chunk_size': 100,
-                    'num_chunks': 3
-                }]
-                
-                print("Checking if the file is indexed")
-                result = self.run_rag_command(runner, ["list"], test_cache_dir)
-                assert result.exit_code == 0, f"Failed to list indexed files: {result.stdout}"
-                assert "text/plain" in result.stdout, "File didn't appear in listing"
+            print("Checking if the file is indexed")
+            result = self.run_rag_command(runner, ["list"], test_data_dir)
+            assert result.exit_code == 0, f"Failed to list indexed files: {result.stdout}"
+            # With fake components, the file should appear in the document store
+            assert "sample.txt" in result.stdout, "File didn't appear in listing"
                      
-                # Step 6: Run 'query' to test information retrieval
-                print("Testing query functionality")
-                query = "What is the capital of Japan?"
-                
-                # Run the query - fake factory handles all OpenAI calls
-                result = self.run_rag_command(runner, ["query", query], test_cache_dir)
-                
-                # With fake vectorstores, we expect the query to fail gracefully without hitting OpenAI
-                # The key is that we get a proper error message instead of an authentication error
-                if result.exit_code != 0:
-                    # Verify this is the expected "no vectorstores" error, not an OpenAI API error
-                    assert "No valid vectorstores found" in result.stdout or "Please run 'rag index' first" in result.stdout, \
-                        f"Expected vectorstore error but got: {result.stdout}"
-                    print("Query failed as expected with fake vectorstore (no OpenAI API calls made)")
-                else:
-                    # If it succeeded, verify it contains a response (could be an error response)
-                    assert "answer" in result.stdout.lower() or "query" in result.stdout.lower(), \
-                        f"Query should return some answer but got: {result.stdout}"
-                    print("Query succeeded with response (may contain errors but avoided OpenAI API calls)")
+            # Step 6: Run 'query' to test information retrieval
+            print("Testing query functionality")
+            query = "What is the capital of Japan?"
+            
+            # Run the query - fake factory handles all OpenAI calls
+            result = self.run_rag_command(runner, ["query", query], test_data_dir)
+            
+            # With fake vectorstores, we expect the query to fail gracefully without hitting OpenAI
+            # The key is that we get a proper error message instead of an authentication error
+            if result.exit_code != 0:
+                # Verify this is the expected "no vectorstores" error, not an OpenAI API error
+                assert "No valid vectorstores found" in result.stdout or "Please run 'rag index' first" in result.stdout, \
+                    f"Expected vectorstore error but got: {result.stdout}"
+                print("Query failed as expected with fake vectorstore (no OpenAI API calls made)")
+            else:
+                # If it succeeded, verify it contains a response (could be an error response)
+                assert "answer" in result.stdout.lower() or "query" in result.stdout.lower(), \
+                    f"Query should return some answer but got: {result.stdout}"
+                print("Query succeeded with response (may contain errors but avoided OpenAI API calls)")
 
             print("\nIntegration test passed successfully!")
             

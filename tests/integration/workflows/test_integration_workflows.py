@@ -19,13 +19,13 @@ class TestIntegrationWorkflows:
     def create_test_config(self, tmp_path: Path) -> RAGConfig:
         """Create test configuration with temp directories."""
         docs_dir = tmp_path / "docs"
-        cache_dir = tmp_path / "cache"
+        data_dir = tmp_path / "data"
         docs_dir.mkdir()
-        cache_dir.mkdir()
+        data_dir.mkdir()
         
         return RAGConfig(
             documents_dir=str(docs_dir),
-            cache_dir=str(cache_dir),
+            data_dir=str(data_dir),
             vectorstore_backend="fake",
             embedding_model="text-embedding-3-small",
             openai_api_key="sk-test"
@@ -158,8 +158,8 @@ class TestIntegrationWorkflows:
         indexed_files = self.get_indexed_files(engine)
         assert len(indexed_files) == 1
 
-    def test_cache_persistence_workflow(self, tmp_path):
-        """Test cache persistence across engine restarts."""
+    def test_data_persistence_workflow(self, tmp_path):
+        """Test data persistence across engine restarts."""
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
@@ -179,10 +179,10 @@ class TestIntegrationWorkflows:
         success, _ = engine1.index_file(doc_path)
         assert success is True
         
-        # Verify cache files exist
-        cache_files = list(Path(config.cache_dir).glob("**/*"))
-        cache_files = [f for f in cache_files if f.is_file()]
-        assert len(cache_files) > 0
+        # Verify data files exist
+        data_files = list(Path(config.data_dir).glob("**/*"))
+        data_files = [f for f in data_files if f.is_file()]
+        assert len(data_files) > 0
         
         # Create new engine instance (simulating restart)
         factory2 = FakeRAGComponentsFactory.create_for_integration_tests(
@@ -287,8 +287,8 @@ class TestIntegrationWorkflows:
         assert response["answer"] is not None
         assert len(response["answer"]) > 0
 
-    def test_cache_invalidation_workflow(self, tmp_path):
-        """Test cache invalidation workflow."""
+    def test_data_invalidation_workflow(self, tmp_path):
+        """Test data invalidation workflow."""
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
@@ -311,14 +311,14 @@ class TestIntegrationWorkflows:
         indexed_files = self.get_indexed_files(engine)
         assert len(indexed_files) == 1
         
-        # Invalidate cache for specific file
-        engine.invalidate_cache(str(doc_path))
+        # Invalidate data for specific file
+        engine.invalidate_data(str(doc_path))
         
-        # File metadata should still exist in DocumentStore (cache != document tracking)
+        # File metadata should still exist in DocumentStore (data != document tracking)
         indexed_files = self.get_indexed_files(engine)
         assert len(indexed_files) == 1
         
-        # Re-index should work and update the cache
+        # Re-index should work and update the data
         success, _ = engine.index_file(doc_path)
         assert success is True
         

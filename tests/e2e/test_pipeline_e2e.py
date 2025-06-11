@@ -111,7 +111,7 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             # Create RAG engine
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                cache_dir=str(cache_dir),
+                data_dir=str(cache_dir),
                 vectorstore_backend="faiss",
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
             )
@@ -186,7 +186,7 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                cache_dir=str(cache_dir),
+                data_dir=str(cache_dir),
                 vectorstore_backend="fake",  # Use fake for predictable testing
                 openai_api_key="sk-test",
             )
@@ -212,7 +212,7 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                cache_dir=str(cache_dir),
+                data_dir=str(cache_dir),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
             )
@@ -258,7 +258,7 @@ and the DocumentStore system.
             
             config = RAGConfig(
                 documents_dir=str(docs_dir.resolve()),  # Use resolved path
-                cache_dir=str(cache_dir),
+                data_dir=str(cache_dir),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
             )
@@ -291,7 +291,7 @@ and the DocumentStore system.
             
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                cache_dir=str(cache_dir),
+                data_dir=str(cache_dir),
                 vectorstore_backend="faiss",
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
             )
