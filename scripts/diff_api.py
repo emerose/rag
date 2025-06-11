@@ -413,12 +413,12 @@ def main():
     try:
         # Dump current (HEAD) API
         print(f"{YELLOW}📊 Analyzing current API...{RESET}")
-        current_api = APIDumper(package, Path.cwd()).dump()
+        current_api = run_api_dump_subprocess(package, Path.cwd())
 
         # Dump base (target ref) API
         print(f"{YELLOW}📊 Analyzing API at {ref}...{RESET}")
         with GitWorktree(ref) as tmpdir:
-            base_api = APIDumper(package, tmpdir).dump()
+            base_api = run_api_dump_subprocess(package, tmpdir)
 
         # Render and show diff
         print(f"{YELLOW}🔄 Computing diff...{RESET}\n")
