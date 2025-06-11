@@ -7,7 +7,7 @@ based on hash changes, parameter changes, and metadata comparison.
 import pytest
 from pathlib import Path
 
-from rag.storage.fake_index_manager import FakeIndexManager
+from rag.storage.document_store import FakeDocumentStore
 
 
 class TestCacheDecisionLogic:
@@ -15,7 +15,7 @@ class TestCacheDecisionLogic:
 
     def test_needs_reindexing_new_file(self):
         """Test cache decision for new file (not in database)."""
-        manager = FakeIndexManager()
+        manager = FakeDocumentStore()
         
         # Add a mock file that doesn't have metadata yet
         test_file = Path("/fake/documents/new_file.txt")
@@ -33,7 +33,7 @@ class TestCacheDecisionLogic:
     
     def test_needs_reindexing_unchanged_file(self):
         """Test cache decision for unchanged file."""
-        manager = FakeIndexManager()
+        manager = FakeDocumentStore()
         
         # Add a mock file with metadata
         test_file = Path("/fake/documents/unchanged_file.txt")
@@ -74,7 +74,7 @@ class TestCacheDecisionLogic:
     
     def test_needs_reindexing_changed_hash(self):
         """Test cache decision when file content changed."""
-        manager = FakeIndexManager()
+        manager = FakeDocumentStore()
         
         # Add initial file and metadata
         test_file = Path("/fake/documents/changed_file.txt")
@@ -119,7 +119,7 @@ class TestCacheDecisionLogic:
     
     def test_needs_reindexing_changed_chunk_parameters(self):
         """Test cache decision when chunking parameters changed."""
-        manager = FakeIndexManager()
+        manager = FakeDocumentStore()
         
         # Add file with metadata using old chunk parameters
         test_file = Path("/fake/documents/param_file.txt")
@@ -161,7 +161,7 @@ class TestCacheDecisionLogic:
     
     def test_needs_reindexing_changed_embedding_model(self):
         """Test cache decision when embedding model changed."""
-        manager = FakeIndexManager()
+        manager = FakeDocumentStore()
         
         # Add file with metadata using old embedding model
         test_file = Path("/fake/documents/model_file.txt")
@@ -203,7 +203,7 @@ class TestCacheDecisionLogic:
     
     def test_needs_reindexing_newer_file_modification(self):
         """Test cache decision when file was modified after indexing."""
-        manager = FakeIndexManager()
+        manager = FakeDocumentStore()
         
         # Add file with older modification time in metadata
         test_file = Path("/fake/documents/newer_file.txt")
@@ -248,7 +248,7 @@ class TestCacheDecisionLogic:
     
     def test_needs_reindexing_nonexistent_file(self):
         """Test cache decision for non-existent file."""
-        manager = FakeIndexManager()
+        manager = FakeDocumentStore()
         
         # Add and then remove a mock file
         test_file = Path("/fake/documents/nonexistent.txt")
@@ -267,7 +267,7 @@ class TestCacheDecisionLogic:
     
     def test_compute_file_hash_algorithm(self):
         """Test file hash computation algorithm."""
-        manager = FakeIndexManager()
+        manager = FakeDocumentStore()
         
         # Test with mock file
         test_file = Path("/fake/documents/hash_test.txt")
@@ -292,7 +292,7 @@ class TestCacheDecisionLogic:
     
     def test_compute_text_hash_algorithm(self):
         """Test text hash computation algorithm."""
-        manager = FakeIndexManager()
+        manager = FakeDocumentStore()
         
         # Test with known text
         text = "test content"

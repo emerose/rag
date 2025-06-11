@@ -6,10 +6,10 @@ from pathlib import Path
 from langchain_core.documents import Document
 
 from rag.storage.document_store import (
-    DocumentStoreProtocol,
     SQLiteDocumentStore,
     FakeDocumentStore,
 )
+from rag.storage.protocols import DocumentStoreProtocol
 from rag.utils.exceptions import DocumentStoreError
 
 

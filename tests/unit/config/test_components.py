@@ -6,7 +6,7 @@ from dataclasses import FrozenInstanceError
 from rag.config.components import (
     ChunkingConfig,
     EmbeddingConfig,
-    CacheConfig,
+    DataConfig,
     QueryConfig,
     StorageConfig,
     IndexingConfig,
@@ -99,15 +99,15 @@ class TestEmbeddingConfig:
             config.batch_size = 128
 
 
-class TestCacheConfig:
-    """Test CacheConfig dataclass."""
+class TestDataConfig:
+    """Test DataConfig dataclass."""
 
     def test_default_values(self):
         """Test that default values are reasonable."""
-        config = CacheConfig()
+        config = DataConfig()
         
         assert config.enabled is True
-        assert config.cache_dir == ".cache"
+        assert config.data_dir == ".cache"
         assert config.ttl_hours == 24 * 7  # 1 week
         assert config.max_cache_size_mb == 1000
         assert config.compression_enabled is True
@@ -116,17 +116,17 @@ class TestCacheConfig:
 
     def test_disabled_cache(self):
         """Test cache can be disabled."""
-        config = CacheConfig(enabled=False)
+        config = DataConfig(enabled=False)
         
         assert config.enabled is False
         # Other settings should still have defaults
-        assert config.cache_dir == ".cache"
+        assert config.data_dir == ".cache"
 
-    def test_custom_cache_dir(self):
+    def test_custom_data_dir(self):
         """Test custom cache directory."""
-        config = CacheConfig(cache_dir="/tmp/rag-cache")
+        config = DataConfig(data_dir="/tmp/rag-cache")
         
-        assert config.cache_dir == "/tmp/rag-cache"
+        assert config.data_dir == "/tmp/rag-cache"
 
 
 class TestQueryConfig:
@@ -193,7 +193,7 @@ class TestIndexingConfig:
         
         assert isinstance(config.chunking, ChunkingConfig)
         assert isinstance(config.embedding, EmbeddingConfig)
-        assert isinstance(config.cache, CacheConfig)
+        assert isinstance(config.cache, DataConfig)
         assert isinstance(config.storage, StorageConfig)
         
         # Check some key defaults
@@ -206,7 +206,7 @@ class TestIndexingConfig:
         """Test creating with custom sub-configurations."""
         chunking = ChunkingConfig(chunk_size=500)
         embedding = EmbeddingConfig(model="custom-model")
-        cache = CacheConfig(enabled=False)
+        cache = DataConfig(enabled=False)
         storage = StorageConfig(backend="fake")
         
         config = IndexingConfig(
@@ -254,7 +254,7 @@ class TestQueryProcessingConfig:
         config = QueryProcessingConfig()
         
         assert isinstance(config.query, QueryConfig)
-        assert isinstance(config.cache, CacheConfig)
+        assert isinstance(config.cache, DataConfig)
         assert isinstance(config.storage, StorageConfig)
         
         # Check some key defaults
@@ -265,7 +265,7 @@ class TestQueryProcessingConfig:
     def test_custom_sub_configs(self):
         """Test creating with custom sub-configurations."""
         query = QueryConfig(temperature=0.8, top_k=8)
-        cache = CacheConfig(cache_dir="/custom/cache")
+        cache = DataConfig(data_dir="/custom/cache")
         storage = StorageConfig(backend="chroma")
         
         config = QueryProcessingConfig(
@@ -276,7 +276,7 @@ class TestQueryProcessingConfig:
         
         assert config.query.temperature == 0.8
         assert config.query.top_k == 8
-        assert config.cache.cache_dir == "/custom/cache"
+        assert config.cache.data_dir == "/custom/cache"
         assert config.storage.backend == "chroma"
 
 
@@ -297,7 +297,7 @@ class TestConfigIntegration:
                 max_workers=1,
                 async_batching=False
             ),
-            cache=CacheConfig(
+            cache=DataConfig(
                 enabled=False  # Disable caching for tests
             ),
             storage=StorageConfig(
@@ -324,7 +324,7 @@ class TestConfigIntegration:
                 max_workers=8,
                 async_batching=True
             ),
-            cache=CacheConfig(
+            cache=DataConfig(
                 enabled=True,
                 max_cache_size_mb=5000,
                 compression_enabled=True
