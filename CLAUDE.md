@@ -231,3 +231,7 @@ Types: feat, fix, docs, style, refactor, test, chore
 - When wrapping up a task, please update TODO.md by removing the tasks you have completed
 
 - Always run check.sh before staging a commit
+
+## Development Best Practices
+
+- Always use parameterized SQL queries. Don't interpolate values directly
