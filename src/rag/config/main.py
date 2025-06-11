@@ -24,7 +24,7 @@ class RAGConfig:
         embedding_model: Name of the OpenAI embedding model to use
         chat_model: Name of the OpenAI chat model to use
         temperature: Temperature parameter for chat model
-        cache_dir: Directory for caching embeddings and vector stores
+        data_dir: Directory for storing embeddings and vector stores
         lock_timeout: Timeout in seconds for file locks
         chunk_size: Number of tokens per chunk
         chunk_overlap: Number of tokens to overlap between chunks
@@ -40,7 +40,7 @@ class RAGConfig:
     embedding_model: str = "text-embedding-3-small"
     chat_model: str = "gpt-4"
     temperature: float = 0.0
-    cache_dir: str = ".cache"
+    data_dir: str = ".rag"
     lock_timeout: int = 30  # seconds
     chunk_size: int = 1000  # tokens
     chunk_overlap: int = 200  # tokens

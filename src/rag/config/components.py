@@ -102,26 +102,26 @@ class EmbeddingConfig:
 
 
 @dataclass(frozen=True)
-class CacheConfig:
-    """Configuration for caching behavior.
+class DataConfig:
+    """Configuration for data storage behavior.
 
-    This class contains all parameters related to caching of embeddings,
+    This class contains all parameters related to storage of embeddings,
     vector stores, and other computed artifacts.
 
     Attributes:
-        enabled: Whether caching is enabled
-        cache_dir: Directory for storing cache files
-        ttl_hours: Time-to-live for cache entries in hours
-        max_cache_size_mb: Maximum cache size in megabytes
-        compression_enabled: Whether to compress cached data
+        enabled: Whether data persistence is enabled
+        data_dir: Directory for storing data files
+        ttl_hours: Time-to-live for data entries in hours
+        max_data_size_mb: Maximum data storage size in megabytes
+        compression_enabled: Whether to compress stored data
         lock_timeout: Timeout in seconds for file locks
-        cleanup_on_startup: Whether to clean up invalid cache entries on startup
+        cleanup_on_startup: Whether to clean up invalid data entries on startup
     """
 
     enabled: bool = True
-    cache_dir: str = ".cache"
+    data_dir: str = ".rag"
     ttl_hours: int = 24 * 7  # 1 week default
-    max_cache_size_mb: int = 1000
+    max_data_size_mb: int = 1000
     compression_enabled: bool = True
     lock_timeout: int = 30
     cleanup_on_startup: bool = True
@@ -187,13 +187,13 @@ class IndexingConfig:
     Attributes:
         chunking: Configuration for text chunking
         embedding: Configuration for embedding generation
-        cache: Configuration for caching behavior
+        data: Configuration for data storage behavior
         storage: Configuration for storage backend
     """
 
     chunking: ChunkingConfig = field(default_factory=ChunkingConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
-    cache: CacheConfig = field(default_factory=CacheConfig)
+    data: DataConfig = field(default_factory=DataConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
 
     def to_dict(self) -> dict[str, Any]:
@@ -217,14 +217,14 @@ class IndexingConfig:
                 "async_batching": self.embedding.async_batching,
                 "rate_limit_rpm": self.embedding.rate_limit_rpm,
             },
-            "cache": {
-                "enabled": self.cache.enabled,
-                "cache_dir": self.cache.cache_dir,
-                "ttl_hours": self.cache.ttl_hours,
-                "max_cache_size_mb": self.cache.max_cache_size_mb,
-                "compression_enabled": self.cache.compression_enabled,
-                "lock_timeout": self.cache.lock_timeout,
-                "cleanup_on_startup": self.cache.cleanup_on_startup,
+            "data": {
+                "enabled": self.data.enabled,
+                "data_dir": self.data.data_dir,
+                "ttl_hours": self.data.ttl_hours,
+                "max_data_size_mb": self.data.max_data_size_mb,
+                "compression_enabled": self.data.compression_enabled,
+                "lock_timeout": self.data.lock_timeout,
+                "cleanup_on_startup": self.data.cleanup_on_startup,
             },
             "storage": {
                 "backend": self.storage.backend,
@@ -246,10 +246,10 @@ class QueryProcessingConfig:
 
     Attributes:
         query: Configuration for query processing
-        cache: Configuration for caching behavior
+        data: Configuration for data storage behavior
         storage: Configuration for storage backend
     """
 
     query: QueryConfig = field(default_factory=QueryConfig)
-    cache: CacheConfig = field(default_factory=CacheConfig)
+    data: DataConfig = field(default_factory=DataConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)

@@ -40,7 +40,7 @@ class RAGEngine:
 
         # Add properties that tests expect
         self.documents_dir = Path(config.documents_dir).resolve()
-        self.cache_dir = Path(config.cache_dir).absolute()
+        self.data_dir = Path(config.data_dir).absolute()
 
         # Use provided factory or create a new one
         if hasattr(dependencies, "create_query_engine"):  # Duck-type check for factory
@@ -61,16 +61,16 @@ class RAGEngine:
         return self._query_engine
 
     @property
-    def cache_orchestrator(self):
-        """Get the cache orchestrator."""
+    def data_orchestrator(self):
+        """Get the data orchestrator."""
         if self._cache_orchestrator is None:
-            self._cache_orchestrator = self._factory.create_cache_orchestrator()
+            self._cache_orchestrator = self._factory.create_data_orchestrator()
         return self._cache_orchestrator
 
     @property
-    def cache_manager(self):
-        """Get the cache manager."""
-        return self._factory.cache_manager
+    def document_store(self):
+        """Get the document store."""
+        return self._factory.document_store
 
     @property
     def vectorstore_manager(self):
@@ -79,8 +79,8 @@ class RAGEngine:
 
     @property
     def index_manager(self):
-        """Get the index manager."""
-        return self._factory.cache_repository
+        """Get the document store (compatibility property)."""
+        return self._factory.document_store
 
     @property
     def vectorstore(self) -> VectorStoreProtocol | None:
@@ -251,7 +251,7 @@ class RAGEngine:
             vectorstore_factory = self._factory.vectorstore_factory
 
             # Try to load existing vectorstore
-            vectorstore = vectorstore_factory.load_from_path(str(self.cache_dir))
+            vectorstore = vectorstore_factory.load_from_path(str(self.data_dir))
 
             if vectorstore:
                 logger.debug("Loaded vectorstore from cache")
@@ -264,8 +264,8 @@ class RAGEngine:
             logger.error(f"Error loading vectorstore: {e}")
             return None
 
-    def invalidate_cache(self, file_path: Path | str) -> None:
-        """Invalidate cache for a specific file.
+    def invalidate_data(self, file_path: Path | str) -> None:
+        """Invalidate data for a specific file.
 
         Args:
             file_path: Path to the file to invalidate
@@ -279,19 +279,19 @@ class RAGEngine:
             vector_repo = self._factory.vector_repository
             vector_repo.remove_vectorstore(str(file_path))
 
-            # Also invalidate old cache system for compatibility
-            if hasattr(self.cache_manager, "invalidate_cache"):
-                self.cache_manager.invalidate_cache(Path(file_path))
+            # Also invalidate document store for compatibility
+            if hasattr(self.document_store, "invalidate_data"):
+                self.document_store.invalidate_data(Path(file_path))
             else:
-                self.cache_manager.remove_metadata(Path(file_path))
+                self.document_store.remove_metadata(Path(file_path))
         except Exception as e:
-            logger.error(f"Error invalidating cache for {file_path}: {e}")
+            logger.error(f"Error invalidating data for {file_path}: {e}")
 
-    def invalidate_all_caches(self) -> None:
-        """Invalidate all caches."""
+    def invalidate_all_data(self) -> None:
+        """Invalidate all data."""
         try:
-            # Clear all file metadata from cache repository
-            self.cache_manager.clear_all_file_metadata()
+            # Clear all file metadata from document store
+            self.document_store.clear_all_file_metadata()
 
             # Also try to clear vector repository if available
             try:
@@ -302,7 +302,7 @@ class RAGEngine:
                 logger.debug(f"Could not clear vector repository: {ve}")
 
         except Exception as e:
-            logger.error(f"Error invalidating all caches: {e}")
+            logger.error(f"Error invalidating all data: {e}")
 
     def get_document_summaries(self, k: int = 5) -> list[dict[str, Any]]:
         """Get summaries of the largest indexed documents.

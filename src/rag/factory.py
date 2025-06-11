@@ -28,10 +28,10 @@ from rag.embeddings.embedding_provider import EmbeddingProvider
 from rag.embeddings.model_map import load_model_map
 from rag.embeddings.protocols import EmbeddingServiceProtocol
 from rag.retrieval import BaseReranker
+from rag.storage.document_store import SQLiteDocumentStore
 from rag.storage.filesystem import FilesystemManager
-from rag.storage.index_manager import IndexManager
 from rag.storage.protocols import (
-    CacheRepositoryProtocol,
+    DocumentStoreProtocol,
     FileSystemProtocol,
 )
 from rag.storage.vector_store import VectorStoreFactory
@@ -50,7 +50,7 @@ class ComponentOverrides:
     """
 
     filesystem_manager: FileSystemProtocol | None = None
-    cache_repository: CacheRepositoryProtocol | None = None
+    document_store: DocumentStoreProtocol | None = None
     vectorstore_factory: VectorStoreFactory | None = None
     embedding_service: EmbeddingServiceProtocol | None = None
     document_loader: Any | None = None
@@ -85,7 +85,7 @@ class RAGComponentsFactory:
 
         # Store injected dependencies or create defaults
         self._filesystem_manager = self.overrides.filesystem_manager
-        self._cache_repository = self.overrides.cache_repository
+        self._document_store = self.overrides.document_store
         self._vectorstore_factory = self.overrides.vectorstore_factory
         self._embedding_service = self.overrides.embedding_service
         self._document_loader = self.overrides.document_loader
@@ -114,19 +114,13 @@ class RAGComponentsFactory:
         return self._filesystem_manager
 
     @property
-    def cache_repository(self) -> CacheRepositoryProtocol:
-        """Get or create cache repository."""
-        if self._cache_repository is None:
-            self._cache_repository = IndexManager(
-                cache_dir=Path(self.config.cache_dir),
-                log_callback=self.runtime.log_callback,
-            )
-        return self._cache_repository
-
-    @property
-    def cache_manager(self) -> CacheRepositoryProtocol:
-        """Get cache manager (alias for cache_repository for backwards compatibility)."""
-        return self.cache_repository
+    def document_store(self) -> DocumentStoreProtocol:
+        """Get or create document store."""
+        if self._document_store is None:
+            data_dir = Path(self.config.data_dir)
+            db_path = data_dir / "documents.db"
+            self._document_store = SQLiteDocumentStore(db_path)
+        return self._document_store
 
     @property
     def vector_repository(self) -> VectorStoreFactory:
@@ -224,7 +218,7 @@ class RAGComponentsFactory:
 
             # Create document store
             document_store = SQLiteDocumentStore(
-                db_path=Path(self.config.cache_dir) / "documents.db"
+                db_path=Path(self.config.data_dir) / "documents.db"
             )
 
             # Create transformer and embedder
@@ -240,7 +234,7 @@ class RAGComponentsFactory:
             )
 
             # Create the ingestion pipeline
-            workspace_path = str(Path(self.config.cache_dir) / "workspace")
+            workspace_path = str(Path(self.config.data_dir) / "workspace")
             self._ingestion_pipeline = IngestionPipeline(
                 source=self.document_source,
                 transformer=transformer,
@@ -328,7 +322,7 @@ class RAGComponentsFactory:
         """
         return {
             "filesystem_manager": self.filesystem_manager,
-            "cache_repository": self.cache_repository,
+            "document_store": self.document_store,
             "vectorstore_factory": self.vectorstore_factory,
             "embedding_service": self.embedding_service,
             "chat_model": self.chat_model,
@@ -370,3 +364,13 @@ class RAGComponentsFactory:
         )
         factory.set_log_callback(self.runtime.log_callback)
         return factory
+
+    def create_data_orchestrator(self) -> Any:
+        """Create data orchestrator (compatibility method)."""
+
+        # For now, return a simple object that delegates to document store
+        class DataOrchestrator:
+            def __init__(self, document_store: DocumentStoreProtocol):
+                self.document_store = document_store
+
+        return DataOrchestrator(self.document_store)

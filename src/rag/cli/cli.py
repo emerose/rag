@@ -73,7 +73,7 @@ prompt_app = typer.Typer(help="Manage prompt templates")
 app.add_typer(prompt_app, name="prompt")
 
 # Global constants
-CACHE_DIR = ".cache"
+DATA_DIR = ".rag"
 MAX_K_VALUE = 20
 DEFAULT_MAX_WORKERS = get_optimal_concurrency()
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
@@ -114,7 +114,7 @@ class GlobalState:
     """Global state for the CLI."""
 
     is_processing: bool = False
-    cache_dir: str = CACHE_DIR  # Initialize with default value
+    data_dir: str = DATA_DIR  # Initialize with default value
     json_mode: bool = False  # Track JSON mode
     console: Console = console  # Store console instance
     vectorstore_backend: str = "faiss"
@@ -287,9 +287,9 @@ def main(  # noqa: PLR0913
         help="Enable verbose output",
     ),
     log_level: LogLevel = LOG_LEVEL_OPTION,
-    cache_dir: str = typer.Option(
-        CACHE_DIR,
-        "--cache-dir",
+    data_dir: str = typer.Option(
+        DATA_DIR,
+        "--data-dir",
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
@@ -305,7 +305,7 @@ def main(  # noqa: PLR0913
     """RAG (Retrieval Augmented Generation) CLI.
 
     This tool provides a command-line interface for indexing documents,
-    querying them using RAG, and managing the document cache.
+    querying them using RAG, and managing the document data.
     """
     # Load environment variables
     load_dotenv()
@@ -329,8 +329,8 @@ def main(  # noqa: PLR0913
         debug_module_list,
     )
 
-    # Set cache directory
-    state.cache_dir = cache_dir
+    # Set data directory
+    state.data_dir = data_dir
     state.vectorstore_backend = vectorstore_backend
     state.max_workers = max_workers
     state.embedding_model = embedding_model
@@ -374,7 +374,7 @@ class IndexingParams:
     preserve_headings: bool
     semantic_chunking: bool
     async_batching: bool
-    cache_dir: str | None
+    data_dir: str | None
 
 
 def _create_rag_config_and_runtime(
@@ -395,7 +395,7 @@ def _create_rag_config_and_runtime(
         temperature=0.0,
         chunk_size=params.chunk_size,
         chunk_overlap=params.chunk_overlap,
-        cache_dir=params.cache_dir or state.cache_dir,
+        data_dir=params.data_dir or state.data_dir,
         vectorstore_backend=state.vectorstore_backend,
     )
     runtime_options = RuntimeOptions(
@@ -434,7 +434,7 @@ def _index_single_file(rag_engine: RAGEngine, path_obj: Path) -> None:
 
 
 def _index_directory(
-    rag_engine: RAGEngine, path_obj: Path, cached_before: set[str]
+    rag_engine: RAGEngine, path_obj: Path, indexed_before: set[str]
 ) -> None:
     """Index a directory and output results."""
     logger.info(f"Indexing directory: {path_obj}")
@@ -467,15 +467,15 @@ def _index_directory(
         f: r.get("error") for f, r in results.items() if not r.get("success")
     }
 
-    cached_in_run = sorted(set(results.keys()) & cached_before)
+    indexed_in_run = sorted(set(results.keys()) & indexed_before)
 
     tables = []
-    if cached_in_run:
+    if indexed_in_run:
         tables.append(
             TableData(
-                title="Cached Files",
+                title="Previously Indexed Files",
                 columns=["File"],
-                rows=[[f] for f in cached_in_run],
+                rows=[[f] for f in indexed_in_run],
             )
         )
 
@@ -542,9 +542,9 @@ def index(  # noqa: PLR0913
         help="Process embeddings asynchronously",
     ),
     # Duplicated from app-level callback for Typer CLI compatibility
-    cache_dir: str = typer.Option(
+    data_dir: str = typer.Option(
         None,  # Default to None to allow app-level value to be used
-        "--cache-dir",
+        "--data-dir",
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
@@ -568,20 +568,20 @@ def index(  # noqa: PLR0913
             preserve_headings,
             semantic_chunking,
             async_batching,
-            cache_dir,
+            data_dir,
         )
 
         config, runtime_options = _create_rag_config_and_runtime(params)
 
         rag_engine = create_rag_engine(config, runtime_options)
-        cached_before = set(rag_engine.cache_manager.list_cached_files().keys())
+        indexed_before = set(rag_engine.document_store.list_indexed_files())
         path_obj = Path(path)
 
         # Run indexing
         if path_obj.is_file():
             _index_single_file(rag_engine, path_obj)
         else:
-            _index_directory(rag_engine, path_obj, cached_before)
+            _index_directory(rag_engine, path_obj, indexed_before)
 
     except ValueError as e:
         write(Error(f"Configuration error: {e}"))
@@ -601,33 +601,33 @@ def index(  # noqa: PLR0913
 @app.command()
 def invalidate(
     path: Path = INVALIDATE_PATH_ARG,
-    all_caches: bool = typer.Option(
+    all_data: bool = typer.Option(
         False,
         "--all",
         "-a",
-        help="Invalidate all caches in the directory (uses current directory if no path specified)",
+        help="Invalidate all data in the directory (uses current directory if no path specified)",
     ),
     # Duplicated from app-level callback for Typer CLI compatibility
-    cache_dir: str = typer.Option(
+    data_dir: str = typer.Option(
         None,  # Default to None to allow app-level value to be used
-        "--cache-dir",
+        "--data-dir",
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
     json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
-    """Invalidate the cache for a specific file or all caches.
+    """Invalidate the data for a specific file or all data.
 
     This command will:
-    1. Remove cached embeddings and vector stores
+    1. Remove stored embeddings and vector stores
     2. Clear metadata for the specified files
     3. Force re-indexing on next run
     """
     try:
-        # Use the provided cache_dir if specified, otherwise use the global state
-        cache_directory = cache_dir if cache_dir is not None else state.cache_dir
+        # Use the provided data_dir if specified, otherwise use the global state
+        data_directory = data_dir if data_dir is not None else state.data_dir
 
-        if all_caches and path is None:
+        if all_data and path is None:
             # Use current directory when --all is specified without a path
             path = Path.cwd()
         elif path is None:
@@ -639,7 +639,7 @@ def invalidate(
             write(Error(f"Path does not exist: {path}"))
             sys.exit(1)
 
-        logger.info(f"Starting cache invalidation for: {path.name}")
+        logger.info(f"Starting data invalidation for: {path.name}")
         logger.debug(f"Full path: {path}")
 
         # If it's a file, use its parent directory
@@ -663,7 +663,7 @@ def invalidate(
             embedding_model=state.embedding_model,
             chat_model=state.chat_model,
             temperature=0.0,
-            cache_dir=cache_directory,
+            data_dir=data_directory,
             vectorstore_backend=state.vectorstore_backend,
         )
 
@@ -675,7 +675,7 @@ def invalidate(
 
         rag_engine = create_rag_engine(config, runtime_options)
 
-        if all_caches:
+        if all_data:
             if not typer.confirm(
                 "This will invalidate all caches. Continue?",
                 default=False,
@@ -685,7 +685,7 @@ def invalidate(
 
             # Invalidate all caches
             logger.info("Invalidating all caches...")
-            rag_engine.invalidate_all_caches()
+            rag_engine.invalidate_all_data()
             write(
                 {
                     "message": "All caches invalidated successfully",
@@ -698,7 +698,7 @@ def invalidate(
             )
         elif path.is_file():
             logger.info(f"Invalidating cache for: {path.name}")
-            rag_engine.invalidate_cache(str(path))
+            rag_engine.invalidate_data(str(path))
             write(
                 {
                     "message": f"Cache invalidated for {path.name}",
@@ -717,7 +717,7 @@ def invalidate(
         write(Error(f"Configuration error: {e}"))
         sys.exit(1)
     except (exceptions.RAGError, OSError, KeyError, FileNotFoundError) as e:
-        write(Error(f"Error during cache invalidation: {e}"))
+        write(Error(f"Error during data invalidation: {e}"))
         sys.exit(1)
 
 
@@ -742,9 +742,9 @@ def query(  # noqa: PLR0913
         help="Prompt template to use (default, cot, creative)",
     ),
     # Duplicated from app-level callback for Typer CLI compatibility
-    cache_dir: str = typer.Option(
+    data_dir: str = typer.Option(
         None,  # Default to None to allow app-level value to be used
-        "--cache-dir",
+        "--data-dir",
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
@@ -762,8 +762,8 @@ def query(  # noqa: PLR0913
     """
     state.is_processing = True
     try:
-        # Use the provided cache_dir if specified, otherwise use the global state
-        cache_directory = cache_dir if cache_dir is not None else state.cache_dir
+        # Use the provided data_dir if specified, otherwise use the global state
+        data_directory = data_dir if data_dir is not None else state.data_dir
 
         # Initialize RAG engine using RAGConfig with specified cache directory
         logger.debug("Initializing RAG engine...")
@@ -772,7 +772,7 @@ def query(  # noqa: PLR0913
             embedding_model=state.embedding_model,
             chat_model=state.chat_model,
             temperature=0.0,
-            cache_dir=cache_directory,
+            data_dir=data_directory,
             vectorstore_backend=state.vectorstore_backend,
         )
 
@@ -797,7 +797,7 @@ def query(  # noqa: PLR0913
         if rag_engine.vectorstore is None:
             write(
                 Error(
-                    "No indexed documents found in cache. Please run 'rag index' first."
+                    "No indexed documents found in data store. Please run 'rag index' first."
                 )
             )
             sys.exit(1)
@@ -846,9 +846,9 @@ def query(  # noqa: PLR0913
 def summarize(
     k: int = typer.Option(5, "--k", "-k", help="Number of documents to summarize"),
     # Duplicated from app-level callback for Typer CLI compatibility
-    cache_dir: str = typer.Option(
+    data_dir: str = typer.Option(
         None,  # Default to None to allow app-level value to be used
-        "--cache-dir",
+        "--data-dir",
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
@@ -867,7 +867,7 @@ def summarize(
             embedding_model=state.embedding_model,
             chat_model=state.chat_model,
             temperature=0.0,
-            cache_dir=cache_dir or state.cache_dir,
+            data_dir=data_dir or state.data_dir,
             vectorstore_backend=state.vectorstore_backend,
         )
         runtime_options = RuntimeOptions(max_workers=state.max_workers)
@@ -877,7 +877,7 @@ def summarize(
         if rag_engine.vectorstore is None:
             write(
                 Error(
-                    "No indexed documents found in cache. Please run 'rag index' first."
+                    "No indexed documents found in data store. Please run 'rag index' first."
                 )
             )
             sys.exit(1)
@@ -926,9 +926,9 @@ def summarize(
 @app.command()
 def list(
     # Duplicated from app-level callback for Typer CLI compatibility
-    cache_dir: str = typer.Option(
+    data_dir: str = typer.Option(
         None,  # Default to None to allow app-level value to be used
-        "--cache-dir",
+        "--data-dir",
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
@@ -940,8 +940,8 @@ def list(
     including their paths and types.
     """
     try:
-        # Use the provided cache_dir if specified, otherwise use the global state
-        cache_directory = cache_dir if cache_dir is not None else state.cache_dir
+        # Use the provided data_dir if specified, otherwise use the global state
+        data_directory = data_dir if data_dir is not None else state.data_dir
 
         # Initialize RAG engine
         logger.debug("Initializing RAG engine")
@@ -950,7 +950,7 @@ def list(
             embedding_model=state.embedding_model,
             chat_model=state.chat_model,
             temperature=0.0,
-            cache_dir=cache_directory,
+            data_dir=data_directory,
             vectorstore_backend=state.vectorstore_backend,
         )
         runtime_options = RuntimeOptions(max_workers=state.max_workers)
@@ -1069,7 +1069,7 @@ def _initialize_rag_engine(runtime_options: RuntimeOptions | None = None) -> RAG
         embedding_model=state.embedding_model,
         chat_model=state.chat_model,
         temperature=0.0,
-        cache_dir=state.cache_dir,
+        data_dir=state.data_dir,
         vectorstore_backend=state.vectorstore_backend,
     )
     return create_rag_engine(config, runtime_options)
@@ -1082,14 +1082,14 @@ def _load_vectorstore(rag_engine: RAGEngine) -> None:
 
     if not source_documents:
         logger.error(
-            "No indexed documents found in cache. Please run 'rag index' first.",
+            "No indexed documents found in data store. Please run 'rag index' first.",
         )
         state.console.print(
-            "[red]No indexed documents found in cache. Please run 'rag index' first.[/red]",
+            "[red]No indexed documents found in data store. Please run 'rag index' first.[/red]",
         )
         sys.exit(1)
 
-    logger.info("Loading cached vectorstore from .cache directory...")
+    logger.info("Loading vectorstore from .rag directory...")
 
     # For the new single vectorstore architecture, we just verify that the
     # vectorstore can be loaded. The RAGEngine handles this automatically.
@@ -1105,10 +1105,10 @@ def _load_vectorstore(rag_engine: RAGEngine) -> None:
 
     if rag_engine.vectorstore is None:
         logger.error(
-            "No valid vectorstore found in cache. Please run 'rag index' first.",
+            "No valid vectorstore found in data store. Please run 'rag index' first.",
         )
         state.console.print(
-            "[red]No valid vectorstore found in cache. Please run 'rag index' first.[/red]",
+            "[red]No valid vectorstore found in data store. Please run 'rag index' first.[/red]",
         )
         sys.exit(1)
 
@@ -1211,9 +1211,9 @@ def repl(
         help="Prompt template to use (default, cot, creative)",
     ),
     # Duplicated from app-level callback for Typer CLI compatibility
-    cache_dir: str = typer.Option(
+    data_dir: str = typer.Option(
         None,  # Default to None to allow app-level value to be used
-        "--cache-dir",
+        "--data-dir",
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
@@ -1334,9 +1334,9 @@ def repl(
 
 @app.command(name="eval")
 def eval_command(
-    cache_dir: str = typer.Option(
+    data_dir: str = typer.Option(
         None,
-        "--cache-dir",
+        "--data-dir",
         "-c",
         help="Directory for caching embeddings and vector stores",
     ),
@@ -1372,7 +1372,7 @@ def mcp(
 
     config = RAGConfig(
         documents_dir=".",
-        cache_dir=state.cache_dir,
+        data_dir=state.data_dir,
         vectorstore_backend=state.vectorstore_backend,
         embedding_model=state.embedding_model,
         chat_model=state.chat_model,

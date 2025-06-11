@@ -156,13 +156,31 @@ class FileSystemProtocol(Protocol):
 
 
 @runtime_checkable
-class CacheRepositoryProtocol(Protocol):
-    """Protocol for cache and metadata repository operations in the RAG system.
+class DocumentStoreProtocol(Protocol):
+    """Protocol for document storage and metadata operations in the RAG system.
 
-    This protocol defines the interface for storing and retrieving document metadata,
-    chunk hashes, and global settings. It enables dependency injection and
-    facilitates testing with in-memory implementations.
+    This protocol combines document storage with file tracking functionality,
+    enabling dependency injection and facilitating testing with in-memory implementations.
     """
+
+    def store_documents(self, documents: list[Document]) -> None:
+        """Store documents in the document store.
+
+        Args:
+            documents: List of documents to store
+        """
+        ...
+
+    def get_documents(self, filters: dict[str, Any] | None = None) -> list[Document]:
+        """Retrieve documents from the store.
+
+        Args:
+            filters: Optional filters to apply
+
+        Returns:
+            List of documents matching the filters
+        """
+        ...
 
     def compute_file_hash(self, file_path: Path) -> str:
         """Compute the SHA-256 hash of a file.
