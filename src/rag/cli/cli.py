@@ -317,7 +317,8 @@ def main(  # noqa: PLR0913
     if debug:
         modules.append("rag")
     if debug_modules:
-        modules.extend(m.strip() for m in debug_modules.split(","))
+        module_names: list[str] = [m.strip() for m in debug_modules.split(",")]
+        modules.extend(module_names)
     configure_logging(
         verbose,
         log_level,
@@ -1041,11 +1042,11 @@ def chunks(
             raise typer.Exit(1)
 
         items = rag_engine.vectorstore_manager._get_docstore_items(vectorstore.docstore)  # type: ignore[attr-defined]
-        chunks = [
+        chunks: list[dict[str, Any]] = [
             {
                 "index": idx,
                 "text": doc.page_content,
-                "metadata": doc.metadata,
+                "metadata": dict(doc.metadata),  # type: ignore[misc]
             }
             for idx, (_, doc) in enumerate(items)
         ]

@@ -138,7 +138,7 @@ class DocumentProcessor(DocumentProcessorProtocol):
         self.progress_tracker.register_task("process_files", len(files))
 
         # Process each file
-        results = {}
+        results: dict[str, list[Document]] = {}
         for i, file_path in enumerate(files):
             try:
                 self._log("INFO", f"Processing file {i + 1}/{len(files)}: {file_path}")
@@ -189,26 +189,25 @@ class DocumentProcessor(DocumentProcessorProtocol):
                 doc.metadata = {}
 
             # Add processing metadata
-            doc.metadata["processed_at"] = timestamp_now()  # type: ignore[misc]
-            doc.metadata["mime_type"] = mime_type  # type: ignore[misc]
-            doc.metadata["text_splitter"] = (  # type: ignore[misc]
-                self.text_splitter_factory.last_splitter_name
-            )
-            doc.metadata["tokenizer"] = self.text_splitter_factory.tokenizer_name  # type: ignore[misc]
+            metadata: dict[str, Any] = doc.metadata  # type: ignore[assignment]
+            metadata["processed_at"] = timestamp_now()
+            metadata["mime_type"] = mime_type
+            metadata["text_splitter"] = self.text_splitter_factory.last_splitter_name
+            metadata["tokenizer"] = self.text_splitter_factory.tokenizer_name
 
             # Add chunk metadata
-            doc.metadata["chunk_index"] = i  # type: ignore[misc]
-            doc.metadata["chunk_total"] = len(documents)  # type: ignore[misc]
+            metadata["chunk_index"] = i
+            metadata["chunk_total"] = len(documents)
 
             # Add token count if available
             try:
-                doc.metadata["token_count"] = (
-                    self.text_splitter_factory.get_token_length(  # type: ignore[misc]
-                        doc.page_content
-                    )
+                metadata["token_count"] = self.text_splitter_factory.get_token_length(
+                    doc.page_content
                 )
             except (AttributeError, ValueError, TypeError):
                 # If token counting fails, set to 0
-                doc.metadata["token_count"] = 0
+                metadata["token_count"] = 0
+
+            doc.metadata = metadata
 
         return documents

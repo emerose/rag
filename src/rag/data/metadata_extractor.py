@@ -8,7 +8,7 @@ import logging
 import os
 import re
 from abc import ABC, abstractmethod
-from typing import Any, Protocol
+from typing import Any, Protocol, TypedDict
 
 from langchain_core.documents import Document
 
@@ -17,6 +17,37 @@ from pdfminer.high_level import extract_pages
 from pdfminer.layout import LTTextContainer
 
 PDFMINER_AVAILABLE = True
+
+
+# Type aliases for metadata structures
+class FontData(TypedDict):
+    """Font information extracted from PDF text elements."""
+
+    text: str
+    font_size: float
+    is_bold: bool
+    page: int
+    position: int
+    length: int
+
+
+class HeadingData(TypedDict):
+    """Heading information extracted from documents."""
+
+    text: str
+    level: int
+    page: int
+    font_size: float
+    position: int
+
+
+class CharData(TypedDict):
+    """Character information extracted from PDF elements."""
+
+    text: str
+    fontname: str
+    size: float
+
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +119,8 @@ class DefaultMetadataExtractor(BaseMetadataExtractor):
         metadata = {}
 
         # Extract title from content if not already in metadata
-        if "title" not in document.metadata and document.page_content:  # type: ignore[operator]
+        doc_metadata: dict[str, Any] = document.metadata
+        if "title" not in doc_metadata and document.page_content:
             title = self._extract_title_from_content(document.page_content)
             if title:
                 metadata["title"] = title
@@ -112,7 +144,8 @@ class MarkdownMetadataExtractor(BaseMetadataExtractor):
         content = document.page_content
 
         # Extract title (usually the first heading)
-        if "title" not in document.metadata and content:  # type: ignore[operator]
+        doc_metadata: dict[str, Any] = document.metadata
+        if "title" not in doc_metadata and content:
             # Look for the first heading
             heading_match = re.search(r"^\s*#\s+(.+?)$", content, re.MULTILINE)
             if heading_match:
@@ -124,7 +157,7 @@ class MarkdownMetadataExtractor(BaseMetadataExtractor):
                     metadata["title"] = title
 
         # Extract all headings
-        headings: list[dict[str, Any]] = []
+        headings: list[HeadingData] = []
         heading_regex = r"^(#+)\s+(.+?)$"
         heading_matches = re.finditer(heading_regex, content, re.MULTILINE)
 
@@ -138,7 +171,7 @@ class MarkdownMetadataExtractor(BaseMetadataExtractor):
 
             # Create a hierarchical path for each heading
             if len(headings) > 0:
-                heading_hierarchy: list[dict[str, Any]] = []
+                heading_hierarchy: list[HeadingData] = []
                 current_path: list[str] = []
 
                 for heading in headings:
@@ -181,18 +214,19 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         metadata = {}
 
         # Extract title from existing metadata or content
-        if "title" not in document.metadata and document.page_content:  # type: ignore[operator]
+        doc_metadata: dict[str, Any] = document.metadata
+        if "title" not in doc_metadata and document.page_content:
             # Try to find PDF title in content
             title = self._extract_title_from_content(document.page_content)
             if title:
                 metadata["title"] = title
 
         # Page numbers - should be preserved from PDF loader
-        if "page" in document.metadata:  # type: ignore[operator]
-            metadata["page_num"] = document.metadata["page"]  # type: ignore[misc]
+        if "page" in doc_metadata:
+            metadata["page_num"] = doc_metadata["page"]
 
         # Try to extract PDF headings from the source file
-        source_path = document.metadata.get("source")  # type: ignore[misc]
+        source_path = doc_metadata.get("source")
         if source_path and isinstance(source_path, str) and os.path.isfile(source_path):
             try:
                 headings = self.extract_pdf_headings(source_path)
@@ -241,7 +275,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
 
         return metadata
 
-    def extract_pdf_headings(self, pdf_path: str) -> list[dict[str, Any]]:
+    def extract_pdf_headings(self, pdf_path: str) -> list[HeadingData]:
         """Extract heading information from a PDF using font analysis.
 
         Args:
@@ -270,7 +304,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
             logger.error(f"Error extracting headings from PDF: {e}")
             return []
 
-    def _extract_font_data(self, pdf_path: str) -> list[dict[str, Any]]:
+    def _extract_font_data(self, pdf_path: str) -> list[FontData]:
         """Extract font size and text data from the PDF.
 
         Args:
@@ -280,7 +314,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
             List of dictionaries with font size, text, and position information
         """
 
-        font_data = []
+        font_data: list[FontData] = []
         char_count = 0
         current_position = 0
 
@@ -350,7 +384,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
 
         return avg_font_size, is_bold
 
-    def _extract_chars_from_element(self, element: Any) -> list:
+    def _extract_chars_from_element(self, element: Any) -> list[CharData]:
         """Extract characters from a text element.
 
         Args:
@@ -359,7 +393,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         Returns:
             List of character information dictionaries
         """
-        chars = []
+        chars: list[CharData] = []
 
         # Use the public API to extract character information
         if hasattr(element, "get_text"):
@@ -385,9 +419,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
 
         return chars
 
-    def _identify_headings(
-        self, font_data: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+    def _identify_headings(self, font_data: list[FontData]) -> list[HeadingData]:
         """Identify headings from font data.
 
         Args:
@@ -412,7 +444,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
             heading_sizes = sorted_sizes[:5] if len(sorted_sizes) > 5 else sorted_sizes
 
             # Create heading entries for each identified heading
-            headings = []
+            headings: list[HeadingData] = []
             level = 1
             for size in heading_sizes:
                 # Skip if no text items with this font size
@@ -436,7 +468,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
                     level += 1
 
             # Sort headings by position
-            headings.sort(key=lambda h: h["position"])
+            headings.sort(key=lambda h: h["position"])  # type: ignore[misc]
 
             # Build heading paths
             self._build_heading_paths(headings)
@@ -495,7 +527,8 @@ class HTMLMetadataExtractor(BaseMetadataExtractor):
         content = document.page_content
 
         # Extract title from HTML content
-        if "title" not in document.metadata and content:
+        doc_metadata: dict[str, Any] = document.metadata
+        if "title" not in doc_metadata and content:
             metadata["title"] = self._extract_title_from_html(content)
 
         # Extract all headings from h1-h6 tags
@@ -534,7 +567,7 @@ class HTMLMetadataExtractor(BaseMetadataExtractor):
         # Fallback to first line heuristic
         return self._extract_title_from_content(content)
 
-    def _extract_headings_from_html(self, content: str) -> list[dict[str, Any]]:
+    def _extract_headings_from_html(self, content: str) -> list[HeadingData]:
         """Extract headings from HTML content.
 
         Args:
@@ -543,7 +576,7 @@ class HTMLMetadataExtractor(BaseMetadataExtractor):
         Returns:
             List of headings with level, text, and position
         """
-        headings = []
+        headings: list[HeadingData] = []
         for level in range(1, 7):
             pattern = rf"<h{level}[^>]*>(.+?)</h{level}>"
             matches = re.finditer(pattern, content, re.IGNORECASE | re.DOTALL)
@@ -556,12 +589,12 @@ class HTMLMetadataExtractor(BaseMetadataExtractor):
                 )
 
         # Sort by position
-        headings.sort(key=lambda x: x["position"])
+        headings.sort(key=lambda x: x["position"])  # type: ignore[misc]
         return headings
 
     def _build_heading_hierarchy(
-        self, headings: list[dict[str, Any]]
-    ) -> list[dict[str, Any]]:
+        self, headings: list[HeadingData]
+    ) -> list[HeadingData]:
         """Build a hierarchical path for each heading.
 
         Args:
@@ -570,7 +603,7 @@ class HTMLMetadataExtractor(BaseMetadataExtractor):
         Returns:
             List of headings with hierarchical paths
         """
-        heading_hierarchy = []
+        heading_hierarchy: list[HeadingData] = []
         current_path = [None] * 6  # For h1-h6
 
         for heading in headings:
@@ -649,7 +682,7 @@ class DocumentMetadataExtractor:
         Returns:
             List of enhanced documents
         """
-        enhanced_docs = []
+        enhanced_docs: list[Document] = []
 
         for doc in documents:
             # Extract metadata

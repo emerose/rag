@@ -138,7 +138,7 @@ def _write_json(
             logger.error(payload.message)
     elif isinstance(payload, list):
         print(json.dumps({"tables": payload}))
-    elif isinstance(payload, dict):
+    elif isinstance(payload, dict):  # type: ignore[misc]
         if is_table_data(payload):
             print(json.dumps({"table": payload}))
         elif "table" in payload:
@@ -190,5 +190,5 @@ def _write_rich(
     elif isinstance(payload, list):
         for table_data in payload:
             _print_table(table_data)
-    elif isinstance(payload, dict):
+    elif isinstance(payload, dict):  # type: ignore[misc]
         _write_dict_rich(payload)

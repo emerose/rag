@@ -207,9 +207,11 @@ class DocumentLoader:
             if not hasattr(doc, "metadata") or doc.metadata is None:
                 doc.metadata = {}
 
-            # Add file metadata
-            doc.metadata["source"] = str(file_path)  # type: ignore[misc]
-            doc.metadata["source_type"] = file_metadata["source_type"]  # type: ignore[misc]
-            doc.metadata["file_size"] = file_metadata["size"]  # type: ignore[misc]
-            doc.metadata["mtime"] = file_metadata["mtime"]  # type: ignore[misc]
-            doc.metadata["content_hash"] = file_metadata["content_hash"]  # type: ignore[misc]
+            # Add file metadata - use type ignore to handle langchain type inference issues
+            metadata: dict[str, Any] = doc.metadata  # type: ignore[assignment]
+            metadata["source"] = str(file_path)
+            metadata["source_type"] = file_metadata["source_type"]
+            metadata["file_size"] = file_metadata["size"]
+            metadata["mtime"] = file_metadata["mtime"]
+            metadata["content_hash"] = file_metadata["content_hash"]
+            doc.metadata = metadata

@@ -1054,7 +1054,10 @@ class FakeDocumentStore:
             # Apply metadata filter
             if metadata_filter:
                 metadata = document.metadata or {}
-                if not all(metadata.get(k) == v for k, v in metadata_filter.items()):
+                matches: list[bool] = [
+                    metadata.get(k) == v for k, v in metadata_filter.items()
+                ]
+                if not all(matches):
                     continue
 
             # Return a copy to avoid mutations

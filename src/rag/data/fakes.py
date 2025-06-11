@@ -217,17 +217,17 @@ class FakeChatModel(BaseChatModel):
         # Create a simple deterministic response based on the last message
         last_message = messages[-1] if messages else None
         if last_message:
-            content = str(last_message.content).lower()
+            content_str: str = str(last_message.content).lower()
 
             # Provide specific responses for common test scenarios
-            if "rag" in content or "retrieval" in content:
+            if "rag" in content_str or "retrieval" in content_str:
                 response = "RAG (Retrieval-Augmented Generation) is a technique that combines retrieval of relevant documents with language model generation to provide more accurate and contextual responses."
-            elif "summary" in content or "summarize" in content:
+            elif "summary" in content_str or "summarize" in content_str:
                 response = "This document discusses important topics related to the query. The main points include relevant information that addresses the user's question."
-            elif "question" in content:
+            elif "question" in content_str:
                 response = "Based on the provided context, here is a relevant answer to your question."
             else:
-                response = f"This is a fake response to: {content}"
+                response = f"This is a fake response to: {content_str}"
         else:
             response = "This is a default fake response."
 
