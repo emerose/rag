@@ -744,7 +744,8 @@ class TextSplitterFactory:
 
         # Extract heading hierarchy for later processing
         if "heading_hierarchy" not in metadata:
-            metadata["heading_hierarchy"] = []
+            hierarchy_list: list[dict[str, Any]] = []
+            metadata["heading_hierarchy"] = hierarchy_list
 
         # Add current heading to hierarchy with position info
         if current_heading and "chunk_start_char" in metadata:

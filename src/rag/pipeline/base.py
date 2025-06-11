@@ -256,7 +256,7 @@ class IngestionPipeline:
         self._report_progress(
             PipelineStage.LOADING, 0, len(source_ids), "Loading documents..."
         )
-        source_documents = []
+        source_documents: list[SourceDocument] = []
 
         for idx, source_id in enumerate(source_ids):
             try:
@@ -324,7 +324,7 @@ class IngestionPipeline:
         self, transformed_docs: dict[str, list[Document]], result: PipelineResult
     ) -> list[Document]:
         """Store source document metadata and chunks."""
-        all_documents = []
+        all_documents: list[Document] = []
 
         # First, store source document metadata for each source
         for source_id in transformed_docs:

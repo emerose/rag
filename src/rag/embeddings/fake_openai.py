@@ -95,7 +95,7 @@ class FakeEmbeddings:
         self, input: list[str], model: str = "text-embedding-3-small"
     ) -> FakeEmbeddingResponse:
         """Create fake embeddings for input texts."""
-        embeddings = []
+        embeddings: list[list[float]] = []
         for input_text in input:
             # Handle case where text might be a list (flatten if needed)
             if isinstance(input_text, list):
@@ -105,7 +105,7 @@ class FakeEmbeddings:
             # Generate deterministic embedding based on text hash
             hash_bytes = hashlib.md5(text.encode()).digest()
             # Convert to floats between -1 and 1
-            embedding = []
+            embedding: list[float] = []
             for i in range(self.dimension):
                 byte_val = hash_bytes[i % len(hash_bytes)]
                 float_val = (byte_val / 255.0) * 2.0 - 1.0

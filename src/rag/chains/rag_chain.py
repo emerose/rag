@@ -250,6 +250,15 @@ def build_rag_chain(
             "documents": packed,
         }
 
+    def _process_llm_response(inp: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "answer": _invoke_llm(inp["prompt"]),
+            "documents": inp["documents"],
+        }
+
+    def _finalize_response(d: dict[str, Any]) -> dict[str, Any]:
+        return {"answer": d["answer"], "documents": d["documents"]}
+
     retrieve_op = RunnableLambda(_retrieve)
 
     # LCEL graph
@@ -261,18 +270,11 @@ def build_rag_chain(
             },
         )
         | RunnableLambda(_prepare_prompt)
-        | RunnableLambda(
-            lambda inp: {
-                "answer": _invoke_llm(inp["prompt"]),
-                "documents": inp["documents"],
-            },
-        )
+        | RunnableLambda(_process_llm_response)
     )
 
     # Final parser to ensure consistent output type
-    chain = chain | RunnableLambda(
-        lambda d: {"answer": d["answer"], "documents": d["documents"]}
-    )
+    chain = chain | RunnableLambda(_finalize_response)
 
     # Return as properly typed chain
     return RunnableLambda(lambda question: chain.invoke(question))
