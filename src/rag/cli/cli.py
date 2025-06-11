@@ -808,7 +808,6 @@ def query(  # noqa: PLR0913
                 "metadata": {
                     "k": k,
                     "prompt_template": prompt,
-                    "num_vectorstores": 1 if rag_engine.vectorstore else 0,
                 },
             }
         )
@@ -1343,7 +1342,6 @@ def repl(
                         "metadata": {
                             "k": k,
                             "prompt_template": prompt,
-                            "num_vectorstores": 1 if rag_engine.vectorstore else 0,
                         },
                     }
                 )
@@ -1375,77 +1373,6 @@ def repl(
         sys.exit(1)
     finally:
         state.is_processing = False
-
-
-@app.command()
-def cleanup(
-    # Duplicated from app-level callback for Typer CLI compatibility
-    cache_dir: str = typer.Option(
-        None,  # Default to None to allow app-level value to be used
-        "--cache-dir",
-        "-c",
-        help="Directory for caching embeddings and vector stores",
-    ),
-    json_output: bool = JSON_OUTPUT_OPTION,
-) -> None:
-    """Clean up the cache by removing entries for non-existent files.
-
-    This command:
-    1. Scans the cache for all indexed documents
-    2. Checks if each document still exists
-    3. Removes cache entries for missing documents
-    4. Reports space freed and files removed
-    """
-    try:
-        logger.info("Starting cache cleanup...")
-
-        # Initialize RAG engine using RAGConfig with default cache directory
-        logger.info(f"Initializing RAGConfig with cache_dir: {state.cache_dir}")
-        config = RAGConfig(
-            documents_dir=".",  # Not used for cleanup, but required
-            cache_dir=cache_dir or state.cache_dir,
-            vectorstore_backend=state.vectorstore_backend,
-        )
-
-        # Initialize the RAG engine
-        rag_engine = create_rag_engine(config)
-
-        # Execute the cleanup
-        result = rag_engine.cleanup_orphaned_chunks()
-
-        # Format size nicely
-        bytes_freed = result.get("bytes_freed", 0)
-        if bytes_freed < 1024:
-            size_str = f"{bytes_freed} bytes"
-        elif bytes_freed < 1024 * 1024:
-            size_str = f"{bytes_freed / 1024:.2f} KB"
-        else:
-            size_str = f"{bytes_freed / (1024 * 1024):.2f} MB"
-
-        # Create output data
-        output_data = {
-            "summary": {
-                "removed_count": result.get("orphaned_files_removed", 0),
-                "bytes_freed": bytes_freed,
-                "size_human": size_str,
-            },
-            "removed_paths": result.get("removed_paths", []),
-        }
-
-        # Write output
-        write(output_data)
-
-        # Log removed paths for debugging
-        if result.get("orphaned_files_removed", 0) > 0:
-            logger.info("Removed the following orphaned vector stores:")
-            for path in result.get("removed_paths", []):
-                logger.info(f"  - {path}")
-        else:
-            logger.info("No orphaned vector stores found")
-
-    except (exceptions.RAGError, OSError, ValueError, KeyError, FileNotFoundError) as e:
-        write(Error(f"Error during cache cleanup: {e}"))
-        raise typer.Exit(code=1) from e
 
 
 @app.command(name="eval")

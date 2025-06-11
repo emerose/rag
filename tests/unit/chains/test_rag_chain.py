@@ -11,8 +11,6 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from langchain_core.documents import Document
-from langchain_community.vectorstores import FAISS
-import numpy as np
 
 import rag.chains.rag_chain as rag_chain
 from rag.chains.rag_chain import (
@@ -20,6 +18,7 @@ from rag.chains.rag_chain import (
     _parse_metadata_filters,
     _doc_matches_filters,
 )
+from rag.storage.fakes import InMemoryVectorStore
 from rag.utils.exceptions import VectorstoreError
 
 
@@ -47,7 +46,21 @@ def mock_documents():
 
 
 @pytest.fixture
-def mock_engine():
+def fake_vectorstore(mock_documents):
+    """Create a fake vectorstore for testing."""
+    vectorstore = InMemoryVectorStore()
+    # Manually add documents to the fake vectorstore
+    vectorstore.documents = mock_documents
+    vectorstore.embeddings = [[0.1, 0.2, 0.3]] * len(mock_documents)  # Dummy embeddings
+    
+    # Mock the as_retriever method to return a trackable mock
+    mock_retriever = MagicMock()
+    vectorstore.as_retriever = MagicMock(return_value=mock_retriever)
+    
+    return vectorstore
+
+@pytest.fixture
+def mock_engine(fake_vectorstore):
     """Create a mock RAGEngine instance for testing."""
     engine = MagicMock()
 
@@ -56,31 +69,12 @@ def mock_engine():
     chat_response.content = "This is a test answer about RAG."
     engine.chat_model.invoke.return_value = chat_response
 
-    # Mock vectorstore_manager (still exists for backward compatibility)
-    engine.vectorstore_manager = MagicMock()
-    
-    # Mock single vectorstore (new architecture)
-    mock_vs = MagicMock()
-    mock_vs.similarity_search.return_value = []
-    mock_vs.as_retriever.return_value = MagicMock()
-    
-    # New architecture: single vectorstore property
-    engine.vectorstore = mock_vs
+    # Use fake vectorstore instead of mocks
+    engine.vectorstore = fake_vectorstore
 
     return engine
 
 
-@pytest.fixture
-def mock_faiss(mock_documents):
-    """Create a mock FAISS vectorstore."""
-    mock_vs = MagicMock(spec=FAISS)
-    mock_vs.similarity_search.return_value = mock_documents
-
-    # Mock as_retriever method
-    mock_retriever = MagicMock()
-    mock_vs.as_retriever.return_value = mock_retriever
-
-    return mock_vs
 
 
 def test_parse_metadata_filters():
@@ -130,7 +124,7 @@ def test_doc_matches_filters(mock_documents):
 
 
 @patch("rag.chains.rag_chain.RunnableLambda")
-def test_build_rag_chain(mock_runnable_lambda, mock_engine, mock_faiss):
+def test_build_rag_chain(mock_runnable_lambda, mock_engine):
     """Test the RAG chain construction."""
     # Build the chain (no longer needs merge operations)
     chain = build_rag_chain(mock_engine, k=2)
@@ -143,7 +137,7 @@ def test_build_rag_chain(mock_runnable_lambda, mock_engine, mock_faiss):
 
 
 @patch("rag.chains.rag_chain.RunnableLambda")
-def test_chain_execution(mock_runnable_lambda, mock_engine, mock_faiss, mock_documents):
+def test_chain_execution(mock_runnable_lambda, mock_engine):
     """Test the execution of the RAG chain end-to-end."""
     # Create a simple test for the build_rag_chain function
     # This mainly verifies that the function doesn't raise any exceptions
@@ -166,7 +160,7 @@ def test_chain_with_error_handling(mock_engine):
         build_rag_chain(mock_engine)
 
 
-def test_system_prompt_invoke(mock_engine, mock_faiss, mock_documents):
+def test_system_prompt_invoke(mock_engine):
     """Ensure system prompt is prepended when defined."""
     mock_engine.system_prompt = "Be concise."
 
@@ -195,7 +189,7 @@ def test_pack_documents_respects_limit():
     assert packed[0].page_content == "one two three"
 
 
-def test_streaming_invocation(mock_engine, mock_faiss, mock_documents):
+def test_streaming_invocation(mock_engine):
     """Ensure tokens are streamed when runtime.stream is True."""
     mock_engine.runtime = MagicMock(stream=True, stream_callback=None)
     mock_engine.chat_model.stream.return_value = [

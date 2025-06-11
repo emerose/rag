@@ -197,9 +197,6 @@ class RAGMCPServer(FastMCP):
             return True
         return False
 
-    async def tool_cleanup(self) -> dict[str, Any]:
-        return self.engine.cleanup_orphaned_chunks()
-
     def _register_tools(self) -> None:
         self.add_tool(self.tool_query)
         self.add_tool(self.tool_search)
@@ -212,7 +209,6 @@ class RAGMCPServer(FastMCP):
         self.add_tool(self.tool_summaries)
         self.add_tool(self.tool_chunks)
         self.add_tool(self.tool_invalidate)
-        self.add_tool(self.tool_cleanup)
 
 
 # ----------------------------------------------------------------------
@@ -287,11 +283,6 @@ async def handle_invalidate(server: RAGMCPServer, req: InvalidateRequest) -> boo
     return await server.tool_invalidate(req.path, req.all)
 
 
-async def handle_cleanup(server: RAGMCPServer) -> dict[str, Any]:
-    """Handle /cleanup POST requests."""
-    return await server.tool_cleanup()
-
-
 def create_http_app(server: RAGMCPServer, api_key: str | None = None) -> FastAPI:
     app = FastAPI()
 
@@ -345,10 +336,6 @@ def create_http_app(server: RAGMCPServer, api_key: str | None = None) -> FastAPI
     @app.post("/invalidate")
     async def invalidate(req: InvalidateRequest) -> bool:
         return await handle_invalidate(server, req)
-
-    @app.post("/cleanup")
-    async def cleanup() -> dict[str, Any]:
-        return await handle_cleanup(server)
 
     return app
 
