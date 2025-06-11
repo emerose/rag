@@ -6,47 +6,38 @@ from pathlib import Path
 from rag.utils.exceptions import (
     # Base exceptions
     RAGError,
-    
     # Configuration errors
     ConfigurationError,
     InvalidConfigurationError,
     MissingConfigurationError,
-    
     # Document errors
     DocumentError,
     DocumentProcessingError,
     DocumentLoadingError,
     UnsupportedFileError,
     RAGFileNotFoundError,
-    
     # Embedding errors
     EmbeddingError,
     EmbeddingGenerationError,
     EmbeddingModelError,
-    
     # Vector store errors
     VectorstoreError,
     VectorstoreNotInitializedError,
-    
     # Query errors
     QueryError,
     QueryProcessingError,
     RetrievalError,
-    
     # Cache errors
     CacheError,
     CacheOperationError,
-    
     # Prompt errors
     PromptError,
     PromptNotFoundError,
     PromptRenderingError,
-    
     # External service errors
     ExternalServiceError,
     APIError,
     RateLimitError,
-    
 )
 
 
@@ -90,7 +81,7 @@ class TestConfigurationErrors:
     def test_invalid_configuration_error(self):
         """Test InvalidConfigurationError."""
         error = InvalidConfigurationError("batch_size", -1, "positive integer")
-        
+
         assert "batch_size" in str(error)
         assert "-1" in str(error)
         assert "positive integer" in str(error)
@@ -103,7 +94,7 @@ class TestConfigurationErrors:
     def test_missing_configuration_error(self):
         """Test MissingConfigurationError."""
         error = MissingConfigurationError("api_key")
-        
+
         assert "api_key" in str(error)
         assert "Missing required" in str(error)
         assert error.error_code == "MISSING_CONFIG"
@@ -114,7 +105,7 @@ class TestConfigurationErrors:
         """Test that configuration errors inherit properly."""
         invalid_error = InvalidConfigurationError("key", "value", "expected")
         missing_error = MissingConfigurationError("key")
-        
+
         assert isinstance(invalid_error, ConfigurationError)
         assert isinstance(invalid_error, RAGError)
         assert isinstance(missing_error, ConfigurationError)
@@ -128,7 +119,7 @@ class TestDocumentErrors:
         """Test basic DocumentProcessingError."""
         file_path = Path("/test/document.pdf")
         error = DocumentProcessingError(file_path, "Failed to parse")
-        
+
         assert str(file_path) in str(error)
         assert "Failed to parse" in str(error)
         assert error.error_code == "DOC_PROCESSING_ERROR"
@@ -139,8 +130,10 @@ class TestDocumentErrors:
         """Test DocumentProcessingError with original exception."""
         file_path = "/test/document.pdf"
         original_error = ValueError("Invalid PDF structure")
-        error = DocumentProcessingError(file_path, "Parsing failed", original_error=original_error)
-        
+        error = DocumentProcessingError(
+            file_path, "Parsing failed", original_error=original_error
+        )
+
         assert "ValueError" in str(error)
         assert "Invalid PDF structure" in str(error)
         assert error.original_error == original_error
@@ -150,7 +143,7 @@ class TestDocumentErrors:
         """Test DocumentLoadingError."""
         file_path = Path("/missing/file.txt")
         error = DocumentLoadingError(file_path, "File not accessible")
-        
+
         assert str(file_path) in str(error)
         assert "Failed to load" in str(error)
         assert error.error_code == "DOC_LOADING_ERROR"
@@ -160,7 +153,7 @@ class TestDocumentErrors:
         """Test UnsupportedFileError."""
         file_path = Path("/test/file.xyz")
         error = UnsupportedFileError(file_path, ".xyz")
-        
+
         assert str(file_path) in str(error)
         assert ".xyz" in str(error)
         assert error.error_code == "UNSUPPORTED_FILE"
@@ -171,7 +164,7 @@ class TestDocumentErrors:
         """Test RAGFileNotFoundError."""
         file_path = Path("/nonexistent/file.txt")
         error = RAGFileNotFoundError(file_path)
-        
+
         assert str(file_path) in str(error)
         assert "not found" in str(error).lower()
         assert error.error_code == "FILE_NOT_FOUND"
@@ -183,8 +176,13 @@ class TestDocumentErrors:
         loading_error = DocumentLoadingError("/test.pdf")
         unsupported_error = UnsupportedFileError("/test.xyz")
         not_found_error = RAGFileNotFoundError("/missing.txt")
-        
-        for error in [processing_error, loading_error, unsupported_error, not_found_error]:
+
+        for error in [
+            processing_error,
+            loading_error,
+            unsupported_error,
+            not_found_error,
+        ]:
             assert isinstance(error, DocumentError)
             assert isinstance(error, RAGError)
 
@@ -195,7 +193,7 @@ class TestEmbeddingErrors:
     def test_embedding_generation_error_basic(self):
         """Test basic EmbeddingGenerationError."""
         error = EmbeddingGenerationError("Sample text", "API timeout")
-        
+
         assert "Sample text" in str(error)
         assert "API timeout" in str(error)
         assert error.error_code == "EMBEDDING_GENERATION_ERROR"
@@ -205,7 +203,7 @@ class TestEmbeddingErrors:
         """Test EmbeddingGenerationError with long text (should be truncated)."""
         long_text = "A" * 200  # 200 characters
         error = EmbeddingGenerationError(long_text, "Failed")
-        
+
         # Text should be truncated to 100 characters + "..."
         assert error.text == "A" * 100 + "..."
         assert len(error.text) == 103
@@ -213,7 +211,7 @@ class TestEmbeddingErrors:
     def test_embedding_model_error(self):
         """Test EmbeddingModelError."""
         error = EmbeddingModelError("text-embedding-ada-002", "Model not available")
-        
+
         assert "text-embedding-ada-002" in str(error)
         assert "Model not available" in str(error)
         assert error.error_code == "EMBEDDING_MODEL_ERROR"
@@ -223,7 +221,7 @@ class TestEmbeddingErrors:
         """Test that embedding errors inherit properly."""
         generation_error = EmbeddingGenerationError("text")
         model_error = EmbeddingModelError("model-name")
-        
+
         for error in [generation_error, model_error]:
             assert isinstance(error, EmbeddingError)
             assert isinstance(error, RAGError)
@@ -235,7 +233,7 @@ class TestVectorstoreErrors:
     def test_vectorstore_error_basic(self):
         """Test basic VectorstoreError."""
         error = VectorstoreError("Search failed")
-        
+
         assert "Search failed" in str(error)
         assert error.error_code == "VECTORSTORE_ERROR"
         assert error.operation is None
@@ -244,11 +242,9 @@ class TestVectorstoreErrors:
     def test_vectorstore_error_with_details(self):
         """Test VectorstoreError with operation and backend."""
         error = VectorstoreError(
-            "Index creation failed",
-            operation="create_index",
-            backend="faiss"
+            "Index creation failed", operation="create_index", backend="faiss"
         )
-        
+
         assert "Index creation failed" in str(error)
         assert "create_index" in str(error)
         assert "faiss" in str(error)
@@ -258,7 +254,7 @@ class TestVectorstoreErrors:
     def test_vectorstore_not_initialized_error(self):
         """Test VectorstoreNotInitializedError."""
         error = VectorstoreNotInitializedError("chroma")
-        
+
         assert "not initialized" in str(error)
         assert "chroma" in str(error)
         assert error.backend == "chroma"
@@ -268,7 +264,7 @@ class TestVectorstoreErrors:
         """Test that vectorstore errors inherit properly."""
         basic_error = VectorstoreError("test")
         not_init_error = VectorstoreNotInitializedError()
-        
+
         for error in [basic_error, not_init_error]:
             assert isinstance(error, VectorstoreError)
             assert isinstance(error, RAGError)
@@ -281,7 +277,7 @@ class TestQueryErrors:
         """Test QueryProcessingError."""
         query = "What is the meaning of life?"
         error = QueryProcessingError(query, "LLM unavailable")
-        
+
         assert query in str(error)
         assert "LLM unavailable" in str(error)
         assert error.error_code == "QUERY_PROCESSING_ERROR"
@@ -291,7 +287,7 @@ class TestQueryErrors:
         """Test QueryProcessingError with long query (should be truncated)."""
         long_query = "Q" * 200  # 200 characters
         error = QueryProcessingError(long_query)
-        
+
         # Query should be truncated to 100 characters + "..."
         assert error.query == "Q" * 100 + "..."
         assert len(error.query) == 103
@@ -300,7 +296,7 @@ class TestQueryErrors:
         """Test RetrievalError."""
         query = "Find documents about AI"
         error = RetrievalError(query, num_documents=5, message="Vector search failed")
-        
+
         assert query in str(error)
         assert "5" in str(error)
         assert "Vector search failed" in str(error)
@@ -312,7 +308,7 @@ class TestQueryErrors:
         """Test that query errors inherit properly."""
         processing_error = QueryProcessingError("test query")
         retrieval_error = RetrievalError("test query")
-        
+
         for error in [processing_error, retrieval_error]:
             assert isinstance(error, QueryError)
             assert isinstance(error, RAGError)
@@ -324,7 +320,7 @@ class TestCacheErrors:
     def test_cache_operation_error(self):
         """Test CacheOperationError."""
         error = CacheOperationError("get", "user:123", "Cache miss")
-        
+
         assert "get" in str(error)
         assert "user:123" in str(error)
         assert "Cache miss" in str(error)
@@ -335,7 +331,7 @@ class TestCacheErrors:
     def test_cache_error_inheritance(self):
         """Test that cache errors inherit properly."""
         operation_error = CacheOperationError("set", "key:value")
-        
+
         assert isinstance(operation_error, CacheError)
         assert isinstance(operation_error, RAGError)
 
@@ -347,7 +343,7 @@ class TestPromptErrors:
         """Test PromptNotFoundError."""
         available_prompts = ["basic", "detailed", "summary"]
         error = PromptNotFoundError("advanced", available_prompts)
-        
+
         assert "advanced" in str(error)
         assert "basic" in str(error)
         assert "detailed" in str(error)
@@ -359,7 +355,7 @@ class TestPromptErrors:
     def test_prompt_not_found_error_no_available(self):
         """Test PromptNotFoundError without available prompts."""
         error = PromptNotFoundError("missing")
-        
+
         assert "missing" in str(error)
         assert error.prompt_id == "missing"
         assert error.available_prompts == []
@@ -367,7 +363,7 @@ class TestPromptErrors:
     def test_prompt_rendering_error(self):
         """Test PromptRenderingError."""
         error = PromptRenderingError("template_id", "Missing variable")
-        
+
         assert "template_id" in str(error)
         assert "Missing variable" in str(error)
         assert error.error_code == "PROMPT_RENDERING_ERROR"
@@ -377,7 +373,7 @@ class TestPromptErrors:
         """Test that prompt errors inherit properly."""
         not_found_error = PromptNotFoundError("test")
         rendering_error = PromptRenderingError("test")
-        
+
         for error in [not_found_error, rendering_error]:
             assert isinstance(error, PromptError)
             assert isinstance(error, RAGError)
@@ -389,7 +385,7 @@ class TestExternalServiceErrors:
     def test_api_error_basic(self):
         """Test basic APIError."""
         error = APIError("OpenAI", "embed_text", "Invalid API key")
-        
+
         assert "OpenAI" in str(error)
         assert "embed_text" in str(error)
         assert "Invalid API key" in str(error)
@@ -401,15 +397,17 @@ class TestExternalServiceErrors:
     def test_api_error_with_status_code(self):
         """Test APIError with status code."""
         error = APIError("OpenAI", "chat_completion", "Rate limited", status_code=429)
-        
+
         assert "OpenAI" in str(error)
         assert "429" in str(error)
         assert error.status_code == 429
 
     def test_rate_limit_error(self):
         """Test RateLimitError."""
-        error = RateLimitError("Anthropic", retry_after=60.0, message="Daily limit exceeded")
-        
+        error = RateLimitError(
+            "Anthropic", retry_after=60.0, message="Daily limit exceeded"
+        )
+
         assert "Anthropic" in str(error)
         assert "60" in str(error)
         assert "Daily limit exceeded" in str(error)
@@ -421,11 +419,10 @@ class TestExternalServiceErrors:
         """Test that external service errors inherit properly."""
         api_error = APIError("Service", "operation")
         rate_limit_error = RateLimitError("Service")
-        
+
         for error in [api_error, rate_limit_error]:
             assert isinstance(error, ExternalServiceError)
             assert isinstance(error, RAGError)
-
 
 
 class TestExceptionChaining:
@@ -434,16 +431,20 @@ class TestExceptionChaining:
     def test_original_error_preservation(self):
         """Test that original errors are preserved in context."""
         original = ValueError("Original error message")
-        
+
         # Test with document error
-        doc_error = DocumentProcessingError("/test.pdf", "Processing failed", original_error=original)
+        doc_error = DocumentProcessingError(
+            "/test.pdf", "Processing failed", original_error=original
+        )
         assert doc_error.original_error == original
         assert "ValueError" in str(doc_error)
         assert "Original error message" in str(doc_error)
         assert doc_error.context["original_error"] is not None
 
         # Test with embedding error
-        embed_error = EmbeddingGenerationError("text", "Generation failed", original_error=original)
+        embed_error = EmbeddingGenerationError(
+            "text", "Generation failed", original_error=original
+        )
         assert embed_error.original_error == original
         assert "ValueError" in str(embed_error)
 
@@ -459,11 +460,11 @@ class TestExceptionChaining:
             PromptNotFoundError("prompt"),
             APIError("service", "operation"),
         ]
-        
+
         for error in test_exceptions:
             assert isinstance(error, RAGError)
-            assert hasattr(error, 'error_code')
-            assert hasattr(error, 'context')
+            assert hasattr(error, "error_code")
+            assert hasattr(error, "context")
 
     def test_error_codes_are_unique(self):
         """Test that error codes are unique across the hierarchy."""
@@ -485,12 +486,12 @@ class TestExceptionChaining:
             "API_ERROR",
             "RATE_LIMIT_ERROR",
         ]
-        
+
         # All error codes should be unique
         assert len(error_codes) == len(set(error_codes))
-        
+
         # All error codes should be strings
         assert all(isinstance(code, str) for code in error_codes)
-        
+
         # All error codes should be uppercase with underscores
         assert all(code.isupper() and "_" in code for code in error_codes)

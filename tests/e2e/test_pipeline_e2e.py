@@ -21,7 +21,7 @@ load_dotenv()
 @pytest.mark.e2e
 class TestPipelineE2E:
     """End-to-end tests for DocumentSource/IngestionPipeline architecture."""
-    
+
     @pytest.fixture(autouse=True)
     def check_openai_key(self):
         """Skip tests if OpenAI API key is not available."""
@@ -31,10 +31,10 @@ class TestPipelineE2E:
     def create_test_documents(self, docs_dir: Path) -> dict[str, Path]:
         """Create test documents for e2e testing."""
         docs_dir.mkdir(exist_ok=True)
-        
+
         # Create test documents
         documents = {}
-        
+
         # Python programming document
         python_doc = docs_dir / "python_guide.md"
         python_doc.write_text("""# Python Programming Guide
@@ -56,7 +56,7 @@ It was first released in 1991 and is known for its simple, readable syntax.
 - Scientific computing
 """)
         documents["python"] = python_doc
-        
+
         # JavaScript programming document
         js_doc = docs_dir / "javascript_basics.txt"
         js_doc.write_text("""JavaScript Programming Basics
@@ -77,7 +77,7 @@ JavaScript is essential for:
 - Desktop applications
 """)
         documents["javascript"] = js_doc
-        
+
         # Technology overview document
         tech_doc = docs_dir / "technology_trends.md"
         tech_doc.write_text("""# Technology Trends
@@ -95,7 +95,7 @@ DevOps practices improve software development and deployment.
 Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
 """)
         documents["technology"] = tech_doc
-        
+
         return documents
 
     def test_complete_workflow(self):
@@ -104,10 +104,10 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
             cache_dir = temp_path / "cache"
-            
+
             # Create test documents
             documents = self.create_test_documents(docs_dir)
-            
+
             # Create RAG engine
             config = RAGConfig(
                 documents_dir=str(docs_dir),
@@ -117,58 +117,64 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             )
             runtime = RuntimeOptions()
             engine = RAGEngine(config, runtime)
-            
+
             # Step 1: Index all documents using IngestionPipeline
             index_results = engine.ingestion_pipeline.ingest_all()
-            
+
             # Verify indexing succeeded
             assert index_results.documents_loaded == 3  # 3 documents
             assert index_results.documents_stored >= 1  # At least 1 document processed
             assert len(index_results.errors) == 0
-            
+
             # Verify documents are listed as indexed
             document_store = engine.ingestion_pipeline.document_store
             source_documents = document_store.list_source_documents()
             # Note: Current pipeline implementation processes files individually
             # So we verify at least one document was processed successfully
             assert len(source_documents) >= 1
-            
+
             # Verify at least one of our test documents was indexed
             indexed_paths = {Path(doc.location).resolve() for doc in source_documents}
-            test_document_paths = {documents["python"].resolve(), documents["javascript"].resolve(), documents["technology"].resolve()}
+            test_document_paths = {
+                documents["python"].resolve(),
+                documents["javascript"].resolve(),
+                documents["technology"].resolve(),
+            }
             # At least one of our test documents should be indexed
             assert len(indexed_paths.intersection(test_document_paths)) >= 1
-            
+
             # Step 2: Test queries with IngestionPipeline
-            
+
             # Query about Python - test that retrieval and answering works
             response1 = engine.answer("Who created Python and when was it released?")
             assert "question" in response1
             assert "answer" in response1
             assert "sources" in response1
-            assert response1["question"] == "Who created Python and when was it released?"
-            
+            assert (
+                response1["question"] == "Who created Python and when was it released?"
+            )
+
             # Check if the system found relevant information
             answer1_lower = response1["answer"].lower()
             print(f"Python query answer: {response1['answer']}")
-            
+
             # The system should generate a coherent response, even if it doesn't find the specific information
             # Since the current pipeline may only index one file, we just verify the system is working
             assert len(response1["answer"]) > 0, "Should generate some answer"
             # Note: sources may be empty if the retrieved content doesn't contain Python info
-                
+
             # Query about JavaScript - test basic functionality
             response2 = engine.answer("What is JavaScript used for?")
             assert "question" in response2
             assert "answer" in response2
             assert "sources" in response2
-            
+
             # Query about technology - test system works
             response3 = engine.answer("What are some current technology trends?")
             assert "question" in response3
             assert "answer" in response3
             assert "sources" in response3
-            
+
             # At minimum, verify the system generates coherent responses (not empty or error responses)
             assert len(response1["answer"]) > 10, "Should generate substantive answer"
             assert len(response2["answer"]) > 10, "Should generate substantive answer"
@@ -180,10 +186,10 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
             cache_dir = temp_path / "cache"
-            
+
             # Create empty docs directory first to test empty directory case
             docs_dir.mkdir()
-            
+
             config = RAGConfig(
                 documents_dir=str(docs_dir),
                 data_dir=str(cache_dir),
@@ -192,10 +198,10 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             )
             runtime = RuntimeOptions()
             engine = RAGEngine(config, runtime)
-            
+
             # Test with empty directory (should handle gracefully)
             results = engine.ingestion_pipeline.ingest_all()
-            
+
             # Should return results indicating no documents processed
             assert results.documents_loaded == 0
             assert results.documents_stored == 0
@@ -206,31 +212,31 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
             cache_dir = temp_path / "cache"
-            
+
             # Create the docs directory first
             docs_dir.mkdir(exist_ok=True)
-            
+
             config = RAGConfig(
                 documents_dir=str(docs_dir),
                 data_dir=str(cache_dir),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
             )
-            
+
             # Use fake components to avoid API calls
             from rag.testing.test_factory import FakeRAGComponentsFactory
-            
+
             factory = FakeRAGComponentsFactory(config=config)
-            
+
             # Test document source creation
             document_source = factory.document_source
             assert document_source is not None
             assert hasattr(document_source, "root_path")
-            
+
             # Test ingestion pipeline creation
             pipeline = factory.ingestion_pipeline
             assert pipeline is not None
-            
+
             # Test that ingest_manager is an alias for ingestion_pipeline
             ingest_manager = factory.ingest_manager
             assert ingest_manager is pipeline
@@ -241,7 +247,7 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
             cache_dir = temp_path / "cache"
-            
+
             # Create test document
             docs_dir.mkdir()
             test_doc = docs_dir / "document_store_test.md"
@@ -255,24 +261,24 @@ and the DocumentStore system.
 - Full-text search capabilities
 - Metadata management
 """)
-            
+
             config = RAGConfig(
                 documents_dir=str(docs_dir.resolve()),  # Use resolved path
                 data_dir=str(cache_dir),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
             )
-            
+
             # Use fake components for testing
             from rag.testing.test_factory import FakeRAGComponentsFactory
-            
+
             factory = FakeRAGComponentsFactory(config=config)
-            
+
             # Test that pipeline components can be created
             pipeline = factory.ingestion_pipeline
             assert pipeline is not None
             assert hasattr(pipeline, "document_store")
-            
+
             # Test that ingest_manager returns the pipeline
             ingest_manager = factory.ingest_manager
             assert ingest_manager is pipeline
@@ -283,12 +289,14 @@ and the DocumentStore system.
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
             cache_dir = temp_path / "cache"
-            
+
             # Create test document
             docs_dir.mkdir()
             test_doc = docs_dir / "persistence_test.txt"
-            test_doc.write_text("This document tests persistence across engine restarts with IngestionPipeline.")
-            
+            test_doc.write_text(
+                "This document tests persistence across engine restarts with IngestionPipeline."
+            )
+
             config = RAGConfig(
                 documents_dir=str(docs_dir),
                 data_dir=str(cache_dir),
@@ -296,28 +304,28 @@ and the DocumentStore system.
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
             )
             runtime = RuntimeOptions()
-            
+
             # First engine instance - index document
             engine1 = RAGEngine(config, runtime)
             results = engine1.ingestion_pipeline.ingest_all()
             assert results.documents_loaded == 1
             assert results.documents_stored == 1
             assert len(results.errors) == 0
-            
+
             # Verify it's indexed
             document_store1 = engine1.ingestion_pipeline.document_store
             source_docs1 = document_store1.list_source_documents()
             assert len(source_docs1) == 1
-            
+
             # Create second engine instance (simulating restart)
             engine2 = RAGEngine(config, runtime)
-            
+
             # Should still see the indexed file
             document_store2 = engine2.ingestion_pipeline.document_store
             source_docs2 = document_store2.list_source_documents()
             assert len(source_docs2) == 1
             assert source_docs2[0].location == str(test_doc.resolve())
-            
+
             # Should be able to query the document
             response = engine2.answer("What does this document test?")
             assert "question" in response

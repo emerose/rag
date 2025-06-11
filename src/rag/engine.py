@@ -50,7 +50,6 @@ class RAGEngine:
 
         # Cache the main components we need
         self._query_engine = None
-        self._cache_orchestrator = None
         self._vectorstore: VectorStoreProtocol | None = None
 
     @property
@@ -59,13 +58,6 @@ class RAGEngine:
         if self._query_engine is None:
             self._query_engine = self._factory.create_query_engine()
         return self._query_engine
-
-    @property
-    def data_orchestrator(self):
-        """Get the data orchestrator."""
-        if self._cache_orchestrator is None:
-            self._cache_orchestrator = self._factory.create_data_orchestrator()
-        return self._cache_orchestrator
 
     @property
     def document_store(self):
@@ -264,30 +256,29 @@ class RAGEngine:
             logger.error(f"Error loading vectorstore: {e}")
             return None
 
-    def invalidate_data(self, file_path: Path | str) -> None:
-        """Invalidate data for a specific file.
+    def clear_data(self, file_path: Path | str) -> None:
+        """Clear data for a specific file.
 
         Args:
-            file_path: Path to the file to invalidate
+            file_path: Path to the file to clear
         """
         try:
             # Remove from DocumentStore
             document_store = self.ingestion_pipeline.document_store
             document_store.remove_source_document(str(file_path))
 
-            # Also invalidate document store for compatibility
-            self.document_store.remove_metadata(Path(file_path))
+            # No additional cleanup needed - document_store handles everything
         except Exception as e:
-            logger.error(f"Error invalidating data for {file_path}: {e}")
+            logger.error(f"Error clearing data for {file_path}: {e}")
 
-    def invalidate_all_data(self) -> None:
-        """Invalidate all data."""
+    def clear_all_data(self) -> None:
+        """Clear all data."""
         try:
             # Clear all file metadata from document store
             self.document_store.clear_all_file_metadata()
 
         except Exception as e:
-            logger.error(f"Error invalidating all data: {e}")
+            logger.error(f"Error clearing all data: {e}")
 
     def get_document_summaries(self, k: int = 5) -> list[dict[str, Any]]:
         """Get summaries of the largest indexed documents.

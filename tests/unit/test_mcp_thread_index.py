@@ -27,15 +27,17 @@ class DummyEngine:
             progress_callback("indexed", path, None)
         return True, None
 
-    def invalidate_all_caches(self) -> None:
+    def clear_all_data(self) -> None:
         pass
 
     @property
     def document_source(self):
         """Mock document source for MCP server compatibility."""
+
         class MockSource:
             def list_documents(self):
                 return ["file.txt"]
+
         return MockSource()
 
 

@@ -88,7 +88,7 @@ def test_json_output_piping(tmp_path: Path) -> None:
     from rag.testing.test_factory import FakeRAGComponentsFactory
     from rag.cli.cli import set_engine_factory_provider, _engine_factory_provider
     from rag.config import RAGConfig, RuntimeOptions
-    
+
     # Create test configuration
     test_config = RAGConfig(
         documents_dir=str(docs_dir),
@@ -98,23 +98,26 @@ def test_json_output_piping(tmp_path: Path) -> None:
         chunk_size=100,
         chunk_overlap=10,
     )
-    
+
     test_runtime = RuntimeOptions(
         max_workers=1,
         async_batching=False,
     )
-    
+
     # Store the original factory to restore later
     original_factory = _engine_factory_provider
-    
+
     try:
         # Set the fake factory as the CLI's engine factory provider
-        set_engine_factory_provider(lambda config, runtime: FakeRAGComponentsFactory.create_for_integration_tests(
-            config=config,
-            runtime=runtime,
-            use_real_filesystem=True  # Use real files but fake OpenAI
-        ))
-        
+        set_engine_factory_provider(
+            lambda config,
+            runtime: FakeRAGComponentsFactory.create_for_integration_tests(
+                config=config,
+                runtime=runtime,
+                use_real_filesystem=True,  # Use real files but fake OpenAI
+            )
+        )
+
         result_index = runner.invoke(
             app, ["index", str(file_path), "--data-dir", str(tmp_path)]
         )
@@ -126,7 +129,7 @@ def test_json_output_piping(tmp_path: Path) -> None:
     finally:
         # Restore the original factory
         set_engine_factory_provider(original_factory)
-        
+
     # With fake vectorstores, the query might fail gracefully
     # The key is that we avoided OpenAI API calls during both index and query
     if result_query.exit_code == 0:

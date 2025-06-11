@@ -21,12 +21,12 @@ class TestQueryWorkflow:
         data_dir = tmp_path / "data"
         docs_dir.mkdir()
         data_dir.mkdir()
-        
+
         return RAGConfig(
             documents_dir=str(docs_dir),
             data_dir=str(data_dir),
             vectorstore_backend="fake",
-            openai_api_key="sk-test"
+            openai_api_key="sk-test",
         )
 
     def create_test_document(self, docs_dir: Path, filename: str, content: str) -> Path:
@@ -40,40 +40,40 @@ class TestQueryWorkflow:
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
-            config=config,
-            runtime=runtime,
-            use_real_filesystem=True
+            config=config, runtime=runtime, use_real_filesystem=True
         )
-        
+
         engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
-        
+
         # Create and index test documents
         doc1 = self.create_test_document(
-            docs_dir, "france.txt", 
-            "France is a country in Europe. The capital of France is Paris."
+            docs_dir,
+            "france.txt",
+            "France is a country in Europe. The capital of France is Paris.",
         )
         doc2 = self.create_test_document(
-            docs_dir, "japan.txt",
-            "Japan is a country in Asia. The capital of Japan is Tokyo."
+            docs_dir,
+            "japan.txt",
+            "Japan is a country in Asia. The capital of Japan is Tokyo.",
         )
-        
+
         # Index documents
         results = engine.index_directory(docs_dir)
         assert len(results) == 2
         assert all(result.get("success") for result in results.values())
-        
+
         # Query the indexed documents
         response = engine.answer("What is the capital of France?")
-        
+
         # Verify response structure
         assert "question" in response
         assert "answer" in response
         assert "sources" in response
         assert "num_documents_retrieved" in response
-        
+
         # Verify query was processed
         assert response["question"] == "What is the capital of France?"
         # Check that we get some answer (fake LLM gives generic responses)
@@ -90,38 +90,39 @@ class TestQueryWorkflow:
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
-            config=config,
-            runtime=runtime,
-            use_real_filesystem=True
+            config=config, runtime=runtime, use_real_filesystem=True
         )
-        
+
         engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
-        
+
         # Create multiple documents with related content
         doc1 = self.create_test_document(
-            docs_dir, "europe.txt",
-            "European capitals include Paris (France), Berlin (Germany), and Rome (Italy)."
+            docs_dir,
+            "europe.txt",
+            "European capitals include Paris (France), Berlin (Germany), and Rome (Italy).",
         )
         doc2 = self.create_test_document(
-            docs_dir, "asia.txt", 
-            "Asian capitals include Tokyo (Japan), Beijing (China), and Seoul (South Korea)."
+            docs_dir,
+            "asia.txt",
+            "Asian capitals include Tokyo (Japan), Beijing (China), and Seoul (South Korea).",
         )
         doc3 = self.create_test_document(
-            docs_dir, "americas.txt",
-            "American capitals include Washington DC (USA), Ottawa (Canada), and Mexico City (Mexico)."
+            docs_dir,
+            "americas.txt",
+            "American capitals include Washington DC (USA), Ottawa (Canada), and Mexico City (Mexico).",
         )
-        
+
         # Index documents
         results = engine.index_directory(docs_dir)
         assert len(results) == 3
         assert all(result.get("success") for result in results.values())
-        
+
         # Query for information across multiple documents
         response = engine.answer("What are some world capitals?", k=3)
-        
+
         # Verify multiple documents were retrieved
         assert response["num_documents_retrieved"] <= 3
         assert len(response["sources"]) <= 3
@@ -132,29 +133,28 @@ class TestQueryWorkflow:
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
-            config=config,
-            runtime=runtime,
-            use_real_filesystem=True
+            config=config, runtime=runtime, use_real_filesystem=True
         )
-        
+
         engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
-        
+
         # Create document with unrelated content
         doc = self.create_test_document(
-            docs_dir, "cooking.txt",
-            "Recipe for pasta: boil water, add pasta, cook for 8 minutes."
+            docs_dir,
+            "cooking.txt",
+            "Recipe for pasta: boil water, add pasta, cook for 8 minutes.",
         )
-        
+
         # Index document
         success, _ = engine.index_file(doc)
         assert success is True
-        
+
         # Query for completely unrelated topic
         response = engine.answer("What is quantum physics?")
-        
+
         # Verify response handles no relevant results
         assert "question" in response
         assert "answer" in response
@@ -167,18 +167,16 @@ class TestQueryWorkflow:
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
-            config=config,
-            runtime=runtime,
-            use_real_filesystem=True
+            config=config, runtime=runtime, use_real_filesystem=True
         )
-        
+
         engine = factory.create_rag_engine()
-        
+
         # Query without any indexed documents
         response = engine.answer("What is the capital of France?")
-        
+
         # Verify response handles empty index gracefully
         assert "question" in response
         assert "answer" in response
@@ -190,37 +188,34 @@ class TestQueryWorkflow:
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
-            config=config,
-            runtime=runtime,
-            use_real_filesystem=True
+            config=config, runtime=runtime, use_real_filesystem=True
         )
-        
+
         engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
-        
+
         # Create multiple test documents
         for i in range(5):
             self.create_test_document(
-                docs_dir, f"doc{i}.txt",
-                f"Document {i} with content about topic {i}."
+                docs_dir, f"doc{i}.txt", f"Document {i} with content about topic {i}."
             )
-        
+
         # Index documents
         results = engine.index_directory(docs_dir)
         assert len(results) == 5
-        
+
         # Test different k values
         response_k1 = engine.answer("test query", k=1)
         response_k3 = engine.answer("test query", k=3)
         response_k5 = engine.answer("test query", k=5)
-        
+
         # Verify k parameter affects retrieval
         assert response_k1["num_documents_retrieved"] <= 1
         assert response_k3["num_documents_retrieved"] <= 3
         assert response_k5["num_documents_retrieved"] <= 5
-        
+
         assert len(response_k1["sources"]) <= 1
         assert len(response_k3["sources"]) <= 3
         assert len(response_k5["sources"]) <= 5
@@ -230,21 +225,19 @@ class TestQueryWorkflow:
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
-            config=config,
-            runtime=runtime,
-            use_real_filesystem=True
+            config=config, runtime=runtime, use_real_filesystem=True
         )
-        
+
         engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
-        
+
         # Create and index a document
         doc = self.create_test_document(docs_dir, "test.txt", "Test content.")
         success, _ = engine.index_file(doc)
         assert success is True
-        
+
         # Query should succeed with fake OpenAI
         response = engine.answer("test query")
         assert "answer" in response
@@ -257,29 +250,31 @@ class TestQueryWorkflow:
         # Setup using factory pattern with fake filesystem to avoid slow loaders
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
             config=config,
             runtime=runtime,
-            use_real_filesystem=False  # Use fake filesystem to avoid slow document loaders
+            use_real_filesystem=False,  # Use fake filesystem to avoid slow document loaders
         )
-        
+
         # Add test documents to fake filesystem
         factory.add_test_document("info.txt", "Text file content.")
-        factory.add_test_document("guide.txt", "Documentation content in text format.")  # Use .txt to avoid markdown loader
-        
+        factory.add_test_document(
+            "guide.txt", "Documentation content in text format."
+        )  # Use .txt to avoid markdown loader
+
         engine = factory.create_rag_engine()
-        
+
         # Index documents
         results = engine.index_directory(Path(config.documents_dir))
         assert len(results) == 1  # Pipeline returns single result
         assert results["pipeline"]["success"] is True
         assert results["pipeline"]["documents_processed"] == 2
-        
+
         # Query with metadata filter (if supported by implementation)
         # Note: This tests the workflow even if filtering isn't fully implemented
         response = engine.answer("test query filter:text/plain")
-        
+
         # Verify response is generated
         assert "answer" in response
         # Check that we get some answer (fake LLM gives generic responses)

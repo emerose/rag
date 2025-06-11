@@ -31,11 +31,11 @@ class TestDocumentStoreProtocol:
         """Test adding and retrieving a single document."""
         doc = Document(
             page_content="Test content",
-            metadata={"title": "Test Document", "author": "Test Author"}
+            metadata={"title": "Test Document", "author": "Test Author"},
         )
-        
+
         document_store.add_document("doc1", doc)
-        
+
         retrieved = document_store.get_document("doc1")
         assert retrieved is not None
         assert retrieved.page_content == "Test content"
@@ -54,9 +54,9 @@ class TestDocumentStoreProtocol:
             "doc2": Document(page_content="Content 2", metadata={"type": "blog"}),
             "doc3": Document(page_content="Content 3", metadata={"type": "paper"}),
         }
-        
+
         document_store.add_documents(docs)
-        
+
         # Verify all documents were added
         for doc_id, expected_doc in docs.items():
             retrieved = document_store.get_document(doc_id)
@@ -71,9 +71,9 @@ class TestDocumentStoreProtocol:
             "doc2": Document(page_content="Content 2"),
             "doc3": Document(page_content="Content 3"),
         }
-        
+
         document_store.add_documents(docs)
-        
+
         # Test getting existing documents using individual lookups
         doc1 = document_store.get_document("doc1")
         doc3 = document_store.get_document("doc3")
@@ -81,7 +81,7 @@ class TestDocumentStoreProtocol:
         assert doc3 is not None
         assert doc1.page_content == "Content 1"
         assert doc3.page_content == "Content 3"
-        
+
         # Test getting non-existing document
         nonexistent = document_store.get_document("nonexistent")
         assert nonexistent is None
@@ -90,14 +90,14 @@ class TestDocumentStoreProtocol:
         """Test deleting a single document."""
         doc = Document(page_content="To be deleted")
         document_store.add_document("doc1", doc)
-        
+
         # Verify document exists
         assert document_store.document_exists("doc1")
-        
+
         # Delete document
         result = document_store.delete_document("doc1")
         assert result is True
-        
+
         # Verify document no longer exists
         assert not document_store.document_exists("doc1")
         assert document_store.get_document("doc1") is None
@@ -114,16 +114,16 @@ class TestDocumentStoreProtocol:
             "doc2": Document(page_content="Content 2"),
             "doc3": Document(page_content="Content 3"),
         }
-        
+
         document_store.add_documents(docs)
-        
+
         # Delete some documents
         results = document_store.delete_documents(["doc1", "doc3", "nonexistent"])
-        
+
         assert results["doc1"] is True
         assert results["doc3"] is True
         assert results["nonexistent"] is False
-        
+
         # Verify correct documents were deleted
         assert not document_store.document_exists("doc1")
         assert document_store.document_exists("doc2")
@@ -132,14 +132,14 @@ class TestDocumentStoreProtocol:
     def test_document_exists(self, document_store: DocumentStoreProtocol):
         """Test checking if documents exist."""
         doc = Document(page_content="Test content")
-        
+
         # Document doesn't exist initially
         assert not document_store.document_exists("doc1")
-        
+
         # Add document
         document_store.add_document("doc1", doc)
         assert document_store.document_exists("doc1")
-        
+
         # Delete document
         document_store.delete_document("doc1")
         assert not document_store.document_exists("doc1")
@@ -148,7 +148,7 @@ class TestDocumentStoreProtocol:
         """Test listing all document IDs."""
         # Empty store
         assert document_store.list_document_ids() == []
-        
+
         # Add documents
         docs = {
             "doc3": Document(page_content="Content 3"),
@@ -156,11 +156,11 @@ class TestDocumentStoreProtocol:
             "doc2": Document(page_content="Content 2"),
         }
         document_store.add_documents(docs)
-        
+
         # Should return sorted list
         doc_ids = document_store.list_document_ids()
         assert doc_ids == ["doc1", "doc2", "doc3"]
-        
+
         # Delete one document
         document_store.delete_document("doc2")
         doc_ids = document_store.list_document_ids()
@@ -170,7 +170,7 @@ class TestDocumentStoreProtocol:
         """Test counting documents."""
         # Empty store
         assert document_store.count_documents() == 0
-        
+
         # Add documents
         docs = {
             "doc1": Document(page_content="Content 1"),
@@ -179,7 +179,7 @@ class TestDocumentStoreProtocol:
         }
         document_store.add_documents(docs)
         assert document_store.count_documents() == 3
-        
+
         # Delete one document
         document_store.delete_document("doc2")
         assert document_store.count_documents() == 2
@@ -194,7 +194,7 @@ class TestDocumentStoreProtocol:
         }
         document_store.add_documents(docs)
         assert document_store.count_documents() == 3
-        
+
         # Clear all documents
         document_store.clear()
         assert document_store.count_documents() == 0
@@ -208,12 +208,12 @@ class TestDocumentStoreProtocol:
             "doc3": Document(page_content="A fast cat runs quickly"),
         }
         document_store.add_documents(docs)
-        
+
         # Search for "quick" (should match doc1 and doc3)
         results = document_store.search_documents(query="quick")
         doc_ids = [doc_id for doc_id, _ in results]
         assert len(results) >= 1  # At least one match expected
-        
+
         # Verify content contains the search term
         for doc_id, doc in results:
             assert "quick" in doc.page_content.lower()
@@ -221,34 +221,48 @@ class TestDocumentStoreProtocol:
     def test_search_documents_by_metadata(self, document_store: DocumentStoreProtocol):
         """Test searching documents by metadata."""
         docs = {
-            "doc1": Document(page_content="Content 1", metadata={"type": "article", "author": "Alice"}),
-            "doc2": Document(page_content="Content 2", metadata={"type": "blog", "author": "Bob"}),
-            "doc3": Document(page_content="Content 3", metadata={"type": "article", "author": "Charlie"}),
+            "doc1": Document(
+                page_content="Content 1",
+                metadata={"type": "article", "author": "Alice"},
+            ),
+            "doc2": Document(
+                page_content="Content 2", metadata={"type": "blog", "author": "Bob"}
+            ),
+            "doc3": Document(
+                page_content="Content 3",
+                metadata={"type": "article", "author": "Charlie"},
+            ),
         }
         document_store.add_documents(docs)
-        
+
         # Search by metadata
         results = document_store.search_documents(metadata_filter={"type": "article"})
         doc_ids = [doc_id for doc_id, _ in results]
         assert len(results) == 2
         assert "doc1" in doc_ids
         assert "doc3" in doc_ids
-        
+
         # Search by multiple metadata fields
-        results = document_store.search_documents(metadata_filter={"type": "article", "author": "Alice"})
+        results = document_store.search_documents(
+            metadata_filter={"type": "article", "author": "Alice"}
+        )
         assert len(results) == 1
         assert results[0][0] == "doc1"
 
     def test_search_documents_with_limit(self, document_store: DocumentStoreProtocol):
         """Test searching documents with result limit."""
         docs = {
-            f"doc{i}": Document(page_content=f"Test content {i}", metadata={"category": "test"})
+            f"doc{i}": Document(
+                page_content=f"Test content {i}", metadata={"category": "test"}
+            )
             for i in range(10)
         }
         document_store.add_documents(docs)
-        
+
         # Search with limit
-        results = document_store.search_documents(metadata_filter={"category": "test"}, limit=3)
+        results = document_store.search_documents(
+            metadata_filter={"category": "test"}, limit=3
+        )
         assert len(results) <= 3
 
     def test_search_documents_no_filters(self, document_store: DocumentStoreProtocol):
@@ -259,7 +273,7 @@ class TestDocumentStoreProtocol:
             "doc3": Document(page_content="Content 3"),
         }
         document_store.add_documents(docs)
-        
+
         # Search without filters should return all documents
         results = document_store.search_documents()
         assert len(results) == 3
@@ -269,17 +283,17 @@ class TestDocumentStoreProtocol:
         # Add initial document
         doc1 = Document(page_content="Original content", metadata={"version": "1"})
         document_store.add_document("doc1", doc1)
-        
+
         # Replace with new document
         doc2 = Document(page_content="Updated content", metadata={"version": "2"})
         document_store.add_document("doc1", doc2)
-        
+
         # Verify document was replaced
         retrieved = document_store.get_document("doc1")
         assert retrieved is not None
         assert retrieved.page_content == "Updated content"
         assert retrieved.metadata["version"] == "2"
-        
+
         # Should still be only one document
         assert document_store.count_documents() == 1
 
@@ -287,7 +301,7 @@ class TestDocumentStoreProtocol:
         """Test handling documents with empty metadata."""
         doc = Document(page_content="Content without metadata")
         document_store.add_document("doc1", doc)
-        
+
         retrieved = document_store.get_document("doc1")
         assert retrieved is not None
         assert retrieved.page_content == "Content without metadata"
@@ -297,7 +311,7 @@ class TestDocumentStoreProtocol:
         """Test handling documents with empty metadata (LangChain doesn't allow None)."""
         doc = Document(page_content="Content with empty metadata", metadata={})
         document_store.add_document("doc1", doc)
-        
+
         retrieved = document_store.get_document("doc1")
         assert retrieved is not None
         assert retrieved.page_content == "Content with empty metadata"
@@ -311,12 +325,12 @@ class TestSQLiteDocumentStore:
         """Test that documents persist across store instances."""
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test.db"
-            
+
             # Create first store instance and add document
             store1 = SQLiteDocumentStore(db_path)
             doc = Document(page_content="Persistent content", metadata={"key": "value"})
             store1.add_document("doc1", doc)
-            
+
             # Create second store instance and verify document exists
             store2 = SQLiteDocumentStore(db_path)
             retrieved = store2.get_document("doc1")
@@ -328,15 +342,15 @@ class TestSQLiteDocumentStore:
         """Test that database and directory are created automatically."""
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "subdir" / "test.db"
-            
+
             # Database directory doesn't exist yet
             assert not db_path.parent.exists()
-            
+
             # Creating store should create directory and database
             store = SQLiteDocumentStore(db_path)
             assert db_path.parent.exists()
             assert db_path.exists()
-            
+
             # Should be able to add documents
             doc = Document(page_content="Test")
             store.add_document("doc1", doc)
@@ -347,19 +361,21 @@ class TestSQLiteDocumentStore:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test.db"
             store = SQLiteDocumentStore(db_path)
-            
+
             docs = {
-                "doc1": Document(page_content="The quick brown fox jumps over the lazy dog"),
+                "doc1": Document(
+                    page_content="The quick brown fox jumps over the lazy dog"
+                ),
                 "doc2": Document(page_content="A fast cat runs through the garden"),
                 "doc3": Document(page_content="The dog sleeps peacefully in the sun"),
             }
             store.add_documents(docs)
-            
+
             # Test exact word match
             results = store.search_documents(query="fox")
             assert len(results) == 1
             assert results[0][0] == "doc1"
-            
+
             # Test multiple word search
             results = store.search_documents(query="dog")
             doc_ids = [doc_id for doc_id, _ in results]
@@ -372,11 +388,11 @@ class TestSQLiteDocumentStore:
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test.db"
             store = SQLiteDocumentStore(db_path)
-            
+
             # Test with malformed JSON in database (simulate corruption)
             # This would be difficult to test directly without corrupting the database
             # Instead, test that operations work normally and handle expected errors gracefully
-            
+
             # Test empty document ID (should work)
             doc = Document(page_content="test content")
             store.add_document("", doc)  # Empty string is valid
@@ -392,11 +408,11 @@ class TestFakeDocumentStore:
         """Test that different FakeDocumentStore instances are isolated."""
         store1 = FakeDocumentStore()
         store2 = FakeDocumentStore()
-        
+
         # Add document to first store
         doc = Document(page_content="Test content")
         store1.add_document("doc1", doc)
-        
+
         # Second store should not see the document
         assert store1.count_documents() == 1
         assert store2.count_documents() == 0
@@ -406,17 +422,16 @@ class TestFakeDocumentStore:
         """Test that returned documents are copies to prevent mutation."""
         store = FakeDocumentStore()
         original_doc = Document(
-            page_content="Original content",
-            metadata={"mutable": "original"}
+            page_content="Original content", metadata={"mutable": "original"}
         )
         store.add_document("doc1", original_doc)
-        
+
         # Get document and modify it
         retrieved = store.get_document("doc1")
         assert retrieved is not None
         retrieved.page_content = "Modified content"
         retrieved.metadata["mutable"] = "modified"
-        
+
         # Original document in store should be unchanged
         stored = store.get_document("doc1")
         assert stored is not None
@@ -432,16 +447,16 @@ class TestFakeDocumentStore:
             "doc3": Document(page_content="FAST CAT RUNS"),
         }
         store.add_documents(docs)
-        
+
         # Test case-insensitive search
         results = store.search_documents(query="quick")
         assert len(results) == 1
         assert results[0][0] == "doc1"
-        
+
         results = store.search_documents(query="LAZY")
         assert len(results) == 1
         assert results[0][0] == "doc2"
-        
+
         results = store.search_documents(query="fast")
         assert len(results) == 1
         assert results[0][0] == "doc3"

@@ -187,9 +187,9 @@ DEBUG_MODULES_OPTION = typer.Option(
 )
 
 # Define argument defaults outside functions
-INVALIDATE_PATH_ARG = typer.Argument(
+CLEAR_PATH_ARG = typer.Argument(
     None,
-    help="Path to the file or directory to invalidate",
+    help="Path to the file or directory to clear",
     exists=True,
     dir_okay=True,
     file_okay=True,
@@ -592,13 +592,13 @@ def index(  # noqa: PLR0913
 
 
 @app.command()
-def invalidate(
-    path: Path = INVALIDATE_PATH_ARG,
+def clear(
+    path: Path = CLEAR_PATH_ARG,
     all_data: bool = typer.Option(
         False,
         "--all",
         "-a",
-        help="Invalidate all data in the directory (uses current directory if no path specified)",
+        help="Clear all data in the directory (uses current directory if no path specified)",
     ),
     # Duplicated from app-level callback for Typer CLI compatibility
     data_dir: str = typer.Option(
@@ -609,7 +609,7 @@ def invalidate(
     ),
     json_output: bool = JSON_OUTPUT_OPTION,
 ) -> None:
-    """Invalidate the data for a specific file or all data.
+    """Clear the data for a specific file or all data.
 
     This command will:
     1. Remove stored embeddings and vector stores
@@ -632,7 +632,7 @@ def invalidate(
             write(Error(f"Path does not exist: {path}"))
             sys.exit(1)
 
-        logger.info(f"Starting data invalidation for: {path.name}")
+        logger.info(f"Starting data clearing for: {path.name}")
         logger.debug(f"Full path: {path}")
 
         # If it's a file, use its parent directory
@@ -670,18 +670,18 @@ def invalidate(
 
         if all_data:
             if not typer.confirm(
-                "This will invalidate all caches. Continue?",
+                "This will clear all caches. Continue?",
                 default=False,
             ):
-                write("Cache invalidation cancelled")
+                write("Cache clearing cancelled")
                 raise typer.Exit()
 
-            # Invalidate all caches
-            logger.info("Invalidating all caches...")
-            rag_engine.invalidate_all_data()
+            # Clear all caches
+            logger.info("Clearing all caches...")
+            rag_engine.clear_all_data()
             write(
                 {
-                    "message": "All caches invalidated successfully",
+                    "message": "All caches cleared successfully",
                     "summary": {
                         "total": 1,
                         "successful": 1,
@@ -690,11 +690,11 @@ def invalidate(
                 }
             )
         elif path.is_file():
-            logger.info(f"Invalidating cache for: {path.name}")
-            rag_engine.invalidate_data(str(path))
+            logger.info(f"Clearing cache for: {path.name}")
+            rag_engine.clear_data(str(path))
             write(
                 {
-                    "message": f"Cache invalidated for {path.name}",
+                    "message": f"Cache cleared for {path.name}",
                     "summary": {
                         "total": 1,
                         "successful": 1,
@@ -710,7 +710,7 @@ def invalidate(
         write(Error(f"Configuration error: {e}"))
         sys.exit(1)
     except (exceptions.RAGError, OSError, KeyError, FileNotFoundError) as e:
-        write(Error(f"Error during data invalidation: {e}"))
+        write(Error(f"Error during data clearing: {e}"))
         sys.exit(1)
 
 

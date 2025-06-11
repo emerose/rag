@@ -21,12 +21,12 @@ class TestIndexingWorkflow:
         data_dir = tmp_path / "data"
         docs_dir.mkdir()
         data_dir.mkdir()
-        
+
         return RAGConfig(
             documents_dir=str(docs_dir),
             data_dir=str(data_dir),
             vectorstore_backend="fake",
-            openai_api_key="sk-test"
+            openai_api_key="sk-test",
         )
 
     def create_test_document(self, docs_dir: Path, filename: str, content: str) -> Path:
@@ -40,34 +40,32 @@ class TestIndexingWorkflow:
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
-            config=config,
-            runtime=runtime,
-            use_real_filesystem=True
+            config=config, runtime=runtime, use_real_filesystem=True
         )
-        
+
         engine = factory.create_rag_engine()
-        
+
         # Create test document
         doc_path = self.create_test_document(
-            Path(config.documents_dir), 
-            "test_doc.txt", 
-            "This is a test document with some content for indexing."
+            Path(config.documents_dir),
+            "test_doc.txt",
+            "This is a test document with some content for indexing.",
         )
-        
+
         # Index the document
         success, message = engine.index_file(doc_path)
-        
+
         # Verify indexing succeeded
         assert success is True
         assert "Successfully indexed" in message
-        
+
         # Verify persistence - check data files exist
         data_files = list(Path(config.data_dir).glob("**/*"))
         data_files = [f for f in data_files if f.is_file()]
         assert len(data_files) > 0
-        
+
         # Verify document appears in index via DocumentStore
         document_store = engine.ingestion_pipeline.document_store
         source_documents = document_store.list_source_documents()
@@ -78,28 +76,30 @@ class TestIndexingWorkflow:
         # Setup using factory pattern with fake filesystem to avoid real loaders
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
             config=config,
             runtime=runtime,
-            use_real_filesystem=False  # Use fake filesystem to avoid slow document loaders
+            use_real_filesystem=False,  # Use fake filesystem to avoid slow document loaders
         )
-        
+
         # Add test documents to fake filesystem instead of real files
         factory.add_test_document("doc1.txt", "First document content.")
-        factory.add_test_document("doc2.txt", "Second document content.")  # Use .txt to avoid markdown loader
+        factory.add_test_document(
+            "doc2.txt", "Second document content."
+        )  # Use .txt to avoid markdown loader
         factory.add_test_document("doc3.txt", "Third document with different content.")
-        
+
         engine = factory.create_rag_engine()
-        
+
         # Index the directory
         results = engine.index_directory(Path(config.documents_dir))
-        
+
         # Verify pipeline processing succeeded
         assert "pipeline" in results
         assert results["pipeline"]["success"] is True
         assert results["pipeline"]["documents_processed"] == 3
-        
+
         # Verify all documents appear in index
         document_store = engine.ingestion_pipeline.document_store
         source_documents = document_store.list_source_documents()
@@ -109,36 +109,35 @@ class TestIndexingWorkflow:
     # TODO: Re-add incremental indexing tests when metadata tracking is implemented
     # def test_incremental_indexing_workflow(self, tmp_path):
     #     """Test incremental indexing behavior - requires metadata tracking."""
-    
+
     # TODO: Re-add when metadata tracking is implemented
     def _test_file_modification_reindexing(self, tmp_path):
         """Test that modified files are re-indexed - requires metadata tracking."""
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
-            config=config,
-            runtime=runtime,
-            use_real_filesystem=True
+            config=config, runtime=runtime, use_real_filesystem=True
         )
-        
+
         engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
-        
+
         # Initial indexing
         doc_path = self.create_test_document(docs_dir, "test.txt", "Original content.")
         success, message = engine.index_file(doc_path)
         assert success is True
-        
+
         # Modify the file
         import os
         import time
+
         current_time = time.time()
         doc_path.write_text("Modified content with different text.")
         # Set explicit modification time to ensure detection
         os.utime(doc_path, (current_time + 1, current_time + 1))
-        
+
         # Re-index the file
         success, message = engine.index_file(doc_path)
         assert success is True
@@ -148,24 +147,22 @@ class TestIndexingWorkflow:
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
-            config=config,
-            runtime=runtime,
-            use_real_filesystem=True
+            config=config, runtime=runtime, use_real_filesystem=True
         )
-        
+
         engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
-        
+
         # Create test document
         doc_path = self.create_test_document(docs_dir, "test.txt", "Test content.")
-        
+
         # Should succeed with fake OpenAI
         success, message = engine.index_file(doc_path)
         assert success is True
         assert "Successfully indexed" in message
-        
+
         # Verify document is properly indexed
         document_store = engine.ingestion_pipeline.document_store
         source_documents = document_store.list_source_documents()
@@ -173,45 +170,43 @@ class TestIndexingWorkflow:
         assert len(indexed_files) == 1
 
     # TODO: Re-add when metadata tracking is implemented
-    def _test_cache_invalidation_workflow(self, tmp_path):
-        """Test cache invalidation and re-indexing workflow."""
+    def _test_cache_clearing_workflow(self, tmp_path):
+        """Test cache clearing and re-indexing workflow."""
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
-            config=config,
-            runtime=runtime,
-            use_real_filesystem=True
+            config=config, runtime=runtime, use_real_filesystem=True
         )
-        
+
         engine = factory.create_rag_engine()
         docs_dir = Path(config.documents_dir)
-        
+
         # Initial indexing
         doc_path = self.create_test_document(docs_dir, "test.txt", "Test content.")
         success, _ = engine.index_file(doc_path)
         assert success is True
-        
+
         # Verify file is indexed
         document_store = engine.ingestion_pipeline.document_store
         source_documents = document_store.list_source_documents()
         indexed_files = source_documents  # For compatibility with existing assertions
         assert len(indexed_files) == 1
-        
-        # Invalidate cache for specific file
-        engine.invalidate_cache(str(doc_path))
-        
+
+        # Clear cache for specific file
+        engine.clear_data(str(doc_path))
+
         # Verify file is no longer in index
         document_store = engine.ingestion_pipeline.document_store
         source_documents = document_store.list_source_documents()
         indexed_files = source_documents  # For compatibility with existing assertions
         assert len(indexed_files) == 0
-        
+
         # Re-index should work
         success, message = engine.index_file(doc_path)
         assert success is True
-        
+
         document_store = engine.ingestion_pipeline.document_store
         source_documents = document_store.list_source_documents()
         indexed_files = source_documents  # For compatibility with existing assertions
@@ -222,38 +217,38 @@ class TestIndexingWorkflow:
         # Setup using factory pattern with fake filesystem to avoid slow loaders
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
-        
+
         factory = FakeRAGComponentsFactory.create_for_integration_tests(
             config=config,
             runtime=runtime,
-            use_real_filesystem=False  # Use fake filesystem to avoid slow document loaders
+            use_real_filesystem=False,  # Use fake filesystem to avoid slow document loaders
         )
-        
+
         # Add test documents to fake filesystem
         factory.add_test_document("doc.txt", "Plain text content.")
-        factory.add_test_document("README.txt", "Another text file with documentation.")  # Use .txt to avoid markdown loader
-        
+        factory.add_test_document(
+            "README.txt", "Another text file with documentation."
+        )  # Use .txt to avoid markdown loader
+
         engine = factory.create_rag_engine()
-        
+
         # Index all files
         results = engine.index_directory(Path(config.documents_dir))
         assert results["pipeline"]["success"] is True
         assert results["pipeline"]["documents_processed"] == 2
-        
+
         # Verify files are recognized
         document_store = engine.ingestion_pipeline.document_store
         source_documents = document_store.list_source_documents()
         indexed_files = source_documents  # For compatibility with existing assertions
         assert len(indexed_files) == 2
-        
+
         # All should be text/plain with fake filesystem
         file_types = {f.content_type or "text/plain" for f in indexed_files}
         assert "text/plain" in file_types
-        
+
         # Verify specific files are present
         # Extract base filenames from source document locations
-        indexed_basenames = {
-            Path(f.location).name for f in indexed_files
-        }
+        indexed_basenames = {Path(f.location).name for f in indexed_files}
         assert "doc.txt" in indexed_basenames
         assert "README.txt" in indexed_basenames
