@@ -1034,7 +1034,7 @@ def chunks(
         )
         rag_engine = create_rag_engine(config)
 
-        # With new architecture, get chunks from workspace vectorstore
+        # With new architecture, get chunks from vectorstore
         vectorstore = rag_engine.vectorstore
         if vectorstore is None:
             write(Error("No cached vectorstore found"))
@@ -1136,17 +1136,15 @@ def _load_vectorstore(rag_engine: RAGEngine) -> None:
     logger.info("Loading cached vectorstore from .cache directory...")
 
     # For the new single vectorstore architecture, we just verify that the
-    # workspace vectorstore can be loaded. The RAGEngine handles this automatically.
+    # vectorstore can be loaded. The RAGEngine handles this automatically.
     try:
         vectorstore = rag_engine.vectorstore
         if vectorstore is not None:
-            logger.info(
-                f"Loaded workspace vectorstore with {len(source_documents)} documents"
-            )
+            logger.info(f"Loaded vectorstore with {len(source_documents)} documents")
         else:
-            logger.warning("No workspace vectorstore found - may need to re-index")
+            logger.warning("No vectorstore found - may need to re-index")
     except Exception as e:
-        logger.warning(f"Failed to load workspace vectorstore: {e}")
+        logger.warning(f"Failed to load vectorstore: {e}")
         # Don't exit here - let the query command handle the missing vectorstore gracefully
 
     if rag_engine.vectorstore is None:
@@ -1159,7 +1157,7 @@ def _load_vectorstore(rag_engine: RAGEngine) -> None:
         sys.exit(1)
 
     logger.info(
-        f"Successfully loaded workspace vectorstore with {len(source_documents)} documents",
+        f"Successfully loaded vectorstore with {len(source_documents)} documents",
     )
 
 

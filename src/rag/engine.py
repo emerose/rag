@@ -84,10 +84,10 @@ class RAGEngine:
 
     @property
     def vectorstore(self) -> VectorStoreProtocol | None:
-        """Get the single workspace vectorstore."""
+        """Get the single vectorstore."""
         if self._vectorstore is None:
-            # Try to load the workspace vectorstore
-            self._vectorstore = self._load_workspace_vectorstore()
+            # Try to load the vectorstore
+            self._vectorstore = self._load_vectorstore()
         return self._vectorstore
 
     @property
@@ -208,7 +208,7 @@ class RAGEngine:
             Dictionary with question, answer, and sources
         """
         try:
-            # Get the workspace vectorstore
+            # Get the vectorstore
             vectorstore = self.vectorstore
 
             if vectorstore is None:
@@ -230,8 +230,8 @@ class RAGEngine:
                 "num_documents_retrieved": 0,
             }
 
-    def _load_workspace_vectorstore(self) -> VectorStoreProtocol | None:
-        """Load the workspace vectorstore from disk.
+    def _load_vectorstore(self) -> VectorStoreProtocol | None:
+        """Load the vectorstore from disk.
 
         Returns:
             Workspace vectorstore if found, None otherwise
@@ -247,14 +247,14 @@ class RAGEngine:
             vectorstore = vectorstore_factory.load_from_path(str(workspace_path))
 
             if vectorstore:
-                logger.debug("Loaded workspace vectorstore from cache")
+                logger.debug("Loaded vectorstore from cache")
                 return vectorstore
             else:
-                logger.debug("No workspace vectorstore found, will create when needed")
+                logger.debug("No vectorstore found, will create when needed")
                 return None
 
         except Exception as e:
-            logger.error(f"Error loading workspace vectorstore: {e}")
+            logger.error(f"Error loading vectorstore: {e}")
             return None
 
     def cleanup_orphaned_chunks(self) -> dict[str, int]:
