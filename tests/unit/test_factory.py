@@ -8,9 +8,9 @@ from rag.config import RAGConfig, RuntimeOptions
 from rag.engine import RAGEngine
 from rag.factory import RAGComponentsFactory, ComponentOverrides
 from rag.storage.fakes import (
-    InMemoryCacheRepository,
     InMemoryFileSystem,
 )
+from rag.storage.document_store import FakeDocumentStore
 from rag.embeddings.fakes import FakeEmbeddingService
 from langchain_core.language_models import FakeListChatModel
 
@@ -33,7 +33,7 @@ def test_factory_creates_real_components(temp_dir: Path) -> None:
     
     # Test that properties create real implementations (except embeddings)
     assert factory.filesystem_manager is not None
-    assert factory.cache_repository is not None
+    assert factory.document_store is not None
     assert factory.vectorstore_factory is not None
     assert isinstance(factory.embedding_service, FakeEmbeddingService)
     assert factory.chat_model is not None
@@ -52,7 +52,7 @@ def test_factory_uses_injected_dependencies(temp_dir: Path) -> None:
     
     # Create fake implementations
     fake_filesystem = InMemoryFileSystem()
-    fake_cache = InMemoryCacheRepository()
+    fake_cache = FakeDocumentStore()
     fake_embedding_service = FakeEmbeddingService()
     
     from rag.storage.vector_store import InMemoryVectorStoreFactory
@@ -60,7 +60,7 @@ def test_factory_uses_injected_dependencies(temp_dir: Path) -> None:
     
     overrides = ComponentOverrides(
         filesystem_manager=fake_filesystem,
-        cache_repository=fake_cache,
+        document_store=fake_cache,
         vectorstore_factory=fake_vectorstore_factory,
         embedding_service=fake_embedding_service,
     )
@@ -69,7 +69,7 @@ def test_factory_uses_injected_dependencies(temp_dir: Path) -> None:
     
     # Test that injected dependencies are used
     assert factory.filesystem_manager is fake_filesystem
-    assert factory.cache_repository is fake_cache
+    assert factory.document_store is fake_cache
     assert factory.vectorstore_factory is fake_vectorstore_factory
     assert factory.embedding_service is fake_embedding_service
 
@@ -120,7 +120,7 @@ def test_factory_create_all_components(temp_dir: Path) -> None:
     # Check that all expected components are present
     expected_keys = {
         "filesystem_manager",
-        "cache_repository", 
+        "document_store", 
         "vectorstore_factory",
         "embedding_service",
         "chat_model",

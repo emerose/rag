@@ -8,10 +8,9 @@ from rag.config import RAGConfig, RuntimeOptions
 from rag.utils.exceptions import ConfigurationError
 from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
 from rag.storage.fakes import (
-    InMemoryCacheRepository,
     InMemoryFileSystem,
 )
-from rag.storage.fake_index_manager import FakeIndexManager
+from rag.storage.document_store import FakeDocumentStore
 from rag.testing import FakeRAGComponentsFactory
 from rag.testing.test_factory import FakeComponentOptions
 
@@ -25,7 +24,7 @@ class TestFakeRAGComponentsFactory:
 
         # Check that all components are fake implementations
         assert isinstance(factory.filesystem_manager, InMemoryFileSystem)
-        assert isinstance(factory.cache_repository, (InMemoryCacheRepository, FakeIndexManager))
+        assert isinstance(factory.cache_repository, (FakeDocumentStore, FakeDocumentStore))
         from rag.storage.vector_store import InMemoryVectorStoreFactory
         assert isinstance(factory.vectorstore_factory, InMemoryVectorStoreFactory)
         assert isinstance(
@@ -179,7 +178,7 @@ class TestFakeRAGComponentsFactory:
         # Check that the engine was created successfully
         assert engine is not None
         assert hasattr(engine, 'ingestion_pipeline')
-        assert isinstance(engine.index_manager, (InMemoryCacheRepository, FakeIndexManager))
+        assert isinstance(engine.index_manager, (FakeDocumentStore, FakeDocumentStore))
         # Note: vectorstore_manager was removed in the new architecture
 
         # Check that the engine has the right configuration
@@ -216,6 +215,6 @@ class TestFakeRAGComponentsFactory:
             factory.get_test_files()
 
         with pytest.raises(
-            ConfigurationError, match="Can only get test metadata from InMemoryCacheRepository|FakeIndexManager"
+            ConfigurationError, match="Can only get test metadata from FakeDocumentStore|FakeDocumentStore"
         ):
             factory.get_test_metadata()
