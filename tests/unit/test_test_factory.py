@@ -24,7 +24,7 @@ class TestFakeRAGComponentsFactory:
 
         # Check that all components are fake implementations
         assert isinstance(factory.filesystem_manager, InMemoryFileSystem)
-        assert isinstance(factory.cache_repository, (FakeDocumentStore, FakeDocumentStore))
+        assert isinstance(factory.document_store, FakeDocumentStore)
         from rag.storage.vector_store import InMemoryVectorStoreFactory
         assert isinstance(factory.vectorstore_factory, InMemoryVectorStoreFactory)
         assert isinstance(
