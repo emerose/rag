@@ -222,16 +222,16 @@ def run_static() -> int:
 
 
 def run_check() -> int:
-    """Run the complete check workflow: lint → unit → integration."""
+    """Run the complete check workflow: static analysis → unit → integration."""
     print(f"{BLUE}🔍 Starting code quality checks...{RESET}")
     
-    # Run linting first
-    print(f"{GREEN}Step 1/3: Running linting and formatting{RESET}")
-    lint_result = run_lint()
-    if lint_result != 0:
-        print(f"{RED}❌ Failed: Running linting and formatting{RESET}")
-        return lint_result
-    print(f"{GREEN}✅ Passed: Running linting and formatting{RESET}")
+    # Run static analysis first (ruff + pyright + vulture)
+    print(f"{GREEN}Step 1/3: Running static analysis{RESET}")
+    static_result = run_static()
+    if static_result != 0:
+        print(f"{RED}❌ Failed: Running static analysis{RESET}")
+        return static_result
+    print(f"{GREEN}✅ Passed: Running static analysis{RESET}")
     
     # Run unit tests
     print(f"{GREEN}Step 2/3: Running unit tests{RESET}")
@@ -272,7 +272,7 @@ Commands:
   {BLUE}typecheck{RESET}    Run type checking only (no baseline limit)
   {BLUE}vulture{RESET}      Run dead code detection (vulture)
   {BLUE}static{RESET}       Run all static analysis (ruff + pyright + vulture)
-  {BLUE}check{RESET}        Run complete check workflow (lint → unit → integration)
+  {BLUE}check{RESET}        Run complete check workflow (static → unit → integration)
 
 Test Categories:
   • Unit Tests: Fast, isolated, no external dependencies
