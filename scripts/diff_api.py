@@ -280,13 +280,18 @@ class APIDiffRenderer:
 
             # Create table for this container
             table = Table(
-                show_header=False, show_edge=False, pad_edge=False, padding=(0, 1)
+                show_header=False,
+                show_edge=False,
+                pad_edge=False,
+                padding=(0, 1),
+                box=None,
             )
             table.add_column("prefix", width=2, no_wrap=True)  # +/-
             table.add_column("name", min_width=8, no_wrap=True)  # function name
-            table.add_column("params", min_width=12)  # parameters
+            table.add_column("params", min_width=12)  # parameters (one per line)
             table.add_column("arrow", width=4, no_wrap=True, justify="center")  # ->
-            table.add_column("return_desc", min_width=15)  # return type : description
+            table.add_column("return_type", min_width=8, no_wrap=True)  # return type
+            table.add_column("description", min_width=15)  # description
 
             # Process all changes for this container
             all_changes = []
@@ -329,17 +334,13 @@ class APIDiffRenderer:
 
             # Add rows to table
             for prefix, name, params, return_type, description, color in all_changes:
-                # Combine return type and description
-                return_desc = (
-                    f"{return_type} : {description}" if description else return_type
-                )
-
                 table.add_row(
                     Text(prefix, style=f"{color} bold"),
                     Text(name, style=color),
                     Text(params, style=color),
                     Text("->", style=color),
-                    Text(return_desc, style=color),
+                    Text(return_type, style=color),
+                    Text(description, style=color),
                 )
 
             # Render table to capture
@@ -362,7 +363,7 @@ class APIDiffRenderer:
     def _parse_function_for_table(
         self, signature: str, full_line: str, container: str
     ) -> tuple[str, str, str, str]:
-        """Parse function for tabular display.
+        """Parse function for tabular display with one parameter per line.
 
         Args:
             signature: The full function signature
@@ -389,10 +390,10 @@ class APIDiffRenderer:
         paren_idx = func_and_params.find("(")
         if paren_idx != -1:
             full_name = func_and_params[:paren_idx]
-            params = func_and_params[paren_idx:]
+            params_str = func_and_params[paren_idx + 1 : -1]  # Remove ( and )
         else:
             full_name = func_and_params
-            params = ""
+            params_str = ""
 
         # Get short name based on container
         if container.startswith("class "):
@@ -407,7 +408,40 @@ class APIDiffRenderer:
         else:
             short_name = full_name.split(".")[-1]
 
-        return short_name, params, return_type, description
+        # Format parameters one per line
+        if params_str.strip():
+            # Split parameters and clean them up
+            params = []
+            current_param = ""
+            paren_depth = 0
+            bracket_depth = 0
+
+            for char in params_str:
+                if char == "," and paren_depth == 0 and bracket_depth == 0:
+                    if current_param.strip():
+                        params.append(current_param.strip())
+                    current_param = ""
+                else:
+                    if char == "(":
+                        paren_depth += 1
+                    elif char == ")":
+                        paren_depth -= 1
+                    elif char == "[":
+                        bracket_depth += 1
+                    elif char == "]":
+                        bracket_depth -= 1
+                    current_param += char
+
+            # Don't forget the last parameter
+            if current_param.strip():
+                params.append(current_param.strip())
+
+            # Join parameters with newlines for one-per-line display
+            formatted_params = "\n".join(params)
+        else:
+            formatted_params = ""
+
+        return short_name, formatted_params, return_type, description
 
     def _parse_api_structure(self, api_dump: str) -> dict[str, dict[str, str]]:
         """Parse an API dump into a hierarchical structure organized by module/class.
@@ -654,22 +688,12 @@ def main():
 
         if not diff.strip():
             console.print(
-                f"✅ No public API differences between HEAD and `{ref}`.", style="green"
+                f"✅ No public API differences between HEAD and `{ref}`", style="green"
             )
         else:
-            print(diff)
-
-    except ImportError as e:
-        console.print(f"❌ Import Error: {e}", style="red")
-        console.print(
-            "💡 Make sure the package is installed and importable.", style="yellow"
-        )
-        sys.exit(1)
-    except RuntimeError as e:
-        console.print(f"❌ Git Error: {e}", style="red")
-        sys.exit(1)
+            console.print(diff)
     except Exception as e:
-        console.print(f"❌ Unexpected Error: {e}", style="red")
+        console.print(f"Error: {e}", style="red")
         sys.exit(1)
 
 
