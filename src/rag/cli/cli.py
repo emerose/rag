@@ -41,6 +41,10 @@ from rag.utils import exceptions
 from rag.utils.async_utils import get_optimal_concurrency
 from rag.utils.logging_utils import get_logger, setup_logging
 
+# Module-level logger - always available, never None
+# Use get_logger() to get the properly configured RAGLogger with structlog integration
+logger = get_logger()
+
 
 class LogLevel(str, Enum):
     """Log levels for the CLI."""
@@ -109,7 +113,6 @@ class GlobalState:
     """Global state for the CLI."""
 
     is_processing: bool = False
-    logger: logging.Logger | None = None
     cache_dir: str = CACHE_DIR  # Initialize with default value
     json_mode: bool = False  # Track JSON mode
     console: Console = console  # Store console instance
@@ -121,12 +124,6 @@ class GlobalState:
 
 
 state = GlobalState()
-
-
-def safe_log(level: str, message: str) -> None:
-    """Safely log a message, handling None logger."""
-    if state.logger is not None:
-        getattr(state.logger, level.lower())(message)
 
 
 # Define options at module level
@@ -321,7 +318,7 @@ def main(  # noqa: PLR0913
         modules.append("rag")
     if debug_modules:
         modules.extend(m.strip() for m in debug_modules.split(","))
-    state.logger = configure_logging(
+    configure_logging(
         verbose,
         log_level,
         False,  # Never use JSON logs for CLI - we want console logs to stderr
@@ -409,7 +406,7 @@ def _create_rag_config_and_runtime(
 
 def _index_single_file(rag_engine: RAGEngine, path_obj: Path) -> None:
     """Index a single file and output results."""
-    safe_log("info", f"Indexing file: {path_obj}")
+    logger.info(f"Indexing file: {path_obj}")
     success, error = rag_engine.index_file(path_obj)
     results = {str(path_obj): success}
 
@@ -437,7 +434,7 @@ def _index_directory(
     rag_engine: RAGEngine, path_obj: Path, cached_before: set[str]
 ) -> None:
     """Index a directory and output results."""
-    safe_log("info", f"Indexing directory: {path_obj}")
+    logger.info(f"Indexing directory: {path_obj}")
 
     # Create a progress bar
     with Progress() as progress:
@@ -547,7 +544,7 @@ def index(  # noqa: PLR0913
         state.is_processing = True
 
         # Initialize RAG engine
-        safe_log("debug", "Initializing RAG engine...")
+        logger.debug("Initializing RAG engine...")
 
         params = IndexingParams(
             path,
@@ -627,23 +624,23 @@ def invalidate(
             write(Error(f"Path does not exist: {path}"))
             sys.exit(1)
 
-        safe_log("info", f"Starting cache invalidation for: {path.name}")
-        state.logger.debug(f"Full path: {path}")
+        logger.info(f"Starting cache invalidation for: {path.name}")
+        logger.debug(f"Full path: {path}")
 
         # If it's a file, use its parent directory
         # If it's a directory, use it directly
         documents_dir = path.parent if path.is_file() else path
 
         if path.is_file():
-            state.logger.debug(f"Processing single file: {path.name}")
+            logger.debug(f"Processing single file: {path.name}")
         else:
-            state.logger.debug(f"Processing directory: {path}")
+            logger.debug(f"Processing directory: {path}")
 
         if str(documents_dir) == ".":
             documents_dir = Path.cwd()
 
-        state.logger.debug(f"Using documents directory: {documents_dir}")
-        state.logger.debug(f"Current working directory: {Path.cwd()}")
+        logger.debug(f"Using documents directory: {documents_dir}")
+        logger.debug(f"Current working directory: {Path.cwd()}")
 
         # Initialize RAG engine using RAGConfig
         config = RAGConfig(
@@ -672,7 +669,7 @@ def invalidate(
                 raise typer.Exit()
 
             # Invalidate all caches
-            state.logger.info("Invalidating all caches...")
+            logger.info("Invalidating all caches...")
             rag_engine.invalidate_all_caches()
             write(
                 {
@@ -685,7 +682,7 @@ def invalidate(
                 }
             )
         elif path.is_file():
-            state.logger.info(f"Invalidating cache for: {path.name}")
+            logger.info(f"Invalidating cache for: {path.name}")
             rag_engine.invalidate_cache(str(path))
             write(
                 {
@@ -754,7 +751,7 @@ def query(  # noqa: PLR0913
         cache_directory = cache_dir if cache_dir is not None else state.cache_dir
 
         # Initialize RAG engine using RAGConfig with specified cache directory
-        state.logger.debug("Initializing RAG engine...")
+        logger.debug("Initializing RAG engine...")
         config = RAGConfig(
             documents_dir=".",  # Not used for querying
             embedding_model=state.embedding_model,
@@ -791,13 +788,13 @@ def query(  # noqa: PLR0913
             )
             sys.exit(1)
 
-        state.logger.info(
+        logger.info(
             f"Successfully loaded {len(rag_engine.vectorstores)} vectorstores",
         )
 
         # Perform the query
-        state.logger.info(f"Running query: {query_text}")
-        state.logger.info(f"Retrieving top {k} most relevant documents...")
+        logger.info(f"Running query: {query_text}")
+        logger.info(f"Retrieving top {k} most relevant documents...")
         result = rag_engine.answer(query_text, k=k)
         if stream:
             state.console.print()
@@ -851,7 +848,7 @@ def summarize(
     """
     try:
         # Initialize RAG engine using RAGConfig with default cache directory
-        state.logger.debug("Initializing RAG engine...")
+        logger.debug("Initializing RAG engine...")
         config = RAGConfig(
             documents_dir=".",  # Not used for summarization
             embedding_model=state.embedding_model,
@@ -873,14 +870,14 @@ def summarize(
             )
             sys.exit(1)
 
-        state.logger.info(
+        logger.info(
             f"Successfully loaded {len(rag_engine.vectorstores)} vectorstores",
         )
 
         # Get document summaries
-        state.logger.info(f"Generating summaries for top {k} documents...")
+        logger.info(f"Generating summaries for top {k} documents...")
         summaries = rag_engine.get_document_summaries(k=k)
-        state.logger.debug(f"Number of summaries generated: {len(summaries)}")
+        logger.debug(f"Number of summaries generated: {len(summaries)}")
 
         if not summaries:
             write(
@@ -909,8 +906,8 @@ def summarize(
 
     except Exception as e:
         write(Error(f"Error during summarization: {e}"))
-        if state.logger.isEnabledFor(logging.DEBUG):
-            state.logger.debug(traceback.format_exc())
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(traceback.format_exc())
         raise typer.Exit(1) from e
 
 
@@ -935,7 +932,7 @@ def list(
         cache_directory = cache_dir if cache_dir is not None else state.cache_dir
 
         # Initialize RAG engine
-        state.logger.debug("Initializing RAG engine")
+        logger.debug("Initializing RAG engine")
         config = RAGConfig(
             documents_dir=".",  # Not used for listing
             embedding_model=state.embedding_model,
@@ -951,7 +948,7 @@ def list(
         document_store = rag_engine.ingestion_pipeline.document_store
         source_documents = document_store.list_source_documents()
 
-        state.logger.debug(f"Found {len(source_documents)} indexed documents")
+        logger.debug(f"Found {len(source_documents)} indexed documents")
 
         # Prepare table data
         table_data = TableData(
@@ -962,7 +959,7 @@ def list(
 
         for source_doc in source_documents:
             file_path = source_doc.location
-            state.logger.debug(f"Processing file: {file_path}")
+            logger.debug(f"Processing file: {file_path}")
 
             # Use stored metadata when available, fall back to file stats
             try:
@@ -983,9 +980,9 @@ def list(
                     modified = datetime.fromtimestamp(stats.st_mtime).strftime(
                         "%Y-%m-%d %H:%M:%S",
                     )
-                state.logger.debug(f"File stats - size: {size}, modified: {modified}")
+                logger.debug(f"File stats - size: {size}, modified: {modified}")
             except (FileNotFoundError, PermissionError, OSError) as e:
-                state.logger.debug(f"Failed to get file stats: {e}")
+                logger.debug(f"Failed to get file stats: {e}")
                 size = "N/A"
                 modified = "N/A"
 
@@ -993,7 +990,7 @@ def list(
             file_type = source_doc.content_type or "text/plain"
             chunks = source_doc.chunk_count
 
-            state.logger.debug(f"File type: {file_type}, Chunks: {chunks}")
+            logger.debug(f"File type: {file_type}, Chunks: {chunks}")
 
             # Add row to table
             table_data["rows"].append(
@@ -1008,7 +1005,7 @@ def list(
 
         # Write output
         write(table_data)
-        state.logger.info(f"Found {len(source_documents)} indexed documents.")
+        logger.info(f"Found {len(source_documents)} indexed documents.")
 
     except (exceptions.RAGError, OSError, KeyError, ValueError, TypeError) as e:
         write(Error(f"Error listing indexed documents: {e}"))
@@ -1117,7 +1114,7 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
     source_documents = document_store.list_source_documents()
 
     if not source_documents:
-        state.logger.error(
+        logger.error(
             "No indexed documents found in cache. Please run 'rag index' first.",
         )
         state.console.print(
@@ -1125,7 +1122,7 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
         )
         sys.exit(1)
 
-    state.logger.info("Loading cached vectorstores from .cache directory...")
+    logger.info("Loading cached vectorstores from .cache directory...")
     for source_doc in source_documents:
         file_path = source_doc.location
         try:
@@ -1134,7 +1131,7 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
             cached_store = vector_repo.load_vectorstore(file_path)
             if cached_store is not None:
                 rag_engine.vectorstores[file_path] = cached_store
-                state.logger.info(f"Loaded vectorstore for: {file_path}")
+                logger.info(f"Loaded vectorstore for: {file_path}")
         except (
             exceptions.RAGError,
             exceptions.VectorstoreError,
@@ -1142,10 +1139,10 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
             KeyError,
             TypeError,
         ) as e:
-            state.logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
+            logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
 
     if not rag_engine.vectorstores:
-        state.logger.error(
+        logger.error(
             "No valid vectorstores found in cache. Please run 'rag index' first.",
         )
         state.console.print(
@@ -1153,7 +1150,7 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
         )
         sys.exit(1)
 
-    state.logger.info(
+    logger.info(
         f"Successfully loaded {len(rag_engine.vectorstores)} vectorstores",
     )
 
@@ -1394,10 +1391,10 @@ def cleanup(
     4. Reports space freed and files removed
     """
     try:
-        state.logger.info("Starting cache cleanup...")
+        logger.info("Starting cache cleanup...")
 
         # Initialize RAG engine using RAGConfig with default cache directory
-        state.logger.info(f"Initializing RAGConfig with cache_dir: {state.cache_dir}")
+        logger.info(f"Initializing RAGConfig with cache_dir: {state.cache_dir}")
         config = RAGConfig(
             documents_dir=".",  # Not used for cleanup, but required
             cache_dir=cache_dir or state.cache_dir,
@@ -1434,11 +1431,11 @@ def cleanup(
 
         # Log removed paths for debugging
         if result.get("orphaned_files_removed", 0) > 0:
-            state.logger.info("Removed the following orphaned vector stores:")
+            logger.info("Removed the following orphaned vector stores:")
             for path in result.get("removed_paths", []):
-                state.logger.info(f"  - {path}")
+                logger.info(f"  - {path}")
         else:
-            state.logger.info("No orphaned vector stores found")
+            logger.info("No orphaned vector stores found")
 
     except (exceptions.RAGError, OSError, ValueError, KeyError, FileNotFoundError) as e:
         write(Error(f"Error during cache cleanup: {e}"))
