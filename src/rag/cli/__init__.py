@@ -57,6 +57,31 @@ class TabularTest:
         param1: str,
         param2: int,
         very_long_param_name: dict[str, list[tuple[int, str]]],
-    ) -> complex_return_type:
+    ) -> tuple[str, dict[str, int]]:
         """Method with complex parameters and return type."""
-        return param1
+        return param1, {}
+
+
+def test_one_arg_per_line(
+    data: str, count: int, options: dict[str, list[str]], flag: bool
+) -> tuple[bool, str]:
+    """Test function with multiple parameters to verify one-per-line formatting."""
+    return len(data) > count, "success"
+
+
+class TestTableFormat:
+    """Test class for new table format."""
+
+    def simple_method(self) -> bool:
+        """Simple method with no params."""
+        return True
+
+    def complex_method(
+        self,
+        param1: str,
+        param2: int,
+        param3: dict[str, list[tuple[int, str]]],
+        param4: bool,
+    ) -> tuple[str, dict[str, int]]:
+        """Method with many parameters to test formatting."""
+        return param1, {}
