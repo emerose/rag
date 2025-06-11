@@ -79,7 +79,7 @@ class DefaultDocumentTransformer:
 
         # Enhance chunk metadata
         for idx, chunk in enumerate(chunks):
-            chunk.metadata.update(  # type: ignore[misc]
+            chunk.metadata.update(
                 {
                     "chunk_index": idx,
                     "total_chunks": len(chunks),

@@ -161,8 +161,8 @@ class DocumentProcessor(DocumentProcessorProtocol):
         self.progress_tracker.complete_task("process_files")
 
         # Summary log
-        processed_files = len(results)  # type: ignore[arg-type]
-        total_chunks = sum(len(docs) for docs in results.values())  # type: ignore[misc]
+        processed_files = len(results)
+        total_chunks = sum(len(docs) for docs in results.values())
         self._log(
             "INFO",
             f"Processed {processed_files}/{len(files)} files, generated {total_chunks} chunks",
@@ -189,7 +189,7 @@ class DocumentProcessor(DocumentProcessorProtocol):
                 doc.metadata = {}
 
             # Add processing metadata
-            metadata: dict[str, Any] = doc.metadata  # type: ignore[assignment]
+            metadata: dict[str, Any] = doc.metadata
             metadata["processed_at"] = timestamp_now()
             metadata["mime_type"] = mime_type
             metadata["text_splitter"] = self.text_splitter_factory.last_splitter_name

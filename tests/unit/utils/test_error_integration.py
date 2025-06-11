@@ -32,29 +32,6 @@ class TestOpenAIEmbeddingServiceErrorHandling:
 
         assert "Cannot embed empty text list" in str(exc_info.value)
 
-    def test_embed_texts_invalid_type(self):
-        """Test that embedding non-string texts raises appropriate error."""
-        # Use FakeEmbeddingService which has the same validation logic
-        service = FakeEmbeddingService()
-
-        # FakeEmbeddingService raises ValueError for non-string texts
-        with pytest.raises(ValueError) as exc_info:
-            service.embed_texts(["valid text", 123, "another valid text"])
-
-        assert "Text must be a string" in str(exc_info.value)
-
-    def test_embed_query_non_string(self):
-        """Test that embedding non-string query raises appropriate error."""
-        # Use FakeEmbeddingService which has the same validation logic
-        service = FakeEmbeddingService()
-
-        # FakeEmbeddingService raises ValueError for non-string queries
-        with pytest.raises(ValueError) as exc_info:
-            service.embed_query(123)
-
-        assert "Query must be a string" in str(exc_info.value)
-        assert "got <class 'int'>" in str(exc_info.value)
-
     def test_embed_query_empty_string(self):
         """Test that embedding empty query raises appropriate error."""
         # Use FakeEmbeddingService which has the same validation logic

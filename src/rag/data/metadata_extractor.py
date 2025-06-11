@@ -468,7 +468,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
                     level += 1
 
             # Sort headings by position
-            headings.sort(key=lambda h: h["position"])  # type: ignore[misc]
+            headings.sort(key=lambda h: h["position"])
 
             # Build heading paths
             self._build_heading_paths(headings)
@@ -589,7 +589,7 @@ class HTMLMetadataExtractor(BaseMetadataExtractor):
                 )
 
         # Sort by position
-        headings.sort(key=lambda x: x["position"])  # type: ignore[misc]
+        headings.sort(key=lambda x: x["position"])
         return headings
 
     def _build_heading_hierarchy(

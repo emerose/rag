@@ -158,10 +158,10 @@ def _write_dict_rich(data: dict[str, Any]) -> None:
     if is_table_data(data):
         _print_table(data)  # type: ignore[arg-type]
     elif "table" in data:
-        _print_table(data["table"])  # type: ignore[arg-type]
+        _print_table(data["table"])
     elif "tables" in data:
         for table_data in data["tables"]:
-            _print_table(table_data)  # type: ignore[arg-type]
+            _print_table(table_data)
     else:
         # Print each key-value pair on a new line
         for key, value in data.items():
