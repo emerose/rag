@@ -4,7 +4,7 @@ This test verifies that the CLI commands accept the necessary options and that
 the full RAG workflow (indexing, querying, etc.) works end-to-end.
 
 The test specifically verifies:
-1. CLI commands accept the --cache-dir option consistently
+1. CLI commands accept the --data-dir option consistently
 2. Document clearing works correctly
 3. Document indexing creates necessary files and metadata
 4. Document listing shows indexed documents
@@ -105,7 +105,7 @@ class TestRAGWorkflow:
 
         This test verifies that the CLI commands work together correctly, by:
         1. Using FakeRAGComponentsFactory to avoid all OpenAI API calls
-        2. Creating a real cache directory
+        2. Creating a real data directory
         3. Testing the full workflow from indexing to querying
         """
         # Import the fake factory here to avoid circular imports

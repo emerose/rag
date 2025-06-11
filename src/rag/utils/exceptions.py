@@ -492,57 +492,6 @@ class RetrievalError(QueryError):
         )
 
 
-# Cache and Storage Errors
-class CacheError(RAGError):
-    """Base class for cache-related errors."""
-
-    pass
-
-
-class CacheOperationError(CacheError):
-    """Exception raised when cache operations fail."""
-
-    def __init__(
-        self,
-        operation: str,
-        key: str | None = None,
-        message: str = "",
-        *,
-        original_error: Exception | None = None,
-    ):
-        """Initialize the exception.
-
-        Args:
-            operation: The cache operation that failed (get, set, delete, etc.)
-            key: The cache key involved in the operation
-            message: Additional error message details
-            original_error: The original exception that caused this error
-        """
-        self.operation = operation
-        self.key = key
-        self.original_error = original_error
-
-        error_msg = f"Cache {operation} operation failed"
-        if key:
-            error_msg += f" for key '{key}'"
-        if message:
-            error_msg += f": {message}"
-        if original_error:
-            error_msg += (
-                f" (caused by: {type(original_error).__name__}: {original_error})"
-            )
-
-        super().__init__(
-            error_msg,
-            error_code="CACHE_OPERATION_ERROR",
-            context={
-                "operation": operation,
-                "key": key,
-                "original_error": str(original_error) if original_error else None,
-            },
-        )
-
-
 # Template and Prompt Errors
 class PromptError(RAGError):
     """Base class for prompt-related errors."""

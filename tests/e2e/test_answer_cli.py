@@ -21,11 +21,11 @@ pytestmark = pytest.mark.e2e
 def test_environment():
     """Create a temporary test environment with sample documents."""
     temp_dir = tempfile.mkdtemp(prefix="rag_test_")
-    cache_dir = Path(temp_dir) / ".cache"
+    data_dir = Path(temp_dir) / ".rag"
     docs_dir = Path(temp_dir) / "docs"
 
     # Create test directories
-    cache_dir.mkdir()
+    data_dir.mkdir()
     docs_dir.mkdir()
 
     # Create a simple test document
@@ -45,7 +45,7 @@ It uses vector embeddings to find relevant documents.
 
     yield {
         "temp_dir": temp_dir,
-        "cache_dir": str(cache_dir),
+        "data_dir": str(data_dir),
         "docs_dir": str(docs_dir),
         "test_doc": str(test_doc),
     }
@@ -54,25 +54,25 @@ It uses vector embeddings to find relevant documents.
     shutil.rmtree(temp_dir)
 
 
-def check_cache_directory(cache_dir):
+def check_data_directory(data_dir):
     """Helper function to check if files were successfully indexed."""
-    cache_path = Path(cache_dir)
+    data_path = Path(data_dir)
 
-    # Check if cache directory exists
-    if not cache_path.exists():
-        print(f"Cache directory {cache_dir} does not exist")
+    # Check if data directory exists
+    if not data_path.exists():
+        print(f"Data directory {data_dir} does not exist")
         return False
 
     # Check for vectorstore files
-    vectorstore_files = list(cache_path.glob("*.faiss"))
+    vectorstore_files = list(data_path.glob("*.faiss"))
     if not vectorstore_files:
-        print(f"No FAISS vectorstore files found in {cache_dir}")
+        print(f"No FAISS vectorstore files found in {data_dir}")
         return False
 
     # Check for metadata stored in index_metadata.db
-    metadata_files = list(cache_path.glob("index_metadata.db"))
+    metadata_files = list(data_path.glob("documents.db"))
     if not metadata_files:
-        print(f"No metadata files found in {cache_dir}")
+        print(f"No metadata files found in {data_dir}")
         return False
 
     print(
@@ -99,7 +99,7 @@ def test_cli_error_handling(test_environment):
                 "query",
                 "What is RAG?",
                 "--data-dir",
-                test_environment["cache_dir"],
+                test_environment["data_dir"],
             ],
             check=False,
             capture_output=True,

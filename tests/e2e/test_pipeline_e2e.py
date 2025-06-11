@@ -103,7 +103,7 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
+            data_dir = temp_path / "data"
 
             # Create test documents
             documents = self.create_test_documents(docs_dir)
@@ -111,7 +111,7 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             # Create RAG engine
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                data_dir=str(cache_dir),
+                data_dir=str(data_dir),
                 vectorstore_backend="faiss",
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
             )
@@ -185,14 +185,14 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
+            data_dir = temp_path / "data"
 
             # Create empty docs directory first to test empty directory case
             docs_dir.mkdir()
 
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                data_dir=str(cache_dir),
+                data_dir=str(data_dir),
                 vectorstore_backend="fake",  # Use fake for predictable testing
                 openai_api_key="sk-test",
             )
@@ -211,14 +211,14 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
+            data_dir = temp_path / "data"
 
             # Create the docs directory first
             docs_dir.mkdir(exist_ok=True)
 
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                data_dir=str(cache_dir),
+                data_dir=str(data_dir),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
             )
@@ -246,7 +246,7 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
+            data_dir = temp_path / "data"
 
             # Create test document
             docs_dir.mkdir()
@@ -264,7 +264,7 @@ and the DocumentStore system.
 
             config = RAGConfig(
                 documents_dir=str(docs_dir.resolve()),  # Use resolved path
-                data_dir=str(cache_dir),
+                data_dir=str(data_dir),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test",
             )
@@ -288,7 +288,7 @@ and the DocumentStore system.
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             docs_dir = temp_path / "docs"
-            cache_dir = temp_path / "cache"
+            data_dir = temp_path / "data"
 
             # Create test document
             docs_dir.mkdir()
@@ -299,7 +299,7 @@ and the DocumentStore system.
 
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                data_dir=str(cache_dir),
+                data_dir=str(data_dir),
                 vectorstore_backend="faiss",
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
             )

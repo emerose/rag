@@ -95,7 +95,7 @@ Use the CLI to index documents and ask questions.
             # Verify command succeeded
             assert result.returncode == 0, f"Index command failed: {result.stderr}"
 
-            # Verify cache files were created
+            # Verify data files were created
             data_files = list(data_dir.glob("**/*"))
             data_files = [f for f in data_files if f.is_file()]
             assert len(data_files) > 0, "No data files were created"
@@ -359,7 +359,7 @@ Use the CLI to index documents and ask questions.
             # Check that error was logged properly
             assert "ERROR" in result.stderr or "does not exist" in result.stderr
 
-            # Test querying with empty cache
+            # Test querying with empty data
             answer_result = subprocess.run(
                 [
                     "python",

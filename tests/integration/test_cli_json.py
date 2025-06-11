@@ -45,7 +45,7 @@ def run_cli_command(cmd: list[str], config: RAGConfig) -> dict[str, Any]:
 
     Args:
         cmd: Command parts as a list (e.g. ["index", "file.txt"])
-        config: RAG configuration with cache and docs directories
+        config: RAG configuration with data and docs directories
 
     Returns:
         Parsed JSON output as a dictionary
@@ -177,7 +177,7 @@ def test_clear_command(fake_openai_factory, sample_file: Path, test_config: RAGC
     # First index a file
     run_cli_command(["index", str(sample_file)], test_config)
 
-    # Then clear its cache
+    # Then clear its data
     output = run_cli_command(["clear", str(sample_file)], test_config)
     assert "message" in output
     assert str(sample_file.name) in output["message"]

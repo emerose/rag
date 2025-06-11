@@ -170,8 +170,8 @@ class TestIndexingWorkflow:
         assert len(indexed_files) == 1
 
     # TODO: Re-add when metadata tracking is implemented
-    def _test_cache_clearing_workflow(self, tmp_path):
-        """Test cache clearing and re-indexing workflow."""
+    def _test_data_clearing_workflow(self, tmp_path):
+        """Test data clearing and re-indexing workflow."""
         # Setup using factory pattern - no patches needed!
         config = self.create_test_config(tmp_path)
         runtime = RuntimeOptions()
@@ -194,7 +194,7 @@ class TestIndexingWorkflow:
         indexed_files = source_documents  # For compatibility with existing assertions
         assert len(indexed_files) == 1
 
-        # Clear cache for specific file
+        # Clear data for specific file
         engine.clear_data(str(doc_path))
 
         # Verify file is no longer in index

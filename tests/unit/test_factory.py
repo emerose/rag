@@ -50,7 +50,7 @@ def test_factory_uses_injected_dependencies(temp_dir: Path) -> None:
 
     # Create fake implementations
     fake_filesystem = InMemoryFileSystem()
-    fake_cache = FakeDocumentStore()
+    fake_document_store = FakeDocumentStore()
     fake_embedding_service = FakeEmbeddingService()
 
     from rag.storage.vector_store import InMemoryVectorStoreFactory
@@ -59,7 +59,7 @@ def test_factory_uses_injected_dependencies(temp_dir: Path) -> None:
 
     overrides = ComponentOverrides(
         filesystem_manager=fake_filesystem,
-        document_store=fake_cache,
+        document_store=fake_document_store,
         vectorstore_factory=fake_vectorstore_factory,
         embedding_service=fake_embedding_service,
     )
@@ -68,7 +68,7 @@ def test_factory_uses_injected_dependencies(temp_dir: Path) -> None:
 
     # Test that injected dependencies are used
     assert factory.filesystem_manager is fake_filesystem
-    assert factory.document_store is fake_cache
+    assert factory.document_store is fake_document_store
     assert factory.vectorstore_factory is fake_vectorstore_factory
     assert factory.embedding_service is fake_embedding_service
 

@@ -59,13 +59,13 @@ class RetrievalEvaluator:
 
         return simplified
 
-    def _index_corpus(self, cache_dir: Path) -> RAGEngine:
+    def _index_corpus(self, eval_data_dir: Path) -> RAGEngine:
         """Download and index the selected corpus."""
         from datasets import load_dataset
 
         dataset = load_dataset(self.dataset, "corpus", split="corpus")
         dataset_slug = self.dataset.rsplit("/", 1)[-1]
-        docs_dir = cache_dir / f"{dataset_slug}-corpus"
+        docs_dir = eval_data_dir / f"{dataset_slug}-corpus"
         docs_dir.mkdir(parents=True, exist_ok=True)
 
         for item in dataset:
@@ -76,7 +76,7 @@ class RetrievalEvaluator:
             if not path.exists():
                 path.write_text(f"{title}\n\n{text}")
 
-        config = RAGConfig(documents_dir=str(docs_dir), data_dir=str(cache_dir))
+        config = RAGConfig(documents_dir=str(docs_dir), data_dir=str(eval_data_dir))
         engine = RAGEngine(config, RuntimeOptions())
         engine.index_directory(docs_dir)
         return engine
@@ -210,13 +210,13 @@ class RetrievalEvaluator:
             f"Starting retrieval evaluation using dataset: {self.dataset}"
         )
 
-        # Create unique cache dir for each dataset
+        # Create unique evaluation data dir for each dataset
         dataset_name = self.dataset.replace("/", "-").lower()
-        cache_dir = Path(f".cache-evals/{dataset_name}")
-        cache_dir.mkdir(exist_ok=True)
+        eval_data_dir = Path(f".data-evals/{dataset_name}")
+        eval_data_dir.mkdir(exist_ok=True)
 
         # Initialize corpus and engine
-        engine = self._index_corpus(cache_dir)
+        engine = self._index_corpus(eval_data_dir)
         self._logger.debug("Corpus indexed")
 
         # Load evaluation data

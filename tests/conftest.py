@@ -266,7 +266,7 @@ def default_config() -> RAGConfig:
         embedding_model="text-embedding-3-small",
         chat_model="gpt-4",
         temperature=0.0,
-        cache_dir=".test_cache",
+        data_dir=".test_data",
         lock_timeout=30,
         chunk_size=1000,
         chunk_overlap=200,
