@@ -23,3 +23,18 @@ def new_test_function(data: str, count: int) -> bool:
         True if processing succeeds
     """
     return len(data) > count
+
+
+class TestDiffClass:
+    """Test class to verify hierarchical diff class sections."""
+
+    def new_method(self, value: str) -> int:
+        """New method to test class diff rendering.
+
+        Args:
+            value: Input value
+
+        Returns:
+            Length of value
+        """
+        return len(value)
