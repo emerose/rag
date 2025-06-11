@@ -10,7 +10,7 @@ import mimetypes
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any
 
 from rag.utils.exceptions import RAGFileNotFoundError
 from rag.utils.logging_utils import log_message
@@ -19,8 +19,8 @@ from .protocols import FileSystemProtocol
 
 logger = logging.getLogger(__name__)
 
-# TypeAlias for log callback function
-LogCallback: TypeAlias = Callable[[str, str, str], None]
+# Type alias for log callback function
+type LogCallback = Callable[[str, str, str], None]
 
 # Map of supported MIME types to their file extensions
 SUPPORTED_MIME_TYPES = {

@@ -18,7 +18,7 @@ def now(tz: datetime.tzinfo | None = None) -> datetime.datetime:
     """
     # Use UTC timezone by default
     if tz is None:
-        tz = datetime.timezone.utc
+        tz = datetime.UTC
 
     return datetime.datetime.now(tz=tz)
 

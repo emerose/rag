@@ -35,7 +35,7 @@ dependencies = [
     "anyio>=4.0.0",
     "tenacity>=8.2.0",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 readme = "README.md"
 license = { text = "MIT" }
 
@@ -70,8 +70,8 @@ allow-direct-references = true
 [tool.ruff]
 # Only keep formatting and version options here
 line-length = 88
-# Assume Python 3.10
-target-version = "py310"
+# Assume Python 3.12
+target-version = "py312"
 
 [tool.ruff.format]
 quote-style = "double"
@@ -194,7 +194,7 @@ show_missing = true
 skip_covered = false
 
 [tool.pyright]
-pythonVersion = "3.10"
+pythonVersion = "3.12"
 typeCheckingMode = "strict"
 reportMissingImports = true
 reportMissingTypeStubs = false
@@ -226,7 +226,7 @@ exclude = [
     "tests/",
 ]
 executionEnvironments = [
-    { root = "src", pythonVersion = "3.10", pythonPlatform = "All", extraPaths = [] }
+    { root = "src", pythonVersion = "3.12", pythonPlatform = "All", extraPaths = [] }
 ]
 
 [dependency-groups]
