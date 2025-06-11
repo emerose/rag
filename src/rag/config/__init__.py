@@ -6,8 +6,8 @@ from the main system configuration to component-specific configurations.
 
 # Export new component-specific configurations
 from .components import (
-    CacheConfig,
     ChunkingConfig,
+    DataConfig,
     EmbeddingConfig,
     IndexingConfig,
     QueryConfig,
@@ -22,8 +22,8 @@ from .components import (
 from .main import RAGConfig, RuntimeOptions
 
 __all__ = [
-    "CacheConfig",
     "ChunkingConfig",
+    "DataConfig",
     "EmbeddingConfig",
     "IndexingConfig",
     "QueryConfig",

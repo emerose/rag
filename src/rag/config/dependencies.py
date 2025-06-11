@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from rag.retrieval import KeywordReranker
     from rag.storage.filesystem import FilesystemManager
     from rag.storage.protocols import (
-        CacheRepositoryProtocol,
+        DocumentStoreProtocol,
     )
 
 
@@ -31,7 +31,7 @@ class StorageDependencies:
     """Groups storage-related dependencies."""
 
     filesystem_manager: FilesystemManager
-    index_manager: CacheRepositoryProtocol
+    document_store: DocumentStoreProtocol
 
 
 @dataclass

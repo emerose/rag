@@ -25,8 +25,8 @@ build/
 # for convenience
 "Scientific Data"
 
-# Ignore cache directory
-.cache/
+# Ignore data directory
+.rag/
 .cache-evals/
 Ingest
 
