@@ -9,7 +9,7 @@ import logging
 import sqlite3
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any
 
 from rag.utils.logging_utils import log_message
 
@@ -18,8 +18,8 @@ from .protocols import CacheRepositoryProtocol
 
 logger = logging.getLogger(__name__)
 
-# TypeAlias for log callback function
-LogCallback: TypeAlias = Callable[[str, str, str], None]
+# Type alias for log callback function
+type LogCallback = Callable[[str, str, str], None]
 
 
 class IndexManager(CacheRepositoryProtocol):

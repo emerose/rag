@@ -6,7 +6,7 @@ OpenAIEmbeddingService with additional functionality and maintains backward comp
 
 import logging
 from collections.abc import Callable
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING
 
 from langchain_core.embeddings import Embeddings
 
@@ -20,8 +20,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# TypeAlias for log callback function
-LogCallback: TypeAlias = Callable[[str, str, str], None]
+# Type alias for log callback function
+type LogCallback = Callable[[str, str, str], None]
 
 
 class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):

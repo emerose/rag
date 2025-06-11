@@ -8,7 +8,7 @@ by higher-level components like EmbeddingProvider.
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, TypeAlias
+from typing import Any
 
 from langchain_openai import OpenAIEmbeddings
 
@@ -27,8 +27,8 @@ from rag.utils.logging_utils import log_message
 
 logger = logging.getLogger(__name__)
 
-# TypeAlias for log callback function
-LogCallback: TypeAlias = Callable[[str, str, str], None]
+# Type alias for log callback function
+type LogCallback = Callable[[str, str, str], None]
 
 
 @dataclass

@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any, TypeAlias
+from typing import Any
 
 from langchain_core.documents import Document
 
 from rag.embeddings.protocols import EmbeddingServiceProtocol
 
 # Type aliases for common metadata patterns
-DocumentMetadata: TypeAlias = dict[str, Any]
-EmbeddingMetadata: TypeAlias = dict[str, str | int | float | None]
+type DocumentMetadata = dict[str, Any]
+type EmbeddingMetadata = dict[str, str | int | float | None]
 
 
 class DefaultEmbedder:

@@ -328,7 +328,7 @@ class InMemoryVectorStore:
     _instance: InMemoryVectorStore | None = None
     _embeddings: Embeddings | None = None
 
-    def __new__(cls, embeddings: Embeddings) -> InMemoryVectorStore:
+    def __new__(cls, embeddings: Embeddings) -> Self:
         """Create or return existing singleton instance."""
         if cls._instance is None or cls._embeddings != embeddings:
             cls._instance = super().__new__(cls)
