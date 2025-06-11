@@ -110,6 +110,16 @@ class RAGEngine:
         """Get the document source."""
         return self._factory.document_source
 
+    @property
+    def chat_model(self):
+        """Get the chat model."""
+        return self._factory.chat_model
+
+    @property
+    def system_prompt(self) -> str:
+        """Get the system prompt."""
+        return getattr(self.query_engine, "system_prompt", "")
+
     def index_directory(
         self, directory_path: Path | str, progress_callback: Any = None
     ) -> dict[str, Any]:

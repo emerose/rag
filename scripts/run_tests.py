@@ -16,12 +16,16 @@ BLUE = "\033[94m"
 RESET = "\033[0m"
 
 # Type checking baseline - lower this as we fix more errors!
-# Current progress: 456 errors (11 errors fixed completing Phase 10: Unknown Type Annotations)
+# Current progress: 395 errors (61 errors fixed completing Phase 11: Import Cycles & Protocol Unification)
+# - Fixed import cycle between rag_chain.py and engine.py via factory.py (moved QueryEngine to TYPE_CHECKING)
+# - Unified VectorStoreProtocol usage (rag_chain.py now uses storage.vector_store version)
+# - Added missing RAGEngine.chat_model and RAGEngine.system_prompt properties
+# Previous: 456 errors (11 errors fixed completing Phase 10: Unknown Type Annotations)
 # Previous: 467 errors (35 errors fixed completing Phase 9: Optional Member Access)
 # Previous: 502 errors (10 errors fixed in Phase 8: External Library Type Stubs)
 # Previous: 512 errors (33 errors fixed in Phase 7: Testing & Utilities)
 # Target: 0 errors for full strict type safety
-MAX_TYPE_ERRORS = 456
+MAX_TYPE_ERRORS = 395
 
 
 def run_command(cmd: list[str]) -> int:
