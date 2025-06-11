@@ -28,7 +28,7 @@ from langchain_core.runnables import RunnableLambda, RunnableParallel
 # Import the prompt registry
 from rag.prompts import get_prompt
 from rag.retrieval import BaseReranker
-from rag.storage.protocols import VectorStoreProtocol
+from rag.storage.vector_store import VectorStoreProtocol
 from rag.utils.exceptions import VectorstoreError
 
 # Forward reference for type checking

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from rag.data.text_splitter import TextSplitterFactory
     from rag.engine import RAGEngine
+    from rag.querying.query_engine import QueryEngine
 
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
@@ -26,7 +27,6 @@ from rag.embeddings.batching import EmbeddingBatcher
 from rag.embeddings.embedding_provider import EmbeddingProvider
 from rag.embeddings.model_map import load_model_map
 from rag.embeddings.protocols import EmbeddingServiceProtocol
-from rag.querying.query_engine import QueryEngine
 from rag.retrieval import BaseReranker
 from rag.storage.filesystem import FilesystemManager
 from rag.storage.index_manager import IndexManager
@@ -292,10 +292,11 @@ class RAGComponentsFactory:
             )
         return self._embedding_batcher
 
-    def create_query_engine(self) -> QueryEngine:
+    def create_query_engine(self) -> "QueryEngine":
         """Create a QueryEngine with all dependencies wired."""
         if self._query_engine is None:
             from rag.config.dependencies import QueryEngineDependencies
+            from rag.querying.query_engine import QueryEngine
 
             # Import here to get the specific type for type checker
             from rag.retrieval.reranker import KeywordReranker
