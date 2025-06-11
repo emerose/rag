@@ -6,9 +6,9 @@ from contextlib import contextmanager
 import pytest
 from typer.testing import CliRunner
 from langchain_core.documents import Document
-from langchain_community.docstore.in_memory import InMemoryDocstore
 
 from rag.cli.cli import app, set_engine_factory_provider
+from rag.storage.fakes import InMemoryVectorStore
 
 
 class MockEngineFactory:
@@ -25,16 +25,11 @@ class MockEngineFactory:
     
     def _create_default_mock(self):
         """Create a default mock engine."""
-        # We need to create the document metadata with the actual path that will be passed
-        # The mock will be called with the full path, so we need to handle this dynamically
-        vectorstore = MagicMock()
-        
-        def mock_similarity_search(query, k=None):
-            # Return documents that match any reasonable path ending in doc.txt
-            doc = Document(page_content="Hello", metadata={"source": "doc.txt"})  
-            return [doc]
-        
-        vectorstore.similarity_search = mock_similarity_search
+        # Use FakeVectorstore instead of mocking
+        vectorstore = InMemoryVectorStore()
+        doc = Document(page_content="Hello", metadata={"source": "doc.txt"})
+        vectorstore.documents = [doc]
+        vectorstore.embeddings = [[0.1, 0.2, 0.3]]
         
         engine_instance = MagicMock()
         engine_instance.vectorstore = vectorstore
@@ -63,10 +58,11 @@ def test_chunks_command_json(tmp_path: Path) -> None:
     file_path = tmp_path / "doc.txt"
     file_path.write_text("dummy")
 
-    # Create a mock engine that returns a document with the correct source path
+    # Create a fake vectorstore with a document that has the correct source path
     doc = Document(page_content="Hello", metadata={"source": str(file_path)})
-    vectorstore = MagicMock()
-    vectorstore.similarity_search.return_value = [doc]
+    vectorstore = InMemoryVectorStore()
+    vectorstore.documents = [doc]
+    vectorstore.embeddings = [[0.1, 0.2, 0.3]]
     
     engine_mock = MagicMock()
     engine_mock.vectorstore = vectorstore

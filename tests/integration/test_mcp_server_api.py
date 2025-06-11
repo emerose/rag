@@ -55,7 +55,6 @@ def _build_test_server(tmp_path: Path):
         {"path": "sample.txt", "summary": "dummy"}
     ]
     engine.index_manager.get_chunk_hashes = lambda path: ["chunk1"]
-    engine.cleanup_orphaned_chunks = lambda: {"removed": 0}
     return server
 
 
@@ -76,7 +75,6 @@ async def test_stdio_transport(tmp_path: Path) -> None:
         await client.call_tool("tool_summaries")
         await client.call_tool("tool_chunks", {"path": "sample.txt"})
         await client.call_tool("tool_invalidate", {"all": True})
-        await client.call_tool("tool_cleanup")
 
 
 @pytest.mark.timeout(30)  # MCP HTTP transport test needs more time
@@ -100,4 +98,3 @@ def test_http_transport(tmp_path: Path) -> None:
     assert client.get("/summaries").status_code == 200
     assert client.post("/chunks", json={"path": "sample.txt"}).status_code == 200
     assert client.post("/invalidate", json={"all": True}).status_code == 200
-    assert client.post("/cleanup").status_code == 200

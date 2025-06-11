@@ -257,20 +257,6 @@ class RAGEngine:
             logger.error(f"Error loading vectorstore: {e}")
             return None
 
-    def cleanup_orphaned_chunks(self) -> dict[str, int]:
-        """Clean up orphaned chunks from deleted files.
-
-        Returns:
-            Dictionary with cleanup statistics
-        """
-        try:
-            # For new architecture, this is handled by the document store
-            # Return success for compatibility
-            return {"orphaned_files_removed": 0}
-        except Exception as e:
-            logger.error(f"Error during cleanup: {e}")
-            return {"orphaned_files_removed": 0, "error": str(e)}
-
     def invalidate_cache(self, file_path: Path | str) -> None:
         """Invalidate cache for a specific file.
 
