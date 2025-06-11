@@ -22,6 +22,7 @@ from pathlib import Path
 from types import ModuleType
 
 from rich.console import Console
+from rich.table import Table
 from rich.text import Text
 
 
@@ -235,10 +236,10 @@ class APIDiffRenderer:
         self.base = base
         self.current = current
         self.base_ref = base_ref
-        self.console = Console()
+        self.console = Console(width=120, soft_wrap=True)
 
     def render(self) -> str:
-        """Render the API diff with Rich formatting organized by module/class."""
+        """Render the API diff with Rich formatting in tabular format."""
         base_structure = self._parse_api_structure(self.base)
         current_structure = self._parse_api_structure(self.current)
 
@@ -277,53 +278,75 @@ class APIDiffRenderer:
                 header = Text(f"# {container}", style="white")
             output_parts.append(header)
 
-            # Collect all items for this container to calculate alignment
-            all_items = []
+            # Create table for this container
+            table = Table(
+                show_header=False, show_edge=False, pad_edge=False, padding=(0, 1)
+            )
+            table.add_column("prefix", width=2, no_wrap=True)  # +/-
+            table.add_column("name", min_width=8, no_wrap=True)  # function name
+            table.add_column("params", min_width=12)  # parameters
+            table.add_column("arrow", width=4, no_wrap=True, justify="center")  # ->
+            table.add_column("return_desc", min_width=15)  # return type : description
+
+            # Process all changes for this container
+            all_changes = []
 
             # Process removals
             for item in sorted(removed):
                 full_line = base_structure[container][item]
-                short_name, signature, description = self._extract_function_parts(
+                name, params, return_type, description = self._parse_function_for_table(
                     item, full_line, container
                 )
-                all_items.append(("- ", short_name + signature, description, "red"))
+                all_changes.append(("-", name, params, return_type, description, "red"))
 
             # Process additions
             for item in sorted(added):
                 full_line = current_structure[container][item]
-                short_name, signature, description = self._extract_function_parts(
+                name, params, return_type, description = self._parse_function_for_table(
                     item, full_line, container
                 )
-                all_items.append(("+ ", short_name + signature, description, "green"))
+                all_changes.append(
+                    ("+", name, params, return_type, description, "green")
+                )
 
             # Process modifications
             for item in sorted(modified):
                 # Old version
                 full_line = base_structure[container][item]
-                short_name, signature, description = self._extract_function_parts(
+                name, params, return_type, description = self._parse_function_for_table(
                     item, full_line, container
                 )
-                all_items.append(("- ", short_name + signature, description, "red"))
+                all_changes.append(("-", name, params, return_type, description, "red"))
 
                 # New version
                 full_line = current_structure[container][item]
-                short_name, signature, description = self._extract_function_parts(
+                name, params, return_type, description = self._parse_function_for_table(
                     item, full_line, container
                 )
-                all_items.append(("+ ", short_name + signature, description, "green"))
+                all_changes.append(
+                    ("+", name, params, return_type, description, "green")
+                )
 
-            # Calculate alignment for this container
-            if all_items:
-                max_signature_len = max(len(sig) for _, sig, _, _ in all_items)
+            # Add rows to table
+            for prefix, name, params, return_type, description, color in all_changes:
+                # Combine return type and description
+                return_desc = (
+                    f"{return_type} : {description}" if description else return_type
+                )
 
-                # Render aligned items
-                for prefix, signature, description, color in all_items:
-                    text = Text()
-                    text.append(prefix, style=f"{color} bold")
-                    text.append(signature.ljust(max_signature_len), style=color)
-                    text.append("`: ", style=color)
-                    text.append(description, style=color)
-                    output_parts.append(text)
+                table.add_row(
+                    Text(prefix, style=f"{color} bold"),
+                    Text(name, style=color),
+                    Text(params, style=color),
+                    Text("->", style=color),
+                    Text(return_desc, style=color),
+                )
+
+            # Render table to capture
+            with self.console.capture() as capture:
+                self.console.print(table)
+
+            output_parts.append(Text(capture.get().rstrip()))
 
             # Add empty line after each container (except the last)
             if container != sorted(containers_with_changes)[-1][0]:
@@ -336,70 +359,55 @@ class APIDiffRenderer:
 
         return capture.get()
 
-    def _extract_function_parts(
+    def _parse_function_for_table(
         self, signature: str, full_line: str, container: str
-    ) -> tuple[str, str, str]:
-        """Extract function name, signature, and description with proper shortening.
+    ) -> tuple[str, str, str, str]:
+        """Parse function for tabular display.
 
         Args:
-            signature: The full function signature (e.g., "rag.cli.function_name(args) -> return")
-            full_line: The full API line (e.g., "- `signature`: description")
+            signature: The full function signature
+            full_line: The full API line
             container: The container name (module or class)
 
         Returns:
-            Tuple of (short_name, full_signature_with_types, description)
+            Tuple of (name, parameters, return_type, description)
         """
         # Extract description from full line
         colon_idx = full_line.find("`: ")
         description = full_line[colon_idx + 3 :] if colon_idx != -1 else ""
 
-        # Determine the short name
-        if container.startswith("class "):
-            # For class methods, remove the class prefix
-            class_name = container[6:]  # Remove "class " prefix
-            if signature.startswith(class_name + "."):
-                short_name = signature[len(class_name) + 1 :]
-                # Find the start of parameters to get just the method name
-                paren_idx = short_name.find("(")
-                if paren_idx != -1:
-                    method_name = short_name[:paren_idx]
-                    params_and_return = short_name[paren_idx:]
-                    short_name = method_name
-                    signature_part = params_and_return
-                else:
-                    signature_part = ""
-            else:
-                # Fallback - just use the signature as-is
-                paren_idx = signature.find("(")
-                if paren_idx != -1:
-                    short_name = signature[:paren_idx].split(".")[-1]
-                    signature_part = signature[paren_idx:]
-                else:
-                    short_name = signature.split(".")[-1]
-                    signature_part = ""
-        # For module functions, remove the module prefix
-        elif signature.startswith(container + "."):
-            short_name = signature[len(container) + 1 :]
-            # Find the start of parameters
-            paren_idx = short_name.find("(")
-            if paren_idx != -1:
-                function_name = short_name[:paren_idx]
-                params_and_return = short_name[paren_idx:]
-                short_name = function_name
-                signature_part = params_and_return
-            else:
-                signature_part = ""
+        # Parse the signature to extract parts
+        arrow_idx = signature.find(" -> ")
+        if arrow_idx != -1:
+            func_and_params = signature[:arrow_idx]
+            return_type = signature[arrow_idx + 4 :]
         else:
-            # Fallback - just use the signature as-is
-            paren_idx = signature.find("(")
-            if paren_idx != -1:
-                short_name = signature[:paren_idx].split(".")[-1]
-                signature_part = signature[paren_idx:]
-            else:
-                short_name = signature.split(".")[-1]
-                signature_part = ""
+            func_and_params = signature
+            return_type = ""
 
-        return short_name, signature_part, description
+        # Extract function name and parameters
+        paren_idx = func_and_params.find("(")
+        if paren_idx != -1:
+            full_name = func_and_params[:paren_idx]
+            params = func_and_params[paren_idx:]
+        else:
+            full_name = func_and_params
+            params = ""
+
+        # Get short name based on container
+        if container.startswith("class "):
+            class_name = container[6:]  # Remove "class " prefix
+            if full_name.startswith(class_name + "."):
+                short_name = full_name[len(class_name) + 1 :]
+            else:
+                short_name = full_name.split(".")[-1]
+        # Module function
+        elif full_name.startswith(container + "."):
+            short_name = full_name[len(container) + 1 :]
+        else:
+            short_name = full_name.split(".")[-1]
+
+        return short_name, params, return_type, description
 
     def _parse_api_structure(self, api_dump: str) -> dict[str, dict[str, str]]:
         """Parse an API dump into a hierarchical structure organized by module/class.

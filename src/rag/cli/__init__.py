@@ -36,3 +36,27 @@ class TestAlignment:
     ) -> tuple[bool, str]:
         """Method with long name and complex parameters."""
         return True, param1
+
+
+def test_tabular_format(
+    data: str, count: int, options: dict[str, list[str]]
+) -> tuple[bool, str]:
+    """Test function to verify the new tabular format."""
+    return len(data) > count, "success"
+
+
+class TabularTest:
+    """Test class for tabular format."""
+
+    def short_method(self) -> bool:
+        """Short method."""
+        return True
+
+    def long_method_with_many_params(
+        self,
+        param1: str,
+        param2: int,
+        very_long_param_name: dict[str, list[tuple[int, str]]],
+    ) -> complex_return_type:
+        """Method with complex parameters and return type."""
+        return param1
