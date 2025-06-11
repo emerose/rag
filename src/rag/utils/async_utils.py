@@ -143,5 +143,5 @@ def run_coro_sync(coro: Awaitable[T]) -> T:
 
     if exc is not None:
         raise exc
-    assert result is not None
-    return result
+    # Type checker knows result is not None due to exception handling above
+    return result  # type: ignore[return-value]

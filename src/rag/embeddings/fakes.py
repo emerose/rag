@@ -131,7 +131,7 @@ class FakeEmbeddingService(EmbeddingServiceProtocol):
         text_hash = hashlib.sha256(text.encode("utf-8")).digest()
 
         # Generate embedding values using the hash bytes
-        embedding = []
+        embedding: list[float] = []
         for i in range(self._embedding_dimension):
             # Use different byte positions cyclically to create variation
             byte_index = i % len(text_hash)
@@ -189,7 +189,7 @@ class DeterministicEmbeddingService(EmbeddingServiceProtocol):
         if not texts:
             raise ValueError("Cannot embed empty text list")
 
-        embeddings = []
+        embeddings: list[list[float]] = []
         for text in texts:
             embedding = self.embed_query(text)
             embeddings.append(embedding)
@@ -260,7 +260,7 @@ class DeterministicEmbeddingService(EmbeddingServiceProtocol):
         text_sum = sum(ord(c) for c in text)
         pattern = text_sum % 100  # Simple pattern generator
 
-        embedding = []
+        embedding: list[float] = []
         for i in range(self._embedding_dimension):
             # Create a simple sine-wave pattern
             value = (pattern + i) / 100.0

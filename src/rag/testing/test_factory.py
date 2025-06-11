@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.config.components import (
@@ -18,6 +19,9 @@ from rag.config.components import (
     IndexingConfig,
     StorageConfig,
 )
+
+if TYPE_CHECKING:
+    from typing import Any
 from rag.embeddings.fake_openai import FakeOpenAI
 from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
 from rag.factory import ComponentOverrides, RAGComponentsFactory
@@ -47,10 +51,10 @@ class FakeComponentOptions:
     initial_files: dict[str, str] | None = None
 
     # Cache repository options
-    initial_metadata: dict[str, dict] | None = None
+    initial_metadata: dict[str, dict[str, Any]] | None = None
 
     # Vector repository options
-    initial_vectors: dict[str, list] | None = None
+    initial_vectors: dict[str, list[Any]] | None = None
 
 
 class FakeRAGComponentsFactory(RAGComponentsFactory):
@@ -167,7 +171,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
         document_loader = FakeDocumentLoader(
             filesystem_manager=filesystem,
-            log_callback=self._create_test_runtime_options().log_callback,
+            log_callback=self._create_test_runtime_options().log_callback,  # type: ignore[arg-type]
         )
 
         # Create fake chat model
@@ -223,7 +227,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
     def create_fake_index_manager(
         cls,
         cache_dir: str = "/fake/cache",
-        initial_metadata: dict[str, dict] | None = None,
+        initial_metadata: dict[str, dict[str, Any]] | None = None,
     ) -> FakeIndexManager:
         """Create a standalone FakeIndexManager for testing.
 
@@ -453,7 +457,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         if hasattr(self.cache_repository, "add_mock_file"):
             self.cache_repository.add_mock_file(resolved_path, content, fixed_mtime)
 
-    def add_test_metadata(self, file_path: str, metadata: dict) -> None:
+    def add_test_metadata(self, file_path: str, metadata: dict[str, Any]) -> None:
         """Add test metadata to the fake cache repository.
 
         Args:
@@ -491,7 +495,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             for path, content in self.filesystem_manager.files.items()
         }
 
-    def get_test_metadata(self) -> dict[str, dict]:
+    def get_test_metadata(self) -> dict[str, dict[str, Any]]:
         """Get all metadata from the fake cache repository.
 
         Returns:

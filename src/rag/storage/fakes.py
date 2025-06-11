@@ -494,8 +494,15 @@ class InMemoryVectorStore(VectorStoreProtocol):
         self._index_to_docstore_id: dict[int, str] = {}
         self._docstore: dict[str, Document] = {}
 
-    def as_retriever(self, *, search_type: str, search_kwargs: dict[str, Any]) -> Any:
+    def as_retriever(
+        self,
+        *,
+        search_type: str = "similarity",
+        search_kwargs: dict[str, Any] | None = None,
+    ) -> Any:
         """Return a retriever instance."""
+        if search_kwargs is None:
+            search_kwargs = {}
 
         # For testing, return a simple mock retriever
         class MockRetriever:
@@ -683,11 +690,11 @@ class InMemoryVectorRepository(VectorRepositoryProtocol):
                 merged.embeddings.extend(vs.embeddings)
 
                 # Update mappings
-                start_idx = len(merged.index_to_docstore_id)
+                start_idx = len(merged._index_to_docstore_id)
                 for i, doc in enumerate(vs.documents):
                     doc_id = str(start_idx + i)
-                    merged.docstore[doc_id] = doc
-                    merged.index_to_docstore_id[start_idx + i] = doc_id
+                    merged._docstore[doc_id] = doc
+                    merged._index_to_docstore_id[start_idx + i] = doc_id
 
         return merged
 

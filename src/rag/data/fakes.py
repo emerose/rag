@@ -5,7 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from langchain_core.callbacks import CallbackManagerForLLMRun
+from langchain_core.callbacks import (
+    AsyncCallbackManagerForLLMRun,
+    CallbackManagerForLLMRun,
+)
 from langchain_core.documents import Document
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage
@@ -161,7 +164,7 @@ class FakeDocumentLoader:
 
                     # Add file metadata
                     file_metadata = self.filesystem_manager.get_file_metadata(file_path)
-                    doc.metadata.update(
+                    doc.metadata.update(  # type: ignore[misc]
                         {
                             "source_type": file_metadata["source_type"],
                             "file_size": file_metadata["size"],
@@ -214,7 +217,7 @@ class FakeChatModel(BaseChatModel):
         # Create a simple deterministic response based on the last message
         last_message = messages[-1] if messages else None
         if last_message:
-            content = last_message.content.lower()
+            content = str(last_message.content).lower()
 
             # Provide specific responses for common test scenarios
             if "rag" in content or "retrieval" in content:
@@ -236,7 +239,7 @@ class FakeChatModel(BaseChatModel):
         self,
         messages: list[BaseMessage],
         stop: list[str] | None = None,
-        run_manager: CallbackManagerForLLMRun | None = None,
+        run_manager: AsyncCallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
         """Async version of _generate."""

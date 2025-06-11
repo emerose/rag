@@ -238,7 +238,7 @@ def setup_logging(
         "columns": custom_columns,  # Use our custom column layout
     }
 
-    pre_chain = [
+    pre_chain: list[Any] = [
         structlog.stdlib.add_log_level,
         uppercase_level,
         structlog.stdlib.add_logger_name,
@@ -249,7 +249,7 @@ def setup_logging(
         format_location,
     ]
 
-    console_pre_chain = [
+    console_pre_chain: list[Any] = [
         *pre_chain
     ]  # Remove colorize_level since ConsoleRenderer handles colors
 
@@ -263,7 +263,7 @@ def setup_logging(
         file_handler.setFormatter(
             structlog.stdlib.ProcessorFormatter(
                 processor=file_processor,
-                foreign_pre_chain=pre_chain,
+                foreign_pre_chain=pre_chain,  # type: ignore[arg-type]
             ),
         )
         root_logger.addHandler(file_handler)
@@ -283,7 +283,7 @@ def setup_logging(
     console_handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
             processor=console_processor,
-            foreign_pre_chain=console_pre_chain,
+            foreign_pre_chain=console_pre_chain,  # type: ignore[arg-type]
         ),
     )
     root_logger.addHandler(console_handler)
@@ -302,14 +302,14 @@ def setup_logging(
             structlog.processors.StackInfoRenderer(),
             structlog.processors.format_exc_info,
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
-        ],
+        ],  # type: ignore[arg-type]
         logger_factory=structlog.stdlib.LoggerFactory(),
         wrapper_class=structlog.make_filtering_bound_logger(log_level),
         cache_logger_on_first_use=True,
     )
 
 
-def get_logger() -> logging.Logger:
+def get_logger() -> RAGLogger:
     """Get the configured RAG logger."""
     return logger
 
