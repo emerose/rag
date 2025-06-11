@@ -18,12 +18,13 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import tiktoken
 from langchain_core.documents import Document
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.runnables import RunnableLambda, RunnableParallel
+from langchain_core.prompts import BasePromptTemplate
+from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
 
 # Import the prompt registry
 from rag.prompts import get_prompt
@@ -31,9 +32,7 @@ from rag.retrieval import BaseReranker
 from rag.storage.vector_store import VectorStoreProtocol
 from rag.utils.exceptions import VectorstoreError
 
-# Forward reference for type checking
-if TYPE_CHECKING:
-    from rag.engine import RAGEngine
+# Use forward references to avoid import cycles
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +125,7 @@ def _pack_documents(
 # ---------------------------------------------------------------------------
 
 
-def _get_prompt_template(prompt_id: str):
+def _get_prompt_template(prompt_id: str) -> BasePromptTemplate[dict[str, Any]]:
     """Get prompt template with fallback to default."""
     try:
         return get_prompt(prompt_id)
@@ -163,7 +162,7 @@ def _create_retrieval_function(
     return _retrieve
 
 
-def _create_llm_function(engine: RAGEngine):
+def _create_llm_function(engine: Any):
     """Create LLM invocation function with streaming support."""
 
     def _invoke_llm(prompt_text: str) -> str:
@@ -188,12 +187,13 @@ def _create_llm_function(engine: RAGEngine):
 
         response = engine.chat_model.invoke(messages)
         # Handle multimodal content - extract string content for text-only RAG
-        content: Any = response.content
+        content = response.content
         if isinstance(content, str):
             return content
         elif isinstance(content, list):
             # Extract text content from list format (multimodal)
-            return " ".join(str(item) for item in content if isinstance(item, str))
+            text_parts = [str(item) for item in content if isinstance(item, str)]
+            return " ".join(text_parts)
         else:
             return str(content)
 
@@ -201,7 +201,7 @@ def _create_llm_function(engine: RAGEngine):
 
 
 def build_rag_chain(
-    engine: RAGEngine,
+    engine: Any,
     k: int = 4,
     prompt_id: str = "default",
     reranker: BaseReranker | None = None,

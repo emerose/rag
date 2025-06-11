@@ -428,7 +428,7 @@ def _index_single_file(rag_engine: RAGEngine, path_obj: Path) -> None:
     }
 
     if error:
-        output["errors"] = {str(path_obj): error}
+        output["errors"] = {str(path_obj): str(error)}
 
     write(output)
 
@@ -444,8 +444,20 @@ def _index_directory(
         # Create progress callback
         progress_callback = create_console_progress_callback(progress)
 
-        # Set the progress callback
-        rag_engine.runtime.progress_callback = progress_callback
+        # Create compatible progress callback wrapper
+        def compatible_progress_callback(
+            stage: str, current: int, total: int | None
+        ) -> None:
+            progress_info = {
+                "stage": stage,
+                "current": current,
+                "total": total,
+                "message": "",
+            }
+            progress_callback(progress_info)
+
+        # Set the compatible progress callback
+        rag_engine.runtime.progress_callback = compatible_progress_callback
 
         # Run indexing on the specified directory
         results = rag_engine.index_directory(path_obj)
