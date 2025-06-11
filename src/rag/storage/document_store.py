@@ -58,7 +58,7 @@ class SourceDocumentMetadata:
 # Import DocumentStoreProtocol from protocols module to avoid duplication
 
 
-class SQLiteDocumentStore:
+class _LegacySQLiteDocumentStore:
     """SQLite-based document store implementation.
 
     This implementation uses SQLite to persist documents and their metadata,
@@ -1181,3 +1181,6 @@ class FakeDocumentStore:
             or metadata.get("embedding_model") != embedding_model
             or metadata.get("embedding_model_version") != embedding_model_version
         )
+
+
+# Import the new SQLAlchemy-based implementation as the default

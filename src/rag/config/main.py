@@ -30,6 +30,8 @@ class RAGConfig:
         chunk_overlap: Number of tokens to overlap between chunks
         openai_api_key: OpenAI API key (will be set in __post_init__)
         vectorstore_backend: Backend to use for vector storage
+        database_backend: Backend to use for document storage (sqlite, postgresql, mysql)
+        database_url: Optional database URL for non-SQLite backends
         embedding_model_map_file: Optional path to embeddings.yaml for per-doc
             model selection
         batch_size: Number of documents to embed per batch (default: 64)
@@ -46,6 +48,8 @@ class RAGConfig:
     chunk_overlap: int = 200  # tokens
     openai_api_key: str = ""  # Will be set in __post_init__
     vectorstore_backend: str = "faiss"
+    database_backend: str = "sqlite"
+    database_url: str | None = None
     embedding_model_map_file: str | None = None
     batch_size: int = 64
 

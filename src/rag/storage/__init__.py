@@ -12,11 +12,13 @@ from .fakes import (
     InMemoryFileSystem,
 )
 from .filesystem import FilesystemManager
+from .models import Base, Document, SourceDocument, SourceDocumentChunk
 from .protocols import (
     DocumentStoreProtocol,
     FileSystemProtocol,
     VectorStoreProtocol,
 )
+from .sqlalchemy_document_store import SQLAlchemyDocumentStore
 from .vector_store import (
     FAISSVectorStore,
     FAISSVectorStoreFactory,
@@ -26,6 +28,8 @@ from .vector_store import (
 )
 
 __all__ = [
+    "Base",
+    "Document",
     "DocumentStoreProtocol",
     "FAISSVectorStore",
     "FAISSVectorStoreFactory",
@@ -35,7 +39,10 @@ __all__ = [
     "InMemoryFileSystem",
     "InMemoryVectorStore",
     "InMemoryVectorStoreFactory",
+    "SQLAlchemyDocumentStore",
     "SQLiteDocumentStore",
+    "SourceDocument",
+    "SourceDocumentChunk",
     "VectorStoreFactory",
     "VectorStoreProtocol",
 ]

@@ -117,9 +117,14 @@ class RAGComponentsFactory:
     def document_store(self) -> DocumentStoreProtocol:
         """Get or create document store."""
         if self._document_store is None:
-            data_dir = Path(self.config.data_dir)
-            db_path = data_dir / "documents.db"
-            self._document_store = SQLiteDocumentStore(db_path)
+            if self.config.database_url:
+                # Use provided database URL
+                self._document_store = SQLiteDocumentStore(self.config.database_url)
+            else:
+                # Use default SQLite with file path
+                data_dir = Path(self.config.data_dir)
+                db_path = data_dir / "documents.db"
+                self._document_store = SQLiteDocumentStore(db_path)
         return self._document_store
 
     @property
@@ -214,12 +219,9 @@ class RAGComponentsFactory:
         """Get or create ingestion pipeline."""
         if self._ingestion_pipeline is None:
             from rag.pipeline import IngestionPipeline
-            from rag.storage.document_store import SQLiteDocumentStore
 
-            # Create document store
-            document_store = SQLiteDocumentStore(
-                db_path=Path(self.config.data_dir) / "documents.db"
-            )
+            # Use the same document store logic as the property
+            document_store = self.document_store
 
             # Create transformer and embedder
             from rag.pipeline import DefaultDocumentTransformer, DefaultEmbedder
