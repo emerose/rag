@@ -304,13 +304,15 @@ class FAISSVectorStoreFactory(VectorStoreFactory):
         """Load a FAISS vector store from the given path.
 
         Args:
-            path: Path to load the vector store from (without extension)
+            path: Directory path to load the vector store from
 
         Returns:
             Loaded FAISS vector store, or None if it doesn't exist or cannot be loaded
         """
         try:
-            return FAISSVectorStore.load(path, self.embeddings)
+            # The standard filename for the vectorstore is "workspace"
+            vectorstore_path = Path(path) / "workspace"
+            return FAISSVectorStore.load(str(vectorstore_path), self.embeddings)
         except (FileNotFoundError, ValueError) as e:
             logger.debug(f"Could not load vector store from {path}: {e}")
             return None

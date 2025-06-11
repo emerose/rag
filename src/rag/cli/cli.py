@@ -445,15 +445,8 @@ def _index_directory(
         progress_callback = create_console_progress_callback(progress)
 
         # Create compatible progress callback wrapper
-        def compatible_progress_callback(
-            stage: str, current: int, total: int | None
-        ) -> None:
-            progress_info = {
-                "stage": stage,
-                "current": current,
-                "total": total,
-                "message": "",
-            }
+        def compatible_progress_callback(progress_info: dict) -> None:
+            # The pipeline calls with a dictionary, so we accept that format
             progress_callback(progress_info)
 
         # Set the compatible progress callback
