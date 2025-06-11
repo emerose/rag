@@ -14,7 +14,7 @@ def test_needs_reindexing_new_file(temp_dir: Path) -> None:
     """Test checking if a new file needs reindexing using dependency injection."""
     # Create fake index manager with no initial metadata
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir)
+        data_dir=str(temp_dir)
     )
 
     # Add a mock file that doesn't have metadata yet
@@ -42,7 +42,7 @@ def test_needs_reindexing_unchanged_file(temp_dir: Path) -> None:
     modified_time = 1234567890.0
 
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir)
+        data_dir=str(temp_dir)
     )
     
     # Add mock file with content
@@ -84,7 +84,7 @@ def test_needs_reindexing_changed_hash(temp_dir: Path) -> None:
     """Test checking if a file with changed hash needs reindexing using dependency injection."""
     # Create fake index manager
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir)
+        data_dir=str(temp_dir)
     )
 
     # Add initial file content and metadata
@@ -135,7 +135,7 @@ def test_needs_reindexing_changed_parameters(temp_dir: Path) -> None:
     """Test checking if a file with changed parameters needs reindexing using dependency injection."""
     # Create fake index manager
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir)
+        data_dir=str(temp_dir)
     )
 
     # Add file with original parameters
@@ -181,7 +181,7 @@ def test_needs_reindexing_nonexistent_file(temp_dir: Path) -> None:
     """Test checking if a non-existent file needs reindexing using dependency injection."""
     # Create fake index manager
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir)
+        data_dir=str(temp_dir)
     )
 
     # Test needs_reindexing for a file that doesn't exist
@@ -202,7 +202,7 @@ def test_needs_reindexing_newer_modification_time(temp_dir: Path) -> None:
     """Test checking if a file with newer modification time needs reindexing."""
     # Create fake index manager
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir)
+        data_dir=str(temp_dir)
     )
 
     # Add file with original modification time

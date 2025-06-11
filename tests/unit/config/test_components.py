@@ -107,26 +107,26 @@ class TestDataConfig:
         config = DataConfig()
         
         assert config.enabled is True
-        assert config.data_dir == ".cache"
+        assert config.data_dir == ".data"
         assert config.ttl_hours == 24 * 7  # 1 week
-        assert config.max_cache_size_mb == 1000
+        assert config.max_data_size_mb == 1000
         assert config.compression_enabled is True
         assert config.lock_timeout == 30
         assert config.cleanup_on_startup is True
 
-    def test_disabled_cache(self):
-        """Test cache can be disabled."""
+    def test_disabled_data(self):
+        """Test data can be disabled."""
         config = DataConfig(enabled=False)
         
         assert config.enabled is False
         # Other settings should still have defaults
-        assert config.data_dir == ".cache"
+        assert config.data_dir == ".data"
 
     def test_custom_data_dir(self):
-        """Test custom cache directory."""
-        config = DataConfig(data_dir="/tmp/rag-cache")
+        """Test custom data directory."""
+        config = DataConfig(data_dir="/tmp/rag-data")
         
-        assert config.data_dir == "/tmp/rag-cache"
+        assert config.data_dir == "/tmp/rag-data"
 
 
 class TestQueryConfig:
@@ -193,32 +193,32 @@ class TestIndexingConfig:
         
         assert isinstance(config.chunking, ChunkingConfig)
         assert isinstance(config.embedding, EmbeddingConfig)
-        assert isinstance(config.cache, DataConfig)
+        assert isinstance(config.data, DataConfig)
         assert isinstance(config.storage, StorageConfig)
         
         # Check some key defaults
         assert config.chunking.chunk_size == 1000
         assert config.embedding.model == "text-embedding-3-small"
-        assert config.cache.enabled is True
+        assert config.data.enabled is True
         assert config.storage.backend == "faiss"
 
     def test_custom_sub_configs(self):
         """Test creating with custom sub-configurations."""
         chunking = ChunkingConfig(chunk_size=500)
         embedding = EmbeddingConfig(model="custom-model")
-        cache = DataConfig(enabled=False)
+        data = DataConfig(enabled=False)
         storage = StorageConfig(backend="fake")
         
         config = IndexingConfig(
             chunking=chunking,
             embedding=embedding,
-            cache=cache,
+            data=data,
             storage=storage
         )
         
         assert config.chunking.chunk_size == 500
         assert config.embedding.model == "custom-model"
-        assert config.cache.enabled is False
+        assert config.data.enabled is False
         assert config.storage.backend == "fake"
 
     def test_to_dict_serialization(self):
@@ -229,13 +229,13 @@ class TestIndexingConfig:
         assert isinstance(data, dict)
         assert "chunking" in data
         assert "embedding" in data
-        assert "cache" in data
+        assert "data" in data
         assert "storage" in data
         
         # Check nested structure
         assert data["chunking"]["chunk_size"] == 1000
         assert data["embedding"]["model"] == "text-embedding-3-small"
-        assert data["cache"]["enabled"] is True
+        assert data["data"]["enabled"] is True
         assert data["storage"]["backend"] == "faiss"
 
     def test_immutable(self):
@@ -254,29 +254,29 @@ class TestQueryProcessingConfig:
         config = QueryProcessingConfig()
         
         assert isinstance(config.query, QueryConfig)
-        assert isinstance(config.cache, DataConfig)
+        assert isinstance(config.data, DataConfig)
         assert isinstance(config.storage, StorageConfig)
         
         # Check some key defaults
         assert config.query.model == "gpt-4"
-        assert config.cache.enabled is True
+        assert config.data.enabled is True
         assert config.storage.backend == "faiss"
 
     def test_custom_sub_configs(self):
         """Test creating with custom sub-configurations."""
         query = QueryConfig(temperature=0.8, top_k=8)
-        cache = DataConfig(data_dir="/custom/cache")
+        data = DataConfig(data_dir="/custom/data")
         storage = StorageConfig(backend="chroma")
         
         config = QueryProcessingConfig(
             query=query,
-            cache=cache,
+            data=data,
             storage=storage
         )
         
         assert config.query.temperature == 0.8
         assert config.query.top_k == 8
-        assert config.cache.data_dir == "/custom/cache"
+        assert config.data.data_dir == "/custom/data"
         assert config.storage.backend == "chroma"
 
 
@@ -297,7 +297,7 @@ class TestConfigIntegration:
                 max_workers=1,
                 async_batching=False
             ),
-            cache=DataConfig(
+            data=DataConfig(
                 enabled=False  # Disable caching for tests
             ),
             storage=StorageConfig(
@@ -308,7 +308,7 @@ class TestConfigIntegration:
         
         assert test_config.chunking.chunk_size == 100
         assert test_config.embedding.batch_size == 2
-        assert test_config.cache.enabled is False
+        assert test_config.data.enabled is False
         assert test_config.storage.backend == "fake"
 
     def test_production_configs(self):
@@ -324,9 +324,9 @@ class TestConfigIntegration:
                 max_workers=8,
                 async_batching=True
             ),
-            cache=DataConfig(
+            data=DataConfig(
                 enabled=True,
-                max_cache_size_mb=5000,
+                max_data_size_mb=5000,
                 compression_enabled=True
             ),
             storage=StorageConfig(
@@ -338,5 +338,5 @@ class TestConfigIntegration:
         
         assert prod_config.chunking.chunk_size == 1500
         assert prod_config.embedding.batch_size == 128
-        assert prod_config.cache.max_cache_size_mb == 5000
+        assert prod_config.data.max_data_size_mb == 5000
         assert prod_config.storage.memory_map is True

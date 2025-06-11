@@ -14,7 +14,7 @@ def test_update_metadata(temp_dir: Path) -> None:
     """Test updating document metadata using dependency injection."""
     # Create fake index manager
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir)
+        data_dir=str(temp_dir)
     )
 
     # Test update_metadata
@@ -67,7 +67,7 @@ def test_get_metadata(temp_dir: Path) -> None:
     }
     
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir),
+        data_dir=str(temp_dir),
         initial_metadata=initial_metadata
     )
 
@@ -96,7 +96,7 @@ def test_get_metadata_not_found(temp_dir: Path) -> None:
     """Test getting metadata for a non-existent file using dependency injection."""
     # Create empty fake index manager
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir)
+        data_dir=str(temp_dir)
     )
 
     # Test get_metadata for non-existent file
@@ -119,7 +119,7 @@ def test_remove_metadata(temp_dir: Path) -> None:
     }
     
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir),
+        data_dir=str(temp_dir),
         initial_metadata=initial_metadata
     )
 

@@ -19,7 +19,7 @@ class TestCacheDecisionLogic:
         
         # Add a mock file that doesn't have metadata yet
         test_file = Path("/fake/documents/new_file.txt")
-        manager.add_mock_file(test_file, "new file content")
+        manager.add_mock_file(test_file, "new file content", 1640995200.0)
         
         result = manager.needs_reindexing(
             file_path=test_file,
@@ -252,7 +252,7 @@ class TestCacheDecisionLogic:
         
         # Add and then remove a mock file
         test_file = Path("/fake/documents/nonexistent.txt")
-        manager.add_mock_file(test_file, "content")
+        manager.add_mock_file(test_file, "content", 1640995200.0)
         manager.remove_mock_file(test_file)
         
         result = manager.needs_reindexing(
@@ -272,7 +272,7 @@ class TestCacheDecisionLogic:
         # Test with mock file
         test_file = Path("/fake/documents/hash_test.txt")
         content = "test content"
-        manager.add_mock_file(test_file, content)
+        manager.add_mock_file(test_file, content, 1640995200.0)
         
         result = manager.compute_file_hash(test_file)
         
@@ -286,7 +286,7 @@ class TestCacheDecisionLogic:
         assert result == result2
         
         # Test different content produces different hash
-        manager.add_mock_file(test_file, "different content")
+        manager.add_mock_file(test_file, "different content", 1640995200.0)
         result3 = manager.compute_file_hash(test_file)
         assert result != result3
     
