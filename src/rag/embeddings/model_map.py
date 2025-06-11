@@ -32,8 +32,6 @@ def get_model_for_path(
 ) -> str:
     """Return embedding model for *file_path* using *model_map*."""
     fp = str(file_path)
-    pattern: str
-    model: str
     for pattern, model in model_map.items():
         if fnmatch.fnmatch(fp, pattern):
             return model

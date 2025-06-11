@@ -367,9 +367,9 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
             # Process each character in the element
             for char in self._extract_chars_from_element(element):
                 if hasattr(char, "size"):
-                    font_sizes.append(float(char.size))
+                    font_sizes.append(char.size)
                     # Heuristic: Some PDFs mark bold with 'Bold' in font name
-                    if hasattr(char, "fontname") and "Bold" in str(char.fontname):
+                    if hasattr(char, "fontname") and "Bold" in char.fontname:
                         bold_count += 1
                     char_count += 1
 
