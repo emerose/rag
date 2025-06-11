@@ -991,8 +991,9 @@ class TextSplitterFactory:
         path_components: list[str] = []
         for header_idx in range(1, max_level + 1):
             key = f"Header {header_idx}"
-            if doc.metadata.get(key):
-                path_components.append(doc.metadata[key])
+            header_value = doc.metadata.get(key)
+            if header_value:
+                path_components.append(str(header_value))
         return path_components
 
     def _find_closest_heading(
