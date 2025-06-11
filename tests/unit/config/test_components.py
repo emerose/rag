@@ -107,7 +107,7 @@ class TestDataConfig:
         config = DataConfig()
         
         assert config.enabled is True
-        assert config.data_dir == ".data"
+        assert config.data_dir == ".rag"
         assert config.ttl_hours == 24 * 7  # 1 week
         assert config.max_data_size_mb == 1000
         assert config.compression_enabled is True
@@ -120,7 +120,7 @@ class TestDataConfig:
         
         assert config.enabled is False
         # Other settings should still have defaults
-        assert config.data_dir == ".data"
+        assert config.data_dir == ".rag"
 
     def test_custom_data_dir(self):
         """Test custom data directory."""

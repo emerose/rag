@@ -351,7 +351,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 max_retries=1,  # Fewer retries for faster test failures
                 timeout_seconds=5,  # Short timeout for fast test failures
             ),
-            cache=DataConfig(
+            data=DataConfig(
                 enabled=False,  # Disable data storage for tests to avoid side effects
                 data_dir="/tmp/test_cache",
                 ttl_hours=1,  # Short TTL for tests
@@ -393,7 +393,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 timeout_seconds=30,  # Standard timeout
                 rate_limit_rpm=3000,
             ),
-            cache=DataConfig(
+            data=DataConfig(
                 enabled=True,
                 data_dir=".rag",
                 ttl_hours=24 * 7,  # 1 week

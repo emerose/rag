@@ -126,7 +126,7 @@ class TestTestFactoryErrorHandling:
         with pytest.raises(ConfigurationError) as exc_info:
             factory.add_test_metadata("/test/file.txt", {"key": "value"})
         
-        assert "Can only add test metadata to InMemoryCacheRepository" in str(exc_info.value)
+        assert "Can only add test metadata to FakeDocumentStore" in str(exc_info.value)
         assert "got str" in str(exc_info.value)
 
     def test_get_test_files_wrong_filesystem_type(self):
@@ -152,7 +152,7 @@ class TestTestFactoryErrorHandling:
         with pytest.raises(ConfigurationError) as exc_info:
             factory.get_test_metadata()
         
-        assert "Can only get test metadata from InMemoryCacheRepository" in str(exc_info.value)
+        assert "Can only get test metadata from FakeDocumentStore" in str(exc_info.value)
         assert "got str" in str(exc_info.value)
 
 
