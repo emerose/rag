@@ -61,13 +61,14 @@ def test_repl_session(tmp_path: Path) -> None:
 
     engine = MagicMock()
     engine.answer.return_value = {"answer": "ok", "sources": []}
-    engine.vectorstores = {}
+    # Mock the vectorstore property to return None (no documents indexed)
+    engine.vectorstore = None
 
     with (
         patch("rag.cli.cli._create_repl_session", return_value=DummySession()),
         patch("rag.cli.cli.print_welcome_message"),
         patch("rag.cli.cli._initialize_rag_engine", return_value=engine),
-        patch("rag.cli.cli._load_vectorstores"),
+        patch("rag.cli.cli._load_vectorstore"),
     ):
         result = runner.invoke(app, ["repl", "--cache-dir", str(tmp_path)])
     assert result.exit_code == 0

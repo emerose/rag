@@ -8,7 +8,6 @@ from typing import Any
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.engine import RAGEngine
-from rag.storage.vectorstore import VectorStoreManager
 from rag.utils.logging_utils import get_logger
 
 from .types import Evaluation, EvaluationResult
@@ -86,17 +85,19 @@ class RetrievalEvaluator:
         self, engine: RAGEngine, queries: list[dict[str, Any]], k: int
     ) -> dict[str, dict[str, float]]:
         """Run similarity search for each query and return ranking results."""
-        vs_manager: VectorStoreManager = engine.vectorstore_manager
+        vectorstore = engine.vectorstore
         self._logger.debug(f"Running retrieval for {len(queries)} queries with k={k}")
-        merged_vs = vs_manager.merge_vectorstores(list(engine.vectorstores.values()))
-        self._logger.debug("Merged vectorstores")
+        if not vectorstore:
+            self._logger.warning("No vectorstore available")
+            return {}
+
         results: dict[str, dict[str, float]] = {}
         self._logger.debug(f"Queries: {queries}")
         for q in queries:
             qid = q.get("query_id") or q.get("_id") or q["id"]
             text = q.get("text") or q.get("query")
             self._logger.debug(f"Running similarity search for query {qid}")
-            docs = vs_manager.similarity_search(merged_vs, text, k=k)
+            docs = vectorstore.similarity_search(text, k=k)
             self._logger.debug(f"Found {len(docs)} documents")
             scores = {
                 d.metadata.get("source", str(idx)): 1.0 / (idx + 1)

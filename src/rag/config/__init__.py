@@ -15,7 +15,6 @@ from .components import (
     SemanticSplitterConfig,
     StorageConfig,
     TextSplittingConfig,
-    VectorStoreManagerConfig,
 )
 
 # Re-export main config classes for convenience
@@ -34,5 +33,4 @@ __all__ = [
     "SemanticSplitterConfig",
     "StorageConfig",
     "TextSplittingConfig",
-    "VectorStoreManagerConfig",
 ]

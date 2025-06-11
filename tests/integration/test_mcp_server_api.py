@@ -38,12 +38,15 @@ def _build_test_server(tmp_path: Path):
 
     engine = server.engine
     engine.answer = lambda q, k=4: {"answer": "ok"}
-    # Mock the cache orchestrator's get_vectorstores method instead of setting vectorstores directly
-    engine.cache_orchestrator.get_vectorstores = lambda: {"vs": object()}
-    engine.vectorstore_manager.merge_vectorstores = lambda stores: None
-    engine.vectorstore_manager.similarity_search = lambda merged, q, k=4: [
-        Document(page_content="doc", metadata={})
-    ]
+    # Mock the private vectorstore attribute with a proper mock that has the required interface
+    class MockVectorStore:
+        def similarity_search(self, query: str, k: int = 4) -> list[Document]:
+            return [Document(page_content="doc", metadata={})]
+        
+        def add_documents(self, documents: list[Document]) -> None:
+            pass
+    
+    engine._vectorstore = MockVectorStore()
     engine.index_directory = lambda path, progress_callback=None: {"indexed": True}
     engine.index_file = lambda path, progress_callback=None: (True, "")
     engine.invalidate_all_caches = lambda: None

@@ -292,3 +292,24 @@ class FakeIndexManager(CacheRepositoryProtocol):
             for key, value in self._global_settings.items()
             if key.startswith("model_")
         }
+
+    def list_cached_files(self) -> dict[str, dict[str, Any]]:
+        """List all cached/indexed files.
+
+        Returns:
+            Dictionary mapping file paths to their metadata
+        """
+        result = {}
+        for file_info in self.list_indexed_files():
+            file_path = file_info.get("file_path", "")
+            if file_path:
+                result[file_path] = file_info
+        return result
+
+    def invalidate_cache(self, file_path: Path) -> None:
+        """Invalidate cache for a specific file (compatibility method).
+
+        Args:
+            file_path: Path to the file to invalidate
+        """
+        self.remove_metadata(file_path)

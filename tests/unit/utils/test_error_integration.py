@@ -6,8 +6,7 @@ from pathlib import Path
 from rag.embeddings.fakes import FakeEmbeddingService
 from rag.evaluation import run_evaluations
 from rag.evaluation.types import Evaluation
-from rag.storage.backends.factory import create_vectorstore_backend
-from rag.storage.vector_repository import VectorRepository
+from rag.storage.vector_store import InMemoryVectorStoreFactory
 from rag.testing.test_factory import FakeRAGComponentsFactory
 from rag.embeddings.model_map import load_model_map
 
@@ -66,118 +65,6 @@ class TestOpenAIEmbeddingServiceErrorHandling:
             service.embed_query("   ")  # Only whitespace
         
         assert "Query cannot be empty or whitespace-only" in str(exc_info.value)
-
-
-class TestVectorRepositoryErrorHandling:
-    """Test that VectorRepository raises proper exceptions."""
-
-    def test_create_vectorstore_empty_documents(self):
-        """Test that creating vectorstore with empty documents raises VectorstoreError."""
-        from rag.embeddings.fakes import FakeEmbeddingService
-        # Create a fake vector repository for testing
-        fake_embeddings = FakeEmbeddingService()
-        repository = VectorRepository(
-            cache_dir=Path("/tmp"),
-            embeddings=fake_embeddings,
-            backend="fake"
-        )
-        
-        with pytest.raises(VectorstoreError) as exc_info:
-            repository.create_vectorstore([])
-        
-        assert exc_info.value.error_code == "VECTORSTORE_ERROR"
-        assert "Cannot create vector store from empty document list" in str(exc_info.value)
-        assert exc_info.value.operation == "create"
-
-    def test_add_documents_mismatched_lengths(self):
-        """Test that mismatched document/embedding lengths raises VectorstoreError."""
-        from rag.embeddings.fakes import FakeEmbeddingService
-        fake_embeddings = FakeEmbeddingService()
-        repository = VectorRepository(
-            cache_dir=Path("/tmp"),
-            embeddings=fake_embeddings,
-            backend="fake"
-        )
-        
-        from langchain_core.documents import Document
-        documents = [Document(page_content="test")]
-        embeddings = [[1.0, 2.0], [3.0, 4.0]]  # Wrong length
-        
-        with pytest.raises(VectorstoreError) as exc_info:
-            repository.add_documents_to_vectorstore(None, documents, embeddings)
-        
-        assert exc_info.value.error_code == "VECTORSTORE_ERROR"
-        assert "Documents count (1) doesn't match embeddings count (2)" in str(exc_info.value)
-        assert exc_info.value.operation == "add_documents"
-
-    def test_similarity_search_invalid_k(self):
-        """Test that invalid k parameter raises VectorstoreError."""
-        from rag.embeddings.fakes import FakeEmbeddingService
-        fake_embeddings = FakeEmbeddingService()
-        repository = VectorRepository(
-            cache_dir=Path("/tmp"),
-            embeddings=fake_embeddings,
-            backend="fake"
-        )
-        
-        with pytest.raises(VectorstoreError) as exc_info:
-            repository.similarity_search(None, "test query", k=0)
-        
-        assert exc_info.value.error_code == "VECTORSTORE_ERROR"
-        assert "k must be at least 1" in str(exc_info.value)
-        assert exc_info.value.operation == "similarity_search"
-
-    def test_similarity_search_empty_query(self):
-        """Test that empty query raises VectorstoreError."""
-        from rag.embeddings.fakes import FakeEmbeddingService
-        fake_embeddings = FakeEmbeddingService()
-        repository = VectorRepository(
-            cache_dir=Path("/tmp"),
-            embeddings=fake_embeddings,
-            backend="fake"
-        )
-        
-        with pytest.raises(VectorstoreError) as exc_info:
-            repository.similarity_search(None, "   ", k=4)  # Only whitespace
-        
-        assert exc_info.value.error_code == "VECTORSTORE_ERROR"
-        assert "Query cannot be empty" in str(exc_info.value)
-        assert exc_info.value.operation == "similarity_search"
-
-    def test_merge_vectorstores_empty_list(self):
-        """Test that merging empty vectorstore list raises VectorstoreError."""
-        from rag.embeddings.fakes import FakeEmbeddingService
-        fake_embeddings = FakeEmbeddingService()
-        repository = VectorRepository(
-            cache_dir=Path("/tmp"),
-            embeddings=fake_embeddings,
-            backend="fake"
-        )
-        
-        with pytest.raises(VectorstoreError) as exc_info:
-            repository.merge_vectorstores([])
-        
-        assert exc_info.value.error_code == "VECTORSTORE_ERROR"
-        assert "Cannot merge empty list of vector stores" in str(exc_info.value)
-        assert exc_info.value.operation == "merge"
-
-
-class TestBackendFactoryErrorHandling:
-    """Test that backend factory raises proper exceptions."""
-
-    def test_create_unsupported_backend(self):
-        """Test that unsupported backend raises InvalidConfigurationError."""
-        from rag.embeddings.fakes import FakeEmbeddingService
-        
-        fake_embeddings = FakeEmbeddingService()
-        
-        with pytest.raises(InvalidConfigurationError) as exc_info:
-            create_vectorstore_backend("unsupported_backend", fake_embeddings)
-        
-        assert exc_info.value.error_code == "INVALID_CONFIG"
-        assert exc_info.value.config_key == "backend_name"
-        assert exc_info.value.value == "unsupported_backend"
-        assert "one of ['faiss', 'fake']" in exc_info.value.expected
 
 
 class TestEvaluationErrorHandling:
@@ -274,14 +161,6 @@ class TestExceptionChainingScenarios:
 
     def test_vectorstore_error_chaining(self):
         """Test that VectorstoreError properly chains original exceptions."""
-        from rag.embeddings.fakes import FakeEmbeddingService
-        fake_embeddings = FakeEmbeddingService()
-        repository = VectorRepository(
-            cache_dir=Path("/tmp"),
-            embeddings=fake_embeddings,
-            backend="fake"
-        )
-        
         # Mock a failure that would cause an exception to be chained
         original_exception = RuntimeError("Simulated backend failure")
         

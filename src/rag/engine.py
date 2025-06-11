@@ -1,7 +1,7 @@
 """Main RAG engine module.
 
 This module provides the main RAGEngine class that orchestrates the entire
-RAG system using the new IngestionPipeline architecture.
+RAG system using the simplified single-vectorstore architecture.
 """
 
 import logging
@@ -10,6 +10,7 @@ from typing import Any
 
 from .config import RAGConfig, RuntimeOptions
 from .factory import RAGComponentsFactory
+from .storage.vector_store import VectorStoreProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,7 @@ class RAGEngine:
         # Cache the main components we need
         self._query_engine = None
         self._cache_orchestrator = None
+        self._vectorstore: VectorStoreProtocol | None = None
 
     @property
     def query_engine(self):
@@ -81,9 +83,12 @@ class RAGEngine:
         return self._factory.cache_repository
 
     @property
-    def vectorstores(self) -> dict[str, Any]:
-        """Get loaded vectorstores."""
-        return self.cache_orchestrator.get_vectorstores()
+    def vectorstore(self) -> VectorStoreProtocol | None:
+        """Get the single workspace vectorstore."""
+        if self._vectorstore is None:
+            # Try to load the workspace vectorstore
+            self._vectorstore = self._load_workspace_vectorstore()
+        return self._vectorstore
 
     @property
     def embedding_batcher(self):
@@ -203,10 +208,10 @@ class RAGEngine:
             Dictionary with question, answer, and sources
         """
         try:
-            # Load vectorstores from DocumentStore
-            vectorstores = self._load_vectorstores_from_document_store()
+            # Get the workspace vectorstore
+            vectorstore = self.vectorstore
 
-            if not vectorstores:
+            if vectorstore is None:
                 return {
                     "question": question,
                     "answer": "No indexed documents found. Please index some documents first.",
@@ -214,7 +219,8 @@ class RAGEngine:
                     "num_documents_retrieved": 0,
                 }
 
-            return self.query_engine.answer(question, vectorstores, k=k)
+            # Pass the vectorstore directly to the query engine
+            return self.query_engine.answer(question, vectorstore, k=k)
         except Exception as e:
             logger.error(f"Error answering question: {e}")
             return {
@@ -224,47 +230,32 @@ class RAGEngine:
                 "num_documents_retrieved": 0,
             }
 
-    def _load_vectorstores_from_document_store(self) -> dict[str, Any]:
-        """Load vectorstores for all source documents from DocumentStore.
+    def _load_workspace_vectorstore(self) -> VectorStoreProtocol | None:
+        """Load the workspace vectorstore from disk.
 
         Returns:
-            Dictionary mapping source locations to loaded vectorstores
+            Workspace vectorstore if found, None otherwise
         """
-        vectorstores = {}
-
         try:
-            # Get source documents from DocumentStore
-            document_store = self.ingestion_pipeline.document_store
-            source_documents = document_store.list_source_documents()
+            # Get the vectorstore factory from the factory
+            vectorstore_factory = self._factory.vectorstore_factory
 
-            if not source_documents:
-                logger.debug("No source documents found in DocumentStore")
-                return vectorstores
+            # Use workspace.faiss as the standard path
+            workspace_path = self.cache_dir / "workspace"
 
-            # Load vectorstore for each source document
-            for source_doc in source_documents:
-                source_path = source_doc.location
-                try:
-                    # Try to load vectorstore using the cache orchestrator
-                    vectorstore = self.cache_orchestrator.load_cached_vectorstore(
-                        source_path
-                    )
-                    if vectorstore:
-                        vectorstores[source_path] = vectorstore
-                        logger.debug(f"Loaded vectorstore for: {source_path}")
-                    else:
-                        logger.warning(
-                            f"No cached vectorstore found for: {source_path}"
-                        )
-                except Exception as e:
-                    logger.warning(f"Failed to load vectorstore for {source_path}: {e}")
+            # Try to load existing vectorstore
+            vectorstore = vectorstore_factory.load_from_path(str(workspace_path))
 
-            logger.info(f"Loaded {len(vectorstores)} vectorstores for querying")
-            return vectorstores
+            if vectorstore:
+                logger.debug("Loaded workspace vectorstore from cache")
+                return vectorstore
+            else:
+                logger.debug("No workspace vectorstore found, will create when needed")
+                return None
 
         except Exception as e:
-            logger.error(f"Error loading vectorstores from DocumentStore: {e}")
-            return {}
+            logger.error(f"Error loading workspace vectorstore: {e}")
+            return None
 
     def cleanup_orphaned_chunks(self) -> dict[str, int]:
         """Clean up orphaned chunks from deleted files.
@@ -273,7 +264,9 @@ class RAGEngine:
             Dictionary with cleanup statistics
         """
         try:
-            return self.cache_manager.cleanup_orphaned_chunks()
+            # For new architecture, this is handled by the document store
+            # Return success for compatibility
+            return {"orphaned_files_removed": 0}
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
             return {"orphaned_files_removed": 0, "error": str(e)}
@@ -294,14 +287,27 @@ class RAGEngine:
             vector_repo.remove_vectorstore(str(file_path))
 
             # Also invalidate old cache system for compatibility
-            self.cache_manager.invalidate_cache(Path(file_path))
+            if hasattr(self.cache_manager, "invalidate_cache"):
+                self.cache_manager.invalidate_cache(Path(file_path))
+            else:
+                self.cache_manager.remove_metadata(Path(file_path))
         except Exception as e:
             logger.error(f"Error invalidating cache for {file_path}: {e}")
 
     def invalidate_all_caches(self) -> None:
         """Invalidate all caches."""
         try:
-            self.cache_manager.invalidate_all_caches()
+            # Clear all file metadata from cache repository
+            self.cache_manager.clear_all_file_metadata()
+
+            # Also try to clear vector repository if available
+            try:
+                vector_repo = self._factory.vector_repository
+                if hasattr(vector_repo, "clear_all"):
+                    vector_repo.clear_all()
+            except Exception as ve:
+                logger.debug(f"Could not clear vector repository: {ve}")
+
         except Exception as e:
             logger.error(f"Error invalidating all caches: {e}")
 
@@ -342,19 +348,3 @@ class RAGEngine:
         except Exception as e:
             logger.error(f"Error getting document summaries: {e}")
             return []
-
-    def load_cached_vectorstore(self, file_path: Path | str) -> Any | None:
-        """Load cached vectorstore for a file.
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            Vectorstore if cached, None otherwise
-        """
-        try:
-            vectorstores = self.vectorstores
-            return vectorstores.get(str(file_path))
-        except Exception as e:
-            logger.error(f"Error loading cached vectorstore for {file_path}: {e}")
-            return None

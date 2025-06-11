@@ -29,7 +29,6 @@ from rag.storage.fake_index_manager import FakeIndexManager
 from rag.storage.fakes import (
     InMemoryCacheRepository,
     InMemoryFileSystem,
-    InMemoryVectorRepository,
 )
 from rag.utils.exceptions import ConfigurationError
 
@@ -148,13 +147,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             for file_path, metadata in self.test_options.initial_metadata.items():
                 cache_repo.set_metadata_dict(file_path, metadata)
 
-        # Create fake vector repository with initial vectors if provided
-        vector_repo = InMemoryVectorRepository()
-        if self.test_options.initial_vectors:
-            for _vector_id, _documents in self.test_options.initial_vectors.items():
-                # This would need implementation in InMemoryVectorRepository
-                pass
-
         # Create fake embedding service
         if self.test_options.use_deterministic_embeddings:
             embedding_service = DeterministicEmbeddingService(
@@ -165,6 +157,11 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             embedding_service = FakeEmbeddingService(
                 embedding_dimension=self.test_options.embedding_dimension
             )
+
+        # Create fake vectorstore factory
+        from rag.storage.vector_store import InMemoryVectorStoreFactory
+
+        vectorstore_factory = InMemoryVectorStoreFactory(embedding_service)
 
         # Create fake document loader
         from rag.data.fakes import FakeDocumentLoader
@@ -182,7 +179,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         return ComponentOverrides(
             filesystem_manager=filesystem,
             cache_repository=cache_repo,
-            vector_repository=vector_repo,
+            vectorstore_factory=vectorstore_factory,
             embedding_service=embedding_service,
             document_loader=document_loader,
             chat_model=chat_model,

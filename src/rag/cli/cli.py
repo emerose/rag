@@ -776,12 +776,11 @@ def query(  # noqa: PLR0913
         # Set the chosen prompt template
         rag_engine.default_prompt_id = prompt
 
-        # Load vectorstores from DocumentStore
-        _load_vectorstores(rag_engine)
+        # Load vectorstore from DocumentStore
+        _load_vectorstore(rag_engine)
 
-        # Check if we have any vectorstores available
-        vectorstores = rag_engine.vectorstores
-        if not vectorstores:
+        # Check if we have a vectorstore available
+        if rag_engine.vectorstore is None:
             write(
                 Error(
                     "No indexed documents found in cache. Please run 'rag index' first."
@@ -790,7 +789,7 @@ def query(  # noqa: PLR0913
             sys.exit(1)
 
         logger.info(
-            f"Successfully loaded {len(rag_engine.vectorstores)} vectorstores",
+            f"Successfully loaded {1 if rag_engine.vectorstore else 0} vectorstore",
         )
 
         # Perform the query
@@ -809,7 +808,7 @@ def query(  # noqa: PLR0913
                 "metadata": {
                     "k": k,
                     "prompt_template": prompt,
-                    "num_vectorstores": len(rag_engine.vectorstores),
+                    "num_vectorstores": 1 if rag_engine.vectorstore else 0,
                 },
             }
         )
@@ -861,9 +860,8 @@ def summarize(
         runtime_options = RuntimeOptions(max_workers=state.max_workers)
         rag_engine = create_rag_engine(config, runtime_options)
 
-        # Check if we have any vectorstores available
-        vectorstores = rag_engine.vectorstores
-        if not vectorstores:
+        # Check if we have a vectorstore available
+        if rag_engine.vectorstore is None:
             write(
                 Error(
                     "No indexed documents found in cache. Please run 'rag index' first."
@@ -872,7 +870,7 @@ def summarize(
             sys.exit(1)
 
         logger.info(
-            f"Successfully loaded {len(rag_engine.vectorstores)} vectorstores",
+            f"Successfully loaded {1 if rag_engine.vectorstore else 0} vectorstore",
         )
 
         # Get document summaries
@@ -1036,20 +1034,32 @@ def chunks(
         )
         rag_engine = create_rag_engine(config)
 
-        vectorstore = rag_engine.load_cached_vectorstore(str(path))
+        # With new architecture, get chunks from workspace vectorstore
+        vectorstore = rag_engine.vectorstore
         if vectorstore is None:
-            write(Error(f"No cached vectorstore for {path}"))
+            write(Error("No cached vectorstore found"))
             raise typer.Exit(1)
 
-        items = rag_engine.vectorstore_manager._get_docstore_items(vectorstore.docstore)  # type: ignore[attr-defined]
-        chunks: list[dict[str, Any]] = [
-            {
-                "index": idx,
-                "text": doc.page_content,
-                "metadata": dict(doc.metadata),  # type: ignore[misc]
-            }
-            for idx, (_, doc) in enumerate(items)
-        ]
+        # For the new architecture, we need to get documents that match the file
+        # This is a simplified implementation - in reality we'd need to filter by source
+        try:
+            # Get all documents and filter by source path
+            all_docs = vectorstore.similarity_search("", k=1000)  # Get many docs
+            file_docs = [
+                doc for doc in all_docs if doc.metadata.get("source") == str(path)
+            ]
+
+            chunks: list[dict[str, Any]] = [
+                {
+                    "index": idx,
+                    "text": doc.page_content,
+                    "metadata": dict(doc.metadata),
+                }
+                for idx, doc in enumerate(file_docs)
+            ]
+        except Exception as e:
+            write(Error(f"Error retrieving chunks: {e}"))
+            raise typer.Exit(1) from e
 
         write({"chunks": chunks})
 
@@ -1109,8 +1119,8 @@ def _initialize_rag_engine(runtime_options: RuntimeOptions | None = None) -> RAG
     return create_rag_engine(config, runtime_options)
 
 
-def _load_vectorstores(rag_engine: RAGEngine) -> None:
-    """Load cached vectorstores into the RAG engine."""
+def _load_vectorstore(rag_engine: RAGEngine) -> None:
+    """Load cached vectorstore into the RAG engine."""
     document_store = rag_engine.ingestion_pipeline.document_store
     source_documents = document_store.list_source_documents()
 
@@ -1123,36 +1133,33 @@ def _load_vectorstores(rag_engine: RAGEngine) -> None:
         )
         sys.exit(1)
 
-    logger.info("Loading cached vectorstores from .cache directory...")
-    for source_doc in source_documents:
-        file_path = source_doc.location
-        try:
-            # Use the vector repository to load vectorstore for new pipeline
-            vector_repo = rag_engine.vector_repository
-            cached_store = vector_repo.load_vectorstore(file_path)
-            if cached_store is not None:
-                rag_engine.vectorstores[file_path] = cached_store
-                logger.info(f"Loaded vectorstore for: {file_path}")
-        except (
-            exceptions.RAGError,
-            exceptions.VectorstoreError,
-            OSError,
-            KeyError,
-            TypeError,
-        ) as e:
-            logger.warning(f"Failed to load vectorstore for {file_path}: {e}")
+    logger.info("Loading cached vectorstore from .cache directory...")
 
-    if not rag_engine.vectorstores:
+    # For the new single vectorstore architecture, we just verify that the
+    # workspace vectorstore can be loaded. The RAGEngine handles this automatically.
+    try:
+        vectorstore = rag_engine.vectorstore
+        if vectorstore is not None:
+            logger.info(
+                f"Loaded workspace vectorstore with {len(source_documents)} documents"
+            )
+        else:
+            logger.warning("No workspace vectorstore found - may need to re-index")
+    except Exception as e:
+        logger.warning(f"Failed to load workspace vectorstore: {e}")
+        # Don't exit here - let the query command handle the missing vectorstore gracefully
+
+    if rag_engine.vectorstore is None:
         logger.error(
-            "No valid vectorstores found in cache. Please run 'rag index' first.",
+            "No valid vectorstore found in cache. Please run 'rag index' first.",
         )
         state.console.print(
-            "[red]No valid vectorstores found in cache. Please run 'rag index' first.[/red]",
+            "[red]No valid vectorstore found in cache. Please run 'rag index' first.[/red]",
         )
         sys.exit(1)
 
     logger.info(
-        f"Successfully loaded {len(rag_engine.vectorstores)} vectorstores",
+        f"Successfully loaded workspace vectorstore with {len(source_documents)} documents",
     )
 
 
@@ -1285,8 +1292,8 @@ def repl(
         # Set the chosen prompt template
         rag_engine.default_prompt_id = prompt
 
-        # Load vectorstores
-        _load_vectorstores(rag_engine)
+        # Load vectorstore
+        _load_vectorstore(rag_engine)
 
         # Set up REPL session
         session = _create_repl_session()
@@ -1338,7 +1345,7 @@ def repl(
                         "metadata": {
                             "k": k,
                             "prompt_template": prompt,
-                            "num_vectorstores": len(rag_engine.vectorstores),
+                            "num_vectorstores": 1 if rag_engine.vectorstore else 0,
                         },
                     }
                 )

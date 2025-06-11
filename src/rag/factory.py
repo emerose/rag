@@ -20,7 +20,6 @@ if TYPE_CHECKING:
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
 
-from rag.caching.cache_orchestrator import CacheOrchestrator
 from rag.config import RAGConfig, RuntimeOptions
 from rag.data.document_loader import DocumentLoader
 from rag.embeddings.batching import EmbeddingBatcher
@@ -29,15 +28,13 @@ from rag.embeddings.model_map import load_model_map
 from rag.embeddings.protocols import EmbeddingServiceProtocol
 from rag.querying.query_engine import QueryEngine
 from rag.retrieval import BaseReranker
-from rag.storage.cache_manager import CacheManager
 from rag.storage.filesystem import FilesystemManager
 from rag.storage.index_manager import IndexManager
 from rag.storage.protocols import (
     CacheRepositoryProtocol,
     FileSystemProtocol,
-    VectorRepositoryProtocol,
 )
-from rag.storage.vectorstore import VectorStoreManager
+from rag.storage.vector_store import VectorStoreFactory
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +51,7 @@ class ComponentOverrides:
 
     filesystem_manager: FileSystemProtocol | None = None
     cache_repository: CacheRepositoryProtocol | None = None
-    vector_repository: VectorRepositoryProtocol | None = None
+    vectorstore_factory: VectorStoreFactory | None = None
     embedding_service: EmbeddingServiceProtocol | None = None
     document_loader: Any | None = None
     chat_model: Any | None = None  # Any LangChain chat model interface
@@ -89,13 +86,12 @@ class RAGComponentsFactory:
         # Store injected dependencies or create defaults
         self._filesystem_manager = self.overrides.filesystem_manager
         self._cache_repository = self.overrides.cache_repository
-        self._vector_repository = self.overrides.vector_repository
+        self._vectorstore_factory = self.overrides.vectorstore_factory
         self._embedding_service = self.overrides.embedding_service
         self._document_loader = self.overrides.document_loader
         self._chat_model = self.overrides.chat_model
 
         # Initialize core dependencies first (that aren't overridden)
-        self._cache_manager: CacheManager | None = None
         self._reranker: BaseReranker | None = None
 
         # Pipeline components
@@ -104,7 +100,6 @@ class RAGComponentsFactory:
 
         # Initialize component caches
         self._query_engine: QueryEngine | None = None
-        self._cache_orchestrator: CacheOrchestrator | None = None
         self._embedding_batcher: EmbeddingBatcher | None = None
 
         # Load embedding model map
@@ -129,18 +124,35 @@ class RAGComponentsFactory:
         return self._cache_repository
 
     @property
-    def vector_repository(self) -> VectorRepositoryProtocol:
-        """Get or create vector repository."""
-        if self._vector_repository is None:
-            cache_dir = Path(self.config.cache_dir)
-            embedding_service = self.embedding_service
-            self._vector_repository = VectorStoreManager(
-                cache_dir=cache_dir,
-                embeddings=embedding_service,
-                backend=self.config.vectorstore_backend,
+    def cache_manager(self) -> CacheRepositoryProtocol:
+        """Get cache manager (alias for cache_repository for backwards compatibility)."""
+        return self.cache_repository
+
+    @property
+    def vector_repository(self) -> VectorStoreFactory:
+        """Get vector repository (alias for vectorstore_factory for backwards compatibility)."""
+        return self.vectorstore_factory
+
+    @property
+    def vectorstore_factory(self) -> VectorStoreFactory:
+        """Get or create vectorstore factory."""
+        if self._vectorstore_factory is None:
+            from rag.storage.vector_store import (
+                FAISSVectorStoreFactory,
+                InMemoryVectorStoreFactory,
             )
-            self._vector_repository.set_log_callback(self.runtime.log_callback)
-        return self._vector_repository
+
+            # For testing, use in-memory vectorstore
+            if self.config.vectorstore_backend == "fake":
+                self._vectorstore_factory = InMemoryVectorStoreFactory(
+                    self.embedding_service
+                )
+            else:
+                # Default to FAISS for production
+                self._vectorstore_factory = FAISSVectorStoreFactory(
+                    self.embedding_service
+                )
+        return self._vectorstore_factory
 
     @property
     def embedding_service(self) -> EmbeddingServiceProtocol:
@@ -228,29 +240,18 @@ class RAGComponentsFactory:
             )
 
             # Create the ingestion pipeline
+            workspace_path = str(Path(self.config.cache_dir) / "workspace")
             self._ingestion_pipeline = IngestionPipeline(
                 source=self.document_source,
                 transformer=transformer,
                 document_store=document_store,
                 embedder=embedder,
-                vector_store=self.vector_repository,
+                vector_store=self.vectorstore_factory,  # Use new factory instead of old repository
                 progress_callback=self.runtime.progress_callback,
+                workspace_path=workspace_path,
             )
 
         return self._ingestion_pipeline
-
-    @property
-    def cache_manager(self) -> CacheManager:
-        """Get or create cache manager."""
-        if self._cache_manager is None:
-            self._cache_manager = CacheManager(
-                cache_dir=Path(self.config.cache_dir),
-                index_manager=self.cache_repository,
-                log_callback=self.runtime.log_callback,
-                filesystem_manager=self.filesystem_manager,
-                vector_repository=self.vector_repository,
-            )
-        return self._cache_manager
 
     @property
     def reranker(self) -> BaseReranker | None:
@@ -309,7 +310,6 @@ class RAGComponentsFactory:
                 document_loader=self.document_loader,
                 reranker=typed_reranker,
                 log_callback=self.runtime.log_callback,
-                vectorstore_manager=self.vector_repository,
             )
             self._query_engine = QueryEngine(
                 config=self.config,
@@ -318,16 +318,6 @@ class RAGComponentsFactory:
                 default_prompt_id="default",
             )
         return self._query_engine
-
-    def create_cache_orchestrator(self) -> CacheOrchestrator:
-        """Create a CacheOrchestrator with all dependencies wired."""
-        if self._cache_orchestrator is None:
-            self._cache_orchestrator = CacheOrchestrator(
-                cache_manager=self.cache_manager,
-                vector_repository=self.vector_repository,
-                log_callback=self.runtime.log_callback,
-            )
-        return self._cache_orchestrator
 
     def create_all_components(self) -> dict[str, Any]:
         """Create all RAG components and return them in a dictionary.
@@ -338,15 +328,13 @@ class RAGComponentsFactory:
         return {
             "filesystem_manager": self.filesystem_manager,
             "cache_repository": self.cache_repository,
-            "vector_repository": self.vector_repository,
+            "vectorstore_factory": self.vectorstore_factory,
             "embedding_service": self.embedding_service,
             "chat_model": self.chat_model,
             "document_loader": self.document_loader,
             "ingestion_pipeline": self.ingestion_pipeline,
-            "cache_manager": self.cache_manager,
             "reranker": self.reranker,
             "query_engine": self.create_query_engine(),
-            "cache_orchestrator": self.create_cache_orchestrator(),
         }
 
     def create_rag_engine(self) -> RAGEngine:

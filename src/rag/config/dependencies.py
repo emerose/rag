@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-    from typing import Any
 
     from langchain_openai import ChatOpenAI
 
@@ -21,12 +20,10 @@ if TYPE_CHECKING:
     from rag.embeddings.batching import EmbeddingBatcher
     from rag.embeddings.embedding_provider import EmbeddingProvider
     from rag.retrieval import KeywordReranker
-    from rag.storage.cache_manager import CacheManager
     from rag.storage.filesystem import FilesystemManager
     from rag.storage.protocols import (
         CacheRepositoryProtocol,
     )
-    from rag.storage.vectorstore import VectorStoreManager
 
 
 @dataclass
@@ -34,9 +31,7 @@ class StorageDependencies:
     """Groups storage-related dependencies."""
 
     filesystem_manager: FilesystemManager
-    cache_manager: CacheManager
     index_manager: CacheRepositoryProtocol
-    vectorstore_manager: VectorStoreManager
 
 
 @dataclass
@@ -85,6 +80,3 @@ class QueryEngineDependencies:
     document_loader: DocumentLoader
     reranker: KeywordReranker | None = None
     log_callback: Callable[[str, str, str], None] | None = None
-    vectorstore_manager: Any | None = (
-        None  # VectorStoreManager for proper vectorstore merging
-    )

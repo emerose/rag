@@ -16,7 +16,6 @@ from rag.chains.rag_chain import build_rag_chain
 from rag.config import RAGConfig, RuntimeOptions
 from rag.config.dependencies import QueryEngineDependencies
 from rag.retrieval import BaseReranker
-from rag.storage.backends.factory import create_vectorstore_backend
 from rag.storage.protocols import VectorStoreProtocol
 from rag.utils.answer_utils import enhance_result
 from rag.utils.logging_utils import log_message
@@ -68,7 +67,6 @@ class QueryEngine:
         self.reranker = dependencies.reranker
         self.default_prompt_id = default_prompt_id
         self.log_callback = dependencies.log_callback
-        self.vectorstore_manager = dependencies.vectorstore_manager
 
         # Lazy-initialised RAG chain cache
         self._rag_chain_cache: dict[tuple[int, str], Any] = {}
@@ -85,14 +83,14 @@ class QueryEngine:
 
     def _get_rag_chain(
         self,
-        vectorstores: dict[str, VectorStoreProtocol],
+        vectorstore: VectorStoreProtocol,
         k: int = 4,
         prompt_id: str = "default",
     ):
         """Return cached or newly-built LCEL RAG chain.
 
         Args:
-            vectorstores: Dictionary mapping file paths to vectorstores
+            vectorstore: Single vectorstore to use
             k: Number of documents to retrieve
             prompt_id: ID of the prompt to use
 
@@ -108,12 +106,11 @@ class QueryEngine:
             # Create a temporary engine-like object for build_rag_chain
             # This maintains compatibility with the existing chain builder
             proxy_config = QueryEngineProxyConfig(
-                vectorstores=vectorstores,
+                vectorstore=vectorstore,
                 chat_model=self.chat_model,
                 reranker=self.reranker,
                 log_callback=self.log_callback,
                 runtime_options=self.runtime,
-                vectorstore_manager=self.vectorstore_manager,
             )
             engine_proxy = QueryEngineProxy(proxy_config)
             self._rag_chain_cache[key] = build_rag_chain(
@@ -124,14 +121,14 @@ class QueryEngine:
     def answer(
         self,
         question: str,
-        vectorstores: dict[str, VectorStoreProtocol],
+        vectorstore: VectorStoreProtocol,
         k: int = 4,
     ) -> dict[str, Any]:
         """Answer question using the LCEL pipeline.
 
         Args:
             question: Question to answer
-            vectorstores: Dictionary mapping file paths to vectorstores
+            vectorstore: Single vectorstore to use
             k: Number of documents to retrieve
 
         Returns:
@@ -140,7 +137,7 @@ class QueryEngine:
         """
         self._log("INFO", f"Answering question: {question}")
 
-        if not vectorstores:
+        if not vectorstore:
             self._log(
                 "ERROR", "No indexed documents found. Please index documents first."
             )
@@ -153,7 +150,7 @@ class QueryEngine:
             }
 
         try:
-            chain = self._get_rag_chain(vectorstores, k=k)
+            chain = self._get_rag_chain(vectorstore, k=k)
             chain_output = chain.invoke(question)  # type: ignore[arg-type]
             answer_text: str = chain_output["answer"]
             documents = chain_output["documents"]
@@ -185,31 +182,31 @@ class QueryEngine:
     def query(
         self,
         query: str,
-        vectorstores: dict[str, VectorStoreProtocol],
+        vectorstore: VectorStoreProtocol,
         k: int = 4,
     ) -> str:
         """Return only the answer text for query (legacy helper).
 
         Args:
             query: Query string
-            vectorstores: Dictionary mapping file paths to vectorstores
+            vectorstore: Single vectorstore to use
             k: Number of documents to retrieve
 
         Returns:
             Answer text
         """
-        return self.answer(query, vectorstores, k).get("answer", "")
+        return self.answer(query, vectorstore, k).get("answer", "")
 
     def get_document_summaries(
         self,
-        vectorstores: dict[str, VectorStoreProtocol],
+        vectorstore: VectorStoreProtocol,
         indexed_files: list[dict[str, Any]],
         k: int = 5,
     ) -> list[dict[str, Any]]:
         """Generate short summaries of the k largest documents.
 
         Args:
-            vectorstores: Dictionary mapping file paths to vectorstores
+            vectorstore: Single vectorstore to use
             indexed_files: List of indexed file metadata
             k: Number of documents to summarize
 
@@ -218,7 +215,7 @@ class QueryEngine:
         """
         self._log("INFO", f"Generating summaries for top {k} documents (LCEL path)")
 
-        if not vectorstores:
+        if not vectorstore:
             self._log("WARNING", "No indexed documents found")
             return []
 
@@ -244,7 +241,7 @@ class QueryEngine:
                     doc_content = "\n\n".join(first_paragraphs)
 
                     # Use the LCEL RAG chain to summarize it
-                    chain = self._get_rag_chain(vectorstores, k=1, prompt_id="summary")
+                    chain = self._get_rag_chain(vectorstore, k=1, prompt_id="summary")
                     chain_output = chain.invoke(
                         f"Generate a 1-2 sentence summary of this document: "
                         f"{doc_content[:5000]}"
@@ -266,52 +263,18 @@ class QueryEngine:
             return []
 
 
-class SimpleVectorStoreManager:
-    """Simple vectorstore manager for QueryEngineProxy compatibility."""
-
-    def __init__(
-        self,
-        log_callback: Callable[[str, str, str], None] | None = None,
-        embeddings: Any = None,
-    ) -> None:
-        """Initialize the simple manager.
-
-        Args:
-            log_callback: Optional logging callback
-            embeddings: Embeddings instance to use, defaults to FakeEmbeddings
-        """
-        self.log_callback = log_callback
-        # Use provided embeddings or default to fake embeddings
-        if embeddings is None:
-            from langchain_core.embeddings import FakeEmbeddings
-
-            embeddings = FakeEmbeddings(size=384)
-        self._backend = create_vectorstore_backend("fake", embeddings)
-
-    def merge_vectorstores(
-        self, vectorstores: list[VectorStoreProtocol]
-    ) -> VectorStoreProtocol:
-        """Merge multiple vector stores into a single vector store.
-
-        Args:
-            vectorstores: List of vector stores to merge
-
-        Returns:
-            Merged vector store
-        """
-        return self._backend.merge_vectorstores(vectorstores)
+# SimpleVectorStoreManager is no longer needed with single-vectorstore architecture
 
 
 @dataclass
 class QueryEngineProxyConfig:
     """Configuration for QueryEngineProxy."""
 
-    vectorstores: dict[str, VectorStoreProtocol]
+    vectorstore: VectorStoreProtocol
     chat_model: ChatOpenAI
     reranker: BaseReranker | None = None
     log_callback: Callable[[str, str, str], None] | None = None
     runtime_options: RuntimeOptions | None = None
-    vectorstore_manager: Any | None = None
 
 
 class QueryEngineProxy:
@@ -327,14 +290,10 @@ class QueryEngineProxy:
         Args:
             config: Configuration object containing all proxy parameters
         """
-        self.vectorstores = config.vectorstores
+        self.vectorstore = config.vectorstore
         self.chat_model = config.chat_model
         self.reranker = config.reranker
         self.log_callback = config.log_callback
-        # Use the real vectorstore manager if provided, otherwise fall back to simple one
-        self.vectorstore_manager = (
-            config.vectorstore_manager or SimpleVectorStoreManager(config.log_callback)
-        )
 
         # Additional attributes expected by build_rag_chain
         self.system_prompt = ""  # Default empty system prompt
