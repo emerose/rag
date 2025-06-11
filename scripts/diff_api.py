@@ -63,6 +63,14 @@ class APIDumper:
         for mod in modules_to_clear:
             del sys.modules[mod]
 
+        # Clear import caches
+        if hasattr(importlib, "invalidate_caches"):
+            importlib.invalidate_caches()
+
+        # Clear any finder caches
+        if hasattr(sys, "path_importer_cache"):
+            sys.path_importer_cache.clear()
+
         try:
             return self._walk_package()
         except ImportError as e:
@@ -285,6 +293,105 @@ def check_git_ref_exists(ref: str) -> None:
     except subprocess.CalledProcessError:
         print(f"{RED}Error: Git reference '{ref}' does not exist{RESET}")
         sys.exit(1)
+
+
+def run_api_dump_subprocess(package: str, root_path: Path) -> str:
+    """Run API dump in a separate subprocess for complete isolation."""
+    # Create a temporary Python script to run the API dump
+    script_content = f'''
+import sys
+# Keep essential Python paths but prioritize the target directory
+original_paths = sys.path[:]
+sys.path = ["{root_path}"] + [p for p in original_paths if not p.endswith("/src") and "{root_path}" not in p]
+
+import importlib
+import inspect
+import pkgutil
+from types import ModuleType
+from typing import List, Set
+
+def is_public(name: str) -> bool:
+    return not name.startswith("_")
+
+def dump_function(fqname: str, func: object) -> str:
+    try:
+        original_sig = inspect.signature(func)
+        clean_params = []
+        for param in original_sig.parameters.values():
+            clean_param = param.replace(default=inspect.Parameter.empty)
+            clean_params.append(clean_param)
+        clean_sig = original_sig.replace(parameters=clean_params)
+        sig = str(clean_sig)
+    except Exception:
+        sig = "(...)"
+    
+    doc = inspect.getdoc(func)
+    first_line = doc.strip().splitlines()[0] if doc else ""
+    return f"- `{{fqname}}{{sig}}`: {{first_line}}"
+
+def dump_class(fqname: str, cls: object) -> List[str]:
+    lines = [f"### class {{fqname}}"]
+    methods = [
+        (name, method) for name, method in inspect.getmembers(cls, inspect.isfunction)
+        if is_public(name) and method.__module__ == cls.__module__
+    ]
+    if not methods:
+        lines.append("- `pass`")
+    else:
+        for name, method in sorted(methods):
+            lines.append(dump_function(f"{{fqname}}.{{name}}", method))
+    return lines
+
+def dump_module(module: ModuleType, seen: Set[str]) -> List[str]:
+    lines = [f"## {{module.__name__}}"]
+    seen.add(module.__name__)
+    
+    for name, obj in sorted(inspect.getmembers(module, inspect.isfunction)):
+        if is_public(name) and obj.__module__ == module.__name__:
+            lines.append(dump_function(f"{{module.__name__}}.{{name}}", obj))
+    
+    for name, obj in sorted(inspect.getmembers(module, inspect.isclass)):
+        if is_public(name) and obj.__module__ == module.__name__:
+            lines.extend(dump_class(f"{{module.__name__}}.{{name}}", obj))
+    
+    return lines
+
+def walk_package() -> str:
+    try:
+        package = importlib.import_module("{package}")
+    except ImportError as e:
+        return f"# Error: Could not import package '{package}': {{e}}"
+    
+    seen: Set[str] = set()
+    lines = dump_module(package, seen)
+    
+    if hasattr(package, '__path__'):
+        for _, modname, _ in pkgutil.walk_packages(package.__path__, package.__name__ + '.'):
+            if modname in seen:
+                continue
+            try:
+                mod = importlib.import_module(modname)
+                lines.extend(dump_module(mod, seen))
+            except Exception as e:
+                lines.append(f"# {{modname}}: Error importing ({{e}})")
+    
+    return "\\n".join(lines)
+
+print(walk_package())
+'''
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", script_content],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=root_path,
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        error_output = e.stderr.strip() if e.stderr else "Unknown error"
+        raise RuntimeError(f"Failed to analyze API: {error_output}")
 
 
 def main():
