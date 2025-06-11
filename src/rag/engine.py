@@ -234,17 +234,14 @@ class RAGEngine:
         """Load the vectorstore from disk.
 
         Returns:
-            Workspace vectorstore if found, None otherwise
+            Vectorstore if found, None otherwise
         """
         try:
             # Get the vectorstore factory from the factory
             vectorstore_factory = self._factory.vectorstore_factory
 
-            # Use workspace.faiss as the standard path
-            workspace_path = self.cache_dir / "workspace"
-
             # Try to load existing vectorstore
-            vectorstore = vectorstore_factory.load_from_path(str(workspace_path))
+            vectorstore = vectorstore_factory.load_from_path(str(self.cache_dir))
 
             if vectorstore:
                 logger.debug("Loaded vectorstore from cache")

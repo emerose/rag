@@ -420,6 +420,14 @@ class IngestionPipeline:
 
             # Save the updated vectorstore
             self._save_vectorstore(vectorstore)
+            # Load or create the workspace vectorstore
+            workspace_vectorstore = self._get_or_create_workspace_vectorstore()
+
+            # Add new documents to the workspace vectorstore
+            workspace_vectorstore.add_documents(all_documents)
+
+            # Save the updated workspace vectorstore
+            self._save_workspace_vectorstore(workspace_vectorstore)
 
             result.vectors_stored = len(embeddings)
         except Exception as e:
@@ -429,6 +437,10 @@ class IngestionPipeline:
         """Get or create the vectorstore."""
         if self.workspace_path:
             # Try to load existing vectorstore
+    def _get_or_create_workspace_vectorstore(self) -> VectorStoreProtocol:
+        """Get or create the workspace vectorstore."""
+        if self.workspace_path:
+            # Try to load existing workspace vectorstore
             existing = self.vector_store.load_from_path(self.workspace_path)
             if existing is not None:
                 return existing
@@ -438,6 +450,8 @@ class IngestionPipeline:
 
     def _save_vectorstore(self, vectorstore: VectorStoreProtocol) -> None:
         """Save the vectorstore."""
+    def _save_workspace_vectorstore(self, vectorstore: VectorStoreProtocol) -> None:
+        """Save the workspace vectorstore."""
         if self.workspace_path:
             vectorstore.save(self.workspace_path)
 

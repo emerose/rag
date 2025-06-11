@@ -71,6 +71,16 @@ def mock_engine(fake_vectorstore):
 
     # Use fake vectorstore instead of mocks
     engine.vectorstore = fake_vectorstore
+    # Mock vectorstore_manager (still exists for backward compatibility)
+    engine.vectorstore_manager = MagicMock()
+    
+    # Mock single workspace vectorstore (new architecture)
+    mock_workspace_vs = MagicMock()
+    mock_workspace_vs.similarity_search.return_value = []
+    mock_workspace_vs.as_retriever.return_value = MagicMock()
+    
+    # New architecture: single vectorstore property
+    engine.vectorstore = mock_workspace_vs
 
     return engine
 
@@ -133,6 +143,7 @@ def test_build_rag_chain(mock_runnable_lambda, mock_engine):
     assert chain is not None
 
     # Verify the vectorstore was accessed (new architecture uses engine.vectorstore)
+    # Verify the workspace vectorstore was accessed (new architecture uses engine.vectorstore)
     mock_engine.vectorstore.as_retriever.assert_called_once()
 
 
@@ -147,6 +158,7 @@ def test_chain_execution(mock_runnable_lambda, mock_engine):
     assert chain is not None
 
     # Verify a retriever was created from the vectorstore (new architecture)
+    # Verify a retriever was created from the workspace vectorstore (new architecture)
     mock_engine.vectorstore.as_retriever.assert_called_once()
 
 

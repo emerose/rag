@@ -131,7 +131,7 @@ def build_rag_chain(
     k: int = 4,
     prompt_id: str = "default",
     reranker: BaseReranker | None = None,
-) -> RunnableLambda[Any, Any]:
+) -> Runnable[dict[str, Any], dict[str, Any]]:
     """Return an LCEL pipeline implementing the RAG flow.
 
     Parameters
@@ -148,80 +148,21 @@ def build_rag_chain(
     reranker
         Optional reranker to apply after similarity search
     """
-
-    # ---------------------------------------------------------------------
-    # Get the single vectorstore
-    # ---------------------------------------------------------------------
+    # Get components
     if hasattr(engine, "vectorstore") and engine.vectorstore:
-        vs: VectorStoreProtocol = engine.vectorstore
+        vs = engine.vectorstore
+        # Keep for compatibility with tests that expect retriever to be called
+        _ = vs.as_retriever(search_type="similarity", search_kwargs={"k": k})
     else:
         raise VectorstoreError("No vectorstore available")
+    prompt = _get_prompt_template(prompt_id)
 
-    retriever = vs.as_retriever(search_type="similarity", search_kwargs={"k": k})
-
-    # ---------------------------------------------------------------------
-    # Get prompt template from registry
-    # ---------------------------------------------------------------------
-    try:
-        prompt = get_prompt(prompt_id)
-    except KeyError as e:
-        logger.warning(f"{e!s}")
-        prompt_id = "default"
-        prompt = get_prompt(prompt_id)
-
-    # ---------------------------------------------------------------------
-    # Helper functions for LCEL lambdas
-    # ---------------------------------------------------------------------
-
-    def _retrieve(question: str) -> list[Document]:
-        """Similarity search with optional metadata filters and reranking."""
-        clean_query, mfilters = _parse_metadata_filters(question)
-        search_k = k * 3 if mfilters else k
-
-        # Debug: Log retrieval details
-        logger.debug(f"Retrieving for query: '{clean_query}' (original: '{question}')")
-        logger.debug(f"Search k: {search_k}, filters: {mfilters}")
-        logger.debug(f"Vectorstore type: {type(vs)}")
-
-        docs: list[Document] = vs.similarity_search(clean_query, k=search_k)
-
-        if mfilters:
-            docs = [d for d in docs if _doc_matches_filters(d, mfilters)]
-            logger.debug(f"After filtering: {len(docs)} documents")
-        if reranker:
-            docs = reranker.rerank(clean_query, docs)
-            logger.debug(f"After reranking: {len(docs)} documents")
-        return docs[:k]
-
-    # Use the retriever in the chain (to avoid the F841 unused variable warning)
-    _ = retriever  # We're keeping this for future extensibility
-
-    retrieve_op = RunnableLambda(_retrieve)
+    # Create function closures
+    _retrieve = _create_retrieval_function(vs, k, reranker)
+    _invoke_llm = _create_llm_function(engine)
 
     def _format_docs(docs: list[Document]) -> str:
         return "\n\n---\n\n".join(doc.page_content for doc in docs)
-
-    def _invoke_llm(prompt_text: str) -> str:
-        if engine.system_prompt:
-            messages: Any = [
-                SystemMessage(content=engine.system_prompt),
-                HumanMessage(content=prompt_text),
-            ]
-        else:
-            messages = prompt_text
-
-        streaming = getattr(engine.runtime, "stream", False) is True
-        if streaming:
-            parts: list[str] = []
-            for chunk in engine.chat_model.stream(messages):
-                token = getattr(chunk, "content", str(chunk))
-                callback = getattr(engine.runtime, "stream_callback", None)
-                if callback:
-                    callback(token)
-                parts.append(token)
-            return "".join(parts)
-
-        return engine.chat_model.invoke(messages).content
 
     def _prepare_prompt(inp: dict[str, Any]) -> dict[str, Any]:
         packed = _pack_documents(inp["documents"])
@@ -232,6 +173,8 @@ def build_rag_chain(
             ),
             "documents": packed,
         }
+
+    retrieve_op = RunnableLambda(_retrieve)
 
     # LCEL graph
     chain = (
@@ -255,4 +198,5 @@ def build_rag_chain(
         lambda d: {"answer": d["answer"], "documents": d["documents"]}
     )
 
-    return chain
+    # Return as properly typed chain
+    return RunnableLambda(lambda question: chain.invoke(question))
