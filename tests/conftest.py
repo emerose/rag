@@ -30,33 +30,38 @@ def pytest_configure(config: pytest.Config) -> None:
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
     """Set marker-based timeouts for tests.
-    
+
     Sets default timeouts based on test location:
     - unit: 100ms per test (fast, isolated tests)
-    - integration: 500ms per test (component interactions) 
+    - integration: 500ms per test (component interactions)
     - e2e: 30s per test (end-to-end workflows)
-    
+
     In CI environments, timeouts are multiplied by CI_TIMEOUT_MULTIPLIER for slower resources.
     Individual @pytest.mark.timeout() decorators override these defaults.
     """
     # Skip if test already has an explicit timeout decorator
     if item.get_closest_marker("timeout"):
         return
-    
+
     # Detect if running in CI environment
-    is_ci = any(os.environ.get(var) for var in [
-        "CI",                    # Generic CI indicator
-        "GITHUB_ACTIONS",        # GitHub Actions
-        "TRAVIS",               # Travis CI
-        "CIRCLECI",             # CircleCI
-        "JENKINS_URL",          # Jenkins
-        "BUILDKITE",            # Buildkite
-        "TF_BUILD",             # Azure DevOps
-    ])
-    
+    is_ci = any(
+        os.environ.get(var)
+        for var in [
+            "CI",  # Generic CI indicator
+            "GITHUB_ACTIONS",  # GitHub Actions
+            "TRAVIS",  # Travis CI
+            "CIRCLECI",  # CircleCI
+            "JENKINS_URL",  # Jenkins
+            "BUILDKITE",  # Buildkite
+            "TF_BUILD",  # Azure DevOps
+        ]
+    )
+
     # Apply CI multiplier if in CI environment
-    ci_multiplier = float(os.environ.get("CI_TIMEOUT_MULTIPLIER", "5.0")) if is_ci else 1.0
-        
+    ci_multiplier = (
+        float(os.environ.get("CI_TIMEOUT_MULTIPLIER", "5.0")) if is_ci else 1.0
+    )
+
     # Determine test type by file path and apply timeouts
     test_path = str(item.path)
     if "/unit/" in test_path:
@@ -73,9 +78,9 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 @pytest.fixture(autouse=True)
 def setup_test_environment() -> Generator[None, None, None]:
     """Set up test environment including API keys and analytics disabling.
-    
+
     - Unit tests: Set dummy API key
-    - Integration tests: Set dummy API key  
+    - Integration tests: Set dummy API key
     - E2E tests: Use .env file if not already set
     - All tests: Disable analytics/telemetry
     """
@@ -84,16 +89,16 @@ def setup_test_environment() -> Generator[None, None, None]:
     original_do_not_track = os.environ.get("DO_NOT_TRACK")
     original_scarf_analytics = os.environ.get("SCARF_NO_ANALYTICS")
     original_langsmith_tracing = os.environ.get("LANGSMITH_TRACING")
-    
+
     # Always disable analytics/telemetry for all tests
     os.environ["DO_NOT_TRACK"] = "true"
     os.environ["SCARF_NO_ANALYTICS"] = "true"
     # Disable LangSmith tracing for tests to prevent network calls
     os.environ["LANGSMITH_TRACING"] = "false"
-    
+
     # Determine test type based on file path
     test_path = os.environ.get("PYTEST_CURRENT_TEST", "")
-    
+
     if "unit/" in test_path or "integration/" in test_path:
         # Set dummy key for unit and integration tests
         os.environ["OPENAI_API_KEY"] = "sk-dummy-key-for-testing"
@@ -103,25 +108,25 @@ def setup_test_environment() -> Generator[None, None, None]:
             env_file = Path(__file__).parent.parent / ".env"
             if env_file.exists():
                 load_dotenv(env_file)
-    
+
     yield
-    
+
     # Restore original values
     if original_key is not None:
         os.environ["OPENAI_API_KEY"] = original_key
     else:
         os.environ.pop("OPENAI_API_KEY", None)
-        
+
     if original_do_not_track is not None:
         os.environ["DO_NOT_TRACK"] = original_do_not_track
     else:
         os.environ.pop("DO_NOT_TRACK", None)
-        
+
     if original_scarf_analytics is not None:
         os.environ["SCARF_NO_ANALYTICS"] = original_scarf_analytics
     else:
         os.environ.pop("SCARF_NO_ANALYTICS", None)
-        
+
     if original_langsmith_tracing is not None:
         os.environ["LANGSMITH_TRACING"] = original_langsmith_tracing
     else:

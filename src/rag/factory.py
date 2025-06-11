@@ -364,13 +364,3 @@ class RAGComponentsFactory:
         )
         factory.set_log_callback(self.runtime.log_callback)
         return factory
-
-    def create_data_orchestrator(self) -> Any:
-        """Create data orchestrator (compatibility method)."""
-
-        # For now, return a simple object that delegates to document store
-        class DataOrchestrator:
-            def __init__(self, document_store: DocumentStoreProtocol):
-                self.document_store = document_store
-
-        return DataOrchestrator(self.document_store)

@@ -42,13 +42,13 @@ def _make_structlog_stub() -> ModuleType:
             self.colors = kwargs.get("colors", True)
             self.level_styles = kwargs.get("level_styles", {})
             self.columns = kwargs.get("columns", None)
-            
+
         def __call__(self, _logger: Any, _name: str, event_dict: dict[str, Any]) -> str:
             if self.columns:
                 # Use column-based formatting
                 formatted_parts = []
                 remaining_dict = dict(event_dict)
-                
+
                 for col in self.columns:
                     if col.key and col.key in remaining_dict:
                         value = remaining_dict.pop(col.key)
@@ -62,7 +62,7 @@ def _make_structlog_stub() -> ModuleType:
                             if formatted_value:
                                 formatted_parts.append(formatted_value)
                         remaining_dict.clear()
-                
+
                 return " ".join(formatted_parts).strip()
             else:
                 # Legacy formatting for backward compatibility
@@ -72,16 +72,16 @@ def _make_structlog_stub() -> ModuleType:
                 logger_name = event_dict.get("logger_name", "")
                 filename = event_dict.get("filename", "")
                 lineno = event_dict.get("lineno", "")
-                
+
                 # Apply coloring if enabled
                 if self.colors and level in self.level_styles:
                     level = f"{self.level_styles[level]}{level}\033[0m"
-                
+
                 # Format similar to real ConsoleRenderer
                 parts = [timestamp, f"[{level}]", event, f"[{logger_name}]"]
                 if filename and lineno:
                     parts.append(f"filename={filename} lineno={lineno}")
-                    
+
                 return " ".join(part for part in parts if part).strip()
 
     class TimeStamper:
@@ -171,7 +171,7 @@ def _make_structlog_stub() -> ModuleType:
             class KeyValueColumnFormatter:
                 def __init__(self, **kwargs: Any) -> None:
                     pass
-                
+
                 def __call__(self, key: str, value: Any) -> str:
                     return f"{key}={value}" if key else str(value)
 
@@ -228,7 +228,7 @@ def _setup_and_log(
     # Store original classes
     original_file_handler = logging_utils.logging.FileHandler
     original_stream_handler = logging_utils.logging.StreamHandler
-    
+
     # Mock the handlers
     logging_utils.logging.FileHandler = MockFileHandler  # type: ignore
     logging_utils.logging.StreamHandler = MockConsoleHandler  # type: ignore

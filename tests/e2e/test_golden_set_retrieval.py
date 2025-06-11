@@ -22,14 +22,14 @@ GOLDEN_QA: List[Tuple[str, str]] = [
 
 def test_golden_set_retrieval_e2e(tmp_path: Path) -> None:
     """End-to-end evaluation test for retrieval accuracy on the golden QA set.
-    
+
     This test uses real OpenAI API calls to properly evaluate retrieval quality.
     It should only be run manually when needed, not in CI.
     """
     data_dir = tmp_path / "data"
     docs_dir = tmp_path / "docs"
     docs_dir.mkdir()
-    
+
     # Copy the sample file with the golden answers
     sample_file = Path(__file__).parent.parent / "integration" / "sample.txt"
     target_file = docs_dir / "sample.txt"
@@ -37,7 +37,7 @@ def test_golden_set_retrieval_e2e(tmp_path: Path) -> None:
 
     # Use real configuration for proper E2E testing
     config = RAGConfig(
-        documents_dir=str(docs_dir), 
+        documents_dir=str(docs_dir),
         data_dir=str(data_dir),
         # Note: This test requires a real OpenAI API key in environment
         # openai_api_key should be set via environment variable
@@ -45,10 +45,10 @@ def test_golden_set_retrieval_e2e(tmp_path: Path) -> None:
     runtime = RuntimeOptions()
 
     from rag.factory import RAGComponentsFactory
-    
+
     factory = RAGComponentsFactory(config, runtime)
     engine = factory.create_rag_engine()
-    
+
     # Index the documents
     result = engine.ingestion_pipeline.ingest_all()
     assert result.documents_loaded > 0, f"No documents loaded during ingestion"
@@ -57,11 +57,11 @@ def test_golden_set_retrieval_e2e(tmp_path: Path) -> None:
     document_store = engine.ingestion_pipeline.document_store
     source_documents = document_store.list_source_documents()
     assert source_documents, "No source documents found after indexing"
-        
+
     hits = 0
     contains_answer = 0
     queries_with_sources = 0
-    
+
     for question, expected_sentence in GOLDEN_QA:
         # Use the query engine to search
         result = engine.answer(question, k=3)
@@ -70,18 +70,18 @@ def test_golden_set_retrieval_e2e(tmp_path: Path) -> None:
         if result.get("sources"):
             queries_with_sources += 1
             docs_content = [source.get("excerpt", "") for source in result["sources"]]
-        
+
         # Check if we have any content to evaluate, either from sources or answer
         doc_text = " ".join(docs_content).strip() if docs_content else ""
         answer_text = result.get("answer", "")
-        
+
         # Combine source content and answer for evaluation
         combined_text = (doc_text + " " + answer_text).strip()
-        
+
         # Skip if no content retrieved at all
         if not combined_text:
             continue
-            
+
         if expected_sentence.lower() in combined_text.lower():
             hits += 1
         # Check if the key information (capital name) is present

@@ -754,53 +754,6 @@ class SQLiteDocumentStore:
         except sqlite3.Error:
             return True
 
-    def update_metadata(self, metadata: Any) -> None:
-        """Update metadata for a file (compatibility method)."""
-        # For compatibility with old IndexManager interface
-        pass
-
-    def get_metadata(self, file_path: Path) -> dict[str, Any] | None:
-        """Get metadata for a file (compatibility method)."""
-        # Try to find source document by path
-        return self.get_file_metadata(str(file_path))
-
-    def remove_metadata(self, file_path: Path) -> None:
-        """Remove metadata for a file (compatibility method)."""
-        # Remove source document by path
-        try:
-            self.remove_source_document(str(file_path))
-        except Exception:
-            pass  # Ignore errors for compatibility
-
-    def update_chunk_hashes(self, file_path: Path, chunk_hashes: list[str]) -> None:
-        """Update chunk hashes for a file (compatibility method)."""
-        # Store in source document metadata
-        try:
-            source_doc = self.get_source_document(str(file_path))
-            if source_doc:
-                # Update metadata to include chunk hashes
-                updated_metadata = source_doc.metadata.copy()
-                updated_metadata["chunk_hashes"] = chunk_hashes
-                # This would require updating the source document, but for now just pass
-                pass
-        except Exception:
-            pass
-
-    def get_chunk_hashes(self, file_path: Path) -> list[str]:
-        """Get chunk hashes for a file (compatibility method)."""
-        try:
-            source_doc = self.get_source_document(str(file_path))
-            if source_doc and "chunk_hashes" in source_doc.metadata:
-                return source_doc.metadata["chunk_hashes"]
-        except Exception:
-            pass
-        return []
-
-    def update_file_metadata(self, metadata: Any) -> None:
-        """Update file metadata (compatibility method)."""
-        # For compatibility with old interface
-        pass
-
     def get_file_metadata(self, file_path: str | Path) -> dict[str, Any] | None:
         """Get file metadata."""
         # Use existing get_source_document method
@@ -827,16 +780,6 @@ class SQLiteDocumentStore:
                 "chunks": {"total": source_doc.chunk_count},
             }
         return result
-
-    def set_global_setting(self, key: str, value: str) -> None:
-        """Set a global setting (compatibility method)."""
-        # Could store in a separate settings table, but for now just pass
-        pass
-
-    def get_global_setting(self, key: str) -> str | None:
-        """Get a global setting (compatibility method)."""
-        # Could retrieve from settings table, but for now return None
-        return None
 
     def list_indexed_files(self) -> list[dict[str, Any]]:
         """List all indexed files."""

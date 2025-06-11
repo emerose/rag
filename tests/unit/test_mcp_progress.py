@@ -26,15 +26,17 @@ class DummyEngine:
             progress_callback("indexed", path, None)
         return True, None
 
-    def invalidate_all_caches(self) -> None:
+    def clear_all_data(self) -> None:
         pass
 
     @property
     def document_source(self):
         """Mock document source for MCP server compatibility."""
+
         class MockSource:
             def list_documents(self):
                 return ["a.txt", "b.txt"]
+
         return MockSource()
 
 
@@ -42,7 +44,9 @@ class DummyContext:
     def __init__(self) -> None:
         self.calls: list[tuple[float, float | None, str | None]] = []
 
-    async def report_progress(self, progress: float, total: float | None, message: str | None) -> None:
+    async def report_progress(
+        self, progress: float, total: float | None, message: str | None
+    ) -> None:
         self.calls.append((progress, total, message))
 
 

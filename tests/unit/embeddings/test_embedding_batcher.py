@@ -17,7 +17,7 @@ def test_process_embeddings_stream_yields_results_in_order() -> None:
         def __init__(self):
             super().__init__(embedding_dimension=1)
             self.call_count = 0
-            
+
         def embed_texts(self, texts: list[str]) -> list[list[float]]:
             # Return different embeddings for each batch call
             results = []
@@ -25,7 +25,7 @@ def test_process_embeddings_stream_yields_results_in_order() -> None:
                 self.call_count += 1
                 results.append([float(self.call_count)])
             return results
-    
+
     provider = CustomFakeEmbeddingService()
     config = EmbeddingConfig(model="test-model", max_workers=2, batch_size=2)
     batcher = EmbeddingBatcher(provider, config=config)
@@ -61,7 +61,7 @@ class TestEmbeddingBatcherProtocolCompliance:
             "model_name": "test-model",
             "provider": "test",
         }
-        
+
         self.config = EmbeddingConfig(model="test-model", max_workers=2, batch_size=4)
         self.batcher = EmbeddingBatcher(self.provider, config=self.config)
 
@@ -78,14 +78,14 @@ class TestEmbeddingBatcherProtocolCompliance:
         """Test embed_texts method delegates to underlying provider."""
         texts = ["hello", "world"]
         result = self.batcher.embed_texts(texts)
-        
+
         assert result == [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
         self.provider.embed_texts.assert_called_once_with(texts)
 
     def test_embed_texts_empty_list(self) -> None:
         """Test embed_texts with empty list."""
         result = self.batcher.embed_texts([])
-        
+
         assert result == []
         self.provider.embed_texts.assert_not_called()
 
@@ -93,14 +93,14 @@ class TestEmbeddingBatcherProtocolCompliance:
         """Test embed_query method delegates to underlying provider."""
         query = "test query"
         result = self.batcher.embed_query(query)
-        
+
         assert result == [0.7, 0.8, 0.9]
         self.provider.embed_query.assert_called_once_with(query)
 
     def test_get_model_info_enhances_provider_info(self) -> None:
         """Test get_model_info adds batching information to provider info."""
         result = self.batcher.get_model_info()
-        
+
         expected = {
             "model_name": "test-model",
             "provider": "test",
@@ -125,10 +125,11 @@ class TestEmbeddingBatcherProtocolCompliance:
 
     def test_can_be_used_as_embedding_service_dependency(self) -> None:
         """Test that EmbeddingBatcher can be used where EmbeddingServiceProtocol is expected."""
+
         def requires_embedding_service(service: EmbeddingServiceProtocol) -> str:
             """Function that requires an EmbeddingServiceProtocol."""
             return f"dimension: {service.embedding_dimension}"
-        
+
         # This should work without type errors
         result = requires_embedding_service(self.batcher)
         assert result == "dimension: 384"

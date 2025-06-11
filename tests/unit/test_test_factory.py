@@ -26,6 +26,7 @@ class TestFakeRAGComponentsFactory:
         assert isinstance(factory.filesystem_manager, InMemoryFileSystem)
         assert isinstance(factory.document_store, FakeDocumentStore)
         from rag.storage.vector_store import InMemoryVectorStoreFactory
+
         assert isinstance(factory.vectorstore_factory, InMemoryVectorStoreFactory)
         assert isinstance(
             factory.embedding_service,
@@ -177,7 +178,7 @@ class TestFakeRAGComponentsFactory:
 
         # Check that the engine was created successfully
         assert engine is not None
-        assert hasattr(engine, 'ingestion_pipeline')
+        assert hasattr(engine, "ingestion_pipeline")
         assert isinstance(engine.index_manager, (FakeDocumentStore, FakeDocumentStore))
         # Note: vectorstore_manager was removed in the new architecture
 
@@ -196,9 +197,7 @@ class TestFakeRAGComponentsFactory:
         # Create overrides with real components
         overrides = ComponentOverrides(
             filesystem_manager=FilesystemManager(),
-            document_store=SQLiteDocumentStore(
-                Path("/tmp/test") / "test.db"
-            ),
+            document_store=SQLiteDocumentStore(Path("/tmp/test") / "test.db"),
         )
 
         config = RAGConfig(documents_dir="/tmp/test", data_dir="/tmp/cache")
@@ -215,6 +214,7 @@ class TestFakeRAGComponentsFactory:
             factory.get_test_files()
 
         with pytest.raises(
-            ConfigurationError, match="Can only get test metadata from FakeDocumentStore|FakeDocumentStore"
+            ConfigurationError,
+            match="Can only get test metadata from FakeDocumentStore|FakeDocumentStore",
         ):
             factory.get_test_metadata()

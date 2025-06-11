@@ -156,9 +156,13 @@ def test_error_handling() -> None:
             provider.embed_query("")
 
         # Test invalid text list
-        with pytest.raises(EmbeddingGenerationError, match="Cannot embed empty text list"):
+        with pytest.raises(
+            EmbeddingGenerationError, match="Cannot embed empty text list"
+        ):
             provider.embed_texts([])
 
         # Test non-string in text list
-        with pytest.raises(EmbeddingGenerationError, match="Text at index 1 must be a string"):
+        with pytest.raises(
+            EmbeddingGenerationError, match="Text at index 1 must be a string"
+        ):
             provider.embed_texts(["valid text", 123])  # type: ignore

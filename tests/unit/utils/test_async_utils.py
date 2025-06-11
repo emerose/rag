@@ -28,7 +28,9 @@ async def test_async_batch_processor_processes_batches() -> None:
         return [x * 2 for x in batch]
 
     with patch("os.cpu_count", return_value=2):
-        processor = AsyncBatchProcessor(dummy_processor, max_concurrency=4, batch_size=3)
+        processor = AsyncBatchProcessor(
+            dummy_processor, max_concurrency=4, batch_size=3
+        )
         result = await processor.process([1, 2, 3, 4, 5, 6, 7])
 
     assert result == [2, 4, 6, 8, 10, 12, 14]
@@ -50,4 +52,3 @@ async def test_run_coro_sync_from_async() -> None:
         return 24
 
     assert run_coro_sync(coro()) == 24
-

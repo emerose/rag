@@ -40,7 +40,7 @@ class IndexRequest(BaseModel):
     path: str
 
 
-class InvalidateRequest(BaseModel):
+class ClearRequest(BaseModel):
     path: str | None = None
     all: bool = False
 
@@ -149,7 +149,7 @@ class RAGMCPServer(FastMCP):
         return {"success": success, "error": error}
 
     async def tool_rebuild(self) -> dict[str, Any]:
-        self.engine.invalidate_all_data()
+        self.engine.clear_all_data()
         return await asyncio.to_thread(
             self.engine.index_directory, self.engine.documents_dir
         )
@@ -175,18 +175,18 @@ class RAGMCPServer(FastMCP):
         return None
 
     async def tool_delete_document(self, path: str) -> bool:
-        self.engine.invalidate_data(path)
+        self.engine.clear_data(path)
         return True
 
     async def tool_summaries(self, k: int = 5) -> list[dict[str, Any]]:
         return self.engine.get_document_summaries(k)
 
-    async def tool_invalidate(self, path: str | None = None, all: bool = False) -> bool:
+    async def tool_clear(self, path: str | None = None, all: bool = False) -> bool:
         if all:
-            self.engine.invalidate_all_data()
+            self.engine.clear_all_data()
             return True
         if path:
-            self.engine.invalidate_data(path)
+            self.engine.clear_data(path)
             return True
         return False
 
@@ -200,7 +200,7 @@ class RAGMCPServer(FastMCP):
         self.add_tool(self.tool_get_document)
         self.add_tool(self.tool_delete_document)
         self.add_tool(self.tool_summaries)
-        self.add_tool(self.tool_invalidate)
+        self.add_tool(self.tool_clear)
 
 
 # ----------------------------------------------------------------------
@@ -265,9 +265,9 @@ async def handle_summaries(server: RAGMCPServer, k: int = 5) -> list[dict[str, A
     return await server.tool_summaries(k)
 
 
-async def handle_invalidate(server: RAGMCPServer, req: InvalidateRequest) -> bool:
-    """Handle /invalidate POST requests."""
-    return await server.tool_invalidate(req.path, req.all)
+async def handle_clear(server: RAGMCPServer, req: ClearRequest) -> bool:
+    """Handle /clear POST requests."""
+    return await server.tool_clear(req.path, req.all)
 
 
 def create_http_app(server: RAGMCPServer, api_key: str | None = None) -> FastAPI:
@@ -316,9 +316,9 @@ def create_http_app(server: RAGMCPServer, api_key: str | None = None) -> FastAPI
     async def summaries(k: int = 5) -> list[dict[str, Any]]:
         return await handle_summaries(server, k)
 
-    @app.post("/invalidate")
-    async def invalidate(req: InvalidateRequest) -> bool:
-        return await handle_invalidate(server, req)
+    @app.post("/clear")
+    async def clear(req: ClearRequest) -> bool:
+        return await handle_clear(server, req)
 
     return app
 

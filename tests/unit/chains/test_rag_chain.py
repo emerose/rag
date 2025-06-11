@@ -52,12 +52,13 @@ def fake_vectorstore(mock_documents):
     # Manually add documents to the fake vectorstore
     vectorstore.documents = mock_documents
     vectorstore.embeddings = [[0.1, 0.2, 0.3]] * len(mock_documents)  # Dummy embeddings
-    
+
     # Mock the as_retriever method to return a trackable mock
     mock_retriever = MagicMock()
     vectorstore.as_retriever = MagicMock(return_value=mock_retriever)
-    
+
     return vectorstore
+
 
 @pytest.fixture
 def mock_engine(fake_vectorstore):
@@ -73,8 +74,6 @@ def mock_engine(fake_vectorstore):
     engine.vectorstore = fake_vectorstore
 
     return engine
-
-
 
 
 def test_parse_metadata_filters():

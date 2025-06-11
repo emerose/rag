@@ -15,7 +15,7 @@ def _dummy_config(tmp_path):
     data_dir = tmp_path / "data"
     docs_dir.mkdir(exist_ok=True)
     data_dir.mkdir(exist_ok=True)
-    
+
     return RAGConfig(
         documents_dir=str(docs_dir),
         data_dir=str(data_dir),
@@ -31,14 +31,12 @@ def test_build_server_registers_tools(tmp_path):
     """Test that the MCP server registers tools correctly."""
     config = _dummy_config(tmp_path)
     runtime = RuntimeOptions()
-    
+
     # Create server with fake components to avoid real API calls
     fake_factory = FakeRAGComponentsFactory.create_for_integration_tests(
-        config=config,
-        runtime=runtime,
-        use_real_filesystem=True
+        config=config, runtime=runtime, use_real_filesystem=True
     )
-    
+
     server = build_server(config, runtime, factory=fake_factory)
     assert len(server.tools) > 0
 
@@ -48,14 +46,12 @@ def test_http_query_endpoint(tmp_path):
     """Test the HTTP query endpoint with fake components."""
     config = _dummy_config(tmp_path)
     runtime = RuntimeOptions()
-    
+
     # Create server with fake components to avoid real API calls
     fake_factory = FakeRAGComponentsFactory.create_for_integration_tests(
-        config=config,
-        runtime=runtime,
-        use_real_filesystem=True
+        config=config, runtime=runtime, use_real_filesystem=True
     )
-    
+
     server = build_server(config, runtime, factory=fake_factory)
     with patch.object(server.engine, "answer", return_value={"answer": "ok"}):
         result = asyncio.run(server.tool_query("hi", 1))
@@ -67,14 +63,12 @@ def test_run_stdio_server_invokes_fastmcp(tmp_path, monkeypatch):
     """Test that stdio server invokes fastmcp correctly."""
     config = _dummy_config(tmp_path)
     runtime = RuntimeOptions()
-    
+
     # Create server with fake components to avoid real API calls
     fake_factory = FakeRAGComponentsFactory.create_for_integration_tests(
-        config=config,
-        runtime=runtime,
-        use_real_filesystem=True
+        config=config, runtime=runtime, use_real_filesystem=True
     )
-    
+
     server = build_server(config, runtime, factory=fake_factory)
     called = False
 
@@ -92,14 +86,12 @@ def test_call_tool_logs_name_and_args(tmp_path):
     """Test that call_tool function works correctly and executes the expected workflow."""
     config = _dummy_config(tmp_path)
     runtime = RuntimeOptions()
-    
+
     # Create server with fake components to avoid real API calls
     fake_factory = FakeRAGComponentsFactory.create_for_integration_tests(
-        config=config,
-        runtime=runtime,
-        use_real_filesystem=True
+        config=config, runtime=runtime, use_real_filesystem=True
     )
-    
+
     server = build_server(config, runtime, factory=fake_factory)
 
     # Test that call_tool works without errors

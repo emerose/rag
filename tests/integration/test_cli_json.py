@@ -22,12 +22,12 @@ def test_config(tmp_path: Path) -> RAGConfig:
     docs_dir.mkdir()
     data_dir = tmp_path / ".rag"
     data_dir.mkdir()
-    
+
     return RAGConfig(
         documents_dir=str(docs_dir),
         data_dir=str(data_dir),
         vectorstore_backend="fake",
-        openai_api_key="sk-test"
+        openai_api_key="sk-test",
     )
 
 
@@ -42,19 +42,19 @@ def sample_file(test_config: RAGConfig) -> Path:
 
 def run_cli_command(cmd: list[str], config: RAGConfig) -> dict[str, Any]:
     """Run a RAG CLI command directly and parse its JSON output.
-    
+
     Args:
         cmd: Command parts as a list (e.g. ["index", "file.txt"])
         config: RAG configuration with cache and docs directories
-    
+
     Returns:
         Parsed JSON output as a dictionary
     """
     runner = CliRunner()
-    
+
     # Add required flags
     full_cmd = cmd + ["--json", "--data-dir", config.data_dir]
-    
+
     # Set up environment variables for the test
     env = {
         "RAG_DATA_DIR": config.data_dir,
@@ -62,31 +62,41 @@ def run_cli_command(cmd: list[str], config: RAGConfig) -> dict[str, Any]:
         "RAG_VECTORSTORE_BACKEND": config.vectorstore_backend,
         "RAG_OPENAI_API_KEY": config.openai_api_key,
     }
-    
+
     result = runner.invoke(app, full_cmd, env=env)
-    
+
     if result.exit_code != 0:
         # With fake vectorstores, some commands are expected to fail
         # Check if this is an authentication error (which we want to avoid) vs expected failures
-        if "authentication" in result.stdout.lower() or "api key" in result.stdout.lower():
-            pytest.fail(f"CLI command failed with authentication error: {result.stdout}")
+        if (
+            "authentication" in result.stdout.lower()
+            or "api key" in result.stdout.lower()
+        ):
+            pytest.fail(
+                f"CLI command failed with authentication error: {result.stdout}"
+            )
         # For other failures, return a mock JSON response indicating failure
-        return {"error": "Command failed as expected with fake components", "exit_code": result.exit_code}
-    
+        return {
+            "error": "Command failed as expected with fake components",
+            "exit_code": result.exit_code,
+        }
+
     # Parse the JSON output - the CLI may output multiple JSON objects
     # We want the last one which is the actual command result
-    lines = result.stdout.strip().split('\n')
+    lines = result.stdout.strip().split("\n")
     for line in reversed(lines):
         if line.strip():
             try:
                 return json.loads(line)
             except json.JSONDecodeError:
                 continue
-    
+
     pytest.fail(f"No valid JSON found in output: {result.stdout}")
 
 
-def test_index_single_file(fake_openai_factory, sample_file: Path, test_config: RAGConfig):
+def test_index_single_file(
+    fake_openai_factory, sample_file: Path, test_config: RAGConfig
+):
     """Test indexing a single file with JSON output."""
     output = run_cli_command(["index", str(sample_file)], test_config)
     assert "summary" in output
@@ -101,7 +111,7 @@ def test_list_command(fake_openai_factory, sample_file: Path, test_config: RAGCo
     """Test the list command with JSON output."""
     # First index a file
     run_cli_command(["index", str(sample_file)], test_config)
-    
+
     # Then list indexed files
     output = run_cli_command(["list"], test_config)
     assert "table" in output
@@ -117,10 +127,10 @@ def test_query_command(fake_openai_factory, sample_file: Path, test_config: RAGC
     """Test the query command with JSON output."""
     # First index a file
     run_cli_command(["index", str(sample_file)], test_config)
-    
+
     # Then run a query
     output = run_cli_command(["query", "What is this document about?"], test_config)
-    
+
     # With fake vectorstores, the query might fail - that's expected
     if "error" in output:
         # Verify this is not an OpenAI authentication error
@@ -136,14 +146,16 @@ def test_query_command(fake_openai_factory, sample_file: Path, test_config: RAGC
         assert output["metadata"]["prompt_template"] == "default"
 
 
-def test_summarize_command(fake_openai_factory, sample_file: Path, test_config: RAGConfig):
+def test_summarize_command(
+    fake_openai_factory, sample_file: Path, test_config: RAGConfig
+):
     """Test the summarize command with JSON output."""
     # First index a file
     run_cli_command(["index", str(sample_file)], test_config)
-    
+
     # Then get summaries
     output = run_cli_command(["summarize"], test_config)
-    
+
     # With fake vectorstores, the summarize might fail - that's expected
     if "error" in output:
         # Verify this is not an OpenAI authentication error
@@ -160,12 +172,12 @@ def test_summarize_command(fake_openai_factory, sample_file: Path, test_config: 
         assert len(table["rows"]) == 1
 
 
-def test_invalidate_command(fake_openai_factory, sample_file: Path, test_config: RAGConfig):
-    """Test the invalidate command with JSON output."""
+def test_clear_command(fake_openai_factory, sample_file: Path, test_config: RAGConfig):
+    """Test the clear command with JSON output."""
     # First index a file
     run_cli_command(["index", str(sample_file)], test_config)
-    
-    # Then invalidate its cache
-    output = run_cli_command(["invalidate", str(sample_file)], test_config)
+
+    # Then clear its cache
+    output = run_cli_command(["clear", str(sample_file)], test_config)
     assert "message" in output
     assert str(sample_file.name) in output["message"]
