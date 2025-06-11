@@ -71,16 +71,6 @@ def mock_engine(fake_vectorstore):
 
     # Use fake vectorstore instead of mocks
     engine.vectorstore = fake_vectorstore
-    # Mock vectorstore_manager (still exists for backward compatibility)
-    engine.vectorstore_manager = MagicMock()
-    
-    # Mock single vectorstore (new architecture)
-    mock_vs = MagicMock()
-    mock_vs.similarity_search.return_value = []
-    mock_vs.as_retriever.return_value = MagicMock()
-    
-    # New architecture: single vectorstore property
-    engine.vectorstore = mock_vs
 
     return engine
 
