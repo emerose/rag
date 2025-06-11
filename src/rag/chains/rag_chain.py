@@ -150,17 +150,14 @@ def build_rag_chain(
     """
 
     # ---------------------------------------------------------------------
-    # Get the single workspace vectorstore
+    # Get the single vectorstore
     # ---------------------------------------------------------------------
-    # Get the single workspace vectorstore
     if hasattr(engine, "vectorstore") and engine.vectorstore:
-        workspace_vs: VectorStoreProtocol = engine.vectorstore
+        vs: VectorStoreProtocol = engine.vectorstore
     else:
         raise VectorstoreError("No vectorstore available")
 
-    retriever = workspace_vs.as_retriever(
-        search_type="similarity", search_kwargs={"k": k}
-    )
+    retriever = vs.as_retriever(search_type="similarity", search_kwargs={"k": k})
 
     # ---------------------------------------------------------------------
     # Get prompt template from registry
@@ -184,9 +181,9 @@ def build_rag_chain(
         # Debug: Log retrieval details
         logger.debug(f"Retrieving for query: '{clean_query}' (original: '{question}')")
         logger.debug(f"Search k: {search_k}, filters: {mfilters}")
-        logger.debug(f"Workspace vectorstore type: {type(workspace_vs)}")
+        logger.debug(f"Vectorstore type: {type(vs)}")
 
-        docs: list[Document] = workspace_vs.similarity_search(clean_query, k=search_k)
+        docs: list[Document] = vs.similarity_search(clean_query, k=search_k)
 
         if mfilters:
             docs = [d for d in docs if _doc_matches_filters(d, mfilters)]

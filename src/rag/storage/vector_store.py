@@ -28,7 +28,7 @@ class VectorStoreProtocol(Protocol):
 
     This protocol defines the core interface that all vector stores must implement
     for the RAG system. It focuses on the essential operations needed for a
-    single-vectorstore-per-workspace architecture.
+    single-vectorstore architecture.
     """
 
     def similarity_search(self, query: str, k: int = 4) -> list[Document]:
