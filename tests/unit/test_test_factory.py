@@ -41,7 +41,7 @@ class TestFakeRAGComponentsFactory:
             temperature=0.5,
             chunk_size=1000,
             chunk_overlap=100,
-            cache_dir="/custom/cache",
+            data_dir="/custom/cache",
             vectorstore_backend="qdrant",
         )
 
@@ -190,18 +190,18 @@ class TestFakeRAGComponentsFactory:
         # Create a FakeRAGComponentsFactory but inject real components
         # (this is a bit contrived but tests the error handling)
         from rag.storage.filesystem import FilesystemManager
-        from rag.storage.index_manager import IndexManager
+        from rag.storage.document_store import SQLiteDocumentStore
         from rag.factory import ComponentOverrides, RAGComponentsFactory
 
         # Create overrides with real components
         overrides = ComponentOverrides(
             filesystem_manager=FilesystemManager(),
-            cache_repository=IndexManager(
-                cache_dir=Path("/tmp/test"), log_callback=None
+            document_store=SQLiteDocumentStore(
+                Path("/tmp/test") / "test.db"
             ),
         )
 
-        config = RAGConfig(documents_dir="/tmp/test", cache_dir="/tmp/cache")
+        config = RAGConfig(documents_dir="/tmp/test", data_dir="/tmp/cache")
         runtime = RuntimeOptions()
 
         # Create FakeRAGComponentsFactory with real component overrides

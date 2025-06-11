@@ -1215,3 +1215,30 @@ class FakeDocumentStore:
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
+
+    def remove_mock_file(self, file_path: Path) -> None:
+        """Remove a mock file for testing purposes."""
+        self.remove_source_document(str(file_path))
+
+    def needs_reindexing(
+        self,
+        file_path: Path,
+        chunk_size: int,
+        chunk_overlap: int,
+        embedding_model: str,
+        embedding_model_version: str,
+    ) -> bool:
+        """Check if a file needs to be reindexed (fake implementation)."""
+        # For testing, check if we have source document metadata
+        source_doc = self.get_source_document(str(file_path))
+        if source_doc is None:
+            return True  # New file needs indexing
+
+        # Check if parameters changed
+        metadata = source_doc.metadata
+        return (
+            metadata.get("chunk_size") != chunk_size
+            or metadata.get("chunk_overlap") != chunk_overlap
+            or metadata.get("embedding_model") != embedding_model
+            or metadata.get("embedding_model_version") != embedding_model_version
+        )

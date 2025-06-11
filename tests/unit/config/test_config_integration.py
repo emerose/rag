@@ -64,7 +64,7 @@ class TestConfigIntegrationWithComponents:
         assert test_config.chunking.chunk_size == 100
         assert test_config.embedding.batch_size == 2
         assert test_config.embedding.max_workers == 1
-        assert test_config.cache.enabled is False
+        assert test_config.data.enabled is False
         assert test_config.storage.backend == "fake"
         
         # Test production config
@@ -73,7 +73,7 @@ class TestConfigIntegrationWithComponents:
         assert prod_config.chunking.chunk_size == 1500
         assert prod_config.embedding.batch_size == 128
         assert prod_config.embedding.max_workers == 8
-        assert prod_config.cache.enabled is True
+        assert prod_config.data.enabled is True
         assert prod_config.storage.backend == "faiss"
 
     def test_indexing_config_to_dict(self):
@@ -84,13 +84,13 @@ class TestConfigIntegrationWithComponents:
         # Check top-level structure
         assert "chunking" in data
         assert "embedding" in data
-        assert "cache" in data
+        assert "data" in data
         assert "storage" in data
         
         # Check nested values
         assert data["chunking"]["chunk_size"] == 1000
         assert data["embedding"]["model"] == "text-embedding-3-small"
-        assert data["cache"]["enabled"] is True
+        assert data["data"]["enabled"] is True
         assert data["storage"]["backend"] == "faiss"
 
     def test_config_immutability(self):
@@ -105,7 +105,7 @@ class TestConfigIntegrationWithComponents:
             config.embedding = None
             
         with pytest.raises(Exception):  # FrozenInstanceError  
-            config.cache = None
+            config.data = None
             
         with pytest.raises(Exception):  # FrozenInstanceError
             config.storage = None
@@ -125,8 +125,8 @@ class TestConfigIntegrationWithComponents:
         assert config.embedding.max_retries == 3  # Reasonable retry count
         
         # Cache defaults
-        assert config.cache.enabled is True  # Caching should be on by default
-        assert config.cache.ttl_hours == 24 * 7  # 1 week is reasonable
+        assert config.data.enabled is True  # Caching should be on by default
+        assert config.data.ttl_hours == 24 * 7  # 1 week is reasonable
         
         # Storage defaults
         assert config.storage.backend == "faiss"  # Good default vector store

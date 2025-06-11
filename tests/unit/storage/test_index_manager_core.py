@@ -17,11 +17,11 @@ def test_index_manager_init(temp_dir: Path) -> None:
     """
     # Create fake index manager using the factory
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir)
+        data_dir=str(temp_dir)
     )
 
     # Verify properties
-    assert manager.cache_dir == temp_dir
+    assert manager.data_dir == temp_dir
     assert manager.db_path == temp_dir / "index_metadata.db"
 
     # Verify it can perform basic operations without SQLite

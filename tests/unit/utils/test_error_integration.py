@@ -121,7 +121,7 @@ class TestTestFactoryErrorHandling:
         factory = FakeRAGComponentsFactory.create_minimal()
         
         # Replace with a different type to trigger the error
-        factory._cache_repository = "not_an_in_memory_repository"
+        factory._document_store = "not_an_in_memory_repository"
         
         with pytest.raises(ConfigurationError) as exc_info:
             factory.add_test_metadata("/test/file.txt", {"key": "value"})
@@ -147,7 +147,7 @@ class TestTestFactoryErrorHandling:
         factory = FakeRAGComponentsFactory.create_minimal()
         
         # Replace with a different type to trigger the error
-        factory._cache_repository = "not_an_in_memory_repository"
+        factory._document_store = "not_an_in_memory_repository"
         
         with pytest.raises(ConfigurationError) as exc_info:
             factory.get_test_metadata()

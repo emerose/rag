@@ -27,7 +27,7 @@ def test_rag_config_defaults() -> None:
     assert config.embedding_model == "text-embedding-3-small"
     assert config.chat_model == "gpt-4"
     assert config.temperature == 0.0
-    assert config.cache_dir == ".cache"
+    assert config.data_dir == ".cache"
     assert config.lock_timeout == 30
     assert config.chunk_size == 1000
     assert config.chunk_overlap == 200

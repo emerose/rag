@@ -17,13 +17,13 @@ def test_compute_file_hash(temp_dir: Path) -> None:
     """
     # Create fake index manager
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir)
+        data_dir=str(temp_dir)
     )
 
     # Add a mock file to compute hash for
     file_path = Path(temp_dir) / "test_file.txt"
     test_content = "test content"
-    manager.add_mock_file(file_path, test_content)
+    manager.add_mock_file(file_path, test_content, 1640995200.0)
 
     # Test compute_file_hash
     result = manager.compute_file_hash(file_path)
@@ -41,7 +41,7 @@ def test_compute_text_hash(temp_dir: Path) -> None:
     """Test computing text hash using dependency injection."""
     # Create fake index manager
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir)
+        data_dir=str(temp_dir)
     )
 
     # Test compute_text_hash
@@ -65,7 +65,7 @@ def test_update_and_get_chunk_hashes(temp_dir: Path) -> None:
     """Test storing and retrieving chunk hashes using dependency injection."""
     # Create fake index manager
     manager = FakeRAGComponentsFactory.create_fake_index_manager(
-        cache_dir=str(temp_dir)
+        data_dir=str(temp_dir)
     )
 
     # Test chunk hash operations
