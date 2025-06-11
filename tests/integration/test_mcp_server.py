@@ -12,13 +12,13 @@ from rag.testing.test_factory import FakeRAGComponentsFactory
 
 def _dummy_config(tmp_path):
     docs_dir = tmp_path / "docs"
-    cache_dir = tmp_path / "cache"
+    data_dir = tmp_path / "data"
     docs_dir.mkdir(exist_ok=True)
-    cache_dir.mkdir(exist_ok=True)
+    data_dir.mkdir(exist_ok=True)
     
     return RAGConfig(
         documents_dir=str(docs_dir),
-        cache_dir=str(cache_dir),
+        data_dir=str(data_dir),
         openai_api_key="sk-test",
     )
 

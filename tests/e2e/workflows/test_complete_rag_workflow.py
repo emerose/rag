@@ -105,7 +105,7 @@ NLP focuses on the interaction between computers and human language.
             # Create RAG engine with real configuration
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                cache_dir=str(cache_dir),
+                data_dir=str(cache_dir),
                 vectorstore_backend="faiss",  # Use real FAISS backend
                 openai_api_key=os.getenv("OPENAI_API_KEY")
             )
@@ -153,7 +153,7 @@ NLP focuses on the interaction between computers and human language.
             
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                cache_dir=str(cache_dir),
+                data_dir=str(cache_dir),
                 vectorstore_backend="faiss",
                 openai_api_key=os.getenv("OPENAI_API_KEY")
             )
@@ -196,7 +196,7 @@ NLP focuses on the interaction between computers and human language.
             
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                cache_dir=str(cache_dir),
+                data_dir=str(cache_dir),
                 vectorstore_backend="faiss",
                 openai_api_key=os.getenv("OPENAI_API_KEY")
             )
@@ -235,7 +235,7 @@ NLP focuses on the interaction between computers and human language.
             
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                cache_dir=str(cache_dir),
+                data_dir=str(cache_dir),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test"
             )
@@ -249,7 +249,7 @@ NLP focuses on the interaction between computers and human language.
             # Update engine config to point to empty directory
             config_empty = RAGConfig(
                 documents_dir=str(empty_dir),
-                cache_dir=str(cache_dir),
+                data_dir=str(cache_dir),
                 vectorstore_backend="fake",
                 openai_api_key="sk-test"
             )
@@ -277,7 +277,7 @@ NLP focuses on the interaction between computers and human language.
             
             config = RAGConfig(
                 documents_dir=str(docs_dir),
-                cache_dir=str(cache_dir),
+                data_dir=str(cache_dir),
                 vectorstore_backend="faiss",  # Use real FAISS backend
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
                 chunk_size=50,  # Smaller chunks for faster processing

@@ -24,13 +24,13 @@ def _build_test_server(tmp_path: Path):
         patch.object(EmbeddingProvider, "embedding_dimension", 32),
     ):
         docs_dir = tmp_path / "docs"
-        cache_dir = tmp_path / "cache"
+        data_dir = tmp_path / "data"
         docs_dir.mkdir(exist_ok=True)
-        cache_dir.mkdir(exist_ok=True)
+        data_dir.mkdir(exist_ok=True)
         
         config = RAGConfig(
             documents_dir=str(docs_dir),
-            cache_dir=str(cache_dir),
+            data_dir=str(data_dir),
             openai_api_key="dummy",
         )
         runtime = RuntimeOptions()
