@@ -18,6 +18,9 @@ source .venv/bin/activate
 # Run all quality checks (tests, formatting, linting)
 ./check.sh
 
+# Or use the Python command directly
+python scripts/run_tests.py check
+
 # Run tests only (excluding integration tests)
 python tests/run_tests.py
 
@@ -30,7 +33,7 @@ ruff format src/ --line-length 88
 # Lint and auto-fix
 ruff check src/rag --fix --line-length 88
 
-# Type checking (with baseline limit)
+# Linting and formatting only (ruff)
 python scripts/run_tests.py lint
 
 # Type checking (no baseline limit) 
@@ -38,6 +41,12 @@ python scripts/run_tests.py typecheck
 
 # Type checking (direct pyright)
 pyright src/rag
+
+# Dead code detection
+python scripts/run_tests.py vulture
+
+# All static analysis (ruff + pyright + vulture)
+python scripts/run_tests.py static
 ```
 
 ### RAG CLI Usage

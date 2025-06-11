@@ -109,14 +109,14 @@ def run_e2e_tests() -> int:
 
 
 def run_all_tests() -> int:
-    """Run all tests in proper order: lint → unit → integration → e2e."""
-    print(f"{BLUE}Running All Tests (lint → unit → integration → e2e){RESET}")
+    """Run all tests in proper order: static → unit → integration → e2e."""
+    print(f"{BLUE}Running All Tests (static → unit → integration → e2e){RESET}")
 
-    # Run lint checks first
-    print(f"{GREEN}Step 1/4: Running lint checks{RESET}")
-    lint_result = run_lint()
-    if lint_result != 0:
-        return lint_result
+    # Run static analysis first
+    print(f"{GREEN}Step 1/4: Running static analysis{RESET}")
+    static_result = run_static()
+    if static_result != 0:
+        return static_result
 
     # Run unit tests second
     print(f"{GREEN}Step 2/4: Running unit tests{RESET}")
@@ -157,13 +157,9 @@ def run_coverage_tests() -> int:
     return run_command(cmd)
 
 
-def run_lint(max_type_errors: int = MAX_TYPE_ERRORS) -> int:
-    """Run linting, formatting, and type checking.
-    
-    Args:
-        max_type_errors: Maximum allowed type errors before failing
-    """
-    print(f"{BLUE}Running Linting, Formatting, and Type Checking{RESET}")
+def run_lint() -> int:
+    """Run linting and formatting only (ruff)."""
+    print(f"{BLUE}Running Linting and Formatting{RESET}")
 
     # Format code
     print(f"{GREEN}Formatting code{RESET}")
@@ -179,11 +175,6 @@ def run_lint(max_type_errors: int = MAX_TYPE_ERRORS) -> int:
     if lint_result != 0:
         return lint_result
 
-    # Run type checking with baseline
-    type_check_result = run_pyright_with_baseline(max_type_errors)
-    if type_check_result != 0:
-        return type_check_result
-
     # Format again after linting
     print(f"{GREEN}Re-formatting after linting{RESET}")
     reformat_cmd = ["ruff", "format", "src/", "--line-length", "88"]
@@ -195,6 +186,71 @@ def run_typecheck_only() -> int:
     print(f"{BLUE}Running Type Checking Only{RESET}")
     cmd = ["pyright", "src/rag"]
     return run_command(cmd)
+
+
+def run_vulture() -> int:
+    """Run vulture to find unused/dead code."""
+    print(f"{BLUE}Running Vulture (Dead Code Detection){RESET}")
+    cmd = ["vulture", "--config", "vulture.toml"]
+    return run_command(cmd)
+
+
+def run_static() -> int:
+    """Run all static analysis checks: ruff, pyright, and vulture."""
+    print(f"{BLUE}Running All Static Analysis Checks{RESET}")
+    
+    # Run lint first (ruff format + check)
+    print(f"{GREEN}Step 1/3: Running ruff (linting and formatting){RESET}")
+    lint_result = run_lint()
+    if lint_result != 0:
+        return lint_result
+    
+    # Run type checking with baseline
+    print(f"{GREEN}Step 2/3: Running pyright (type checking){RESET}")
+    type_check_result = run_pyright_with_baseline(MAX_TYPE_ERRORS)
+    if type_check_result != 0:
+        return type_check_result
+    
+    # Run dead code detection
+    print(f"{GREEN}Step 3/3: Running vulture (dead code detection){RESET}")
+    vulture_result = run_vulture()
+    if vulture_result != 0:
+        return vulture_result
+    
+    print(f"{GREEN}✓ All static analysis checks passed{RESET}")
+    return 0
+
+
+def run_check() -> int:
+    """Run the complete check workflow: lint → unit → integration."""
+    print(f"{BLUE}🔍 Starting code quality checks...{RESET}")
+    
+    # Run linting first
+    print(f"{GREEN}Step 1/3: Running linting and formatting{RESET}")
+    lint_result = run_lint()
+    if lint_result != 0:
+        print(f"{RED}❌ Failed: Running linting and formatting{RESET}")
+        return lint_result
+    print(f"{GREEN}✅ Passed: Running linting and formatting{RESET}")
+    
+    # Run unit tests
+    print(f"{GREEN}Step 2/3: Running unit tests{RESET}")
+    unit_result = run_unit_tests()
+    if unit_result != 0:
+        print(f"{RED}❌ Failed: Running unit tests{RESET}")
+        return unit_result
+    print(f"{GREEN}✅ Passed: Running unit tests{RESET}")
+    
+    # Run integration tests
+    print(f"{GREEN}Step 3/3: Running integration tests{RESET}")
+    integration_result = run_integration_tests()
+    if integration_result != 0:
+        print(f"{RED}❌ Failed: Running integration tests{RESET}")
+        return integration_result
+    print(f"{GREEN}✅ Passed: Running integration tests{RESET}")
+    
+    print(f"{GREEN}✨ All checks passed successfully! ✨{RESET}")
+    return 0
 
 
 def main():
@@ -212,19 +268,28 @@ Commands:
   {RED}e2e{RESET}          Run end-to-end tests (complete workflows)
   {BLUE}all{RESET}          Run all tests
   {BLUE}coverage{RESET}     Run tests with coverage reporting
-  {BLUE}lint{RESET}         Run linting, formatting, and type checking (baseline: {MAX_TYPE_ERRORS} errors)
+  {BLUE}lint{RESET}         Run linting and formatting only (ruff)
   {BLUE}typecheck{RESET}    Run type checking only (no baseline limit)
+  {BLUE}vulture{RESET}      Run dead code detection (vulture)
+  {BLUE}static{RESET}       Run all static analysis (ruff + pyright + vulture)
+  {BLUE}check{RESET}        Run complete check workflow (lint → unit → integration)
 
 Test Categories:
   • Unit Tests: Fast, isolated, no external dependencies
   • Integration Tests: Component interactions with controlled dependencies  
   • E2E Tests: Complete user workflows with real environment
 
+Static Analysis:
+  • lint: Formatting and linting with ruff
+  • typecheck: Type checking with pyright
+  • vulture: Dead code detection
+  • static: All static analysis checks
+
 Examples:
   python scripts/run_tests.py unit
   python scripts/run_tests.py integration  
-  python scripts/run_tests.py coverage
-  python scripts/run_tests.py lint
+  python scripts/run_tests.py static
+  python scripts/run_tests.py vulture
         """)
         return 1
 
@@ -246,6 +311,12 @@ Examples:
         return run_lint()
     elif command == "typecheck":
         return run_typecheck_only()
+    elif command == "vulture":
+        return run_vulture()
+    elif command == "static":
+        return run_static()
+    elif command == "check":
+        return run_check()
     else:
         print(f"{RED}Unknown command: {command}{RESET}")
         return 1
