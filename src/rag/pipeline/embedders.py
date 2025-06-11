@@ -158,7 +158,7 @@ class BatchedEmbedder:
         if not documents:
             return []
 
-        all_embeddings = []
+        all_embeddings: list[list[float]] = []
 
         # Process in batches
         for i in range(0, len(documents), self.batch_size):
@@ -182,8 +182,8 @@ class BatchedEmbedder:
         if not documents:
             return [], []
 
-        all_embeddings = []
-        all_metadata = []
+        all_embeddings: list[list[float]] = []
+        all_metadata: list[dict[str, Any]] = []
 
         # Process in batches
         for i in range(0, len(documents), self.batch_size):
@@ -256,9 +256,9 @@ class CachedEmbedder:
         if not documents:
             return []
 
-        embeddings = []
-        documents_to_embed = []
-        indices_to_embed = []
+        embeddings: list[list[float] | None] = []
+        documents_to_embed: list[Document] = []
+        indices_to_embed: list[int] = []
 
         # Check cache for each document
         for idx, doc in enumerate(documents):

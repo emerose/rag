@@ -137,7 +137,7 @@ class RAGEngine:
 
                 source = self._factory.document_source
                 if isinstance(source, FilesystemDocumentSource):
-                    file_paths = []
+                    file_paths: list[str] = []
                     for source_id in source.list_documents():
                         file_path = source.root_path / source_id
                         if file_path.exists():
@@ -302,7 +302,7 @@ class RAGEngine:
             )
 
             # Return top k files with basic summary info
-            summaries = []
+            summaries: list[dict[str, Any]] = []
             for source_doc in sorted_docs[:k]:
                 summaries.append(
                     {

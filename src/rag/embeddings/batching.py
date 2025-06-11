@@ -249,7 +249,7 @@ class EmbeddingBatcher(EmbeddingServiceProtocol):
         self.progress_tracker.register_task("embedding", len(texts))
 
         # Process in batches
-        embeddings = []
+        embeddings: list[list[float]] = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
             try:
