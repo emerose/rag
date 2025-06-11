@@ -352,10 +352,10 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 timeout_seconds=5,  # Short timeout for fast test failures
             ),
             cache=DataConfig(
-                enabled=False,  # Disable caching for tests to avoid side effects
-                cache_dir="/tmp/test_cache",
+                enabled=False,  # Disable data storage for tests to avoid side effects
+                data_dir="/tmp/test_cache",
                 ttl_hours=1,  # Short TTL for tests
-                max_cache_size_mb=10,  # Small cache for tests
+                max_data_size_mb=10,  # Small data storage for tests
                 cleanup_on_startup=True,
             ),
             storage=StorageConfig(
@@ -395,9 +395,9 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             ),
             cache=DataConfig(
                 enabled=True,
-                cache_dir=".cache",
+                data_dir=".rag",
                 ttl_hours=24 * 7,  # 1 week
-                max_cache_size_mb=5000,  # Large cache for production
+                max_data_size_mb=5000,  # Large data storage for production
                 compression_enabled=True,
                 cleanup_on_startup=True,
             ),
