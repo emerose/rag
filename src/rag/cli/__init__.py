@@ -12,29 +12,27 @@ from rag.cli.output import Error, TableData, set_json_mode, write
 __all__ = ["Error", "TableData", "app", "run_cli", "set_json_mode", "write"]
 
 
-def new_test_function(data: str, count: int) -> bool:
-    """New function to test hierarchical diff output.
-
-    Args:
-        data: Input data string
-        count: Number of items to process
-
-    Returns:
-        True if processing succeeds
-    """
-    return len(data) > count
+def short_func(x: int) -> str:
+    """Short function with minimal params."""
+    return str(x)
 
 
-class TestDiffClass:
-    """Test class to verify hierarchical diff class sections."""
+def very_long_function_name_with_many_parameters(
+    data: str, count: int, flag: bool, options: dict[str, str]
+) -> list[tuple[str, int]]:
+    """Function with very long name and many parameters."""
+    return [(data, count)] if flag else []
 
-    def new_method(self, value: str) -> int:
-        """New method to test class diff rendering.
 
-        Args:
-            value: Input value
+class TestAlignment:
+    """Test class for alignment verification."""
 
-        Returns:
-            Length of value
-        """
-        return len(value)
+    def a(self) -> bool:
+        """Minimal method."""
+        return True
+
+    def very_long_method_name(
+        self, param1: str, param2: int, param3: dict[str, list[int]]
+    ) -> tuple[bool, str]:
+        """Method with long name and complex parameters."""
+        return True, param1
