@@ -358,7 +358,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         Returns:
             Tuple of (average font size, is bold)
         """
-        font_sizes = []
+        font_sizes: list[float] = []
         bold_count = 0
         char_count = 0
 
@@ -502,7 +502,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
                 current_headings[i] = None
 
             # Build path from present headings
-            path_components = []
+            path_components: list[str] = []
             for i in range(level):
                 if current_headings[i] is not None:
                     path_components.append(current_headings[i])
