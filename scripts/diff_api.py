@@ -118,7 +118,24 @@ class APIDumper:
     def _dump_function(self, fqname: str, func: object) -> str:
         """Dump a function signature and description."""
         try:
-            sig = str(inspect.signature(func))
+            # Get the original signature
+            original_sig = inspect.signature(func)
+
+            # Create a clean signature without default values to avoid memory addresses
+            clean_params = []
+            for param in original_sig.parameters.values():
+                # Create new parameter without default value
+                if param.annotation != inspect.Parameter.empty:
+                    # Keep the type annotation
+                    clean_param = param.replace(default=inspect.Parameter.empty)
+                else:
+                    # No annotation, just the name
+                    clean_param = param.replace(default=inspect.Parameter.empty)
+                clean_params.append(clean_param)
+
+            # Create new signature with clean parameters
+            clean_sig = original_sig.replace(parameters=clean_params)
+            sig = str(clean_sig)
         except Exception:
             sig = "(...)"
 
