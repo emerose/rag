@@ -122,6 +122,13 @@ class GlobalState:
 
 state = GlobalState()
 
+
+def safe_log(level: str, message: str) -> None:
+    """Safely log a message, handling None logger."""
+    if state.logger is not None:
+        getattr(state.logger, level.lower())(message)
+
+
 # Define options at module level
 LOG_LEVEL_OPTION = typer.Option(
     LogLevel.INFO,
@@ -402,7 +409,7 @@ def _create_rag_config_and_runtime(
 
 def _index_single_file(rag_engine: RAGEngine, path_obj: Path) -> None:
     """Index a single file and output results."""
-    state.logger.info(f"Indexing file: {path_obj}")
+    safe_log("info", f"Indexing file: {path_obj}")
     success, error = rag_engine.index_file(path_obj)
     results = {str(path_obj): success}
 
@@ -430,7 +437,7 @@ def _index_directory(
     rag_engine: RAGEngine, path_obj: Path, cached_before: set[str]
 ) -> None:
     """Index a directory and output results."""
-    state.logger.info(f"Indexing directory: {path_obj}")
+    safe_log("info", f"Indexing directory: {path_obj}")
 
     # Create a progress bar
     with Progress() as progress:
@@ -540,7 +547,7 @@ def index(  # noqa: PLR0913
         state.is_processing = True
 
         # Initialize RAG engine
-        state.logger.debug("Initializing RAG engine...")
+        safe_log("debug", "Initializing RAG engine...")
 
         params = IndexingParams(
             path,
@@ -620,7 +627,7 @@ def invalidate(
             write(Error(f"Path does not exist: {path}"))
             sys.exit(1)
 
-        state.logger.info(f"Starting cache invalidation for: {path.name}")
+        safe_log("info", f"Starting cache invalidation for: {path.name}")
         state.logger.debug(f"Full path: {path}")
 
         # If it's a file, use its parent directory

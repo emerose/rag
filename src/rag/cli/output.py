@@ -135,7 +135,7 @@ def _write_json(
         print(json.dumps({"error": payload.message}))
         # Also log the error using the standard logger if configured
         if structlog.is_configured():
-            logger.error(payload.message, subsystem="CLI")
+            logger.error(payload.message)
     elif isinstance(payload, list):
         print(json.dumps({"tables": payload}))
     elif isinstance(payload, dict):
@@ -156,12 +156,12 @@ def _write_dict_rich(data: dict[str, Any]) -> None:
         data: The dictionary to write
     """
     if is_table_data(data):
-        _print_table(data)
+        _print_table(data)  # type: ignore[arg-type]
     elif "table" in data:
-        _print_table(data["table"])
+        _print_table(data["table"])  # type: ignore[arg-type]
     elif "tables" in data:
         for table_data in data["tables"]:
-            _print_table(table_data)
+            _print_table(table_data)  # type: ignore[arg-type]
     else:
         # Print each key-value pair on a new line
         for key, value in data.items():
@@ -186,7 +186,7 @@ def _write_rich(
         get_console().print(f"[red]Error:[/red] {payload.message}")
         # Also log the error so it includes timestamp and file location if configured
         if structlog.is_configured():
-            logger.error(payload.message, subsystem="CLI")
+            logger.error(payload.message)
     elif isinstance(payload, list):
         for table_data in payload:
             _print_table(table_data)
