@@ -161,6 +161,8 @@ def build_rag_chain(
     _retrieve = _create_retrieval_function(vs, k, reranker)
     _invoke_llm = _create_llm_function(engine)
 
+    retrieve_op = RunnableLambda(_retrieve)
+
     def _format_docs(docs: list[Document]) -> str:
         return "\n\n---\n\n".join(doc.page_content for doc in docs)
 
