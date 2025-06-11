@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import structlog
 import typer
@@ -1255,10 +1255,13 @@ def repl(
         while True:
             try:
                 # Get user input
-                user_input = session.prompt(
-                    HTML("<prompt>rag></prompt> "),
-                    style=style,
-                    completer=command_completer,
+                user_input = cast(
+                    str,
+                    session.prompt(
+                        HTML("<prompt>rag></prompt> "),
+                        style=style,
+                        completer=command_completer,
+                    ),
                 ).strip()
 
                 # Skip empty input

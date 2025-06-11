@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any
+from typing import Any, cast
 
 from langchain_core.documents import Document
 
@@ -34,9 +34,15 @@ def extract_citations(answer: str) -> dict[str, list[str]]:
         if not citation:
             continue
         if ":" in citation:
-            source, excerpt = (part.strip() for part in citation.split(":", 1))
+            parts = citation.split(":", 1)
+            source_part = cast(str, parts[0])
+            excerpt_part = cast(str, parts[1])
+            source = source_part.strip()
+            excerpt = excerpt_part.strip()
         else:
-            source, excerpt = citation.strip(), ""
+            citation_str = cast(str, citation)
+            source = citation_str.strip()
+            excerpt = ""
         citations.setdefault(source, [])
         if excerpt and excerpt not in citations[source]:
             citations[source].append(excerpt)

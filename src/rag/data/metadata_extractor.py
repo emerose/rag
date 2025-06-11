@@ -164,7 +164,15 @@ class MarkdownMetadataExtractor(BaseMetadataExtractor):
         for match in heading_matches:
             level = len(match.group(1))  # Number of # characters
             text = match.group(2).strip()
-            headings.append({"level": level, "text": text, "position": match.start()})
+            headings.append(
+                {
+                    "level": level,
+                    "text": text,
+                    "position": match.start(),
+                    "page": 1,  # Default page for markdown
+                    "font_size": 12.0,  # Default font size for markdown
+                }
+            )
 
         if headings:
             metadata["headings"] = headings
@@ -191,6 +199,8 @@ class MarkdownMetadataExtractor(BaseMetadataExtractor):
                             "text": heading["text"],
                             "path": " > ".join(current_path),
                             "position": heading["position"],
+                            "page": heading["page"],
+                            "font_size": heading["font_size"],
                         }
                     )
 
@@ -259,6 +269,8 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
                     if is_test
                     else (document.page_content.split("\n")[0][:50]),
                     "position": 0,
+                    "page": 1,
+                    "font_size": 16.0,
                 }
             ]
 
@@ -270,6 +282,8 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
                         "text": "Section Heading",
                         "path": "Document Title > Section Heading",
                         "position": 100,
+                        "page": 1,
+                        "font_size": 14.0,
                     }
                 )
 
@@ -508,7 +522,18 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
                     path_components.append(current_headings[i])
 
             # Store path in heading
-            heading["path"] = " > ".join(path_components)
+            path = " > ".join(path_components)
+
+            heading_hierarchy.append(
+                {
+                    "level": level,
+                    "text": heading["text"],
+                    "path": path,
+                    "position": heading["position"],
+                    "page": heading["page"],
+                    "font_size": heading["font_size"],
+                }
+            )
 
 
 class HTMLMetadataExtractor(BaseMetadataExtractor):
@@ -585,7 +610,14 @@ class HTMLMetadataExtractor(BaseMetadataExtractor):
                 # Clean the heading text (remove any HTML tags)
                 heading_text = re.sub(r"<[^>]+>", "", match.group(1)).strip()
                 headings.append(
-                    {"level": level, "text": heading_text, "position": match.start()}
+                    {
+                        "level": level,
+                        "text": heading_text,
+                        "position": match.start(),
+                        "page": 1,  # Default page for HTML
+                        "font_size": 12.0
+                        + (6 - level) * 2.0,  # Larger font for higher headings
+                    }
                 )
 
         # Sort by position
@@ -626,6 +658,8 @@ class HTMLMetadataExtractor(BaseMetadataExtractor):
                     "text": heading["text"],
                     "path": path,
                     "position": heading["position"],
+                    "page": heading["page"],
+                    "font_size": heading["font_size"],
                 }
             )
 
