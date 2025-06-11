@@ -1156,3 +1156,53 @@ class FakeDocumentStore:
 
         # Add new entry
         self._source_document_chunks[source_id].append((document_id, chunk_order))
+
+    # Testing-specific methods for FakeDocumentStore
+    @property
+    def document_metadata(self) -> dict[str, dict[str, Any]]:
+        """Get all document metadata for testing purposes."""
+        result = {}
+        for source_doc in self._source_documents.values():
+            result[source_doc.location] = source_doc.metadata
+        return result
+
+    def set_metadata_dict(self, file_path: str, metadata: dict[str, Any]) -> None:
+        """Set metadata for a file (testing compatibility method)."""
+        # Create a minimal SourceDocumentMetadata object
+        import time
+
+        source_metadata = SourceDocumentMetadata(
+            source_id=file_path,
+            location=file_path,
+            content_type=metadata.get("content_type"),
+            content_hash=metadata.get("content_hash"),
+            size_bytes=metadata.get("size_bytes"),
+            last_modified=metadata.get("last_modified"),
+            indexed_at=metadata.get("indexed_at", time.time()),
+            metadata=metadata,
+            chunk_count=0,
+        )
+        self.add_source_document(source_metadata)
+
+    def add_mock_file(self, file_path: Path, content: str, mtime: float) -> None:
+        """Add a mock file for testing purposes."""
+        import time
+
+        source_metadata = SourceDocumentMetadata(
+            source_id=str(file_path),
+            location=str(file_path),
+            content_type="text/plain",
+            content_hash=self.compute_text_hash(content),
+            size_bytes=len(content.encode("utf-8")),
+            last_modified=mtime,
+            indexed_at=time.time(),
+            metadata={"content": content},
+            chunk_count=1,
+        )
+        self.add_source_document(source_metadata)
+
+    def compute_text_hash(self, text: str) -> str:
+        """Compute the SHA-256 hash of a text string."""
+        import hashlib
+
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
