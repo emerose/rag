@@ -664,7 +664,7 @@ class TextSplitterFactory:
         semantic_splitter = splitters[1]
 
         # Process each document
-        chunked_docs = []
+        chunked_docs: list[Document] = []
         for doc in documents:
             # Split by headers
             header_splits = md_header_splitter.split_text(doc.page_content)
@@ -731,7 +731,7 @@ class TextSplitterFactory:
         metadata["heading_level"] = level
 
         # Build hierarchical path (e.g., "Chapter 1 > Section 1.2")
-        path_components = []
+        path_components: list[str] = []
         for i in range(1, 7):  # Header levels 1-6
             key = f"Header {i}"
             if metadata.get(key):
@@ -987,7 +987,7 @@ class TextSplitterFactory:
         Returns:
             List of path components for the heading path
         """
-        path_components = []
+        path_components: list[str] = []
         for header_idx in range(1, max_level + 1):
             key = f"Header {header_idx}"
             if doc.metadata.get(key):

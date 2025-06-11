@@ -481,7 +481,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             )
 
         return {
-            path: content.decode("utf-8") if isinstance(content, bytes) else content
+            path: content.decode("utf-8")
             for path, content in self.filesystem_manager.files.items()
         }
 

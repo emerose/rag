@@ -69,9 +69,10 @@ class RetrievalEvaluator:
         docs_dir.mkdir(parents=True, exist_ok=True)
 
         for item in dataset:
-            doc_id = item.get("doc_id") or item.get("_id") or item["id"]
-            title = item.get("title", "")
-            text = item.get("text") or item.get("abstract") or ""
+            item_dict = dict(item)  # Ensure item is treated as a dictionary
+            doc_id = item_dict.get("doc_id") or item_dict.get("_id") or item_dict["id"]
+            title = item_dict.get("title", "")
+            text = item_dict.get("text") or item_dict.get("abstract") or ""
             path = docs_dir / f"{doc_id}.txt"
             if not path.exists():
                 path.write_text(f"{title}\n\n{text}")
@@ -135,9 +136,10 @@ class RetrievalEvaluator:
 
         qrels_dict: dict[str, dict[str, int]] = {}
         for row in qrels:
-            qid = str(row.get("query-id") or row.get("query_id"))
-            doc_id = str(row.get("corpus-id") or row.get("doc_id"))
-            score = int(row.get("score", 0))
+            row_dict = dict(row)  # Ensure row is treated as a dictionary
+            qid = str(row_dict.get("query-id") or row_dict.get("query_id"))
+            doc_id = str(row_dict.get("corpus-id") or row_dict.get("doc_id"))
+            score = int(row_dict.get("score", 0))
             if qid not in qrels_dict:
                 qrels_dict[qid] = {}
             qrels_dict[qid][doc_id] = score
@@ -183,13 +185,12 @@ class RetrievalEvaluator:
         # First collect all available metrics
         available_metrics = {}
         for result_dict in metrics_result:
-            if isinstance(result_dict, dict):
-                for metric_name, value in result_dict.items():
-                    if (
-                        metric_name not in available_metrics
-                        or value > available_metrics[metric_name]
-                    ):
-                        available_metrics[metric_name] = value
+            for metric_name, value in result_dict.items():
+                if (
+                    metric_name not in available_metrics
+                    or value > available_metrics[metric_name]
+                ):
+                    available_metrics[metric_name] = value
 
         # Then only keep the metrics that were requested
         metrics = {
