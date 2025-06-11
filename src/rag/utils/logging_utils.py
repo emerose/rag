@@ -264,7 +264,7 @@ def setup_logging(
         file_handler.setFormatter(
             structlog.stdlib.ProcessorFormatter(
                 processor=file_processor,
-                foreign_pre_chain=pre_chain,  # type: ignore[arg-type]
+                foreign_pre_chain=pre_chain,
             ),
         )
         root_logger.addHandler(file_handler)
@@ -284,7 +284,7 @@ def setup_logging(
     console_handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
             processor=console_processor,
-            foreign_pre_chain=console_pre_chain,  # type: ignore[arg-type]
+            foreign_pre_chain=console_pre_chain,
         ),
     )
     root_logger.addHandler(console_handler)

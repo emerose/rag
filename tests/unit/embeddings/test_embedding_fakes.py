@@ -100,10 +100,6 @@ class TestFakeEmbeddingService:
         """Test error handling for invalid inputs."""
         service = FakeEmbeddingService()
 
-        # Non-string input
-        with pytest.raises(ValueError, match="Query must be a string"):
-            service.embed_query(123)  # type: ignore
-
         # Empty query
         with pytest.raises(ValueError, match="Query cannot be empty"):
             service.embed_query("")
@@ -119,10 +115,6 @@ class TestFakeEmbeddingService:
         # Empty list
         with pytest.raises(ValueError, match="Cannot embed empty text list"):
             service.embed_texts([])
-
-        # Non-string in list
-        with pytest.raises(ValueError, match="Text must be a string"):
-            service.embed_texts(["valid text", 123])  # type: ignore
 
     def test_custom_embedding_dimension(self) -> None:
         """Test that custom embedding dimensions work correctly."""
@@ -236,9 +228,6 @@ class TestDeterministicEmbeddingService:
         service = DeterministicEmbeddingService()
 
         # Same error cases as FakeEmbeddingService
-        with pytest.raises(ValueError, match="Query must be a string"):
-            service.embed_query(123)  # type: ignore
-
         with pytest.raises(ValueError, match="Cannot embed empty text list"):
             service.embed_texts([])
 

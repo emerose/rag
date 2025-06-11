@@ -418,7 +418,7 @@ def _index_single_file(rag_engine: RAGEngine, path_obj: Path) -> None:
     successful = 1 if success else 0
     failed = 1 if not success else 0
 
-    output = {
+    output: dict[str, Any] = {
         "summary": {
             "total": total,
             "successful": successful,
@@ -462,7 +462,7 @@ def _index_directory(
 
     indexed_in_run = sorted(set(results.keys()) & indexed_before)
 
-    tables = []
+    tables: list[TableData] = []
     if indexed_in_run:
         tables.append(
             TableData(
@@ -567,7 +567,8 @@ def index(  # noqa: PLR0913
         config, runtime_options = _create_rag_config_and_runtime(params)
 
         rag_engine = create_rag_engine(config, runtime_options)
-        indexed_before = set(rag_engine.document_store.list_indexed_files())
+        indexed_files = rag_engine.document_store.list_indexed_files()
+        indexed_before = {file_info["file_path"] for file_info in indexed_files}
         path_obj = Path(path)
 
         # Run indexing

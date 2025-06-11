@@ -42,28 +42,24 @@ class FakeEmbeddingService(EmbeddingServiceProtocol):
         return self._embedding_dimension
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
-        """Generate embeddings for a list of texts.
+        """Generate embeddings for multiple texts.
 
         Args:
             texts: List of text strings to embed
 
         Returns:
-            List of embedding vectors
+            List of deterministic embeddings
 
         Raises:
-            ValueError: If texts is empty or contains invalid entries
+            ValueError: If texts list is empty or contains invalid items
         """
         if not texts:
             raise ValueError("Cannot embed empty text list")
 
-        if not all(isinstance(text, str) for text in texts):
-            raise ValueError("Text must be a string")
-
         if not all(text.strip() for text in texts):
-            raise ValueError("Texts cannot be empty or whitespace-only")
+            raise ValueError("All texts must be non-empty after stripping whitespace")
 
-        # Generate embeddings for each text
-        return [self.embed_query(text) for text in texts]
+        return [self._generate_deterministic_embedding(text) for text in texts]
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Alias for embed_texts to match OpenAIEmbeddings interface.
@@ -91,9 +87,6 @@ class FakeEmbeddingService(EmbeddingServiceProtocol):
         Raises:
             ValueError: If query is invalid
         """
-        if not isinstance(query, str):
-            raise ValueError(f"Query must be a string, got {type(query)}")
-
         if not query.strip():
             raise ValueError("Query cannot be empty or whitespace-only")
 
@@ -211,19 +204,23 @@ class DeterministicEmbeddingService(EmbeddingServiceProtocol):
         return self.embed_texts(texts)
 
     def embed_query(self, query: str) -> list[float]:
-        """Generate embedding for a query."""
-        if not isinstance(query, str):
-            raise ValueError(f"Query must be a string, got {type(query)}")
+        """Generate embedding for a query.
 
+        Args:
+            query: Query text to embed
+
+        Returns:
+            Deterministic embedding based on query content
+        """
         if not query.strip():
             raise ValueError("Query cannot be empty or whitespace-only")
 
-        # Use predefined embedding if available
+        # Check for predefined embedding first
         if query in self._predefined_embeddings:
             return self._predefined_embeddings[query].copy()
 
-        # Fall back to deterministic generation
-        return self._generate_simple_embedding(query)
+        # Generate deterministic embedding
+        return self._generate_deterministic_embedding(query)
 
     def get_model_info(self) -> dict[str, str]:
         """Get information about the embeddings model."""
@@ -254,7 +251,7 @@ class DeterministicEmbeddingService(EmbeddingServiceProtocol):
 
         self._predefined_embeddings[text] = embedding.copy()
 
-    def _generate_simple_embedding(self, text: str) -> list[float]:
+    def _generate_deterministic_embedding(self, text: str) -> list[float]:
         """Generate a simple deterministic embedding."""
         # Create a simple pattern based on text length and content
         text_sum = sum(ord(c) for c in text)

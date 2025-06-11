@@ -185,12 +185,12 @@ class OpenAIEmbeddingService:
         if not texts:
             raise EmbeddingGenerationError(message="Cannot embed empty text list")
 
-        # Validate all texts are strings
+        # Validate all texts are non-empty
         for i, text in enumerate(texts):
-            if not isinstance(text, str):
+            if not text.strip():
                 raise EmbeddingGenerationError(
-                    text=str(text) if text else None,
-                    message=f"Text at index {i} must be a string, got {type(text).__name__}",
+                    text=text,
+                    message=f"Text at index {i} cannot be empty",
                 )
 
         # Create and apply retry decorator
@@ -240,11 +240,6 @@ class OpenAIEmbeddingService:
             EmbeddingGenerationError: If query is empty or embedding generation fails
             RateLimitError, APIError, APIConnectionError: After max retries exceeded
         """
-        if not isinstance(query, str):
-            raise EmbeddingGenerationError(
-                text=str(query) if query else None,
-                message=f"Query must be a string, got {type(query).__name__}",
-            )
         if not query.strip():
             raise EmbeddingGenerationError(
                 text=query, message="Cannot embed empty query"

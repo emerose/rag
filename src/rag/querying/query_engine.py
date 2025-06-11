@@ -153,7 +153,7 @@ class QueryEngine:
 
         try:
             chain = self._get_rag_chain(vectorstore, k=k)
-            chain_output = chain.invoke(question)  # type: ignore[arg-type]
+            chain_output = chain.invoke(question)
             answer_text: str = chain_output["answer"]
             documents = chain_output["documents"]
 

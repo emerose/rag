@@ -167,7 +167,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
         document_loader = FakeDocumentLoader(
             filesystem_manager=filesystem,
-            log_callback=self._create_test_runtime_options().log_callback,  # type: ignore[arg-type]
+            log_callback=self._create_test_runtime_options().log_callback,
         )
 
         # Create fake chat model
