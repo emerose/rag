@@ -238,55 +238,86 @@ class APIDiffRenderer:
         self.console = Console()
 
     def render(self) -> str:
-        """Render the API diff with Rich formatting."""
-        base_api = self._parse_api_dump(self.base)
-        current_api = self._parse_api_dump(self.current)
+        """Render the API diff with Rich formatting organized by module/class."""
+        base_structure = self._parse_api_structure(self.base)
+        current_structure = self._parse_api_structure(self.current)
 
-        # Find additions, removals, and modifications
-        base_items = set(base_api.keys())
-        current_items = set(current_api.keys())
+        # Find all modules/classes that have changes
+        all_containers = set(base_structure.keys()) | set(current_structure.keys())
+        containers_with_changes = []
 
-        added = current_items - base_items
-        removed = base_items - current_items
-        common = base_items & current_items
-        modified = {item for item in common if base_api[item] != current_api[item]}
+        for container in all_containers:
+            base_items = set(base_structure.get(container, {}).keys())
+            current_items = set(current_structure.get(container, {}).keys())
 
-        if not (added or removed or modified):
+            added = current_items - base_items
+            removed = base_items - current_items
+            common = base_items & current_items
+            modified = {
+                item
+                for item in common
+                if base_structure.get(container, {}).get(item)
+                != current_structure.get(container, {}).get(item)
+            }
+
+            if added or removed or modified:
+                containers_with_changes.append((container, added, removed, modified))
+
+        if not containers_with_changes:
             return ""  # No differences
 
-        # Build rich output
+        # Build rich output organized by container
         output_parts = []
 
-        # Show removals
-        if removed:
+        for container, added, removed, modified in sorted(containers_with_changes):
+            # Add container header
+            if container.startswith("class "):
+                header = Text(f"### {container}", style="bold blue")
+            else:
+                header = Text(f"## {container}", style="bold blue")
+            output_parts.append(header)
+
+            # Show removals for this container
             for item in sorted(removed):
                 text = Text()
                 text.append("- ", style="red bold")
-                text.append(base_api[item], style="red")
+                # Extract just the function signature and description
+                full_line = base_structure[container][item]
+                signature_desc = full_line[3:]  # Remove "- `" prefix
+                text.append(signature_desc, style="red")
                 output_parts.append(text)
 
-        # Show additions
-        if added:
+            # Show additions for this container
             for item in sorted(added):
                 text = Text()
                 text.append("+ ", style="green bold")
-                text.append(current_api[item], style="green")
+                # Extract just the function signature and description
+                full_line = current_structure[container][item]
+                signature_desc = full_line[3:]  # Remove "- `" prefix
+                text.append(signature_desc, style="green")
                 output_parts.append(text)
 
-        # Show modifications
-        if modified:
+            # Show modifications for this container
             for item in sorted(modified):
                 # Show old version
                 text_old = Text()
                 text_old.append("- ", style="red bold")
-                text_old.append(base_api[item], style="red")
+                full_line = base_structure[container][item]
+                signature_desc = full_line[3:]  # Remove "- `" prefix
+                text_old.append(signature_desc, style="red")
                 output_parts.append(text_old)
 
                 # Show new version
                 text_new = Text()
                 text_new.append("+ ", style="green bold")
-                text_new.append(current_api[item], style="green")
+                full_line = current_structure[container][item]
+                signature_desc = full_line[3:]  # Remove "- `" prefix
+                text_new.append(signature_desc, style="green")
                 output_parts.append(text_new)
+
+            # Add empty line after each container (except the last)
+            if container != sorted(containers_with_changes)[-1][0]:
+                output_parts.append(Text())
 
         # Render all parts to string
         with self.console.capture() as capture:
@@ -294,6 +325,46 @@ class APIDiffRenderer:
                 self.console.print(part)
 
         return capture.get()
+
+    def _parse_api_structure(self, api_dump: str) -> dict[str, dict[str, str]]:
+        """Parse an API dump into a hierarchical structure organized by module/class.
+
+        Returns:
+            Dict mapping container names (modules/classes) to their API items
+        """
+        structure = {}
+        lines = api_dump.strip().split("\n")
+        current_container = None
+
+        for line in lines:
+            line = line.strip()
+
+            if line.startswith("## ") and not line.startswith("### "):
+                # Module header
+                current_container = line[3:]  # Remove "## " prefix
+                if current_container not in structure:
+                    structure[current_container] = {}
+            elif line.startswith("### class "):
+                # Class header
+                current_container = line[4:]  # Remove "### " prefix
+                if current_container not in structure:
+                    structure[current_container] = {}
+            elif line.startswith("- `") and "`:" in line and current_container:
+                # Function/method line
+                try:
+                    # Find the closing backtick for the signature
+                    end_backtick = line.find("`:")
+                    if end_backtick != -1:
+                        signature = line[
+                            3:end_backtick
+                        ]  # Extract between "- `" and "`:"
+                        # Store the full line for later rendering
+                        structure[current_container][signature] = line
+                except Exception:
+                    # If parsing fails, use the whole line as both key and value
+                    structure[current_container][line] = line
+
+        return structure
 
     def _parse_api_dump(self, api_dump: str) -> dict[str, str]:
         """Parse an API dump string into a dictionary of API items.
