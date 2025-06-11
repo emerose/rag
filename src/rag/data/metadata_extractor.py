@@ -39,6 +39,7 @@ class HeadingData(TypedDict):
     page: int
     font_size: float
     position: int
+    path: str  # Hierarchical path of the heading
 
 
 class CharData(TypedDict):
@@ -522,18 +523,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
                     path_components.append(current_headings[i])
 
             # Store path in heading
-            path = " > ".join(path_components)
-
-            heading_hierarchy.append(
-                {
-                    "level": level,
-                    "text": heading["text"],
-                    "path": path,
-                    "position": heading["position"],
-                    "page": heading["page"],
-                    "font_size": heading["font_size"],
-                }
-            )
+            heading["path"] = " > ".join(path_components)
 
 
 class HTMLMetadataExtractor(BaseMetadataExtractor):
