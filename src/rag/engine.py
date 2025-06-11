@@ -271,13 +271,9 @@ class RAGEngine:
             file_path: Path to the file to invalidate
         """
         try:
-            # Remove from DocumentStore (new architecture)
+            # Remove from DocumentStore
             document_store = self.ingestion_pipeline.document_store
             document_store.remove_source_document(str(file_path))
-
-            # Remove vectorstore (new architecture)
-            vector_repo = self._factory.vector_repository
-            vector_repo.remove_vectorstore(str(file_path))
 
             # Also invalidate document store for compatibility
             self.document_store.remove_metadata(Path(file_path))
@@ -289,14 +285,6 @@ class RAGEngine:
         try:
             # Clear all file metadata from document store
             self.document_store.clear_all_file_metadata()
-
-            # Also try to clear vector repository if available
-            try:
-                vector_repo = self._factory.vector_repository
-                if hasattr(vector_repo, "clear_all"):
-                    vector_repo.clear_all()
-            except Exception as ve:
-                logger.debug(f"Could not clear vector repository: {ve}")
 
         except Exception as e:
             logger.error(f"Error invalidating all data: {e}")

@@ -9,7 +9,7 @@ from typing import Any, Protocol, runtime_checkable
 from langchain_core.documents import Document
 
 from rag.sources.base import DocumentSourceProtocol, SourceDocument
-from rag.storage.document_store import DocumentStoreProtocol
+from rag.storage.protocols import DocumentStoreProtocol
 from rag.storage.vector_store import VectorStoreFactory, VectorStoreProtocol
 
 

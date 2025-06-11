@@ -76,7 +76,7 @@ class RetrievalEvaluator:
             if not path.exists():
                 path.write_text(f"{title}\n\n{text}")
 
-        config = RAGConfig(documents_dir=str(docs_dir), cache_dir=str(cache_dir))
+        config = RAGConfig(documents_dir=str(docs_dir), data_dir=str(cache_dir))
         engine = RAGEngine(config, RuntimeOptions())
         engine.index_directory(docs_dir)
         return engine

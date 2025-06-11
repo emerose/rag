@@ -149,7 +149,7 @@ class RAGMCPServer(FastMCP):
         return {"success": success, "error": error}
 
     async def tool_rebuild(self) -> dict[str, Any]:
-        self.engine.invalidate_all_caches()
+        self.engine.invalidate_all_data()
         return await asyncio.to_thread(
             self.engine.index_directory, self.engine.documents_dir
         )
@@ -175,7 +175,7 @@ class RAGMCPServer(FastMCP):
         return None
 
     async def tool_delete_document(self, path: str) -> bool:
-        self.engine.invalidate_cache(path)
+        self.engine.invalidate_data(path)
         return True
 
     async def tool_summaries(self, k: int = 5) -> list[dict[str, Any]]:
@@ -183,10 +183,10 @@ class RAGMCPServer(FastMCP):
 
     async def tool_invalidate(self, path: str | None = None, all: bool = False) -> bool:
         if all:
-            self.engine.invalidate_all_caches()
+            self.engine.invalidate_all_data()
             return True
         if path:
-            self.engine.invalidate_cache(path)
+            self.engine.invalidate_data(path)
             return True
         return False
 
