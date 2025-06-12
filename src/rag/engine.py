@@ -345,30 +345,3 @@ class RAGEngine:
             logger.error(f"Error getting document summaries: {e}")
             return []
 
-    @classmethod
-    def create(
-        cls,
-        config: RAGConfig,
-        runtime: RuntimeOptions,
-        dependencies: Any = None,
-    ) -> "RAGEngine":
-        """Create RAGEngine using legacy interface for backward compatibility.
-
-        Args:
-            config: RAG system configuration
-            runtime: Runtime options and callbacks
-            dependencies: Optional factory or legacy parameter
-
-        Returns:
-            RAGEngine instance
-        """
-        if dependencies and hasattr(dependencies, "create_rag_engine"):
-            # Use provided factory
-            return dependencies.create_rag_engine()
-        else:
-            # Create new factory and use it to create engine
-            # Import here to avoid circular imports
-            from rag.factory import RAGComponentsFactory
-
-            factory = RAGComponentsFactory(config, runtime)
-            return factory.create_rag_engine()

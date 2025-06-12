@@ -135,7 +135,7 @@ class FakeDocumentSource(DocumentSourceProtocol):
         Returns:
             Dictionary mapping found IDs to SourceDocuments
         """
-        results = {}
+        results: dict[str, SourceDocument] = {}
 
         for source_id in source_ids:
             if source_id in self._documents:

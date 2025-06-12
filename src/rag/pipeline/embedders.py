@@ -52,7 +52,10 @@ class DefaultEmbedder:
                 if key in document.metadata:
                     value = document.metadata[key]
                     if isinstance(value, list):
-                        value = ", ".join(str(v) for v in value)
+                        # Convert list items to strings, handling Any types from metadata
+                        from typing import cast
+                        value_list = cast(list[Any], value)
+                        value = ", ".join(str(v) for v in value_list)
                     metadata_parts.append(f"{key}: {value}")
 
             if metadata_parts:
@@ -256,7 +259,7 @@ class CachedEmbedder:
         if not documents:
             return []
 
-        embeddings: list[list[float] | None] = []
+        embeddings: list[list[float]] = [[] for _ in documents]  # Initialize with empty lists
         documents_to_embed: list[Document] = []
         indices_to_embed: list[int] = []
 
@@ -266,10 +269,9 @@ class CachedEmbedder:
 
             if cache_key in self.cache:
                 # Use cached embedding
-                embeddings.append(self.cache[cache_key])
+                embeddings[idx] = self.cache[cache_key]
             else:
                 # Need to generate embedding
-                embeddings.append(None)  # Placeholder
                 documents_to_embed.append(doc)
                 indices_to_embed.append(idx)
 

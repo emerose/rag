@@ -188,7 +188,7 @@ class AdvancedDocumentTransformer:
 
         # Deduplicate if enabled
         if self.enable_deduplication and filtered_documents:
-            seen_content = set()
+            seen_content: set[int] = set()
             unique_documents: list[Document] = []
 
             for doc in filtered_documents:
@@ -212,7 +212,7 @@ class AdvancedDocumentTransformer:
         Returns:
             Dictionary mapping source IDs to lists of chunks
         """
-        results = {}
+        results: dict[str, list[Document]] = {}
 
         for source_doc in source_documents:
             try:

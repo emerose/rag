@@ -8,8 +8,8 @@ import asyncio
 import logging
 import os
 import threading
-from collections.abc import Awaitable, Callable
-from typing import Generic, TypeVar
+from collections.abc import Awaitable, Callable, Coroutine
+from typing import Any, Generic, TypeVar
 
 logger = logging.getLogger("rag")
 
@@ -109,7 +109,7 @@ class AsyncBatchProcessor(Generic[T, R]):
             return await self.processor_func(batch, self.semaphore)
 
 
-def run_coro_sync(coro: Awaitable[T]) -> T:
+def run_coro_sync(coro: Coroutine[Any, Any, T]) -> T:
     """Run *coro* and return its result from synchronous code.
 
     If called while an event loop is running in the current thread, the
