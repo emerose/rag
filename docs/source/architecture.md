@@ -104,8 +104,8 @@ Components depend on protocols (interfaces) rather than concrete implementations
 **Protocol**: `CacheRepositoryProtocol`  
 
 **Implementations**:
-- **IndexManager**: SQLite-based metadata storage
-- **InMemoryCacheRepository**: In-memory fake for testing
+- **SQLAlchemyDocumentStore**: SQLite-based document and metadata storage
+- **FakeDocumentStore**: In-memory fake for testing
 
 #### Vector Repository
 **Protocol**: `VectorRepositoryProtocol`

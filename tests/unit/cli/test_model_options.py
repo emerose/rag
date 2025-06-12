@@ -20,7 +20,7 @@ class MockEngineFactory:
         if self._engine_mock:
             return self._engine_mock
         engine = MagicMock()
-        engine.index_manager.list_indexed_files.return_value = []
+        engine.document_store.list_indexed_files.return_value = []
         return engine
 
 
@@ -43,7 +43,7 @@ def mock_engine_factory(engine_mock=None):
 def test_custom_models_passed_to_engine(tmp_path: Path) -> None:
     runner = CliRunner()
     engine_instance = MagicMock()
-    engine_instance.index_manager.list_indexed_files.return_value = []
+    engine_instance.document_store.list_indexed_files.return_value = []
 
     # Store the factory calls to check config later
     factory_calls = []

@@ -760,7 +760,7 @@ class SQLAlchemyDocumentStore:
                 {"document_id": document_id, "source_id": source_id, "error": str(e)},
             ) from e
 
-    # File tracking methods (inherited from IndexManager functionality)
+    # File tracking methods for incremental indexing
     def compute_file_hash(self, file_path: Path) -> str:
         """Compute the SHA-256 hash of a file."""
         import hashlib

@@ -179,7 +179,7 @@ class TestFakeRAGComponentsFactory:
         # Check that the engine was created successfully
         assert engine is not None
         assert hasattr(engine, "ingestion_pipeline")
-        assert isinstance(engine.index_manager, (FakeDocumentStore, FakeDocumentStore))
+        assert isinstance(engine.document_store, FakeDocumentStore)
         # Note: vectorstore_manager was removed in the new architecture
 
         # Check that the engine has the right configuration
