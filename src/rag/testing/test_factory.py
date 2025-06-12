@@ -297,8 +297,8 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             from pathlib import Path
 
             from rag.data.document_loader import DocumentLoader
-            from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
             from rag.storage.filesystem import FilesystemManager
+            from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
 
             factory._filesystem_manager = FilesystemManager()
             factory._document_store = SQLAlchemyDocumentStore(
@@ -447,7 +447,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                     metadata={"path": str(resolved_path), "mtime": fixed_mtime},
                     content_type="text/plain",
                 )
-
 
     def add_test_metadata(self, file_path: str, metadata: dict[str, Any]) -> None:
         """Add test metadata to the fake document store.
