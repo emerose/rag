@@ -36,7 +36,7 @@ app = typer.Typer(
 console = Console()
 
 # Type checking configuration
-MAX_TYPE_ERRORS = 85   # Updated after fixing metadata_extractor.py and mcp/server.py (issue #325)
+MAX_TYPE_ERRORS = 62   # Updated after fixing storage, pipeline, and protocol type issues (issue #325)
 
 
 @dataclass
