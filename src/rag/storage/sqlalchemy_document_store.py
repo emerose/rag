@@ -916,3 +916,134 @@ class SQLAlchemyDocumentStore:
     def close(self) -> None:
         """Close the database connection."""
         self.engine.dispose()
+
+    # Methods required by DocumentStoreProtocol but not yet implemented
+    def update_metadata(self, metadata: Any) -> None:
+        """Update metadata for a file.
+
+        Args:
+            metadata: Document metadata containing all indexing information
+        """
+        # This would map to updating source document metadata
+        if hasattr(metadata, "file_path"):
+            source_doc = self.get_source_document(str(metadata.file_path))
+            if source_doc:
+                # Update the source document with new metadata
+                updated_metadata = source_doc.metadata.copy()
+                updated_metadata.update(
+                    metadata.to_dict() if hasattr(metadata, "to_dict") else {}
+                )
+                source_doc.metadata = updated_metadata
+                self.add_source_document(source_doc)
+
+    def get_metadata(self, file_path: Path) -> dict[str, Any] | None:
+        """Get metadata for a file.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            Dictionary containing file metadata, or None if not found
+        """
+        source_doc = self.get_source_document(str(file_path))
+        if source_doc:
+            return source_doc.metadata
+        return None
+
+    def remove_metadata(self, file_path: Path) -> None:
+        """Remove metadata for a file.
+
+        Args:
+            file_path: Path to the file
+        """
+        # This maps to removing source document
+        self.remove_source_document(str(file_path))
+
+    def update_chunk_hashes(self, file_path: Path, chunk_hashes: list[str]) -> None:
+        """Update chunk hashes for a file.
+
+        Args:
+            file_path: Path to the file
+            chunk_hashes: List of SHA-256 hashes for each chunk
+        """
+        source_doc = self.get_source_document(str(file_path))
+        if source_doc:
+            # Store chunk hashes in metadata
+            source_doc.metadata["chunk_hashes"] = chunk_hashes
+            self.add_source_document(source_doc)
+
+    def get_chunk_hashes(self, file_path: Path) -> list[str]:
+        """Get chunk hashes for a file.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            List of SHA-256 hashes for each chunk
+        """
+        source_doc = self.get_source_document(str(file_path))
+        if source_doc:
+            return source_doc.metadata.get("chunk_hashes", [])
+        return []
+
+    def update_file_metadata(self, metadata: Any) -> None:
+        """Update file metadata.
+
+        Args:
+            metadata: File metadata containing basic file information
+        """
+        # Create or update source document from file metadata
+        if hasattr(metadata, "file_path"):
+            source_metadata = SourceDocumentMetadata(
+                source_id=str(metadata.file_path),
+                location=str(metadata.file_path),
+                content_type=getattr(metadata, "mime_type", None),
+                content_hash=getattr(metadata, "hash", None),
+                size_bytes=getattr(metadata, "size", None),
+                last_modified=getattr(metadata, "mtime", None),
+                indexed_at=time.time(),
+                metadata=metadata.to_dict() if hasattr(metadata, "to_dict") else {},
+                chunk_count=0,
+            )
+            self.add_source_document(source_metadata)
+
+    def set_global_setting(self, key: str, value: str) -> None:
+        """Set a global setting.
+
+        Args:
+            key: Setting key
+            value: Setting value
+        """
+        # Store global settings as a special source document
+        settings_doc = self.get_source_document("__global_settings__")
+        if settings_doc:
+            settings_doc.metadata[key] = value
+            self.add_source_document(settings_doc)
+        else:
+            # Create new settings document
+            settings_metadata = SourceDocumentMetadata(
+                source_id="__global_settings__",
+                location="__global_settings__",
+                content_type="application/json",
+                content_hash="",
+                size_bytes=0,
+                last_modified=None,
+                indexed_at=time.time(),
+                metadata={key: value},
+                chunk_count=0,
+            )
+            self.add_source_document(settings_metadata)
+
+    def get_global_setting(self, key: str) -> str | None:
+        """Get a global setting.
+
+        Args:
+            key: Setting key
+
+        Returns:
+            Setting value, or None if not found
+        """
+        settings_doc = self.get_source_document("__global_settings__")
+        if settings_doc:
+            return settings_doc.metadata.get(key)
+        return None
