@@ -18,6 +18,8 @@ This repository welcomes contributions from AI-based tools. When acting as an ag
 9. **Keep contributor docs aligned** – update `.cursorrules`, `AGENTS.md`, and `CONTRIBUTING.md` together when guidelines change.
 10. **Use `uv run`** to ensure the project's virtual environment is active when
     running scripts or commands.
+11. **Use `--full-output`** with `scripts/run_tests.py` to see detailed logs
+    when debugging failing checks.
 
 ## Code Quality Expectations
 
