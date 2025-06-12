@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -31,14 +32,17 @@ def load_model_map(path: str | Path) -> dict[str, str]:
         )
 
     # At this point we know raw_data is a dict
-    # Convert all keys and values to strings
-    assert isinstance(raw_data, dict)
-    # Use explicit typing to avoid Unknown types
+    # Use explicit type casting to break Unknown type propagation
+    from typing import cast
+    
     result: dict[str, str] = {}
-    items = list(raw_data.items())  # Convert to list to avoid Unknown types
-    for item in items:
-        key, value = item
+    # Cast to Any first to break Unknown chain, then process safely
+    any_dict = cast(dict[Any, Any], raw_data)
+    
+    # Convert to strings with proper type handling
+    for key, value in any_dict.items():
         result[str(key)] = str(value)
+    
     return result
 
 

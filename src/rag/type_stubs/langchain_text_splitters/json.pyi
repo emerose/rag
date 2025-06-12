@@ -42,7 +42,7 @@ class RecursiveJsonSplitter:
 
     def split_json(
         self, json_data: dict[str, Any], convert_lists: bool = ...
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         """Splits JSON into a list of JSON chunks."""
         ...
 
@@ -57,10 +57,10 @@ class RecursiveJsonSplitter:
 
     def create_documents(
         self,
-        texts: list[dict],
+        texts: list[dict[str, Any]],
         convert_lists: bool = ...,
         ensure_ascii: bool = ...,
-        metadatas: list[dict] | None = ...,
+        metadatas: list[dict[str, Any]] | None = ...,
     ) -> list[Document]:
         """Create documents from a list of json objects (Dict)."""
         ...

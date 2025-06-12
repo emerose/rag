@@ -9,7 +9,12 @@ from typing import (
 )
 
 from langchain_core._api import beta
-from langchain_core.documents import BaseDocumentTransformer, Document
+from langchain_core.documents import Document
+from typing import Protocol
+
+class BaseDocumentTransformer(Protocol):
+    """Base protocol for document transformers."""
+    def transform_documents(self, documents: list[Document]) -> list[Document]: ...
 
 class ElementType(TypedDict):
     """Element type as typed dict."""
@@ -190,7 +195,7 @@ class HTMLSectionSplitter:
         ...
 
     def create_documents(
-        self, texts: list[str], metadatas: list[dict] | None = ...
+        self, texts: list[str], metadatas: list[dict[str, Any]] | None = ...
     ) -> list[Document]:
         """Create documents from a list of texts."""
         ...

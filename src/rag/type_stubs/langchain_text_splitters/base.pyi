@@ -9,10 +9,15 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Literal, TypeVar
 
-from langchain_core.documents import BaseDocumentTransformer, Document
+from langchain_core.documents import Document
+from typing import Protocol
 
 logger = ...
 TS = TypeVar("TS", bound="TextSplitter")
+
+class BaseDocumentTransformer(Protocol):
+    """Base protocol for document transformers."""
+    def transform_documents(self, documents: list[Document]) -> list[Document]: ...
 
 class TextSplitter(BaseDocumentTransformer, ABC):
     """Interface for splitting text into chunks."""
@@ -45,7 +50,7 @@ class TextSplitter(BaseDocumentTransformer, ABC):
         ...
 
     def create_documents(
-        self, texts: list[str], metadatas: list[dict] | None = ...
+        self, texts: list[str], metadatas: list[dict[str, Any]] | None = ...
     ) -> list[Document]:
         """Create documents from a list of texts."""
         ...

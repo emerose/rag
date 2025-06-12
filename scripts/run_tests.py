@@ -36,7 +36,7 @@ app = typer.Typer(
 console = Console()
 
 # Type checking configuration
-MAX_TYPE_ERRORS = 54   # Updated after fixing embedding protocols, vulture issues, and vectorstore compatibility (issue #325)
+MAX_TYPE_ERRORS = 31   # Updated after fixing type stubs, YAML propagation, and VectorStore architecture (issue #325)
 
 
 @dataclass
