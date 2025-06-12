@@ -9,7 +9,6 @@ from __future__ import annotations
 import json
 import sqlite3
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -17,43 +16,8 @@ from langchain_core.documents import Document
 
 from rag.utils.exceptions import DocumentStoreError
 
-
-@dataclass
-class SourceDocumentMetadata:
-    """Metadata for a source document."""
-
-    source_id: str
-    location: str
-    content_type: str | None
-    content_hash: str | None
-    size_bytes: int | None
-    last_modified: float | None
-    indexed_at: float
-    metadata: dict[str, Any]
-    chunk_count: int
-
-    @classmethod
-    def create(
-        cls,
-        source_id: str,
-        location: str,
-        **kwargs: Any,
-    ) -> SourceDocumentMetadata:
-        """Create SourceDocumentMetadata with current timestamp."""
-        import time
-
-        return cls(
-            source_id=source_id,
-            location=location,
-            content_type=kwargs.get("content_type"),
-            content_hash=kwargs.get("content_hash"),
-            size_bytes=kwargs.get("size_bytes"),
-            last_modified=kwargs.get("last_modified"),
-            indexed_at=time.time(),
-            metadata=kwargs.get("metadata", {}),
-            chunk_count=0,  # Will be updated when chunks are added
-        )
-
+from .source_metadata import SourceDocumentMetadata
+from .sqlalchemy_document_store import SQLAlchemyDocumentStore
 
 # Import DocumentStoreProtocol from protocols module to avoid duplication
 
@@ -1257,9 +1221,6 @@ class FakeDocumentStore:
             or metadata.get("embedding_model_version") != embedding_model_version
         )
 
-
-# Import at the end to avoid circular imports
-from .sqlalchemy_document_store import SQLAlchemyDocumentStore  # noqa: E402
 
 # Create an alias for backward compatibility
 SQLiteDocumentStore = SQLAlchemyDocumentStore

@@ -18,6 +18,7 @@ from .protocols import (
     FileSystemProtocol,
     VectorStoreProtocol,
 )
+from .source_metadata import SourceDocumentMetadata
 from .sqlalchemy_document_store import SQLAlchemyDocumentStore
 from .vector_store import (
     FAISSVectorStore,
@@ -43,6 +44,7 @@ __all__ = [
     "SQLiteDocumentStore",
     "SourceDocument",
     "SourceDocumentChunk",
+    "SourceDocumentMetadata",
     "VectorStoreFactory",
     "VectorStoreProtocol",
 ]
