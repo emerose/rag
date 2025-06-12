@@ -1,0 +1,28 @@
+"""Type stubs for langchain_core.prompts module."""
+
+from abc import ABC, abstractmethod
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+
+class BasePromptTemplate(Generic[T], ABC):
+    """Base class for prompt templates."""
+
+    input_variables: list[str]
+
+    def __init__(self, input_variables: list[str], **kwargs: Any) -> None: ...
+    @abstractmethod
+    def format(self, **kwargs: Any) -> str: ...
+    def format_prompt(self, **kwargs: Any) -> Any: ...
+
+class PromptTemplate(BasePromptTemplate[dict[str, Any]]):
+    """A prompt template for a language model."""
+
+    template: str
+
+    def __init__(
+        self, template: str, input_variables: list[str], **kwargs: Any
+    ) -> None: ...
+    def format(self, **kwargs: Any) -> str: ...
+    @classmethod
+    def from_template(cls, template: str, **kwargs: Any) -> PromptTemplate: ...
