@@ -1,12 +1,7 @@
 ## 🚀 Next Priorities
 
-### API Diff Tool Implementation
-- [#333] ✅ **COMPLETED** – Create standalone API diff script (`scripts/diff_api.py`) with APIDumper, GitWorktree, and APIDiffRenderer classes
-- [#333] ✅ **COMPLETED** – Add graceful error handling for git operations, package inspection, and cleanup
-
 ### DocumentSource/IngestionPipeline Integration
 - [#302] [P2] **Update documentation** – Document new architecture, migration guide, and configuration options  
-- [#302] ✅ **COMPLETED** – Remove old architecture (IngestManager, backwards compatibility layers)
 
 ---
 
