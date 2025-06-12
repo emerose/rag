@@ -1249,7 +1249,7 @@ def static(
     if full_output:
         console.print("[blue]Running all static analysis...[/blue]")
         # Run each tool with full output
-        cmds = [
+        steps = [
             (["ruff", "format", "src/", "--line-length", "88"], "Formatting"),
             (["ruff", "check", "src/rag", "--fix", "--line-length", "88"], "Linting"),
             (["ruff", "format", "src/", "--line-length", "88"], "Re-formatting"),
@@ -1257,10 +1257,32 @@ def static(
             (["vulture", "--config", "vulture.toml"], "Dead code detection"),
         ]
         exit_code = 0
-        for cmd, desc in cmds:
+        for cmd, desc in steps:
             console.print(f"\n[green]{desc}:[/green]")
             result = subprocess.run(cmd)
-            exit_code = max(exit_code, result.returncode)
+            
+            # Special handling for type checking to respect baseline
+            if desc == "Type checking":
+                # Parse pyright output to count errors
+                if result.returncode != 0:
+                    # Run again to capture output for error counting
+                    capture_result = subprocess.run(cmd, capture_output=True, text=True)
+                    output = capture_result.stdout + capture_result.stderr
+                    parsed_result = parse_pyright_output(output)
+                    
+                    # Only fail if errors exceed baseline
+                    if parsed_result.total_errors <= max_errors:
+                        console.print(f"[green]Type checking passed: {parsed_result.total_errors} errors (≤ {max_errors} baseline)[/green]")
+                        # Don't update exit_code for type checking if within baseline
+                    else:
+                        console.print(f"[red]Type checking failed: {parsed_result.total_errors} errors (> {max_errors} baseline)[/red]")
+                        exit_code = max(exit_code, result.returncode)
+                else:
+                    # No errors at all
+                    console.print("[green]Type checking passed: 0 errors[/green]")
+            else:
+                # Normal handling for other tools
+                exit_code = max(exit_code, result.returncode)
         raise typer.Exit(exit_code)
     else:
         raise typer.Exit(run_static_with_summary(max_errors, verbose))
