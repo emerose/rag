@@ -470,9 +470,9 @@ def display_pyright_results(
 
         tables.append(file_table)
         
-        # Display tables side by side
+        # Display tables side by side with minimal spacing
         console.print()
-        console.print(Columns(tables, equal=True, expand=True))
+        console.print(Columns(tables, equal=False, expand=False, padding=(0, 1)))
 
 
 def display_coverage_results(output: str):
