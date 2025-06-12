@@ -46,7 +46,7 @@ class RetrievalEvaluator:
             Dictionary with the same structure but using query IDs instead of full paths.
             Example: {'0': {'123': 1.0, ...}, ...}
         """
-        simplified = {}
+        simplified: dict[str, dict[str, float]] = {}
         for query_idx, paths_dict in results.items():
             # Create a new inner dictionary for this query
             simplified[query_idx] = {}
@@ -69,10 +69,12 @@ class RetrievalEvaluator:
         docs_dir.mkdir(parents=True, exist_ok=True)
 
         for item in dataset:
-            item_dict = dict(item)  # Ensure item is treated as a dictionary
+            # Cast to dict[str, Any] to fix type checking issues with datasets library
+            from typing import cast
+            item_dict = cast(dict[str, Any], item)
             doc_id = item_dict.get("doc_id") or item_dict.get("_id") or item_dict["id"]
-            title = item_dict.get("title", "")
-            text = item_dict.get("text") or item_dict.get("abstract") or ""
+            title = str(item_dict.get("title", ""))
+            text = str(item_dict.get("text") or item_dict.get("abstract") or "")
             path = docs_dir / f"{doc_id}.txt"
             if not path.exists():
                 path.write_text(f"{title}\n\n{text}")
@@ -96,7 +98,10 @@ class RetrievalEvaluator:
         self._logger.debug(f"Queries: {queries}")
         for q in queries:
             qid = q.get("query_id") or q.get("_id") or q["id"]
-            text = q.get("text") or q.get("query")
+            text = q.get("text") or q.get("query") or ""
+            if not text:
+                self._logger.warning(f"Empty query text for query {qid}, skipping")
+                continue
             self._logger.debug(f"Running similarity search for query {qid}")
             docs = vectorstore.similarity_search(text, k=k)
             self._logger.debug(f"Found {len(docs)} documents")
@@ -117,7 +122,9 @@ class RetrievalEvaluator:
         from datasets import load_dataset
 
         queries = load_dataset(self.dataset, "queries")
-        query_list = [dict(q) for q in queries["queries"]]
+        # Cast each query to proper dict type
+        from typing import cast
+        query_list: list[dict[str, Any]] = [cast(dict[str, Any], q) for q in queries["queries"]]
         # Sort queries by ID numerically for consistent ordering
         query_list.sort(key=lambda x: int(x["_id"]))
         self._logger.debug(f"Loaded {len(query_list)} queries")
@@ -136,7 +143,9 @@ class RetrievalEvaluator:
 
         qrels_dict: dict[str, dict[str, int]] = {}
         for row in qrels:
-            row_dict = dict(row)  # Ensure row is treated as a dictionary
+            # Cast to dict[str, Any] to fix type checking issues with datasets library
+            from typing import cast
+            row_dict = cast(dict[str, Any], row)
             qid = str(row_dict.get("query-id") or row_dict.get("query_id"))
             doc_id = str(row_dict.get("corpus-id") or row_dict.get("doc_id"))
             score = int(row_dict.get("score", 0))
@@ -153,7 +162,7 @@ class RetrievalEvaluator:
         Returns:
             Set of k values to evaluate at.
         """
-        k_values = set()
+        k_values: set[int] = set()
         for metric in self.evaluation.metrics:
             if "@" in metric:
                 try:
@@ -183,7 +192,7 @@ class RetrievalEvaluator:
             Dictionary mapping metric names to their values.
         """
         # First collect all available metrics
-        available_metrics = {}
+        available_metrics: dict[str, float] = {}
         for result_dict in metrics_result:
             for metric_name, value in result_dict.items():
                 if (
@@ -193,7 +202,7 @@ class RetrievalEvaluator:
                     available_metrics[metric_name] = value
 
         # Then only keep the metrics that were requested
-        metrics = {
+        metrics: dict[str, float] = {
             metric: available_metrics[metric]
             for metric in self.evaluation.metrics
             if metric in available_metrics

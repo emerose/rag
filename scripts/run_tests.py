@@ -36,7 +36,7 @@ app = typer.Typer(
 console = Console()
 
 # Type checking configuration
-MAX_TYPE_ERRORS = 150  # Updated after implementing comprehensive type stubs
+MAX_TYPE_ERRORS = 128  # Updated after fixing fundamental type checking issues (issue #325)
 
 
 @dataclass
