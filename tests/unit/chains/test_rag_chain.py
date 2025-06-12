@@ -32,6 +32,7 @@ def mock_documents():
                 "source": "doc1.md",
                 "title": "LLM Applications",
                 "heading_path": "Chapter 1 > Introduction",
+                "token_count": 10,  # Pre-computed to avoid tokenization
             },
         ),
         Document(
@@ -40,6 +41,7 @@ def mock_documents():
                 "source": "doc2.md",
                 "title": "RAG Architecture",
                 "heading_path": "Chapter 2 > Architecture",
+                "token_count": 12,  # Pre-computed to avoid tokenization
             },
         ),
     ]
@@ -163,8 +165,12 @@ def test_system_prompt_invoke(mock_engine):
     """Ensure system prompt is prepended when defined."""
     mock_engine.system_prompt = "Be concise."
 
-    chain = build_rag_chain(mock_engine)
-    chain.invoke("What is RAG?")
+    # Mock _pack_documents to avoid tokenization
+    with patch.object(rag_chain, "_pack_documents") as mock_pack:
+        mock_pack.return_value = [Document(page_content="test", metadata={})]
+        
+        chain = build_rag_chain(mock_engine)
+        chain.invoke("What is RAG?")
 
     args, _ = mock_engine.chat_model.invoke.call_args
     messages = args[0]
@@ -196,9 +202,12 @@ def test_streaming_invocation(mock_engine):
         MagicMock(content=" world"),
     ]
 
-    chain = build_rag_chain(mock_engine)
-
-    result = chain.invoke("question")
+    # Mock _pack_documents to avoid tokenization
+    with patch.object(rag_chain, "_pack_documents") as mock_pack:
+        mock_pack.return_value = [Document(page_content="test", metadata={})]
+        
+        chain = build_rag_chain(mock_engine)
+        result = chain.invoke("question")
 
     assert result["answer"] == "Hello world"
     mock_engine.chat_model.stream.assert_called_once()

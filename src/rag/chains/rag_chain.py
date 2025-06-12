@@ -39,8 +39,10 @@ logger = logging.getLogger(__name__)
 # Maximum tokens of context to include in the prompt
 MAX_CONTEXT_TOKENS = 4096
 
-# Tokenizer for estimating token counts
+
+# Tokenizer for estimating token counts (loaded at import)
 _tokenizer = tiktoken.get_encoding("cl100k_base")
+
 
 # ---------------------------------------------------------------------------
 # Metadata-filter helpers (ported from the old QueryEngine)
