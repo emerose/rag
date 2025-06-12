@@ -20,10 +20,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from rag.utils.exceptions import DocumentStoreError
 
-from .document_store import SourceDocumentMetadata
 from .models import Document as DocumentModel
 from .models import SourceDocument as SourceDocumentModel
 from .models import SourceDocumentChunk as SourceDocumentChunkModel
+from .source_metadata import SourceDocumentMetadata
 
 
 class SQLAlchemyDocumentStore:
