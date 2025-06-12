@@ -113,7 +113,7 @@ class VectorStoreFactory(ABC):
         self.embeddings = embeddings
 
     @abstractmethod
-    def create_empty(self) -> VectorStoreProtocol:
+    def create_empty(self) -> ExtendedVectorStoreProtocol:
         """Create an empty vector store.
 
         Returns:
@@ -122,7 +122,7 @@ class VectorStoreFactory(ABC):
         ...
 
     @abstractmethod
-    def create_from_documents(self, documents: list[Document]) -> VectorStoreProtocol:
+    def create_from_documents(self, documents: list[Document]) -> ExtendedVectorStoreProtocol:
         """Create a vector store from a list of documents.
 
         Args:
@@ -273,26 +273,6 @@ class FAISSVectorStore:
         except Exception as e:
             raise ValueError(f"Failed to load vector store from {path}: {e}") from e
 
-    def as_retriever(
-        self,
-        *,
-        search_type: str = "similarity",
-        search_kwargs: dict[str, Any] | None = None,
-    ) -> Any:
-        """Return a retriever instance for this vector store.
-
-        Args:
-            search_type: Type of search to perform (e.g., "similarity")
-            search_kwargs: Additional search parameters
-
-        Returns:
-            Retriever instance that can be used in LangChain chains
-        """
-        search_kwargs = search_kwargs or {}
-        return self._faiss_store.as_retriever(
-            search_type=search_type, search_kwargs=search_kwargs
-        )
-
     @property
     def embedding_function(self) -> Embeddings:
         """Get the embeddings function."""
@@ -312,7 +292,7 @@ class FAISSVectorStoreFactory(VectorStoreFactory):
     vector storage technology.
     """
 
-    def create_empty(self) -> FAISSVectorStore:
+    def create_empty(self) -> ExtendedVectorStoreProtocol:
         """Create an empty FAISS vector store.
 
         Returns:
@@ -341,7 +321,7 @@ class FAISSVectorStoreFactory(VectorStoreFactory):
 
         return FAISSVectorStore(faiss_store)
 
-    def create_from_documents(self, documents: list[Document]) -> FAISSVectorStore:
+    def create_from_documents(self, documents: list[Document]) -> ExtendedVectorStoreProtocol:
         """Create a FAISS vector store from a list of documents.
 
         Args:
@@ -534,6 +514,25 @@ class InMemoryVectorStore:
 
         return float(dot_product / (norm_v1 * norm_v2))
 
+    def save_local(self, folder_path: str, index_name: str) -> None:
+        """Persist the vector store to disk (no-op for in-memory store)."""
+        logger.debug(f"InMemoryVectorStore.save_local() called (no-op)")
+
+    @property
+    def index(self) -> Any:
+        """Get the underlying index (returns None for in-memory store)."""
+        return None
+
+    @property
+    def docstore(self) -> dict[str, Document]:
+        """Get the document store."""
+        return {str(i): doc for i, doc in enumerate(self.documents)}
+
+    @property
+    def index_to_docstore_id(self) -> dict[int, str]:
+        """Get mapping from index positions to document store IDs."""
+        return {i: str(i) for i in range(len(self.documents))}
+
 
 class InMemoryVectorStoreFactory(VectorStoreFactory):
     """Factory for creating in-memory vector stores.
@@ -543,7 +542,7 @@ class InMemoryVectorStoreFactory(VectorStoreFactory):
     consistency across test scenarios.
     """
 
-    def create_empty(self) -> InMemoryVectorStore:
+    def create_empty(self) -> ExtendedVectorStoreProtocol:
         """Create an empty in-memory vector store.
 
         Returns:
@@ -551,7 +550,7 @@ class InMemoryVectorStoreFactory(VectorStoreFactory):
         """
         return InMemoryVectorStore(self.embeddings)
 
-    def create_from_documents(self, documents: list[Document]) -> InMemoryVectorStore:
+    def create_from_documents(self, documents: list[Document]) -> ExtendedVectorStoreProtocol:
         """Create an in-memory vector store from a list of documents.
 
         Args:

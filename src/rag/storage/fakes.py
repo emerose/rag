@@ -84,7 +84,7 @@ class InMemoryFileSystem(FileSystemProtocol):
             List of paths to supported files
         """
         directory_str = str(Path(directory).resolve())
-        found_files = []
+        found_files: list[Path] = []
 
         for file_path in self.files:
             path_obj = Path(file_path)
@@ -236,10 +236,11 @@ class InMemoryVectorStore(VectorStoreProtocol):
     without FAISS, enabling fast and reliable unit tests.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, dimension: int = 512) -> None:
         """Initialize the in-memory vector store."""
         self.documents: list[Document] = []
         self.embeddings: list[list[float]] = []
+        self.dimension = dimension
         self._index_to_docstore_id: dict[int, str] = {}
         self._docstore: dict[str, Document] = {}
 
@@ -307,13 +308,14 @@ class InMemoryVectorStore(VectorStoreProtocol):
         """Get mapping from index positions to document store IDs."""
         return self._index_to_docstore_id
 
-    def add_documents(
-        self, documents: list[Document], embeddings: list[list[float]]
-    ) -> None:
-        """Add documents and embeddings to the store."""
+    def add_documents(self, documents: list[Document]) -> None:
+        """Add documents to the store."""
         start_idx = len(self.documents)
         self.documents.extend(documents)
-        self.embeddings.extend(embeddings)
+        
+        # Generate fake embeddings for the documents
+        fake_embeddings: list[list[float]] = [[0.1] * self.dimension for _ in documents]
+        self.embeddings.extend(fake_embeddings)
 
         for i, doc in enumerate(documents):
             doc_id = str(start_idx + i)

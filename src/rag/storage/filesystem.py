@@ -100,7 +100,7 @@ class FilesystemManager(FileSystemProtocol):
 
         self._log("DEBUG", f"Scanning directory: {directory}")
 
-        supported_files = []
+        supported_files: list[Path] = []
         for root, _, files in os.walk(directory):
             for file in files:
                 # Skip files that begin with a dot (hidden files)
