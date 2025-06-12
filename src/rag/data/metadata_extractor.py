@@ -365,9 +365,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
 
         return font_data
 
-    def _analyze_text_element(
-        self, element: LTTextContainer
-    ) -> tuple[float, bool]:
+    def _analyze_text_element(self, element: LTTextContainer) -> tuple[float, bool]:
         """Analyze a text element to determine font size and if it's bold.
 
         Args:
