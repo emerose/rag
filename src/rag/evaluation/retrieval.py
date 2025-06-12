@@ -78,7 +78,7 @@ class RetrievalEvaluator:
                 path.write_text(f"{title}\n\n{text}")
 
         config = RAGConfig(documents_dir=str(docs_dir), data_dir=str(eval_data_dir))
-        engine = RAGEngine(config, RuntimeOptions())
+        engine = RAGEngine.create(config, RuntimeOptions())
         engine.index_directory(docs_dir)
         return engine
 
