@@ -321,9 +321,12 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
 
             factory._filesystem_manager = FilesystemManager()
-            factory._document_store = SQLAlchemyDocumentStore(
-                Path(config.data_dir) / "documents.db"
-            )
+
+            # Ensure data directory exists before creating document store
+            data_dir = Path(config.data_dir)
+            data_dir.mkdir(parents=True, exist_ok=True)
+
+            factory._document_store = SQLAlchemyDocumentStore(data_dir / "documents.db")
             factory._document_loader = DocumentLoader(
                 filesystem_manager=factory._filesystem_manager,
                 log_callback=runtime.log_callback,

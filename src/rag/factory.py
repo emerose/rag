@@ -126,6 +126,9 @@ class RAGComponentsFactory:
             else:
                 # Use default SQLite with file path
                 data_dir = Path(self.config.data_dir)
+                # Ensure data directory exists before creating document store
+                data_dir.mkdir(parents=True, exist_ok=True)
+
                 db_path = data_dir / "documents.db"
                 self._document_store = SQLAlchemyDocumentStore(db_path)
         return self._document_store
@@ -353,18 +356,23 @@ class RAGComponentsFactory:
             RAGEngine instance with all dependencies injected
         """
         # Import here to avoid circular imports - moved inside function
-        from rag.engine import RAGEngine
+        from rag.engine import RAGDependencies, RAGEngine
 
-        # Create RAGEngine with all dependencies injected explicitly
-        return RAGEngine(
-            config=self.config,
-            runtime=self.runtime,
+        # Create dependencies container
+        dependencies = RAGDependencies(
             query_engine=self.create_query_engine(),
             document_store=self.document_store,
             vectorstore_factory=self.vectorstore_factory,
             ingestion_pipeline=self.ingestion_pipeline,
             document_source=self.document_source,
             embedding_batcher=self.embedding_batcher,
+        )
+
+        # Create RAGEngine with dependencies container
+        return RAGEngine(
+            config=self.config,
+            runtime=self.runtime,
+            dependencies=dependencies,
         )
 
     def _create_text_splitter_factory(self) -> TextSplitterFactory:
