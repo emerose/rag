@@ -7,6 +7,7 @@ and retrieving documents with their content and metadata.
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from typing import Any
 
 from langchain_core.documents import Document
@@ -485,8 +486,10 @@ class FakeDocumentStore:
             doc_id = f"doc_{i}_{hash(doc.page_content)}"
             self.add_document(doc_id, doc)
 
-    def get_documents(self, filters: dict[str, Any] | None = None) -> list[Document]:
-        """Retrieve documents from the store.
+    def get_documents_by_filter(
+        self, filters: dict[str, Any] | None = None
+    ) -> list[Document]:
+        """Retrieve documents from the store by filter.
 
         Args:
             filters: Optional filters to apply

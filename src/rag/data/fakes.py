@@ -244,3 +244,105 @@ class FakeChatModel(BaseChatModel):
     ) -> ChatResult:
         """Async version of _generate."""
         return self._generate(messages, stop, run_manager, **kwargs)
+
+
+class FakeTextSplitter:
+    """Fake text splitter that splits text into simple chunks without tokenization."""
+
+    def __init__(self, chunk_size: int = 500, chunk_overlap: int = 50) -> None:
+        """Initialize fake text splitter.
+
+        Args:
+            chunk_size: Size of each chunk in characters
+            chunk_overlap: Overlap between chunks in characters
+        """
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+
+    def split_text(self, text: str) -> list[str]:
+        """Split text into chunks.
+
+        Args:
+            text: Text to split
+
+        Returns:
+            List of text chunks
+        """
+        if not text:
+            return []
+
+        chunks = []
+        start = 0
+
+        while start < len(text):
+            end = start + self.chunk_size
+            chunk = text[start:end]
+            chunks.append(chunk)
+
+            # Move start position with overlap
+            start = end - self.chunk_overlap
+            if start >= len(text):
+                break
+
+        return chunks
+
+    def split_documents(self, documents: list[Document]) -> list[Document]:
+        """Split documents into chunks.
+
+        Args:
+            documents: Documents to split
+
+        Returns:
+            List of document chunks
+        """
+        result = []
+
+        for doc in documents:
+            chunks = self.split_text(doc.page_content)
+            for i, chunk in enumerate(chunks):
+                chunk_doc = Document(
+                    page_content=chunk,
+                    metadata={
+                        **doc.metadata,
+                        "chunk_index": i,
+                        "total_chunks": len(chunks),
+                    },
+                )
+                result.append(chunk_doc)
+
+        return result
+
+
+class FakeTextSplitterFactory:
+    """Fake text splitter factory that creates fake text splitters."""
+
+    def __init__(self, chunk_size: int = 500, chunk_overlap: int = 50) -> None:
+        """Initialize fake text splitter factory.
+
+        Args:
+            chunk_size: Default chunk size
+            chunk_overlap: Default chunk overlap
+        """
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+
+    def create_text_splitter(
+        self,
+        chunk_size: int | None = None,
+        chunk_overlap: int | None = None,
+        **kwargs: Any,
+    ) -> FakeTextSplitter:
+        """Create a fake text splitter.
+
+        Args:
+            chunk_size: Chunk size (uses default if None)
+            chunk_overlap: Chunk overlap (uses default if None)
+            **kwargs: Additional arguments (ignored)
+
+        Returns:
+            Fake text splitter instance
+        """
+        return FakeTextSplitter(
+            chunk_size=chunk_size or self.chunk_size,
+            chunk_overlap=chunk_overlap or self.chunk_overlap,
+        )

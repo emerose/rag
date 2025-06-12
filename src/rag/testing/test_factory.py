@@ -133,7 +133,21 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         )
 
     def _create_fake_overrides(self) -> ComponentOverrides:
-        """Create component overrides with fake implementations."""
+        """Create fake component overrides for testing."""
+        # Create the embedding service based on test options
+        if self.test_options.use_deterministic_embeddings:
+            embedding_service = DeterministicEmbeddingService(
+                embedding_dimension=self.test_options.embedding_dimension,
+                predefined_embeddings=self.test_options.predefined_embeddings or {},
+            )
+        else:
+            embedding_service = FakeEmbeddingService(
+                embedding_dimension=self.test_options.embedding_dimension
+            )
+
+        # Store the raw embedding service for test access
+        self._raw_embedding_service = embedding_service
+
         # Create fake filesystem with initial files if provided
         filesystem = InMemoryFileSystem()
         if self.test_options.initial_files:
@@ -146,37 +160,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             # Directly populate the internal storage for testing
             for file_path, metadata in self.test_options.initial_metadata.items():
                 document_store.set_metadata_dict(file_path, metadata)
-
-        # Create adapter to make fake embedding services compatible with LangChain Embeddings
-        from langchain_core.embeddings import Embeddings
-
-        class EmbeddingServiceAdapter(Embeddings):
-            """Adapter to make EmbeddingServiceProtocol compatible with LangChain Embeddings."""
-
-            def __init__(self, service: EmbeddingServiceProtocol) -> None:
-                self.service = service
-
-            def embed_documents(self, texts: list[str]) -> list[list[float]]:
-                """Embed search docs."""
-                return self.service.embed_documents(texts)
-
-            def embed_query(self, text: str) -> list[float]:
-                """Embed query text."""
-                return self.service.embed_query(text)
-
-        # Create embedding service
-        if self.test_options.use_deterministic_embeddings:
-            base_service = DeterministicEmbeddingService(
-                embedding_dimension=self.test_options.embedding_dimension,
-                predefined_embeddings=self.test_options.predefined_embeddings,
-            )
-        else:
-            base_service = FakeEmbeddingService(
-                embedding_dimension=self.test_options.embedding_dimension
-            )
-
-        # Wrap in adapter for LangChain compatibility
-        embedding_service = EmbeddingServiceAdapter(base_service)
 
         # Create fake vectorstore factory
         from rag.storage.vector_store import InMemoryVectorStoreFactory
@@ -196,14 +179,30 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
         chat_model = FakeChatModel()
 
+        # Create fake text splitter factory
+        from rag.data.fakes import FakeTextSplitterFactory
+
+        text_splitter_factory = FakeTextSplitterFactory(
+            chunk_size=500,  # Use a reasonable default chunk size
+            chunk_overlap=50,
+        )
+
         return ComponentOverrides(
             filesystem_manager=filesystem,
             document_store=document_store,
             vectorstore_factory=vectorstore_factory,
-            embedding_service=embedding_service,
+            embedding_service=embedding_service,  # Store the raw service
             document_loader=document_loader,
             chat_model=chat_model,
+            text_splitter_factory=text_splitter_factory,
         )
+
+    @property
+    def embedding_service(self) -> EmbeddingServiceProtocol:
+        """Get the raw embedding service for testing."""
+        if hasattr(self, "_raw_embedding_service"):
+            return self._raw_embedding_service
+        return super().embedding_service
 
     @classmethod
     def create_with_sample_data(cls) -> FakeRAGComponentsFactory:

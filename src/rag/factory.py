@@ -57,6 +57,7 @@ class ComponentOverrides:
     )
     document_loader: Any | None = None
     chat_model: Any | None = None  # Any LangChain chat model interface
+    text_splitter_factory: Any | None = None  # TextSplitterFactory or compatible
 
 
 class RAGComponentsFactory:
@@ -92,6 +93,7 @@ class RAGComponentsFactory:
         self._embedding_service = self.overrides.embedding_service
         self._document_loader = self.overrides.document_loader
         self._chat_model = self.overrides.chat_model
+        self._text_splitter_factory = self.overrides.text_splitter_factory
 
         # Initialize core dependencies first (that aren't overridden)
         self._reranker: BaseReranker | None = None
@@ -228,9 +230,15 @@ class RAGComponentsFactory:
             # Create transformer and embedder
             from rag.pipeline import DefaultDocumentTransformer, DefaultEmbedder
 
+            # Use text splitter factory override if provided
+            text_splitter_factory = self._text_splitter_factory
+            if text_splitter_factory is None:
+                text_splitter_factory = self._create_text_splitter_factory()
+
             transformer = DefaultDocumentTransformer(
                 chunk_size=self.config.chunk_size,
                 chunk_overlap=self.config.chunk_overlap,
+                text_splitter_factory=text_splitter_factory,
             )
 
             embedder = DefaultEmbedder(
