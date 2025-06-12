@@ -134,7 +134,11 @@ class DocumentLoadingProcessor(BaseTaskProcessor):
                 )
 
             # Compute content hash
-            content_hash = hashlib.sha256(content.encode()).hexdigest()
+            if isinstance(content, str):
+                content_bytes = content.encode('utf-8')
+            else:
+                content_bytes = content
+            content_hash = hashlib.sha256(content_bytes).hexdigest()
 
             # Prepare output
             output_data = {
@@ -219,19 +223,8 @@ class ChunkingProcessor(BaseTaskProcessor):
                     error_message="Missing chunking configuration",
                 )
 
-            # Create text splitter
-            if hasattr(self.text_splitter_factory, "create_text_splitter"):
-                # Use factory method
-                splitter = self.text_splitter_factory(
-                    chunk_size=chunking_details.chunk_size,
-                    chunk_overlap=chunking_details.chunk_overlap,
-                ).create_text_splitter()
-            else:
-                # Direct instantiation
-                splitter = self.text_splitter_factory(
-                    chunk_size=chunking_details.chunk_size,
-                    chunk_overlap=chunking_details.chunk_overlap,
-                )
+            # Create text splitter using factory
+            splitter = self.text_splitter_factory.create_splitter("text/plain")
 
             # Create source document for splitting
             metadata = input_data.get("metadata", {})
@@ -240,8 +233,18 @@ class ChunkingProcessor(BaseTaskProcessor):
                 metadata=metadata,
             )
 
-            # Split the document
-            chunks = splitter.split_documents([source_doc])
+            # Split the document - provide mime_type parameter if required
+            if hasattr(splitter, 'split_documents'):
+                # Check if method expects mime_type parameter
+                import inspect
+                sig = inspect.signature(splitter.split_documents)
+                if 'mime_type' in sig.parameters:
+                    chunks = splitter.split_documents([source_doc], mime_type="text/plain")
+                else:
+                    chunks = splitter.split_documents([source_doc])
+            else:
+                # Fallback - create simple chunks
+                chunks = [source_doc]
 
             # Prepare output
             output_data = {

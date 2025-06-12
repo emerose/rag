@@ -65,7 +65,7 @@ class PipelineFactory:
         """
         # Use provided config or create default
         if config is None:
-            config = RAGConfig()
+            config = RAGConfig(documents_dir="./documents")
 
         # Create pipeline config
         pipeline_config = PipelineConfig(
@@ -73,7 +73,7 @@ class PipelineFactory:
             chunk_overlap=config.chunk_overlap,
             chunking_strategy="recursive",
             embedding_model=config.embedding_model,
-            embedding_provider=config.embedding_provider,
+            embedding_provider="openai",
             embedding_batch_size=100,
             vector_store_type="faiss",
             database_url=database_url or "sqlite:///pipeline_state.db",
@@ -86,30 +86,45 @@ class PipelineFactory:
 
         # Create document source
         document_source = FilesystemDocumentSource(
-            root_path=Path(config.documents_dir),
-            supported_extensions=config.supported_extensions,
+            root_path=Path(config.documents_dir)
         )
 
         # Create dependencies for processors
         from rag.embeddings import EmbeddingProvider
-
-        embedding_service = EmbeddingProvider(
+        from rag.config.components import EmbeddingConfig
+        
+        embedding_config = EmbeddingConfig(
             model=config.embedding_model,
-            api_key=config.api_key,
+            batch_size=config.batch_size,
+        )
+        
+        embedding_service = EmbeddingProvider(
+            config=embedding_config,
+            openai_api_key=config.openai_api_key,
         )
 
-        document_store = SQLAlchemyDocumentStore(database_url=config.get_database_url())
+        # Create document store with proper database URL
+        db_path = Path(config.data_dir) / "documents.db"
+        document_store = SQLAlchemyDocumentStore(db_path=db_path)
 
+        # Create vector store factory with proper embedding service
         vector_store_factory = VectorStoreFactory(
             embedding_service=embedding_service,
             workspace_path=Path(config.data_dir),
         )
         vector_store = vector_store_factory.create_empty()
 
+        # Create text splitter factory for chunking
+        from rag.data.text_splitter import TextSplitterFactory
+        text_splitter_factory = TextSplitterFactory(
+            chunk_size=config.chunk_size,
+            chunk_overlap=config.chunk_overlap,
+        )
+        
         # Create task processors
         processors = {
             TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(document_source),
-            TaskType.CHUNKING: ChunkingProcessor(),
+            TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
             TaskType.EMBEDDING: EmbeddingProcessor(embedding_service),
             TaskType.VECTOR_STORAGE: VectorStorageProcessor(
                 document_store, vector_store
@@ -146,12 +161,19 @@ class PipelineFactory:
         # Create state transitions
         transitions = StateTransitionService(dependencies.storage)
 
+        # Create text splitter factory
+        from rag.data.text_splitter import TextSplitterFactory
+        text_splitter_factory = TextSplitterFactory(
+            chunk_size=config.chunk_size,
+            chunk_overlap=config.chunk_overlap,
+        )
+        
         # Create task processors
         processors = {
             TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(
                 dependencies.document_source
             ),
-            TaskType.CHUNKING: ChunkingProcessor(),
+            TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
             TaskType.EMBEDDING: EmbeddingProcessor(dependencies.embedding_service),
             TaskType.VECTOR_STORAGE: VectorStorageProcessor(
                 dependencies.document_store, dependencies.vector_store
@@ -191,7 +213,9 @@ class PipelineFactory:
 
         # Use provided config or create default
         if config is None:
-            config = PipelineConfig()
+            config = PipelineConfig(
+                database_url="sqlite:///:memory:"
+            )
 
         # Create transitions
         transitions = StateTransitionService(storage)
@@ -203,11 +227,18 @@ class PipelineFactory:
 
             factory = FakeRAGComponentsFactory.create_minimal()
 
+            # Create text splitter factory
+            from rag.data.text_splitter import TextSplitterFactory
+            text_splitter_factory = TextSplitterFactory(
+                chunk_size=config.chunk_size,
+                chunk_overlap=config.chunk_overlap,
+            )
+            
             processors = {
                 TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(
                     document_source or factory.document_source
                 ),
-                TaskType.CHUNKING: ChunkingProcessor(),
+                TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
                 TaskType.EMBEDDING: EmbeddingProcessor(factory.embedding_service),
                 TaskType.VECTOR_STORAGE: VectorStorageProcessor(
                     factory.document_store, factory.vector_store
