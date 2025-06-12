@@ -281,21 +281,35 @@ class FilesystemManager(FileSystemProtocol):
 
         """
         directory = Path(directory)
-
-        # Check if directory exists
-        if not directory.exists():
-            self._log("ERROR", f"Directory does not exist: {directory}")
+        if not self.validate_documents_dir(directory):
             return False, []
 
-        # Check if it's a directory
-        if not directory.is_dir():
-            self._log("ERROR", f"Not a directory: {directory}")
-            return False, []
-
-        # Scan for supported files
         supported_files = self.scan_directory(directory)
-        if not supported_files:
-            self._log("WARNING", f"No supported files found in {directory}")
-            return False, []
-
         return True, supported_files
+
+    def add_file(
+        self,
+        path: Path | str,
+        content: str | bytes,
+        mime_type: str = "text/plain",
+        mtime: float = 1640995200.0,
+    ) -> None:
+        """Add a file to the filesystem (used for testing).
+
+        This method is primarily for testing purposes and raises an error
+        for the real filesystem implementation since we don't want to
+        create files arbitrarily.
+
+        Args:
+            path: Path to the file
+            content: File content
+            mime_type: MIME type of the file
+            mtime: Modification time (Unix timestamp)
+
+        Raises:
+            NotImplementedError: This method is not implemented for real filesystem
+        """
+        raise NotImplementedError(
+            "add_file is not supported for real filesystem operations. "
+            "Use InMemoryFileSystem for testing."
+        )

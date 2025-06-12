@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from typing import Any
 from rag.embeddings.fake_openai import FakeOpenAI
 from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
+from rag.embeddings.protocols import EmbeddingServiceProtocol
 from rag.factory import ComponentOverrides, RAGComponentsFactory
 from rag.storage.document_store import FakeDocumentStore
 from rag.storage.fakes import (
@@ -146,16 +147,36 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             for file_path, metadata in self.test_options.initial_metadata.items():
                 document_store.set_metadata_dict(file_path, metadata)
 
-        # Create fake embedding service
+        # Create adapter to make fake embedding services compatible with LangChain Embeddings
+        from langchain_core.embeddings import Embeddings
+
+        class EmbeddingServiceAdapter(Embeddings):
+            """Adapter to make EmbeddingServiceProtocol compatible with LangChain Embeddings."""
+
+            def __init__(self, service: EmbeddingServiceProtocol) -> None:
+                self.service = service
+
+            def embed_documents(self, texts: list[str]) -> list[list[float]]:
+                """Embed search docs."""
+                return self.service.embed_documents(texts)
+
+            def embed_query(self, text: str) -> list[float]:
+                """Embed query text."""
+                return self.service.embed_query(text)
+
+        # Create embedding service
         if self.test_options.use_deterministic_embeddings:
-            embedding_service = DeterministicEmbeddingService(
+            base_service = DeterministicEmbeddingService(
                 embedding_dimension=self.test_options.embedding_dimension,
-                predefined_embeddings=self.test_options.predefined_embeddings or {},
+                predefined_embeddings=self.test_options.predefined_embeddings,
             )
         else:
-            embedding_service = FakeEmbeddingService(
+            base_service = FakeEmbeddingService(
                 embedding_dimension=self.test_options.embedding_dimension
             )
+
+        # Wrap in adapter for LangChain compatibility
+        embedding_service = EmbeddingServiceAdapter(base_service)
 
         # Create fake vectorstore factory
         from rag.storage.vector_store import InMemoryVectorStoreFactory
@@ -506,17 +527,21 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         """
         fake_openai = FakeOpenAI()
 
-        # If we have embedding providers that use OpenAI, replace them
-        if hasattr(self, "embedding_provider"):
-            # Inject the fake OpenAI into the embedding provider
-            if hasattr(self.embedding_provider, "openai_client"):
-                self.embedding_provider.openai_client = fake_openai
-            if hasattr(self.embedding_provider, "_client"):
-                self.embedding_provider._client = fake_openai
+        # If we have embedding services that use OpenAI, replace them
+        if hasattr(self, "embedding_service"):
+            # Inject the fake OpenAI into the embedding service
+            # Cast to Any to avoid type errors when accessing unknown attributes
+            embedding_service: Any = self.embedding_service
+            if hasattr(embedding_service, "openai_client"):
+                embedding_service.openai_client = fake_openai
+            if hasattr(embedding_service, "_client"):
+                embedding_service._client = fake_openai
 
         # If we have chat models that use OpenAI, replace them
         if hasattr(self, "chat_model"):
-            if hasattr(self.chat_model, "client"):
-                self.chat_model.client = fake_openai
+            # Cast to Any to avoid type errors when accessing unknown attributes
+            chat_model: Any = self.chat_model
+            if hasattr(chat_model, "client"):
+                chat_model.client = fake_openai
 
         return fake_openai

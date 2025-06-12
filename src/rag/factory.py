@@ -52,7 +52,9 @@ class ComponentOverrides:
     filesystem_manager: FileSystemProtocol | None = None
     document_store: DocumentStoreProtocol | None = None
     vectorstore_factory: VectorStoreFactory | None = None
-    embedding_service: EmbeddingServiceProtocol | None = None
+    embedding_service: Any | None = (
+        None  # Allow both EmbeddingServiceProtocol and Embeddings
+    )
     document_loader: Any | None = None
     chat_model: Any | None = None  # Any LangChain chat model interface
 
@@ -343,7 +345,7 @@ class RAGComponentsFactory:
         Returns:
             RAGEngine instance with factory-injected dependencies
         """
-        # Import here to avoid circular imports
+        # Import here to avoid circular imports - moved inside function
         from rag.engine import RAGEngine
 
         # Create RAGEngine with factory as dependencies
