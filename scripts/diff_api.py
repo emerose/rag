@@ -238,8 +238,8 @@ class APIDiffRenderer:
         self.base_ref = base_ref
         self.console = Console(width=120, soft_wrap=True)
 
-    def render(self) -> str:
-        """Render the API diff with Rich formatting in tabular format."""
+    def render(self) -> None:
+        """Render the API diff with Rich formatting in one unified table."""
         base_structure = self._parse_api_structure(self.base)
         current_structure = self._parse_api_structure(self.current)
 
@@ -265,33 +265,48 @@ class APIDiffRenderer:
                 containers_with_changes.append((container, added, removed, modified))
 
         if not containers_with_changes:
-            return ""  # No differences
-
-        # Build rich output organized by container
-        output_parts = []
-
-        for container, added, removed, modified in sorted(containers_with_changes):
-            # Add container header
-            if container.startswith("class "):
-                header = Text(f"## {container}", style="white")
-            else:
-                header = Text(f"# {container}", style="white")
-            output_parts.append(header)
-
-            # Create table for this container
-            table = Table(
-                show_header=False,
-                show_edge=False,
-                pad_edge=False,
-                padding=(0, 1),
-                box=None,
+            self.console.print(
+                f"✅ No public API differences between HEAD and `{self.base_ref}`",
+                style="green",
             )
-            table.add_column("prefix", width=2, no_wrap=True)  # +/-
-            table.add_column("name", min_width=8, no_wrap=True)  # function name
-            table.add_column("params", min_width=12)  # parameters (one per line)
-            table.add_column("arrow", width=4, no_wrap=True, justify="center")  # ->
-            table.add_column("return_type", min_width=8, no_wrap=True)  # return type
-            table.add_column("description", min_width=15)  # description
+            return  # No differences
+
+        # Create one unified table
+        table = Table(
+            show_header=False,
+            show_edge=False,
+            pad_edge=False,
+            padding=(0, 1),
+            box=None,
+        )
+        table.add_column("prefix", width=2, no_wrap=True)  # +/-
+        table.add_column("name", min_width=8, no_wrap=True)  # function name
+        table.add_column("params", min_width=12)  # parameters (one per line)
+        table.add_column("arrow", width=4, no_wrap=True, justify="center")  # ->
+        table.add_column("return_type", min_width=8, no_wrap=True)  # return type
+        table.add_column("description", min_width=15)  # description
+
+        # Process all containers and their changes
+        for i, (container, added, removed, modified) in enumerate(
+            sorted(containers_with_changes)
+        ):
+            # Add container header row
+            if container.startswith("class "):
+                header_text = container
+                header_style = "white bold"
+            else:
+                header_text = container
+                header_style = "white bold"
+
+            # Add header as a row spanning all columns
+            table.add_row(
+                "",  # empty prefix
+                Text.from_markup(f"[{header_style}]{header_text}[/{header_style}]"),
+                "",
+                "",
+                "",
+                "",  # empty other columns
+            )
 
             # Process all changes for this container
             all_changes = []
@@ -335,30 +350,22 @@ class APIDiffRenderer:
             # Add rows to table
             for prefix, name, params, return_type, description, color in all_changes:
                 table.add_row(
-                    Text(prefix, style=f"{color} bold"),
-                    Text(name, style=color),
-                    Text(params, style=color),
-                    Text("->", style=color),
-                    Text(return_type, style=color),
-                    Text(description, style=color),
+                    Text.from_markup(f"[{color} bold]{prefix}[/{color} bold]"),
+                    Text.from_markup(f"[{color}]{name}[/{color}]"),
+                    Text.from_markup(f"[{color}]{params}[/{color}]"),
+                    Text.from_markup(f"[{color}]->[/{color}]"),
+                    Text.from_markup(f"[{color}]{return_type}[/{color}]"),
+                    Text.from_markup(f"[{color}]{description}[/{color}]"),
                 )
 
-            # Render table to capture
-            with self.console.capture() as capture:
-                self.console.print(table)
+            # Add horizontal divider after each container (except the last one)
+            if i < len(containers_with_changes) - 1:
+                table.add_row(
+                    "", Text.from_markup("[dim]" + "─" * 50 + "[/dim]"), "", "", "", ""
+                )
 
-            output_parts.append(Text(capture.get().rstrip()))
-
-            # Add empty line after each container (except the last)
-            if container != sorted(containers_with_changes)[-1][0]:
-                output_parts.append(Text())
-
-        # Render all parts to string
-        with self.console.capture() as capture:
-            for part in output_parts:
-                self.console.print(part)
-
-        return capture.get()
+        # Print the table directly to console
+        self.console.print(table)
 
     def _parse_function_for_table(
         self, signature: str, full_line: str, container: str
@@ -684,14 +691,10 @@ def main():
         # Render and show diff
         console.print("🔄 Computing diff...", style="yellow")
         console.print()
-        diff = APIDiffRenderer(base_api, current_api, ref).render()
 
-        if not diff.strip():
-            console.print(
-                f"✅ No public API differences between HEAD and `{ref}`", style="green"
-            )
-        else:
-            console.print(diff)
+        renderer = APIDiffRenderer(base_api, current_api, ref)
+        renderer.render()
+
     except Exception as e:
         console.print(f"Error: {e}", style="red")
         sys.exit(1)
