@@ -7,8 +7,7 @@ prompt IDs.
 
 from typing import Any
 
-from langchain_core.prompts import PromptTemplate
-from langchain_core.prompts.base import BasePromptTemplate
+from langchain_core.prompts import BasePromptTemplate, PromptTemplate
 
 from rag.utils.exceptions import PromptNotFoundError
 

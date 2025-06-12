@@ -109,6 +109,16 @@ class RAGEngine:
         return self._ingestion_pipeline
 
     @property
+    def default_prompt_id(self) -> str:
+        """Get the default prompt ID from the query engine."""
+        return self._query_engine.default_prompt_id
+
+    @default_prompt_id.setter
+    def default_prompt_id(self, value: str) -> None:
+        """Set the default prompt ID on the query engine."""
+        self._query_engine.default_prompt_id = value
+
+    @property
     def vector_repository(self) -> VectorStoreFactory:
         """Get the vector repository (compatibility property)."""
         return self._vectorstore_factory

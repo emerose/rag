@@ -194,7 +194,12 @@ def _create_llm_function(engine: Any):
             return content
         elif isinstance(content, list):
             # Extract text content from list format (multimodal)
-            text_parts = [str(item) for item in content if isinstance(item, str)]
+            from typing import cast
+
+            content_list = cast(list[Any], content)
+            text_parts: list[str] = [
+                str(item) for item in content_list if isinstance(item, str)
+            ]
             return " ".join(text_parts)
         else:
             return str(content)
@@ -207,7 +212,7 @@ def build_rag_chain(
     k: int = 4,
     prompt_id: str = "default",
     reranker: BaseReranker | None = None,
-) -> Runnable[dict[str, Any], dict[str, Any]]:
+) -> Runnable[str, dict[str, Any]]:
     """Return an LCEL pipeline implementing the RAG flow.
 
     Parameters

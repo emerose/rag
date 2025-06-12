@@ -26,7 +26,9 @@ class Runnable(Generic[Input, Output], ABC):
 class RunnableSerializable(Runnable[Input, Output]):
     """Serializable runnable."""
 
-    pass
+    def invoke(
+        self, input: Input, config: RunnableConfig | None = None, **kwargs: Any
+    ) -> Output: ...
 
 class RunnableLambda(RunnableSerializable[Input, Output]):
     """A runnable that runs a lambda function."""
@@ -36,4 +38,8 @@ class RunnableLambda(RunnableSerializable[Input, Output]):
 class RunnableParallel(RunnableSerializable[Input, dict[str, Any]]):
     """A runnable that runs multiple runnables in parallel."""
 
-    def __init__(self, **kwargs: Runnable[Input, Any]) -> None: ...
+    def __init__(
+        self,
+        mapping: dict[str, Runnable[Input, Any]] | None = None,
+        **kwargs: Runnable[Input, Any],
+    ) -> None: ...
