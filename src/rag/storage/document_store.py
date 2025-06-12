@@ -69,7 +69,41 @@ class FakeDocumentStore:
             metadata=document.metadata.copy() if document.metadata else {},
         )
 
-    def get_documents(self, doc_ids: list[str]) -> dict[str, Document]:
+    def get_documents(self, filters: dict[str, Any] | None = None) -> list[Document]:
+        """Retrieve documents from the store.
+
+        Args:
+            filters: Optional filters to apply
+
+        Returns:
+            List of documents matching the filters
+        """
+        # If no filters, return all documents
+        if not filters:
+            return [
+                Document(
+                    page_content=doc.page_content,
+                    metadata=doc.metadata.copy() if doc.metadata else {},
+                )
+                for doc in self._documents.values()
+            ]
+
+        # Apply filters to documents
+        results = []
+        for document in self._documents.values():
+            metadata = document.metadata or {}
+            matches = [metadata.get(k) == v for k, v in filters.items()]
+            if all(matches):
+                results.append(
+                    Document(
+                        page_content=document.page_content,
+                        metadata=document.metadata.copy() if document.metadata else {},
+                    )
+                )
+
+        return results
+
+    def get_documents_by_ids(self, doc_ids: list[str]) -> dict[str, Document]:
         """Retrieve multiple documents by their IDs.
 
         Args:

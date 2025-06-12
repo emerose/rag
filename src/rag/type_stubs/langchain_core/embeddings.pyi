@@ -17,4 +17,4 @@ class Embeddings(ABC):
 
     def __call__(self, input: str) -> list[float]:
         """Call embed_query."""
-        return self.embed_query(input)
+        ...

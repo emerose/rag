@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     pass
 
-from .config import RAGConfig, RuntimeOptions
-from .storage.vector_store import VectorStoreProtocol
+from rag.config import RAGConfig, RuntimeOptions
+from rag.storage.vector_store import VectorStoreProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +45,12 @@ class RAGEngine:
         self.data_dir = Path(config.data_dir).absolute()
 
         # Use provided factory or create a new one
+        self._factory: Any
         if hasattr(dependencies, "create_query_engine"):  # Duck-type check for factory
             self._factory = dependencies
         else:
             # Import here to avoid circular imports
-            from .factory import RAGComponentsFactory
+            from rag.factory import RAGComponentsFactory
 
             self._factory = RAGComponentsFactory(config, runtime)
 
