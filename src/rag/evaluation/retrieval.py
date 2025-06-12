@@ -81,7 +81,10 @@ class RetrievalEvaluator:
                 path.write_text(f"{title}\n\n{text}")
 
         config = RAGConfig(documents_dir=str(docs_dir), data_dir=str(eval_data_dir))
-        engine = RAGEngine.create(config, RuntimeOptions())
+        # Use factory instead of the deprecated create method to avoid import cycles
+        from rag.factory import RAGComponentsFactory
+        factory = RAGComponentsFactory(config, RuntimeOptions())
+        engine = factory.create_rag_engine()
         engine.index_directory(docs_dir)
         return engine
 

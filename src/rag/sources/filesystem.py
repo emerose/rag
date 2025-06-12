@@ -181,7 +181,7 @@ class FilesystemDocumentSource:
         Returns:
             Dictionary mapping source IDs to SourceDocuments
         """
-        results = {}
+        results: dict[str, SourceDocument] = {}
 
         for source_id in source_ids:
             doc = self.get_document(source_id)

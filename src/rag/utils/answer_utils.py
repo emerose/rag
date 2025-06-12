@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from typing import Any, cast
+from typing import Any
 
 from langchain_core.documents import Document
 
@@ -30,17 +30,19 @@ def extract_citations(answer: str) -> dict[str, list[str]]:
 
     citations: dict[str, list[str]] = {}
     for match in matches:
-        citation = next(filter(bool, match), None)
+        # match is a tuple of (group1, group2, group3) from regex groups
+        match_tuple: tuple[str, str, str] = match
+        citation = next((group for group in match_tuple if group), None)
         if not citation:
             continue
         if ":" in citation:
-            parts = citation.split(":", 1)
-            source_part = cast(str, parts[0])
-            excerpt_part = cast(str, parts[1])
+            parts: list[str] = citation.split(":", 1)
+            source_part = parts[0]
+            excerpt_part = parts[1]
             source = source_part.strip()
             excerpt = excerpt_part.strip()
         else:
-            citation_str = cast(str, citation)
+            citation_str = citation
             source = citation_str.strip()
             excerpt = ""
         citations.setdefault(source, [])

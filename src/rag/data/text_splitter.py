@@ -586,7 +586,10 @@ class TextSplitterFactory:
 
         # Handle markdown special case where we have a list of splitters
         if isinstance(splitter, list):
-            chunked_docs = self._split_markdown_documents(documents, splitter)
+            # Type cast to handle Unknown types in list
+            from typing import cast
+            splitter_list = cast(list[Any], splitter)
+            chunked_docs = self._split_markdown_documents(documents, splitter_list)
         else:
             # Regular case: use the splitter directly
             chunked_docs = self._split_regular_documents(documents, splitter, mime_type)
@@ -861,7 +864,7 @@ class TextSplitterFactory:
         ]
 
         # Extract fields from first document
-        base_metadata = {}
+        base_metadata: dict[str, Any] = {}
         for field in metadata_to_preserve:
             if field in doc.metadata:
                 base_metadata[field] = doc.metadata[field]
