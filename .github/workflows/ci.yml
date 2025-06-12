@@ -46,14 +46,7 @@ jobs:
       - name: Show installed packages
         run: uv pip list
 
-      - name: Run formatter
-        run: uv run ruff format src/ --line-length 88
-
-      - name: Run linter
-        run: uv run ruff check src/rag --line-length 88
-
-      - name: Run unit tests
-        run: uv run python scripts/run_tests.py unit
-
-      - name: Run integration tests
-        run: uv run python scripts/run_tests.py integration
+      - name: Run all quality checks and tests  
+        run: uv run python scripts/run_tests.py check --full-output
+        # Uses enhanced test runner with static analysis + unit + integration tests
+        # --full-output provides verbose CI logging while respecting error baselines
