@@ -917,8 +917,8 @@ def summarize(
         raise typer.Exit(1) from e
 
 
-@app.command()
-def list(
+@app.command(name="list")
+def list_documents(
     # Duplicated from app-level callback for Typer CLI compatibility
     data_dir: str = typer.Option(
         None,  # Default to None to allow app-level value to be used
