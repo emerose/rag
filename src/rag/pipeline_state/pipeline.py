@@ -74,6 +74,7 @@ class Pipeline:
         task_processors: dict[TaskType, TaskProcessor],
         document_source: DocumentSourceProtocol,
         config: PipelineConfig,
+        document_store: Any = None,
     ):
         """Initialize the pipeline.
 
@@ -89,11 +90,17 @@ class Pipeline:
         self.processors = task_processors
         self.document_source = document_source
         self.config = config
+        self._document_store = document_store
 
         # Execution control
         self._executor = ThreadPoolExecutor(max_workers=config.concurrent_tasks)
         self._running = False
         self._paused = False
+        
+    @property
+    def document_store(self) -> Any:
+        """Access to document store for backward compatibility."""
+        return self._document_store
 
     def start(
         self,

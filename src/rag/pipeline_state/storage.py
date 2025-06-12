@@ -7,7 +7,7 @@ documents, and tasks using SQLAlchemy.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import create_engine, select
@@ -81,7 +81,7 @@ class PipelineStorage:
                 state=PipelineState.CREATED,
                 source_type=source_type,
                 source_config=source_config,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
                 doc_metadata=metadata or {},
             )
             session.add(execution)
@@ -113,7 +113,7 @@ class PipelineStorage:
                 execution_id=execution_id,
                 source_identifier=source_identifier,
                 processing_config=processing_config,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(timezone.utc),
                 doc_metadata=metadata or {},
             )
             session.add(document)
@@ -145,8 +145,8 @@ class PipelineStorage:
             List of created task IDs
         """
         with self.get_session() as session:
-            task_ids = []
-            task_id_by_type = {}
+            task_ids: list[str] = []
+            task_id_by_type: dict[str, str] = {}
 
             for i, config in enumerate(task_configs):
                 task_id = str(uuid.uuid4())
@@ -165,7 +165,7 @@ class PipelineStorage:
                     task_type=task_type,
                     sequence_number=i,
                     depends_on_task_id=depends_on_id,
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
                     task_config=config.get("task_config", {}),
                     max_retries=config.get("max_retries", 3),
                 )
@@ -265,13 +265,13 @@ class PipelineStorage:
 
             # Set timestamps
             if state == PipelineState.RUNNING and not execution.started_at:
-                execution.started_at = datetime.utcnow()
+                execution.started_at = datetime.now(timezone.utc)
             elif state in (
                 PipelineState.COMPLETED,
                 PipelineState.FAILED,
                 PipelineState.CANCELLED,
             ):
-                execution.completed_at = datetime.utcnow()
+                execution.completed_at = datetime.now(timezone.utc)
 
             # Set error info
             if error_message:
@@ -298,7 +298,7 @@ class PipelineStorage:
 
             # Set completion time
             if state in (TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED):
-                document.completed_at = datetime.utcnow()
+                document.completed_at = datetime.now(timezone.utc)
 
             # Set error info
             if error_message:
@@ -334,9 +334,9 @@ class PipelineStorage:
 
             # Set timestamps
             if state == TaskState.IN_PROGRESS and not task.started_at:
-                task.started_at = datetime.utcnow()
+                task.started_at = datetime.now(timezone.utc)
             elif state in (TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED):
-                task.completed_at = datetime.utcnow()
+                task.completed_at = datetime.now(timezone.utc)
 
             # Set error info
             if error_message:
@@ -358,7 +358,7 @@ class PipelineStorage:
                 raise ValueError(f"Processing task not found: {task_id}")
 
             task.retry_count += 1
-            task.last_retry_at = datetime.utcnow()
+            task.last_retry_at = datetime.now(timezone.utc)
             session.commit()
             return task.retry_count
 
@@ -509,7 +509,7 @@ class PipelineStorage:
         from datetime import timedelta
 
         with self.get_session() as session:
-            cutoff_date = datetime.utcnow() - timedelta(days=days)
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             # Find old executions
             old_executions = session.scalars(

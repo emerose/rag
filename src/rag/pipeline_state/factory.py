@@ -138,6 +138,7 @@ class PipelineFactory:
             task_processors=processors,
             document_source=document_source,
             config=pipeline_config,
+            document_store=document_store,
         )
 
     @staticmethod
@@ -187,6 +188,7 @@ class PipelineFactory:
             task_processors=processors,
             document_source=dependencies.document_source,
             config=config,
+            document_store=dependencies.document_store,
         )
 
     @staticmethod
@@ -258,4 +260,5 @@ class PipelineFactory:
             task_processors=processors,
             document_source=document_source,
             config=config,
+            document_store=getattr(factory, 'document_store', None) if 'factory' in locals() else None,
         )
