@@ -1,0 +1,528 @@
+"""Storage implementation for the pipeline state machine.
+
+This module provides database operations for managing pipeline executions,
+documents, and tasks using SQLAlchemy.
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session, sessionmaker
+
+from rag.pipeline_state.models import (
+    Base,
+    ChunkingTask,
+    DocumentLoadingTask,
+    DocumentProcessing,
+    EmbeddingTask,
+    PipelineExecution,
+    PipelineState,
+    ProcessingTask,
+    TaskState,
+    TaskType,
+    VectorStorageTask,
+)
+from rag.utils.logging_utils import get_logger
+
+logger = get_logger()
+
+
+class PipelineStorage:
+    """Database storage for pipeline state management."""
+
+    def __init__(self, database_url: str = "sqlite:///pipeline_state.db"):
+        """Initialize the pipeline storage.
+
+        Args:
+            database_url: SQLAlchemy database URL
+        """
+        # Create engine
+        self.engine = create_engine(
+            database_url,
+            connect_args={"check_same_thread": False}
+            if database_url.startswith("sqlite")
+            else {},
+        )
+
+        # Create session factory
+        self.SessionLocal = sessionmaker(bind=self.engine, expire_on_commit=False)
+
+        # Create tables
+        Base.metadata.create_all(self.engine)
+
+    def get_session(self) -> Session:
+        """Get a new database session."""
+        return self.SessionLocal()
+
+    def create_pipeline_execution(
+        self,
+        source_type: str,
+        source_config: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """Create a new pipeline execution.
+
+        Args:
+            source_type: Type of document source (e.g., "filesystem")
+            source_config: Configuration for the source
+            metadata: Optional execution metadata
+
+        Returns:
+            Execution ID
+        """
+        with self.get_session() as session:
+            execution_id = str(uuid.uuid4())
+            execution = PipelineExecution(
+                id=execution_id,
+                state=PipelineState.CREATED,
+                source_type=source_type,
+                source_config=source_config,
+                created_at=datetime.utcnow(),
+                doc_metadata=metadata or {},
+            )
+            session.add(execution)
+            session.commit()
+            return execution_id
+
+    def create_document_processing(
+        self,
+        execution_id: str,
+        source_identifier: str,
+        processing_config: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """Create a document processing record.
+
+        Args:
+            execution_id: Parent pipeline execution ID
+            source_identifier: Document source identifier
+            processing_config: Configuration for processing this document
+            metadata: Optional document metadata
+
+        Returns:
+            Document processing ID
+        """
+        with self.get_session() as session:
+            doc_id = str(uuid.uuid4())
+            document = DocumentProcessing(
+                id=doc_id,
+                execution_id=execution_id,
+                source_identifier=source_identifier,
+                processing_config=processing_config,
+                created_at=datetime.utcnow(),
+                doc_metadata=metadata or {},
+            )
+            session.add(document)
+
+            # Update execution document count
+            execution = session.get(PipelineExecution, execution_id)
+            if execution:
+                execution.total_documents += 1
+
+            session.commit()
+            return doc_id
+
+    def create_processing_tasks(
+        self,
+        document_id: str,
+        task_configs: list[dict[str, Any]],
+    ) -> list[str]:
+        """Create processing tasks for a document.
+
+        Args:
+            document_id: Parent document processing ID
+            task_configs: List of task configurations, each containing:
+                - task_type: TaskType enum value
+                - task_config: Task-specific configuration
+                - depends_on: Optional task type to depend on
+                - max_retries: Optional max retry count
+
+        Returns:
+            List of created task IDs
+        """
+        with self.get_session() as session:
+            task_ids = []
+            task_id_by_type = {}
+
+            for i, config in enumerate(task_configs):
+                task_id = str(uuid.uuid4())
+                task_type = config["task_type"]
+
+                # Find dependency task ID if specified
+                depends_on_id = None
+                if "depends_on" in config:
+                    depends_on_type = config["depends_on"]
+                    depends_on_id = task_id_by_type.get(depends_on_type)
+
+                # Create base task
+                task = ProcessingTask(
+                    id=task_id,
+                    document_id=document_id,
+                    task_type=task_type,
+                    sequence_number=i,
+                    depends_on_task_id=depends_on_id,
+                    created_at=datetime.utcnow(),
+                    task_config=config.get("task_config", {}),
+                    max_retries=config.get("max_retries", 3),
+                )
+                session.add(task)
+
+                # Create task-specific details
+                self._create_task_details(
+                    session, task_id, task_type, config.get("task_config", {})
+                )
+
+                task_ids.append(task_id)
+                task_id_by_type[task_type] = task_id
+
+            session.commit()
+            return task_ids
+
+    def _create_task_details(
+        self,
+        session: Session,
+        task_id: str,
+        task_type: TaskType,
+        config: dict[str, Any],
+    ) -> None:
+        """Create task-specific detail records."""
+        if task_type == TaskType.DOCUMENT_LOADING:
+            details = DocumentLoadingTask(
+                task_id=task_id,
+                loader_type=config.get("loader_type", "default"),
+                loader_config=config.get("loader_config", {}),
+            )
+            session.add(details)
+        elif task_type == TaskType.CHUNKING:
+            details = ChunkingTask(
+                task_id=task_id,
+                chunking_strategy=config.get("strategy", "recursive"),
+                chunk_size=config.get("chunk_size", 1000),
+                chunk_overlap=config.get("chunk_overlap", 200),
+                separator=config.get("separator"),
+            )
+            session.add(details)
+        elif task_type == TaskType.EMBEDDING:
+            details = EmbeddingTask(
+                task_id=task_id,
+                model_name=config.get("model_name", "text-embedding-ada-002"),
+                model_provider=config.get("provider", "openai"),
+                batch_size=config.get("batch_size", 100),
+                embedding_dimension=config.get("dimension"),
+            )
+            session.add(details)
+        elif task_type == TaskType.VECTOR_STORAGE:
+            details = VectorStorageTask(
+                task_id=task_id,
+                store_type=config.get("store_type", "faiss"),
+                store_config=config.get("store_config", {}),
+                collection_name=config.get("collection_name"),
+            )
+            session.add(details)
+
+    def get_pipeline_execution(self, execution_id: str) -> PipelineExecution:
+        """Get a pipeline execution by ID."""
+        with self.get_session() as session:
+            execution = session.get(PipelineExecution, execution_id)
+            if not execution:
+                raise ValueError(f"Pipeline execution not found: {execution_id}")
+            return execution
+
+    def get_document(self, document_id: str) -> DocumentProcessing:
+        """Get a document processing record by ID."""
+        with self.get_session() as session:
+            document = session.get(DocumentProcessing, document_id)
+            if not document:
+                raise ValueError(f"Document processing not found: {document_id}")
+            return document
+
+    def get_task(self, task_id: str) -> ProcessingTask:
+        """Get a processing task by ID."""
+        with self.get_session() as session:
+            task = session.get(ProcessingTask, task_id)
+            if not task:
+                raise ValueError(f"Processing task not found: {task_id}")
+            return task
+
+    def update_pipeline_state(
+        self,
+        execution_id: str,
+        state: PipelineState,
+        error_message: str | None = None,
+        error_details: dict[str, Any] | None = None,
+    ) -> None:
+        """Update pipeline execution state."""
+        with self.get_session() as session:
+            execution = session.get(PipelineExecution, execution_id)
+            if not execution:
+                raise ValueError(f"Pipeline execution not found: {execution_id}")
+
+            execution.state = state
+
+            # Set timestamps
+            if state == PipelineState.RUNNING and not execution.started_at:
+                execution.started_at = datetime.utcnow()
+            elif state in (
+                PipelineState.COMPLETED,
+                PipelineState.FAILED,
+                PipelineState.CANCELLED,
+            ):
+                execution.completed_at = datetime.utcnow()
+
+            # Set error info
+            if error_message:
+                execution.error_message = error_message
+            if error_details:
+                execution.error_details = error_details
+
+            session.commit()
+
+    def update_document_state(
+        self,
+        document_id: str,
+        state: TaskState,
+        error_message: str | None = None,
+        error_details: dict[str, Any] | None = None,
+    ) -> None:
+        """Update document processing state."""
+        with self.get_session() as session:
+            document = session.get(DocumentProcessing, document_id)
+            if not document:
+                raise ValueError(f"Document processing not found: {document_id}")
+
+            document.current_state = state
+
+            # Set completion time
+            if state in (TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED):
+                document.completed_at = datetime.utcnow()
+
+            # Set error info
+            if error_message:
+                document.error_message = error_message
+            if error_details:
+                document.error_details = error_details
+
+            # Update execution counters
+            execution = session.get(PipelineExecution, document.execution_id)
+            if execution:
+                if state == TaskState.COMPLETED:
+                    execution.processed_documents += 1
+                elif state == TaskState.FAILED:
+                    execution.failed_documents += 1
+
+            session.commit()
+
+    def update_task_state(
+        self,
+        task_id: str,
+        state: TaskState,
+        error_message: str | None = None,
+        error_details: dict[str, Any] | None = None,
+        result_summary: dict[str, Any] | None = None,
+    ) -> None:
+        """Update processing task state."""
+        with self.get_session() as session:
+            task = session.get(ProcessingTask, task_id)
+            if not task:
+                raise ValueError(f"Processing task not found: {task_id}")
+
+            task.state = state
+
+            # Set timestamps
+            if state == TaskState.IN_PROGRESS and not task.started_at:
+                task.started_at = datetime.utcnow()
+            elif state in (TaskState.COMPLETED, TaskState.FAILED, TaskState.CANCELLED):
+                task.completed_at = datetime.utcnow()
+
+            # Set error info
+            if error_message:
+                task.error_message = error_message
+            if error_details:
+                task.error_details = error_details
+
+            # Set results
+            if result_summary:
+                task.result_summary = result_summary
+
+            session.commit()
+
+    def increment_retry_count(self, task_id: str) -> int:
+        """Increment and return the retry count for a task."""
+        with self.get_session() as session:
+            task = session.get(ProcessingTask, task_id)
+            if not task:
+                raise ValueError(f"Processing task not found: {task_id}")
+
+            task.retry_count += 1
+            task.last_retry_at = datetime.utcnow()
+            session.commit()
+            return task.retry_count
+
+    def get_pending_tasks(
+        self,
+        document_id: str | None = None,
+        limit: int = 10,
+    ) -> list[ProcessingTask]:
+        """Get pending tasks ready to be executed.
+
+        Args:
+            document_id: Optional document ID to filter by
+            limit: Maximum number of tasks to return
+
+        Returns:
+            List of pending tasks with satisfied dependencies
+        """
+        with self.get_session() as session:
+            query = select(ProcessingTask).where(
+                ProcessingTask.state == TaskState.PENDING
+            )
+
+            if document_id:
+                query = query.where(ProcessingTask.document_id == document_id)
+
+            query = query.order_by(ProcessingTask.sequence_number).limit(limit)
+
+            tasks = session.scalars(query).all()
+
+            # Filter tasks with satisfied dependencies
+            ready_tasks = []
+            for task in tasks:
+                if task.depends_on_task_id:
+                    dependency = session.get(ProcessingTask, task.depends_on_task_id)
+                    if dependency and dependency.state == TaskState.COMPLETED:
+                        ready_tasks.append(task)
+                else:
+                    ready_tasks.append(task)
+
+            return ready_tasks
+
+    def get_pipeline_documents(
+        self,
+        execution_id: str,
+        state: TaskState | None = None,
+    ) -> list[DocumentProcessing]:
+        """Get all documents for a pipeline execution.
+
+        Args:
+            execution_id: Pipeline execution ID
+            state: Optional state filter
+
+        Returns:
+            List of document processing records
+        """
+        with self.get_session() as session:
+            query = select(DocumentProcessing).where(
+                DocumentProcessing.execution_id == execution_id
+            )
+
+            if state:
+                query = query.where(DocumentProcessing.current_state == state)
+
+            return list(session.scalars(query).all())
+
+    def get_document_tasks(
+        self,
+        document_id: str,
+        task_type: TaskType | None = None,
+    ) -> list[ProcessingTask]:
+        """Get all tasks for a document.
+
+        Args:
+            document_id: Document processing ID
+            task_type: Optional task type filter
+
+        Returns:
+            List of processing tasks
+        """
+        with self.get_session() as session:
+            query = select(ProcessingTask).where(
+                ProcessingTask.document_id == document_id
+            )
+
+            if task_type:
+                query = query.where(ProcessingTask.task_type == task_type)
+
+            query = query.order_by(ProcessingTask.sequence_number)
+
+            return list(session.scalars(query).all())
+
+    def get_execution_status(self, execution_id: str) -> dict[str, Any]:
+        """Get detailed status of a pipeline execution.
+
+        Args:
+            execution_id: Pipeline execution ID
+
+        Returns:
+            Status dictionary with execution details
+        """
+        with self.get_session() as session:
+            execution = session.get(PipelineExecution, execution_id)
+            if not execution:
+                raise ValueError(f"Pipeline execution not found: {execution_id}")
+
+            # Get document states
+            documents = self.get_pipeline_documents(execution_id)
+            doc_states = {}
+            for doc in documents:
+                state = doc.current_state.value
+                doc_states[state] = doc_states.get(state, 0) + 1
+
+            # Get task states across all documents
+            task_states = {}
+            for doc in documents:
+                tasks = self.get_document_tasks(doc.id)
+                for task in tasks:
+                    state = task.state.value
+                    task_states[state] = task_states.get(state, 0) + 1
+
+            return {
+                "execution_id": execution_id,
+                "state": execution.state.value,
+                "total_documents": execution.total_documents,
+                "processed_documents": execution.processed_documents,
+                "failed_documents": execution.failed_documents,
+                "document_states": doc_states,
+                "task_states": task_states,
+                "created_at": execution.created_at.isoformat(),
+                "started_at": execution.started_at.isoformat()
+                if execution.started_at
+                else None,
+                "completed_at": execution.completed_at.isoformat()
+                if execution.completed_at
+                else None,
+                "error_message": execution.error_message,
+            }
+
+    def cleanup_old_executions(self, days: int = 30) -> int:
+        """Clean up old pipeline executions.
+
+        Args:
+            days: Number of days to keep
+
+        Returns:
+            Number of executions deleted
+        """
+        from datetime import timedelta
+
+        with self.get_session() as session:
+            cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+            # Find old executions
+            old_executions = session.scalars(
+                select(PipelineExecution).where(
+                    PipelineExecution.created_at < cutoff_date
+                )
+            ).all()
+
+            count = len(old_executions)
+
+            # Delete them (cascade will handle related records)
+            for execution in old_executions:
+                session.delete(execution)
+
+            session.commit()
+            return count

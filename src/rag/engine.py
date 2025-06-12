@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.embeddings.batching import EmbeddingBatcher
+from rag.pipeline_state import Pipeline, PipelineState
 from rag.storage.protocols import DocumentStoreProtocol, VectorStoreProtocol
 from rag.storage.vector_store import VectorStoreFactory
 
@@ -27,7 +28,7 @@ class RAGDependencies:
     query_engine: "QueryEngine"
     document_store: DocumentStoreProtocol
     vectorstore_factory: VectorStoreFactory
-    ingestion_pipeline: Any
+    pipeline: Pipeline
     document_source: Any
     embedding_batcher: EmbeddingBatcher
 
@@ -59,7 +60,7 @@ class RAGEngine:
         self._query_engine = dependencies.query_engine
         self._document_store = dependencies.document_store
         self._vectorstore_factory = dependencies.vectorstore_factory
-        self._ingestion_pipeline = dependencies.ingestion_pipeline
+        self._pipeline = dependencies.pipeline
         self._document_source = dependencies.document_source
         self._embedding_batcher = dependencies.embedding_batcher
 
@@ -99,9 +100,14 @@ class RAGEngine:
         return self._embedding_batcher
 
     @property
-    def ingestion_pipeline(self) -> Any:
-        """Get the ingestion pipeline."""
-        return self._ingestion_pipeline
+    def pipeline(self) -> Pipeline:
+        """Get the state machine pipeline."""
+        return self._pipeline
+
+    @property
+    def ingestion_pipeline(self) -> Pipeline:
+        """Get the ingestion pipeline (compatibility property)."""
+        return self._pipeline
 
     @property
     def default_prompt_id(self) -> str:
@@ -147,12 +153,19 @@ class RAGEngine:
         """
         directory_path = Path(directory_path)
 
-        # Use the ingestion pipeline to process all documents
+        # Use the state machine pipeline to process all documents
         try:
-            result = self.ingestion_pipeline.ingest_all()
+            # Start a new pipeline execution
+            execution_id = self.pipeline.start(
+                source_path=str(directory_path),
+                metadata={"initiated_by": "index_directory"},
+            )
+
+            # Run the pipeline
+            result = self.pipeline.run(execution_id)
 
             # Convert pipeline result to the expected format
-            if result.success:
+            if result.state == PipelineState.COMPLETED:
                 # Get list of files that were processed
                 # Import here to avoid circular imports
                 from rag.sources.filesystem import FilesystemDocumentSource
@@ -171,11 +184,22 @@ class RAGEngine:
                     return {
                         "pipeline": {
                             "success": True,
-                            "documents_processed": result.documents_stored,
+                            "execution_id": execution_id,
+                            "documents_processed": result.processed_documents,
+                            "total_documents": result.total_documents,
                         }
                     }
             else:
-                return {"pipeline": {"success": False, "errors": result.errors}}
+                return {
+                    "pipeline": {
+                        "success": False,
+                        "execution_id": execution_id,
+                        "state": result.state.value,
+                        "error": result.error_message,
+                        "processed_documents": result.processed_documents,
+                        "failed_documents": result.failed_documents,
+                    }
+                }
 
         except Exception as e:
             logger.error(f"Error during directory indexing: {e}")
@@ -196,26 +220,35 @@ class RAGEngine:
         file_path = Path(file_path)
 
         try:
-            # Get the relative path for the source ID
-            source = self._document_source
-            if hasattr(source, "root_path"):
-                if file_path.is_relative_to(source.root_path):
-                    source_id = str(file_path.relative_to(source.root_path))
-                else:
-                    source_id = str(file_path)
-            else:
-                source_id = str(file_path)
+            # For single file indexing, use the parent directory as source path
+            # and filter to just this file
+            parent_dir = file_path.parent
 
-            # Use pipeline to process single document
-            result = self.ingestion_pipeline.ingest_document(source_id)
+            # Start a new pipeline execution for the parent directory
+            execution_id = self.pipeline.start(
+                source_path=str(parent_dir),
+                metadata={
+                    "initiated_by": "index_file",
+                    "target_file": str(file_path),
+                },
+            )
 
-            if result.success:
-                return True, f"Successfully indexed {file_path}"
+            # Run the pipeline
+            result = self.pipeline.run(execution_id)
+
+            if (
+                result.state == PipelineState.COMPLETED
+                and result.processed_documents > 0
+            ):
+                return (
+                    True,
+                    f"Successfully indexed {file_path} (execution: {execution_id})",
+                )
             else:
-                error_msgs = [
-                    err.get("error_message", "Unknown error") for err in result.errors
-                ]
-                return False, f"Failed to index {file_path}: {'; '.join(error_msgs)}"
+                return (
+                    False,
+                    f"Failed to index {file_path}: {result.error_message or 'Unknown error'}",
+                )
 
         except Exception as e:
             logger.error(f"Error indexing file {file_path}: {e}")

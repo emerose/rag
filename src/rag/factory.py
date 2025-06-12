@@ -98,6 +98,7 @@ class RAGComponentsFactory:
         self._reranker: BaseReranker | None = None
 
         # Pipeline components
+        self._pipeline: Any | None = None
         self._ingestion_pipeline: Any | None = None
         self._document_source: Any | None = None
 
@@ -221,45 +222,22 @@ class RAGComponentsFactory:
         return self._document_source
 
     @property
-    def ingestion_pipeline(self) -> Any:
-        """Get or create ingestion pipeline."""
-        if self._ingestion_pipeline is None:
-            from rag.pipeline import IngestionPipeline
+    def pipeline(self) -> Any:
+        """Get or create state machine pipeline."""
+        if self._pipeline is None:
+            from rag.pipeline_state import PipelineFactory
 
-            # Use the same document store logic as the property
-            document_store = self.document_store
-
-            # Create transformer and embedder
-            from rag.pipeline import DefaultDocumentTransformer, DefaultEmbedder
-
-            # Use text splitter factory override if provided
-            text_splitter_factory = self._text_splitter_factory
-            if text_splitter_factory is None:
-                text_splitter_factory = self._create_text_splitter_factory()
-
-            transformer = DefaultDocumentTransformer(
-                chunk_size=self.config.chunk_size,
-                chunk_overlap=self.config.chunk_overlap,
-                text_splitter_factory=text_splitter_factory,
-            )
-
-            embedder = DefaultEmbedder(
-                embedding_service=self.embedding_service,
-            )
-
-            # Create the ingestion pipeline
-            workspace_path = str(Path(self.config.data_dir) / "workspace")
-            self._ingestion_pipeline = IngestionPipeline(
-                source=self.document_source,
-                transformer=transformer,
-                document_store=document_store,
-                embedder=embedder,
-                vector_store=self.vectorstore_factory,  # Use new factory instead of old repository
+            # Create pipeline using factory
+            self._pipeline = PipelineFactory.create_default(
+                config=self.config,
                 progress_callback=self.runtime.progress_callback,
-                workspace_path=workspace_path,
             )
+        return self._pipeline
 
-        return self._ingestion_pipeline
+    @property
+    def ingestion_pipeline(self) -> Any:
+        """Get or create ingestion pipeline (compatibility property)."""
+        return self.pipeline
 
     @property
     def reranker(self) -> BaseReranker | None:
@@ -363,7 +341,7 @@ class RAGComponentsFactory:
             query_engine=self.create_query_engine(),
             document_store=self.document_store,
             vectorstore_factory=self.vectorstore_factory,
-            ingestion_pipeline=self.ingestion_pipeline,
+            pipeline=self.pipeline,
             document_source=self.document_source,
             embedding_batcher=self.embedding_batcher,
         )
