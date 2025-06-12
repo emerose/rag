@@ -8,6 +8,7 @@ to the testing strategy, with rich formatted output and summary views.
 import re
 import subprocess
 import sys
+import threading
 import time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -76,6 +77,7 @@ class CheckStatus:
     skipped_count: int = 0
     error_count: int = 0
     baseline_errors: int = 0
+    percentage: int = 0  # Current progress percentage for running tests
     
     def start(self):
         self.status = "running"
@@ -93,6 +95,9 @@ class CheckStatus:
         self.skipped_count = kwargs.get('skipped_count', 0)
         self.error_count = kwargs.get('error_count', 0)
         self.baseline_errors = kwargs.get('baseline_errors', 0)
+        # When finished, set percentage to 100% for completed tests
+        if status in ["passed", "failed"] and self.name in ["Unit Tests", "Integration Tests", "E2E Tests"]:
+            self.percentage = 100
 
 
 class DynamicTestRunner:
@@ -146,15 +151,14 @@ class DynamicTestRunner:
             if check.status == "pending":
                 status = "[dim]⏳ Pending[/dim]"
             elif check.status == "running":
-                # Calculate percentage if possible
-                if check.start_time:
+                # Use real percentage for test steps that support it
+                if check.name in ["Unit Tests", "Integration Tests", "E2E Tests"] and check.percentage > 0:
+                    status = f"[yellow]⠋ Running ({check.percentage}%)[/yellow]"
+                elif check.start_time:
+                    # Fall back to time-based estimate for non-test steps
                     elapsed = time.time() - check.start_time
                     # Estimate completion based on typical durations
-                    if "Unit Tests" in check.name:
-                        estimated_total = 5.0  # ~5 seconds for unit tests
-                    elif "Integration Tests" in check.name:
-                        estimated_total = 7.0  # ~7 seconds for integration
-                    elif "Type Checking" in check.name:
+                    if "Type Checking" in check.name:
                         estimated_total = 4.0  # ~4 seconds for pyright
                     else:
                         estimated_total = 2.0  # Default for quick checks
@@ -655,6 +659,52 @@ def run_pytest_quietly(cmd: list[str]) -> tuple[int, str]:
     return result.returncode, output
 
 
+def run_pytest_with_progress(cmd: list[str], check_status: "CheckStatus", live_update_callback=None) -> tuple[int, str]:
+    """Run pytest with real-time progress updates."""
+    # Add progress output style to pytest command
+    cmd_with_progress = cmd + ["-o", "console_output_style=progress"]
+    
+    # Start the process
+    process = subprocess.Popen(
+        cmd_with_progress,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+        universal_newlines=True
+    )
+    
+    output_lines = []
+    percentage = 0
+    
+    try:
+        for line in process.stdout:
+            output_lines.append(line)
+            
+            # Parse progress percentage from pytest output
+            # Look for patterns like "[ 25%]", "[ 50%]", etc.
+            progress_match = re.search(r'\[\s*(\d+)%\]', line)
+            if progress_match:
+                new_percentage = int(progress_match.group(1))
+                if new_percentage > percentage:
+                    percentage = new_percentage
+                    # Update the check status with current percentage
+                    check_status.percentage = percentage
+                    # Trigger live update if callback provided
+                    if live_update_callback:
+                        live_update_callback()
+                    
+    except Exception:
+        # If anything goes wrong with progress parsing, continue silently
+        pass
+    
+    # Wait for process to complete
+    process.wait()
+    
+    full_output = ''.join(output_lines)
+    return process.returncode, full_output
+
+
 def run_static_with_summary(max_errors: int = MAX_TYPE_ERRORS, verbose: bool = False) -> int:
     """Run all static analysis with summary output."""
     console.print(
@@ -771,8 +821,10 @@ def run_check_with_dynamic_table(
         # Run unit tests
         unit_check.start()
         live.update(runner.create_status_table())
-        unit_result, unit_output = run_pytest_quietly(
-            ["python", "-m", "pytest", "tests/unit/", "-v", "--tb=short"]
+        unit_result, unit_output = run_pytest_with_progress(
+            ["python", "-m", "pytest", "tests/unit/", "-v", "--tb=short"],
+            unit_check,
+            lambda: live.update(runner.create_status_table())
         )
         parsed_unit = parse_pytest_output(unit_output)
         if unit_result == 0:
@@ -799,8 +851,10 @@ def run_check_with_dynamic_table(
         if integration_check:
             integration_check.start()
             live.update(runner.create_status_table())
-            integration_result, integration_output = run_pytest_quietly(
-                ["python", "-m", "pytest", "-m", "integration", "-v", "--tb=short"]
+            integration_result, integration_output = run_pytest_with_progress(
+                ["python", "-m", "pytest", "-m", "integration", "-v", "--tb=short"],
+                integration_check,
+                lambda: live.update(runner.create_status_table())
             )
             parsed_integration = parse_pytest_output(integration_output)
             if integration_result == 0:
@@ -827,8 +881,10 @@ def run_check_with_dynamic_table(
         if e2e_check:
             e2e_check.start()
             live.update(runner.create_status_table())
-            e2e_result, e2e_output = run_pytest_quietly(
-                ["python", "-m", "pytest", "-m", "e2e", "-v", "--tb=short"]
+            e2e_result, e2e_output = run_pytest_with_progress(
+                ["python", "-m", "pytest", "-m", "e2e", "-v", "--tb=short"],
+                e2e_check,
+                lambda: live.update(runner.create_status_table())
             )
             parsed_e2e = parse_pytest_output(e2e_output)
             if e2e_result == 0:
