@@ -165,16 +165,16 @@ class DynamicTestRunner:
                     status = "[yellow]⠋ Running[/yellow]"
             elif check.status == "passed":
                 if check.name == "Type Checking":
-                    # Show error count in green if <= baseline
+                    # Show error count in green if <= baseline (no checkmark for numerical results)
                     if check.error_count > 0:
                         if check.error_count <= check.baseline_errors:
-                            status = f"[green]✅ {check.error_count} errors[/green]"
+                            status = f"[green]{check.error_count} errors[/green]"
                         else:
-                            status = f"[red]✗ {check.error_count} errors[/red]"
+                            status = f"[red]{check.error_count} errors[/red]"
                     else:
-                        status = "[green]✅ 0 errors[/green]"
+                        status = "[green]0 errors[/green]"
                 elif check.name in test_checks:
-                    # For tests, show passed/failed/skipped counts with colors
+                    # For tests, show passed/failed/skipped counts with colors (no checkmark for numerical results)
                     parts = []
                     if check.passed_count > 0:
                         parts.append(f"[green]{check.passed_count} passed[/green]")
@@ -184,7 +184,7 @@ class DynamicTestRunner:
                         parts.append(f"[yellow]{check.skipped_count} skipped[/yellow]")
                     
                     if parts:
-                        status = f"✅ {' | '.join(parts)}"
+                        status = ' | '.join(parts)
                     else:
                         status = "[green]✅[/green]"
                 else:
@@ -192,13 +192,13 @@ class DynamicTestRunner:
             elif check.status == "failed":
                 if check.name == "Type Checking":
                     if check.error_count > check.baseline_errors:
-                        status = f"[red]✗ {check.error_count} errors[/red]"
+                        status = f"[red]{check.error_count} errors[/red]"
                     else:
                         status = "[red]✗[/red]"
                 elif check.name in test_checks:
-                    # Show failed count in red
+                    # Show failed count in red (no checkmark for numerical results)
                     if check.failed_count > 0:
-                        status = f"[red]✗ {check.failed_count} failed[/red]"
+                        status = f"[red]{check.failed_count} failed[/red]"
                     else:
                         status = "[red]✗[/red]"
                 else:
@@ -418,41 +418,57 @@ def display_pyright_results(
             for error in errors:
                 console.print(f"  • {error}")
     elif result.errors_by_file:
-        # Show summary by error type
+        # Create side-by-side tables with limited rows
+        from rich.columns import Columns
+        
+        tables = []
+        
+        # Show summary by error type (top 5)
         if result.errors_by_type:
-            table = Table(
+            error_type_table = Table(
                 title="Type Errors by Category", show_header=True, header_style="bold magenta"
             )
-            table.add_column("Error Type", style="cyan")
-            table.add_column("Count", justify="right")
+            error_type_table.add_column("Error Type", style="cyan")
+            error_type_table.add_column("Count", justify="right")
 
-            for error_type, count in sorted(
+            # Get top 5 error types
+            top_error_types = sorted(
                 result.errors_by_type.items(), key=lambda x: x[1], reverse=True
-            ):
-                table.add_row(error_type, str(count))
+            )[:5]
+            
+            for error_type, count in top_error_types:
+                error_type_table.add_row(error_type, str(count))
+            
+            # Add "..." row if there are more than 5 types
+            if len(result.errors_by_type) > 5:
+                error_type_table.add_row("...", "...", style="dim")
 
-            console.print(table)
+            tables.append(error_type_table)
 
-        # Show summary by file
-        console.print()
-        table = Table(
+        # Show summary by file (top 5)
+        file_table = Table(
             title="Type Errors by File", show_header=True, header_style="bold magenta"
         )
-        table.add_column("File", style="cyan")
-        table.add_column("Errors", justify="right")
+        file_table.add_column("File", style="cyan")
+        file_table.add_column("Errors", justify="right")
 
-        # Get top 10 files with most errors
+        # Get top 5 files with most errors
         files_by_error_count = sorted(
             result.errors_by_file.items(), key=lambda x: len(x[1]), reverse=True
-        )[:10]
+        )[:5]
 
         for file_path, errors in files_by_error_count:
-            table.add_row(file_path, str(len(errors)))
+            file_table.add_row(file_path, str(len(errors)))
 
-        if len(result.errors_by_file) > 10:
-            table.add_row("...", "...", style="dim")
+        # Add "..." row if there are more than 5 files
+        if len(result.errors_by_file) > 5:
+            file_table.add_row("...", "...", style="dim")
 
-        console.print(table)
+        tables.append(file_table)
+        
+        # Display tables side by side
+        console.print()
+        console.print(Columns(tables, equal=True, expand=True))
 
 
 def display_coverage_results(output: str):
