@@ -221,10 +221,16 @@ class PipelineFactory:
 
         # Use provided processors or create minimal set
         if processors is None:
-            # Import here to avoid circular dependencies
-            from rag.testing.test_factory import FakeRAGComponentsFactory
+            # Create minimal fake dependencies for testing
+            from unittest.mock import Mock
 
-            factory = FakeRAGComponentsFactory.create_minimal()
+            from rag.embeddings.fakes import FakeEmbeddingService
+            from rag.sources.fakes import FakeDocumentSource
+            from rag.storage.fakes import InMemoryVectorStore
+
+            fake_doc_source = FakeDocumentSource()
+            fake_embedding_service = FakeEmbeddingService()
+            fake_doc_store = Mock()  # Mock document store for testing
 
             # Create text splitter factory
             from rag.data.text_splitter import TextSplitterFactory
@@ -236,22 +242,27 @@ class PipelineFactory:
 
             processors = {
                 TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(
-                    document_source or factory.document_source
+                    document_source or fake_doc_source
                 ),
                 TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
-                TaskType.EMBEDDING: EmbeddingProcessor(factory.embedding_service),
+                TaskType.EMBEDDING: EmbeddingProcessor(fake_embedding_service),
                 TaskType.VECTOR_STORAGE: VectorStorageProcessor(
-                    factory.document_store,
-                    getattr(factory, "vector_store", InMemoryVectorStore()),
+                    fake_doc_store,
+                    InMemoryVectorStore(),
                 ),
             }
 
-        # Use provided or fake document source
+        # Use provided or create simple document source
         if document_source is None:
-            from rag.testing.fakes import FakeRAGComponentsFactory
+            # Create a simple filesystem document source for testing
+            import tempfile
+            from pathlib import Path
 
-            factory = FakeRAGComponentsFactory.create_minimal()
-            document_source = factory.document_source
+            from rag.sources.filesystem import FilesystemDocumentSource
+
+            # Use a temporary directory for testing
+            temp_dir = Path(tempfile.mkdtemp())
+            document_source = FilesystemDocumentSource(root_path=temp_dir)
 
         return Pipeline(
             storage=storage,
@@ -259,7 +270,5 @@ class PipelineFactory:
             task_processors=processors,
             document_source=document_source,
             config=config,
-            document_store=getattr(factory, "document_store", None)
-            if "factory" in locals()
-            else None,
+            document_store=None,  # Use minimal testing setup
         )

@@ -193,7 +193,11 @@ class ChunkingProcessor(BaseTaskProcessor):
         Args:
             text_splitter_factory: Factory for creating text splitters
         """
-        self.text_splitter_factory = text_splitter_factory or TextSplitterFactory
+        if text_splitter_factory is None:
+            # Create default instance with sensible defaults
+            self.text_splitter_factory = TextSplitterFactory()
+        else:
+            self.text_splitter_factory = text_splitter_factory
 
     def process(self, task: ProcessingTask, input_data: dict[str, Any]) -> TaskResult:
         """Split document content into chunks.

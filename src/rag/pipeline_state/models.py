@@ -322,7 +322,7 @@ class VectorStorageTask(Base):
 
     # Results
     vectors_stored: Mapped[int] = mapped_column(Integer, default=0)
-    storage_duration_ms: Mapped[Float | None] = mapped_column(Float)
+    storage_duration_ms: Mapped[float | None] = mapped_column(Float)
     index_updated: Mapped[bool] = mapped_column(
         Integer, default=False
     )  # SQLite boolean

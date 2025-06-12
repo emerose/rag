@@ -389,7 +389,7 @@ class PipelineStorage:
             tasks = session.scalars(query).all()
 
             # Filter tasks with satisfied dependencies
-            ready_tasks = []
+            ready_tasks: list[ProcessingTask] = []
             for task in tasks:
                 if task.depends_on_task_id:
                     dependency = session.get(ProcessingTask, task.depends_on_task_id)
@@ -466,13 +466,13 @@ class PipelineStorage:
 
             # Get document states
             documents = self.get_pipeline_documents(execution_id)
-            doc_states = {}
+            doc_states: dict[str, int] = {}
             for doc in documents:
                 state = doc.current_state.value
                 doc_states[state] = doc_states.get(state, 0) + 1
 
             # Get task states across all documents
-            task_states = {}
+            task_states: dict[str, int] = {}
             for doc in documents:
                 tasks = self.get_document_tasks(doc.id)
                 for task in tasks:

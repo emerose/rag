@@ -7,9 +7,9 @@ processing through the state machine with full recovery support.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, TypedDict
 
 from rag.pipeline_state.models import PipelineState, ProcessingTask, TaskState, TaskType
 from rag.pipeline_state.processors import TaskProcessor
@@ -19,6 +19,15 @@ from rag.sources.base import DocumentSourceProtocol
 from rag.utils.logging_utils import get_logger
 
 logger = get_logger()
+
+
+class TaskConfigDict(TypedDict, total=False):
+    """Type definition for task configuration dictionary."""
+
+    task_type: TaskType
+    task_config: dict[str, Any]
+    max_retries: int
+    depends_on: TaskType  # Only present for some tasks
 
 
 @dataclass
@@ -167,7 +176,7 @@ class Pipeline:
             )
 
             # Create processing tasks
-            task_configs = [
+            task_configs: list[TaskConfigDict] = [
                 {
                     "task_type": TaskType.DOCUMENT_LOADING,
                     "task_config": {
@@ -207,7 +216,7 @@ class Pipeline:
                 },
             ]
 
-            self.storage.create_processing_tasks(doc_processing_id, task_configs)
+            self.storage.create_processing_tasks(doc_processing_id, task_configs)  # type: ignore[arg-type]
 
         logger.info(
             f"Created pipeline execution {execution_id} with {len(document_ids)} documents"
@@ -327,7 +336,7 @@ class Pipeline:
         documents = self.storage.get_pipeline_documents(execution_id)
 
         # Process documents concurrently
-        futures = []
+        futures: list[Future[None]] = []
         for doc in documents:
             if doc.current_state not in (TaskState.COMPLETED, TaskState.CANCELLED):
                 future = self._executor.submit(self._process_document, doc.id)
@@ -356,7 +365,7 @@ class Pipeline:
             tasks = self.storage.get_document_tasks(document_id)
 
             # Process tasks in order
-            task_outputs = {}
+            task_outputs: dict[str, Any] = {}
             for task in sorted(tasks, key=lambda t: t.sequence_number):
                 if self._paused:
                     logger.info("Pipeline paused, stopping document processing")
