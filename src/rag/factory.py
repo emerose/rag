@@ -28,12 +28,12 @@ from rag.embeddings.embedding_provider import EmbeddingProvider
 from rag.embeddings.model_map import load_model_map
 from rag.embeddings.protocols import EmbeddingServiceProtocol
 from rag.retrieval import BaseReranker
-from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
 from rag.storage.filesystem import FilesystemManager
 from rag.storage.protocols import (
     DocumentStoreProtocol,
     FileSystemProtocol,
 )
+from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
 from rag.storage.vector_store import VectorStoreFactory
 
 logger = logging.getLogger(__name__)
