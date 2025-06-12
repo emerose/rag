@@ -19,7 +19,7 @@ class Document:
 
 # Submodule stubs
 class Documents:
-    Document = Document
+    """Documents module stub."""
 
 # Make it available as documents (lowercase)
 documents = Documents()

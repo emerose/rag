@@ -19,12 +19,20 @@ class VectorStoreProtocol(Protocol):
     facilitates testing with fake implementations.
     """
 
-    def as_retriever(self, *, search_type: str, search_kwargs: dict[str, Any]) -> Any:
+    def as_retriever(self, *, search_type: str = "similarity", search_kwargs: dict[str, Any] | None = None) -> Any:
         """Return a retriever instance."""
         ...
 
     def similarity_search(self, query: str, k: int = 4) -> list[Document]:
         """Return documents similar to the query."""
+        ...
+
+    def add_documents(self, documents: list[Document]) -> None:
+        """Add documents to the vector store."""
+        ...
+
+    def save(self, path: str) -> None:
+        """Save the vector store to disk."""
         ...
 
     def save_local(self, folder_path: str, index_name: str) -> None:
