@@ -50,7 +50,7 @@ class DefaultEmbedder:
             # Add important metadata fields
             for key in ["title", "author", "source", "category", "tags"]:
                 if key in document.metadata:
-                    value = document.metadata[key]  # type: ignore[misc]
+                    value = document.metadata[key]
                     if isinstance(value, list):
                         value = ", ".join(str(v) for v in value)
                     metadata_parts.append(f"{key}: {value}")
@@ -104,16 +104,16 @@ class DefaultEmbedder:
             # Create metadata for vector storage
             vector_metadata: EmbeddingMetadata = {
                 "text": doc.page_content[:1000],  # Store first 1000 chars
-                "source": doc.metadata.get("source", ""),  # type: ignore[misc]
-                "source_id": doc.metadata.get("source_id", ""),  # type: ignore[misc]
-                "chunk_index": doc.metadata.get("chunk_index", 0),  # type: ignore[misc]
-                "total_chunks": doc.metadata.get("total_chunks", 1),  # type: ignore[misc]
+                "source": doc.metadata.get("source", ""),
+                "source_id": doc.metadata.get("source_id", ""),
+                "chunk_index": doc.metadata.get("chunk_index", 0),
+                "total_chunks": doc.metadata.get("total_chunks", 1),
             }
 
             # Add other relevant metadata
             for key in ["title", "author", "date", "category", "content_type"]:
-                if key in doc.metadata:  # type: ignore[misc]
-                    vector_metadata[key] = doc.metadata[key]  # type: ignore[misc]
+                if key in doc.metadata:
+                    vector_metadata[key] = doc.metadata[key]
 
             metadata_list.append(vector_metadata)
 
@@ -239,7 +239,7 @@ class CachedEmbedder:
         import hashlib
 
         content_hash = hashlib.sha256(document.page_content.encode()).hexdigest()
-        source: str = document.metadata.get("source", "unknown")  # type: ignore[misc]
+        source: str = document.metadata.get("source", "unknown")
         chunk_index = document.metadata.get("chunk_index", 0)
 
         return f"{source}:{chunk_index}:{content_hash[:16]}"

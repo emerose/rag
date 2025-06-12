@@ -634,7 +634,7 @@ class TextSplitterFactory:
                             "DEBUG", f"Extracted {len(headings)} headings from PDF"
                         )
                         # Store heading hierarchy in document metadata
-                        documents[0].metadata["heading_hierarchy"] = headings  # type: ignore[misc]
+                        documents[0].metadata["heading_hierarchy"] = headings
                 except (
                     OSError,
                     ValueError,
@@ -696,7 +696,7 @@ class TextSplitterFactory:
         header_docs: list[Document] = []
         for split in header_splits:
             # Enrich metadata with heading path
-            split_metadata = {**doc.metadata, **split.metadata}  # type: ignore[misc]
+            split_metadata = {**doc.metadata, **split.metadata}
 
             # Build heading path if needed
             if "Heading" in split_metadata and self.preserve_headings:
@@ -782,9 +782,9 @@ class TextSplitterFactory:
             and len(documents) == 1
             and "heading_hierarchy" in documents[0].metadata
         ):
-            heading_hierarchy = documents[0].metadata["heading_hierarchy"]  # type: ignore[misc]
+            heading_hierarchy = documents[0].metadata["heading_hierarchy"]
             for chunk in chunked_docs:
-                chunk.metadata["heading_hierarchy"] = heading_hierarchy  # type: ignore[misc]
+                chunk.metadata["heading_hierarchy"] = heading_hierarchy
 
         return chunked_docs
 
@@ -802,8 +802,8 @@ class TextSplitterFactory:
         """
         for i, chunk in enumerate(chunked_docs):
             # Add chunk index information
-            chunk.metadata["chunk_index"] = i  # type: ignore[misc]
-            chunk.metadata["chunk_total"] = len(chunked_docs)  # type: ignore[misc]
+            chunk.metadata["chunk_index"] = i
+            chunk.metadata["chunk_total"] = len(chunked_docs)
 
             # Add character position information if possible
             if len(original_docs) == 1:  # Only track position for single document
@@ -811,8 +811,8 @@ class TextSplitterFactory:
                 if chunk.page_content and chunk.page_content in original_text:
                     start_pos = original_text.find(chunk.page_content)
                     if start_pos != -1:
-                        chunk.metadata["chunk_start_char"] = start_pos  # type: ignore[misc]
-                        chunk.metadata["chunk_end_char"] = start_pos + len(  # type: ignore[misc]
+                        chunk.metadata["chunk_start_char"] = start_pos
+                        chunk.metadata["chunk_end_char"] = start_pos + len(
                             chunk.page_content
                         )
 
@@ -864,7 +864,7 @@ class TextSplitterFactory:
         base_metadata = {}
         for field in metadata_to_preserve:
             if field in doc.metadata:
-                base_metadata[field] = doc.metadata[field]  # type: ignore[misc]
+                base_metadata[field] = doc.metadata[field]
 
         return base_metadata
 

@@ -40,3 +40,7 @@ class HybridRetriever:
 
         ranked = sorted(scores.values(), key=lambda x: x[1], reverse=True)
         return [doc for doc, _ in ranked[:k]]
+
+    # Initialize BM25 retriever with documents
+    def initialize_bm25_retriever(self, documents: list[Document], k: int = 4):
+        self.bm25_retriever = BM25Retriever.from_documents(documents, k=k)

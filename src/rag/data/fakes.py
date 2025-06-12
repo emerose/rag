@@ -154,7 +154,7 @@ class FakeDocumentLoader:
                     if isinstance(content, bytes):
                         content = content.decode("utf-8")
 
-                    # Create a document with the content
+                    # Create a fake document with the content
                     doc = Document(
                         page_content=content,
                         metadata={
@@ -164,7 +164,7 @@ class FakeDocumentLoader:
 
                     # Add file metadata
                     file_metadata = self.filesystem_manager.get_file_metadata(file_path)
-                    doc.metadata.update(  # type: ignore[misc]
+                    doc.metadata.update(
                         {
                             "source_type": file_metadata["source_type"],
                             "file_size": file_metadata["size"],
