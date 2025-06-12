@@ -50,7 +50,7 @@ class TestPipelineStorage:
         assert execution is not None
         assert execution.source_type == "filesystem"
         assert execution.source_config == {"path": "/test/path"}
-        assert execution.execution_metadata == {"test": "data"}
+        assert execution.doc_metadata == {"test": "data"}
         assert execution.state == PipelineState.CREATED
 
     def test_get_pipeline_execution_not_found(self, storage):

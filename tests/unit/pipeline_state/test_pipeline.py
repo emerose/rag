@@ -19,42 +19,36 @@ class TestPipelineExecutionResult:
         """Test creating a successful pipeline result."""
         result = PipelineExecutionResult(
             execution_id="test-exec-1",
-            success=True,
+            state=PipelineState.COMPLETED,
             total_documents=5,
             processed_documents=5,
             failed_documents=0,
-            total_tasks=20,
-            completed_tasks=20,
-            failed_tasks=0,
-            execution_time_seconds=120.5,
-            error_message=None
+            error_message=None,
+            metadata={"execution_time_seconds": 120.5}
         )
         
-        assert result.success is True
+        assert result.state == PipelineState.COMPLETED
         assert result.total_documents == 5
         assert result.processed_documents == 5
         assert result.failed_documents == 0
-        assert result.execution_time_seconds == 120.5
+        assert result.metadata["execution_time_seconds"] == 120.5
         assert result.error_message is None
 
     def test_failed_result(self):
         """Test creating a failed pipeline result."""
         result = PipelineExecutionResult(
             execution_id="test-exec-2",
-            success=False,
+            state=PipelineState.FAILED,
             total_documents=3,
             processed_documents=1,
             failed_documents=2,
-            total_tasks=12,
-            completed_tasks=4,
-            failed_tasks=8,
-            execution_time_seconds=45.2,
-            error_message="Pipeline failed due to multiple task failures"
+            error_message="Pipeline failed due to multiple task failures",
+            metadata={"execution_time_seconds": 45.2, "failed_tasks": 8}
         )
         
-        assert result.success is False
+        assert result.state == PipelineState.FAILED
         assert result.failed_documents == 2
-        assert result.failed_tasks == 8
+        assert result.metadata["failed_tasks"] == 8
         assert "Pipeline failed" in result.error_message
 
 
