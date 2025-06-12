@@ -28,7 +28,7 @@ from rag.embeddings.embedding_provider import EmbeddingProvider
 from rag.embeddings.model_map import load_model_map
 from rag.embeddings.protocols import EmbeddingServiceProtocol
 from rag.retrieval import BaseReranker
-from rag.storage.document_store import SQLiteDocumentStore
+from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
 from rag.storage.filesystem import FilesystemManager
 from rag.storage.protocols import (
     DocumentStoreProtocol,
@@ -119,12 +119,12 @@ class RAGComponentsFactory:
         if self._document_store is None:
             if self.config.database_url:
                 # Use provided database URL
-                self._document_store = SQLiteDocumentStore(self.config.database_url)
+                self._document_store = SQLAlchemyDocumentStore(self.config.database_url)
             else:
                 # Use default SQLite with file path
                 data_dir = Path(self.config.data_dir)
                 db_path = data_dir / "documents.db"
-                self._document_store = SQLiteDocumentStore(db_path)
+                self._document_store = SQLAlchemyDocumentStore(db_path)
         return self._document_store
 
     @property

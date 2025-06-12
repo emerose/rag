@@ -191,13 +191,13 @@ class TestFakeRAGComponentsFactory:
         # Create a FakeRAGComponentsFactory but inject real components
         # (this is a bit contrived but tests the error handling)
         from rag.storage.filesystem import FilesystemManager
-        from rag.storage.document_store import SQLiteDocumentStore
+        from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
         from rag.factory import ComponentOverrides, RAGComponentsFactory
 
         # Create overrides with real components
         overrides = ComponentOverrides(
             filesystem_manager=FilesystemManager(),
-            document_store=SQLiteDocumentStore(Path("/tmp/test") / "test.db"),
+            document_store=SQLAlchemyDocumentStore(Path("/tmp/test") / "test.db"),
         )
 
         config = RAGConfig(documents_dir="/tmp/test", data_dir="/tmp/data")

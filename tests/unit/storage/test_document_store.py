@@ -5,10 +5,8 @@ import tempfile
 from pathlib import Path
 from langchain_core.documents import Document
 
-from rag.storage.document_store import (
-    SQLiteDocumentStore,
-    FakeDocumentStore,
-)
+from rag.storage.document_store import FakeDocumentStore
+from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
 from rag.storage.protocols import DocumentStoreProtocol
 from rag.utils.exceptions import DocumentStoreError
 
@@ -16,13 +14,13 @@ from rag.utils.exceptions import DocumentStoreError
 class TestDocumentStoreProtocol:
     """Test the DocumentStore protocol compliance."""
 
-    @pytest.fixture(params=[SQLiteDocumentStore, FakeDocumentStore])
+    @pytest.fixture(params=[SQLAlchemyDocumentStore, FakeDocumentStore])
     def document_store(self, request) -> DocumentStoreProtocol:
         """Create different document store implementations for testing."""
-        if request.param == SQLiteDocumentStore:
+        if request.param == SQLAlchemyDocumentStore:
             with tempfile.TemporaryDirectory() as temp_dir:
                 db_path = Path(temp_dir) / "test.db"
-                store = SQLiteDocumentStore(db_path)
+                store = SQLAlchemyDocumentStore(db_path)
                 yield store
         else:
             yield FakeDocumentStore()
@@ -318,7 +316,7 @@ class TestDocumentStoreProtocol:
         assert retrieved.metadata == {}
 
 
-class TestSQLiteDocumentStore:
+class TestSQLAlchemyDocumentStore:
     """Test SQLite-specific functionality."""
 
     def test_persistent_storage(self):
@@ -327,12 +325,12 @@ class TestSQLiteDocumentStore:
             db_path = Path(temp_dir) / "test.db"
 
             # Create first store instance and add document
-            store1 = SQLiteDocumentStore(db_path)
+            store1 = SQLAlchemyDocumentStore(db_path)
             doc = Document(page_content="Persistent content", metadata={"key": "value"})
             store1.add_document("doc1", doc)
 
             # Create second store instance and verify document exists
-            store2 = SQLiteDocumentStore(db_path)
+            store2 = SQLAlchemyDocumentStore(db_path)
             retrieved = store2.get_document("doc1")
             assert retrieved is not None
             assert retrieved.page_content == "Persistent content"
@@ -347,7 +345,7 @@ class TestSQLiteDocumentStore:
             assert not db_path.parent.exists()
 
             # Creating store should create directory and database
-            store = SQLiteDocumentStore(db_path)
+            store = SQLAlchemyDocumentStore(db_path)
             assert db_path.parent.exists()
             assert db_path.exists()
 
@@ -360,7 +358,7 @@ class TestSQLiteDocumentStore:
         """Test SQLite FTS5 full-text search capabilities."""
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test.db"
-            store = SQLiteDocumentStore(db_path)
+            store = SQLAlchemyDocumentStore(db_path)
 
             docs = {
                 "doc1": Document(
@@ -387,7 +385,7 @@ class TestSQLiteDocumentStore:
         """Test error handling for SQLite operations."""
         with tempfile.TemporaryDirectory() as temp_dir:
             db_path = Path(temp_dir) / "test.db"
-            store = SQLiteDocumentStore(db_path)
+            store = SQLAlchemyDocumentStore(db_path)
 
             # Test with malformed JSON in database (simulate corruption)
             # This would be difficult to test directly without corrupting the database
