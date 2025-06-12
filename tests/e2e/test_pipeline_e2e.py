@@ -116,7 +116,7 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
             )
             runtime = RuntimeOptions()
-            engine = RAGEngine(config, runtime)
+            engine = RAGEngine.create(config, runtime)
 
             # Step 1: Index all documents using IngestionPipeline
             index_results = engine.ingestion_pipeline.ingest_all()
@@ -197,7 +197,7 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
                 openai_api_key="sk-test",
             )
             runtime = RuntimeOptions()
-            engine = RAGEngine(config, runtime)
+            engine = RAGEngine.create(config, runtime)
 
             # Test with empty directory (should handle gracefully)
             results = engine.ingestion_pipeline.ingest_all()
@@ -306,7 +306,7 @@ and the DocumentStore system.
             runtime = RuntimeOptions()
 
             # First engine instance - index document
-            engine1 = RAGEngine(config, runtime)
+            engine1 = RAGEngine.create(config, runtime)
             results = engine1.ingestion_pipeline.ingest_all()
             assert results.documents_loaded == 1
             assert results.documents_stored == 1
@@ -318,7 +318,7 @@ and the DocumentStore system.
             assert len(source_docs1) == 1
 
             # Create second engine instance (simulating restart)
-            engine2 = RAGEngine(config, runtime)
+            engine2 = RAGEngine.create(config, runtime)
 
             # Should still see the indexed file
             document_store2 = engine2.ingestion_pipeline.document_store

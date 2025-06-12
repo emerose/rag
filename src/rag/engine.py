@@ -1,7 +1,7 @@
 """Main RAG engine module.
 
 This module provides the main RAGEngine class that orchestrates the entire
-RAG system using the simplified single-vectorstore architecture.
+RAG system using dependency injection for better testability and modularity.
 """
 
 import logging
@@ -9,10 +9,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    pass
+    from rag.querying.query_engine import QueryEngine
 
 from rag.config import RAGConfig, RuntimeOptions
-from rag.storage.vector_store import VectorStoreProtocol
+from rag.embeddings.batching import EmbeddingBatcher
+from rag.storage.protocols import DocumentStoreProtocol
+from rag.storage.vector_store import VectorStoreFactory, VectorStoreProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -20,65 +22,70 @@ logger = logging.getLogger(__name__)
 class RAGEngine:
     """Main RAG engine that orchestrates document indexing and querying.
 
-    This engine provides a simplified interface for RAG operations while
-    internally using the new IngestionPipeline architecture through the factory.
+    This engine uses dependency injection to receive all required components,
+    making it more testable and avoiding circular imports.
     """
 
     def __init__(
         self,
         config: RAGConfig,
         runtime: RuntimeOptions,
-        dependencies: Any = None,  # Legacy parameter, can be RAGComponentsFactory
+        query_engine: "QueryEngine",
+        document_store: DocumentStoreProtocol,
+        vectorstore_factory: VectorStoreFactory,
+        ingestion_pipeline: Any,
+        document_source: Any,
+        embedding_batcher: EmbeddingBatcher,
     ) -> None:
-        """Initialize the RAG engine.
+        """Initialize the RAG engine with injected dependencies.
 
         Args:
             config: RAG system configuration
             runtime: Runtime options and callbacks
-            dependencies: Legacy parameter, can be RAGComponentsFactory or None
+            query_engine: Query engine for answering questions
+            document_store: Document store for metadata management
+            vectorstore_factory: Factory for creating/loading vectorstores
+            ingestion_pipeline: Pipeline for document ingestion
+            document_source: Source for reading documents
+            embedding_batcher: Service for batch embedding operations
         """
         self.config = config
         self.runtime = runtime
+
+        # Store injected dependencies
+        self._query_engine = query_engine
+        self._document_store = document_store
+        self._vectorstore_factory = vectorstore_factory
+        self._ingestion_pipeline = ingestion_pipeline
+        self._document_source = document_source
+        self._embedding_batcher = embedding_batcher
 
         # Add properties that tests expect
         self.documents_dir = Path(config.documents_dir).resolve()
         self.data_dir = Path(config.data_dir).absolute()
 
-        # Use provided factory or create a new one
-        self._factory: Any
-        if hasattr(dependencies, "create_query_engine"):  # Duck-type check for factory
-            self._factory = dependencies
-        else:
-            # Import here to avoid circular imports
-            from rag.factory import RAGComponentsFactory
-
-            self._factory = RAGComponentsFactory(config, runtime)
-
-        # Cache the main components we need
-        self._query_engine = None
+        # Cache the vectorstore
         self._vectorstore: VectorStoreProtocol | None = None
 
     @property
-    def query_engine(self):
+    def query_engine(self) -> "QueryEngine":
         """Get the query engine."""
-        if self._query_engine is None:
-            self._query_engine = self._factory.create_query_engine()
         return self._query_engine
 
     @property
-    def document_store(self):
+    def document_store(self) -> DocumentStoreProtocol:
         """Get the document store."""
-        return self._factory.document_store
+        return self._document_store
 
     @property
-    def vectorstore_manager(self):
-        """Get the vectorstore manager."""
-        return self._factory.vector_repository
+    def vectorstore_manager(self) -> VectorStoreFactory:
+        """Get the vectorstore factory (compatibility property)."""
+        return self._vectorstore_factory
 
     @property
-    def index_manager(self):
+    def index_manager(self) -> DocumentStoreProtocol:
         """Get the document store (compatibility property)."""
-        return self._factory.document_store
+        return self._document_store
 
     @property
     def vectorstore(self) -> VectorStoreProtocol | None:
@@ -89,29 +96,29 @@ class RAGEngine:
         return self._vectorstore
 
     @property
-    def embedding_batcher(self):
+    def embedding_batcher(self) -> EmbeddingBatcher:
         """Get the embedding batcher."""
-        return self._factory.embedding_batcher
+        return self._embedding_batcher
 
     @property
-    def ingestion_pipeline(self):
+    def ingestion_pipeline(self) -> Any:
         """Get the ingestion pipeline."""
-        return self._factory.ingestion_pipeline
+        return self._ingestion_pipeline
 
     @property
-    def vector_repository(self):
-        """Get the vector repository."""
-        return self._factory.vector_repository
+    def vector_repository(self) -> VectorStoreFactory:
+        """Get the vector repository (compatibility property)."""
+        return self._vectorstore_factory
 
     @property
-    def document_source(self):
+    def document_source(self) -> Any:
         """Get the document source."""
-        return self._factory.document_source
+        return self._document_source
 
     @property
-    def chat_model(self):
-        """Get the chat model."""
-        return self._factory.chat_model
+    def chat_model(self) -> Any:
+        """Get the chat model from the query engine."""
+        return getattr(self._query_engine, "chat_model", None)
 
     @property
     def system_prompt(self) -> str:
@@ -141,7 +148,7 @@ class RAGEngine:
                 # Get list of files that were processed
                 from rag.sources.filesystem import FilesystemDocumentSource
 
-                source = self._factory.document_source
+                source = self._document_source
                 if isinstance(source, FilesystemDocumentSource):
                     file_paths: list[str] = []
                     for source_id in source.list_documents():
@@ -181,7 +188,7 @@ class RAGEngine:
 
         try:
             # Get the relative path for the source ID
-            source = self._factory.document_source
+            source = self._document_source
             if hasattr(source, "root_path"):
                 if file_path.is_relative_to(source.root_path):
                     source_id = str(file_path.relative_to(source.root_path))
@@ -246,7 +253,7 @@ class RAGEngine:
         """
         try:
             # Get the vectorstore factory from the factory
-            vectorstore_factory = self._factory.vectorstore_factory
+            vectorstore_factory = self._vectorstore_factory
 
             # Try to load existing vectorstore
             vectorstore = vectorstore_factory.load_from_path(str(self.data_dir))
@@ -323,3 +330,30 @@ class RAGEngine:
         except Exception as e:
             logger.error(f"Error getting document summaries: {e}")
             return []
+
+    @classmethod
+    def create(
+        cls,
+        config: RAGConfig,
+        runtime: RuntimeOptions,
+        dependencies: Any = None,
+    ) -> "RAGEngine":
+        """Create RAGEngine using legacy interface for backward compatibility.
+
+        Args:
+            config: RAG system configuration
+            runtime: Runtime options and callbacks
+            dependencies: Optional factory or legacy parameter
+
+        Returns:
+            RAGEngine instance
+        """
+        if dependencies and hasattr(dependencies, "create_rag_engine"):
+            # Use provided factory
+            return dependencies.create_rag_engine()
+        else:
+            # Create new factory and use it to create engine
+            from rag.factory import RAGComponentsFactory
+
+            factory = RAGComponentsFactory(config, runtime)
+            return factory.create_rag_engine()

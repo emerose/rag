@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from rag.data.text_splitter import TextSplitterFactory  
+    from rag.data.text_splitter import TextSplitterFactory
     from rag.querying.query_engine import QueryEngine
 
 from langchain_openai import ChatOpenAI
@@ -344,23 +344,27 @@ class RAGComponentsFactory:
         }
 
     def create_rag_engine(self):
-        """Create a RAGEngine with all dependencies injected from the factory.
+        """Create a RAGEngine with all dependencies injected explicitly.
 
-        This method creates a RAGEngine instance with pre-built components
-        from this factory.
+        This method creates a RAGEngine instance with all required dependencies
+        passed directly to the constructor, avoiding circular imports.
 
         Returns:
-            RAGEngine instance with factory-injected dependencies
+            RAGEngine instance with all dependencies injected
         """
         # Import here to avoid circular imports - moved inside function
         from rag.engine import RAGEngine
 
-        # Create RAGEngine with factory as dependencies
-        # Factory provides all components through dependency injection
+        # Create RAGEngine with all dependencies injected explicitly
         return RAGEngine(
             config=self.config,
             runtime=self.runtime,
-            dependencies=self,  # Pass the factory with all its overrides
+            query_engine=self.create_query_engine(),
+            document_store=self.document_store,
+            vectorstore_factory=self.vectorstore_factory,
+            ingestion_pipeline=self.ingestion_pipeline,
+            document_source=self.document_source,
+            embedding_batcher=self.embedding_batcher,
         )
 
     def _create_text_splitter_factory(self) -> TextSplitterFactory:
