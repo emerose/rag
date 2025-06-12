@@ -5,6 +5,7 @@ RAG system using dependency injection for better testability and modularity.
 """
 
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -19,6 +20,18 @@ from rag.storage.vector_store import VectorStoreFactory, VectorStoreProtocol
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class RAGDependencies:
+    """Container for RAG engine dependencies."""
+
+    query_engine: "QueryEngine"
+    document_store: DocumentStoreProtocol
+    vectorstore_factory: VectorStoreFactory
+    ingestion_pipeline: Any
+    document_source: Any
+    embedding_batcher: EmbeddingBatcher
+
+
 class RAGEngine:
     """Main RAG engine that orchestrates document indexing and querying.
 
@@ -30,35 +43,25 @@ class RAGEngine:
         self,
         config: RAGConfig,
         runtime: RuntimeOptions,
-        query_engine: "QueryEngine",
-        document_store: DocumentStoreProtocol,
-        vectorstore_factory: VectorStoreFactory,
-        ingestion_pipeline: Any,
-        document_source: Any,
-        embedding_batcher: EmbeddingBatcher,
+        dependencies: RAGDependencies,
     ) -> None:
         """Initialize the RAG engine with injected dependencies.
 
         Args:
             config: RAG system configuration
             runtime: Runtime options and callbacks
-            query_engine: Query engine for answering questions
-            document_store: Document store for metadata management
-            vectorstore_factory: Factory for creating/loading vectorstores
-            ingestion_pipeline: Pipeline for document ingestion
-            document_source: Source for reading documents
-            embedding_batcher: Service for batch embedding operations
+            dependencies: Container with all required dependencies
         """
         self.config = config
         self.runtime = runtime
 
         # Store injected dependencies
-        self._query_engine = query_engine
-        self._document_store = document_store
-        self._vectorstore_factory = vectorstore_factory
-        self._ingestion_pipeline = ingestion_pipeline
-        self._document_source = document_source
-        self._embedding_batcher = embedding_batcher
+        self._query_engine = dependencies.query_engine
+        self._document_store = dependencies.document_store
+        self._vectorstore_factory = dependencies.vectorstore_factory
+        self._ingestion_pipeline = dependencies.ingestion_pipeline
+        self._document_source = dependencies.document_source
+        self._embedding_batcher = dependencies.embedding_batcher
 
         # Add properties that tests expect
         self.documents_dir = Path(config.documents_dir).resolve()
