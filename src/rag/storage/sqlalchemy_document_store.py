@@ -163,16 +163,19 @@ class SQLAlchemyDocumentStore:
                 # Check if document already exists
                 existing = session.query(DocumentModel).filter_by(doc_id=doc_id).first()
 
+                # Ensure metadata is properly typed
+                metadata: dict[str, Any] = document.metadata or {}  # type: ignore[assignment]
+
                 if existing:
                     # Update existing document
                     existing.content = document.page_content
-                    existing.doc_metadata = document.metadata or {}
+                    existing.doc_metadata = metadata
                 else:
                     # Create new document
                     doc_model = DocumentModel(
                         doc_id=doc_id,
                         content=document.page_content,
-                        doc_metadata=document.metadata or {},
+                        doc_metadata=metadata,
                     )
                     session.add(doc_model)
 
@@ -199,16 +202,19 @@ class SQLAlchemyDocumentStore:
                         session.query(DocumentModel).filter_by(doc_id=doc_id).first()
                     )
 
+                    # Ensure metadata is properly typed
+                    metadata: dict[str, Any] = document.metadata or {}  # type: ignore[assignment]
+
                     if existing:
                         # Update existing document
                         existing.content = document.page_content
-                        existing.doc_metadata = document.metadata or {}
+                        existing.doc_metadata = metadata
                     else:
                         # Create new document
                         doc_model = DocumentModel(
                             doc_id=doc_id,
                             content=document.page_content,
-                            doc_metadata=document.metadata or {},
+                            doc_metadata=metadata,
                         )
                         session.add(doc_model)
 
@@ -225,10 +231,11 @@ class SQLAlchemyDocumentStore:
             documents: List of documents to store
         """
         # Convert list to dict with generated IDs and use existing add_documents method
-        doc_dict = {}
+        doc_dict: dict[str, Document] = {}
         for i, doc in enumerate(documents):
             # Generate a simple ID based on index if no metadata ID exists
-            doc_id = doc.metadata.get("doc_id", f"doc_{i}")
+            metadata: dict[str, Any] = doc.metadata or {}  # type: ignore[assignment]
+            doc_id: str = str(metadata.get("doc_id", f"doc_{i}"))
             doc_dict[doc_id] = doc
         self.add_documents(doc_dict)
 
@@ -351,7 +358,7 @@ class SQLAlchemyDocumentStore:
             DocumentStoreError: If deletion fails
         """
         try:
-            result = {}
+            result: dict[str, bool] = {}
 
             with self.get_session() as session:
                 for doc_id in doc_ids:
@@ -477,7 +484,9 @@ class SQLAlchemyDocumentStore:
                     fts_results = self._search_full_text(query, limit)
 
                     for doc_id, content, metadata_json in fts_results:
-                        metadata = json.loads(metadata_json) if metadata_json else {}
+                        metadata: dict[str, Any] = (
+                            json.loads(metadata_json) if metadata_json else {}
+                        )
 
                         # Apply metadata filter if specified
                         if metadata_filter:
@@ -503,7 +512,7 @@ class SQLAlchemyDocumentStore:
                     for doc_model in doc_models:
                         # Apply metadata filter if specified
                         if metadata_filter:
-                            metadata = doc_model.doc_metadata or {}
+                            metadata: dict[str, Any] = doc_model.doc_metadata or {}
                             if not all(
                                 metadata.get(k) == v for k, v in metadata_filter.items()
                             ):
@@ -788,11 +797,14 @@ class SQLAlchemyDocumentStore:
             return True
 
         metadata = source_doc.metadata
+        last_mod_check = bool(
+            source_doc.last_modified and source_doc.last_modified < last_modified
+        )
         return (
             source_doc.content_hash != current_hash
             or metadata.get("chunk_size") != chunk_size
             or metadata.get("chunk_overlap") != chunk_overlap
-            or (source_doc.last_modified and source_doc.last_modified < last_modified)
+            or last_mod_check
             or metadata.get("embedding_model") != embedding_model
             or metadata.get("embedding_model_version") != embedding_model_version
         )
@@ -813,7 +825,7 @@ class SQLAlchemyDocumentStore:
 
     def get_all_file_metadata(self) -> dict[str, dict[str, Any]]:
         """Get metadata for all files."""
-        result = {}
+        result: dict[str, dict[str, Any]] = {}
         for source_doc in self.list_source_documents():
             result[source_doc.location] = {
                 "size": source_doc.size_bytes,
