@@ -472,3 +472,112 @@ class FakeDocumentStore:
             or metadata.get("embedding_model") != embedding_model
             or metadata.get("embedding_model_version") != embedding_model_version
         )
+
+    # Additional methods required by DocumentStoreProtocol
+    def store_documents(self, documents: list[Document]) -> None:
+        """Store documents in the document store.
+
+        Args:
+            documents: List of documents to store
+        """
+        for i, doc in enumerate(documents):
+            # Generate a simple ID for each document
+            doc_id = f"doc_{i}_{hash(doc.page_content)}"
+            self.add_document(doc_id, doc)
+
+    def get_documents(self, filters: dict[str, Any] | None = None) -> list[Document]:
+        """Retrieve documents from the store.
+
+        Args:
+            filters: Optional filters to apply
+
+        Returns:
+            List of documents matching the filters
+        """
+        if filters is None:
+            return list(self._documents.values())
+
+        results = []
+        for document in self._documents.values():
+            metadata = document.metadata or {}
+            matches = all(metadata.get(k) == v for k, v in filters.items())
+            if matches:
+                results.append(document)
+        return results
+
+    def get_file_metadata(self, file_path: str | Path) -> dict[str, Any] | None:
+        """Get file metadata.
+
+        Args:
+            file_path: Path to the file
+
+        Returns:
+            Dictionary containing file metadata, or None if not found
+        """
+        from pathlib import Path
+
+        source_doc = self.get_source_document(str(Path(file_path)))
+        if source_doc:
+            return {
+                "file_path": source_doc.location,
+                "content_hash": source_doc.content_hash,
+                "size_bytes": source_doc.size_bytes,
+                "last_modified": source_doc.last_modified,
+                "indexed_at": source_doc.indexed_at,
+                "chunk_count": source_doc.chunk_count,
+                **source_doc.metadata,
+            }
+        return None
+
+    def get_all_file_metadata(self) -> dict[str, dict[str, Any]]:
+        """Get metadata for all files.
+
+        Returns:
+            Dictionary mapping file paths to their metadata
+        """
+        result = {}
+        for source_doc in self._source_documents.values():
+            if source_doc.source_id == "__global_settings__":
+                continue
+            result[source_doc.location] = {
+                "file_path": source_doc.location,
+                "content_hash": source_doc.content_hash,
+                "size_bytes": source_doc.size_bytes,
+                "last_modified": source_doc.last_modified,
+                "indexed_at": source_doc.indexed_at,
+                "chunk_count": source_doc.chunk_count,
+                **source_doc.metadata,
+            }
+        return result
+
+    def list_indexed_files(self) -> list[dict[str, Any]]:
+        """List all indexed files.
+
+        Returns:
+            List of dictionaries containing file information
+        """
+        results = []
+        for source_doc in self._source_documents.values():
+            if source_doc.source_id == "__global_settings__":
+                continue
+            results.append(
+                {
+                    "file_path": source_doc.location,
+                    "content_hash": source_doc.content_hash,
+                    "size_bytes": source_doc.size_bytes,
+                    "last_modified": source_doc.last_modified,
+                    "indexed_at": source_doc.indexed_at,
+                    "chunk_count": source_doc.chunk_count,
+                    **source_doc.metadata,
+                }
+            )
+        return results
+
+    def clear_all_file_metadata(self) -> None:
+        """Clear all file metadata."""
+        # Preserve global settings
+        global_settings = self._source_documents.get("__global_settings__")
+        self._source_documents.clear()
+        self._source_document_chunks.clear()
+        if global_settings:
+            self._source_documents["__global_settings__"] = global_settings

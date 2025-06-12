@@ -6,10 +6,12 @@ RAG system using the simplified single-vectorstore architecture.
 
 import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    pass
 
 from .config import RAGConfig, RuntimeOptions
-from .factory import RAGComponentsFactory
 from .storage.vector_store import VectorStoreProtocol
 
 logger = logging.getLogger(__name__)
@@ -46,6 +48,9 @@ class RAGEngine:
         if hasattr(dependencies, "create_query_engine"):  # Duck-type check for factory
             self._factory = dependencies
         else:
+            # Import here to avoid circular imports
+            from .factory import RAGComponentsFactory
+
             self._factory = RAGComponentsFactory(config, runtime)
 
         # Cache the main components we need

@@ -37,6 +37,22 @@ class EmbeddingServiceProtocol(Protocol):
         """
         ...
 
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings for a list of documents (alias for embed_texts).
+
+        This method provides compatibility with LangChain's Embeddings interface.
+
+        Args:
+            texts: List of texts to embed
+
+        Returns:
+            List of embeddings (lists of floats)
+
+        Raises:
+            ValueError: If embedding generation fails
+        """
+        ...
+
     def embed_query(self, query: str) -> list[float]:
         """Generate embedding for a query.
 

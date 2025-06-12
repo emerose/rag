@@ -154,6 +154,23 @@ class FileSystemProtocol(Protocol):
         """
         ...
 
+    def add_file(
+        self,
+        path: Path | str,
+        content: str | bytes,
+        mime_type: str = "text/plain",
+        mtime: float = 1640995200.0,
+    ) -> None:
+        """Add a file to the filesystem (used for testing).
+
+        Args:
+            path: Path to the file
+            content: File content
+            mime_type: MIME type of the file
+            mtime: Modification time (Unix timestamp)
+        """
+        ...
+
 
 @runtime_checkable
 class DocumentStoreProtocol(Protocol):

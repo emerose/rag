@@ -5,13 +5,15 @@ It exposes helper functions to retrieve prompt templates and list available
 prompt IDs.
 """
 
+from typing import Any
+
 from langchain_core.prompts import PromptTemplate
 from langchain_core.prompts.base import BasePromptTemplate
 
 from rag.utils.exceptions import PromptNotFoundError
 
 # Dictionary of built-in prompt templates
-_PROMPTS: dict[str, BasePromptTemplate] = {
+_PROMPTS: dict[str, BasePromptTemplate[dict[str, Any]]] = {
     "default": PromptTemplate.from_template(
         "You are a helpful assistant. Answer the user's **question** using ONLY "
         "the provided **context**. If the context is insufficient, respond with "
@@ -48,7 +50,7 @@ _PROMPTS: dict[str, BasePromptTemplate] = {
 }
 
 
-def get_prompt(prompt_id: str) -> BasePromptTemplate:
+def get_prompt(prompt_id: str) -> BasePromptTemplate[dict[str, Any]]:
     """Get a prompt template by ID.
 
     Args:

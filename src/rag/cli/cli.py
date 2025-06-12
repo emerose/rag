@@ -1111,7 +1111,7 @@ def _load_vectorstore(rag_engine: RAGEngine) -> None:
     )
 
 
-def _create_repl_session() -> PromptSession:
+def _create_repl_session() -> PromptSession[str]:
     """Create and return a configured prompt session."""
     history_file = Path.home() / ".rag_history"
     history = FileHistory(str(history_file))
@@ -1157,7 +1157,7 @@ def _get_repl_completer(commands: dict[str, Any]):
     """Return a completer for the REPL with command and path completion."""
     return merge_completers(
         [
-            WordCompleter(commands.keys()),
+            WordCompleter(list(commands.keys())),
             PathCompleter(expanduser=True),
         ]
     )
