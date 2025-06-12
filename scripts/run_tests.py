@@ -70,16 +70,29 @@ class CheckStatus:
     duration: float | None = None
     details: str = ""
     start_time: float | None = None
+    # Enhanced details for better display
+    passed_count: int = 0
+    failed_count: int = 0
+    skipped_count: int = 0
+    error_count: int = 0
+    baseline_errors: int = 0
     
     def start(self):
         self.status = "running"
         self.start_time = time.time()
     
-    def finish(self, status: str, details: str = ""):
+    def finish(self, status: str, details: str = "", **kwargs):
         self.status = status
         self.details = details
         if self.start_time:
             self.duration = time.time() - self.start_time
+        
+        # Store additional details
+        self.passed_count = kwargs.get('passed_count', 0)
+        self.failed_count = kwargs.get('failed_count', 0) 
+        self.skipped_count = kwargs.get('skipped_count', 0)
+        self.error_count = kwargs.get('error_count', 0)
+        self.baseline_errors = kwargs.get('baseline_errors', 0)
 
 
 class DynamicTestRunner:
@@ -99,9 +112,10 @@ class DynamicTestRunner:
     def create_status_table(self) -> Table:
         """Create the dynamic status table."""
         table = Table(title="Test Execution Status", show_header=True, header_style="bold magenta")
-        table.add_column("Check", style="cyan", no_wrap=True)
-        table.add_column("Status", justify="center")
-        table.add_column("Duration", justify="right", style="dim")
+        table.add_column("✓", justify="center", width=3)  # Success indicator column
+        table.add_column("Check", style="cyan", no_wrap=True, width=25)
+        table.add_column("Status", justify="center", width=38)  # Fixed width for stability
+        table.add_column("Duration", justify="right", style="dim", width=10)
         
         # Add static analysis section
         static_checks = ["Code Formatting & Linting", "Type Checking", "Dead Code Detection"]
@@ -120,29 +134,75 @@ class DynamicTestRunner:
                     table.add_section()
                 current_section = "tests"
             
+            # Success indicator (leftmost column)
+            if check.status == "passed":
+                success_indicator = "[green]✓[/green]"
+            elif check.status == "failed":
+                success_indicator = "[red]✗[/red]"
+            else:
+                success_indicator = "[dim]•[/dim]"  # Pending/running
+            
             # Format status with appropriate colors and icons
             if check.status == "pending":
                 status = "[dim]⏳ Pending[/dim]"
             elif check.status == "running":
-                status = "[yellow]⠋ Running[/yellow]"
+                # Calculate percentage if possible
+                if check.start_time:
+                    elapsed = time.time() - check.start_time
+                    # Estimate completion based on typical durations
+                    if "Unit Tests" in check.name:
+                        estimated_total = 5.0  # ~5 seconds for unit tests
+                    elif "Integration Tests" in check.name:
+                        estimated_total = 7.0  # ~7 seconds for integration
+                    elif "Type Checking" in check.name:
+                        estimated_total = 4.0  # ~4 seconds for pyright
+                    else:
+                        estimated_total = 2.0  # Default for quick checks
+                    
+                    percentage = min(95, int((elapsed / estimated_total) * 100))
+                    status = f"[yellow]⠋ Running ({percentage}%)[/yellow]"
+                else:
+                    status = "[yellow]⠋ Running[/yellow]"
             elif check.status == "passed":
-                if "tests passed" in check.details:
-                    # Extract number for coloring
-                    count = check.details.split()[0]
-                    status = f"[green]✅ Passed[/green] [green]({count})[/green]"
-                elif "errors" in check.details:
-                    # Show error count
-                    status = f"[green]✅ Passed[/green] [dim]({check.details})[/dim]"
+                if check.name == "Type Checking":
+                    # Show error count in green if <= baseline
+                    if check.error_count > 0:
+                        if check.error_count <= check.baseline_errors:
+                            status = f"[green]✅ {check.error_count} errors[/green]"
+                        else:
+                            status = f"[red]✗ {check.error_count} errors[/red]"
+                    else:
+                        status = "[green]✅ 0 errors[/green]"
+                elif check.name in test_checks:
+                    # For tests, show passed/failed/skipped counts with colors
+                    parts = []
+                    if check.passed_count > 0:
+                        parts.append(f"[green]{check.passed_count} passed[/green]")
+                    if check.failed_count > 0:
+                        parts.append(f"[red]{check.failed_count} failed[/red]")
+                    if check.skipped_count > 0:
+                        parts.append(f"[yellow]{check.skipped_count} skipped[/yellow]")
+                    
+                    if parts:
+                        status = f"✅ {' | '.join(parts)}"
+                    else:
+                        status = "[green]✅[/green]"
                 else:
-                    status = "[green]✅ Passed[/green]"
+                    status = "[green]✅[/green]"
             elif check.status == "failed":
-                if "tests failed" in check.details:
-                    count = check.details.split()[0]
-                    status = f"[red]❌ Failed[/red] [red]({count})[/red]"
-                elif "errors" in check.details:
-                    status = f"[red]❌ Failed[/red] [red]({check.details})[/red]"
+                if check.name == "Type Checking":
+                    if check.error_count > check.baseline_errors:
+                        status = f"[red]✗ {check.error_count} errors[/red]"
+                    else:
+                        status = "[red]✗[/red]"
+                elif check.name in test_checks:
+                    # Show failed count in red
+                    if check.failed_count > 0:
+                        status = f"[red]✗ {check.failed_count} failed[/red]"
+                    else:
+                        status = "[red]✗[/red]"
                 else:
-                    status = "[red]❌ Failed[/red]"
+                    status = "[red]✗[/red]"
             elif check.status == "skipped":
                 status = "[yellow]⏭️ Skipped[/yellow]"
             else:
@@ -157,7 +217,7 @@ class DynamicTestRunner:
             else:
                 duration = "-"
             
-            table.add_row(check.name, status, duration)
+            table.add_row(success_indicator, check.name, status, duration)
         
         return table
     
@@ -660,13 +720,21 @@ def run_check_with_dynamic_table(
         pyright_check.start()
         live.update(runner.create_status_table())
         pyright_result, pyright_output = run_pyright_quietly(max_errors)
+        parsed = parse_pyright_output(pyright_output)
         if pyright_result == 0:
-            # Parse results for summary
-            parsed = parse_pyright_output(pyright_output)
-            pyright_check.finish("passed", f"{parsed.total_errors} errors (≤ {max_errors} baseline)")
+            pyright_check.finish(
+                "passed", 
+                f"{parsed.total_errors} errors (≤ {max_errors} baseline)",
+                error_count=parsed.total_errors,
+                baseline_errors=max_errors
+            )
         else:
-            parsed = parse_pyright_output(pyright_output)
-            pyright_check.finish("failed", f"{parsed.total_errors} errors (> {max_errors} baseline)")
+            pyright_check.finish(
+                "failed", 
+                f"{parsed.total_errors} errors (> {max_errors} baseline)",
+                error_count=parsed.total_errors,
+                baseline_errors=max_errors
+            )
             live.update(runner.create_status_table())
             return pyright_result
         live.update(runner.create_status_table())
@@ -692,9 +760,21 @@ def run_check_with_dynamic_table(
         )
         parsed_unit = parse_pytest_output(unit_output)
         if unit_result == 0:
-            unit_check.finish("passed", f"{parsed_unit.passed} tests passed")
+            unit_check.finish(
+                "passed", 
+                f"{parsed_unit.passed} tests passed",
+                passed_count=parsed_unit.passed,
+                failed_count=parsed_unit.failed,
+                skipped_count=parsed_unit.skipped
+            )
         else:
-            unit_check.finish("failed", f"{parsed_unit.failed} tests failed")
+            unit_check.finish(
+                "failed", 
+                f"{parsed_unit.failed} tests failed",
+                passed_count=parsed_unit.passed,
+                failed_count=parsed_unit.failed,
+                skipped_count=parsed_unit.skipped
+            )
             live.update(runner.create_status_table())
             return unit_result
         live.update(runner.create_status_table())
@@ -708,9 +788,21 @@ def run_check_with_dynamic_table(
             )
             parsed_integration = parse_pytest_output(integration_output)
             if integration_result == 0:
-                integration_check.finish("passed", f"{parsed_integration.passed} tests passed")
+                integration_check.finish(
+                    "passed", 
+                    f"{parsed_integration.passed} tests passed",
+                    passed_count=parsed_integration.passed,
+                    failed_count=parsed_integration.failed,
+                    skipped_count=parsed_integration.skipped
+                )
             else:
-                integration_check.finish("failed", f"{parsed_integration.failed} tests failed")
+                integration_check.finish(
+                    "failed", 
+                    f"{parsed_integration.failed} tests failed",
+                    passed_count=parsed_integration.passed,
+                    failed_count=parsed_integration.failed,
+                    skipped_count=parsed_integration.skipped
+                )
                 live.update(runner.create_status_table())
                 return integration_result
             live.update(runner.create_status_table())
@@ -724,9 +816,21 @@ def run_check_with_dynamic_table(
             )
             parsed_e2e = parse_pytest_output(e2e_output)
             if e2e_result == 0:
-                e2e_check.finish("passed", f"{parsed_e2e.passed} tests passed")
+                e2e_check.finish(
+                    "passed", 
+                    f"{parsed_e2e.passed} tests passed",
+                    passed_count=parsed_e2e.passed,
+                    failed_count=parsed_e2e.failed,
+                    skipped_count=parsed_e2e.skipped
+                )
             else:
-                e2e_check.finish("failed", f"{parsed_e2e.failed} tests failed")
+                e2e_check.finish(
+                    "failed", 
+                    f"{parsed_e2e.failed} tests failed",
+                    passed_count=parsed_e2e.passed,
+                    failed_count=parsed_e2e.failed,
+                    skipped_count=parsed_e2e.skipped
+                )
                 live.update(runner.create_status_table())
                 return e2e_result
             live.update(runner.create_status_table())
