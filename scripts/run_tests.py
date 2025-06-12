@@ -1354,43 +1354,65 @@ def all_tests(
     full_output: Annotated[
         bool, typer.Option("--full-output", help="Show full output for all tools")
     ] = False,
+    dynamic: Annotated[
+        bool, typer.Option("--dynamic", help="Use dynamic table display")
+    ] = True,
+    legacy: Annotated[
+        bool, typer.Option("--legacy", help="Use legacy sequential output")
+    ] = False,
 ) -> None:
     """Run all tests in order: static → unit → integration → e2e."""
-    # First run check (static + unit + integration)
     if full_output:
-        check_result = subprocess.run(
-            ["python", "scripts/run_tests.py", "check", "--full-output"]
-        ).returncode
-    else:
+        # Run with full output (fallback to original behavior)
+        console.print("[blue]Running complete test workflow...[/blue]")
+        steps = [
+            ("static", ["python", "scripts/run_tests.py", "static", "--full-output"]),
+            ("unit", ["python", "scripts/run_tests.py", "unit", "--full-output"]),
+            ("integration", ["python", "scripts/run_tests.py", "integration", "--full-output"]),
+        ]
+        if not skip_e2e:
+            steps.append(
+                ("e2e", ["python", "scripts/run_tests.py", "e2e", "--full-output"])
+            )
+
+        for step_name, cmd in steps:
+            console.print(f"\n[green]Running {step_name}...[/green]")
+            result = subprocess.run(cmd)
+            if result.returncode != 0:
+                console.print(f"[red]❌ {step_name} failed[/red]")
+                raise typer.Exit(result.returncode)
+            console.print(f"[green]✅ {step_name} passed[/green]")
+
+        console.print("[green]✨ All tests passed! ✨[/green]")
+        raise typer.Exit(0)
+    elif legacy or not dynamic:
+        # Use the original sequential output
+        # First run check (static + unit + integration)
         check_result = run_check_with_summary(
             max_errors=max_errors,
             skip_integration=False,
             verbose=verbose,
         )
-    if check_result != 0:
-        raise typer.Exit(check_result)
+        if check_result != 0:
+            raise typer.Exit(check_result)
 
-    # Then run E2E if not skipped
-    if not skip_e2e:
-        console.print("\n[bold green]Step 4/4: E2E Tests[/bold green]")
-        if full_output:
-            exit_code, _, _ = run_command_with_progress(
-                ["python", "-m", "pytest", "-m", "e2e", "-v", "--tb=short"],
-                "Running E2E tests...",
-                capture_output=False,
-            )
-        else:
+        # Then run E2E if not skipped
+        if not skip_e2e:
+            console.print("\n[bold green]Step 4/4: E2E Tests[/bold green]")
             exit_code = run_pytest_with_summary(
                 ["python", "-m", "pytest", "-m", "e2e", "-v", "--tb=short"],
                 "E2E Tests",
                 verbose,
             )
-        if exit_code != 0:
-            console.print("[red]❌ E2E tests failed[/red]")
-            raise typer.Exit(exit_code)
-        console.print("[green]✅ E2E tests passed[/green]")
+            if exit_code != 0:
+                console.print("[red]❌ E2E tests failed[/red]")
+                raise typer.Exit(exit_code)
+            console.print("[green]✅ E2E tests passed[/green]")
 
-    raise typer.Exit(0)
+        raise typer.Exit(0)
+    else:
+        # Use the new dynamic table display with E2E tests included
+        raise typer.Exit(run_check_with_dynamic_table(max_errors, False, not skip_e2e, verbose))
 
 
 @app.command()
