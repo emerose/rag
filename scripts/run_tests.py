@@ -816,12 +816,13 @@ def run_check_with_dynamic_table(
             )
         else:
             pyright_check.finish(
-                "failed", 
+                "failed",
                 f"{parsed.total_errors} errors (> {max_errors} allowed)",
                 error_count=parsed.total_errors,
                 allowed_errors=max_errors
             )
             live.update(runner.create_status_table())
+            display_pyright_results(parsed, max_errors, verbose)
             return pyright_result
         live.update(runner.create_status_table())
         
