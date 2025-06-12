@@ -28,10 +28,43 @@ class TaskResult:
     """Result of processing a task."""
 
     success: bool
-    output_data: dict[str, Any]
+    output_data: dict[str, Any] | None = None
     error_message: str | None = None
     error_details: dict[str, Any] | None = None
     metrics: dict[str, Any] | None = None
+
+    def __post_init__(self):
+        """Ensure output_data is not None."""
+        if self.output_data is None:
+            self.output_data = {}
+
+    @classmethod
+    def create_success(
+        cls,
+        output_data: dict[str, Any],
+        metrics: dict[str, Any] | None = None,
+    ) -> TaskResult:
+        """Create a successful task result."""
+        return cls(
+            success=True,
+            output_data=output_data,
+            metrics=metrics,
+        )
+
+    @classmethod
+    def create_failure(
+        cls,
+        error_message: str,
+        error_details: dict[str, Any] | None = None,
+        output_data: dict[str, Any] | None = None,
+    ) -> TaskResult:
+        """Create a failed task result."""
+        return cls(
+            success=False,
+            output_data=output_data or {},
+            error_message=error_message,
+            error_details=error_details,
+        )
 
 
 class TaskProcessor(Protocol):

@@ -110,7 +110,7 @@ class TestPipeline:
         
         # Mock processors
         mock_processor = Mock()
-        mock_processor.process.return_value = TaskResult.success(
+        mock_processor.process.return_value = TaskResult.create_success(
             {"test": "output"},
             {"duration_ms": 100}
         )
@@ -236,8 +236,8 @@ class TestPipeline:
         # Mock processor responses
         mock_processor = Mock()
         mock_processor.process.side_effect = [
-            TaskResult.success({"document": Mock()}, {"content_length": 1000}),  # Loading
-            TaskResult.success({"chunks": [Mock(), Mock()]}, {"chunks_created": 2}),  # Chunking
+            TaskResult.create_success({"document": Mock()}, {"content_length": 1000}),  # Loading
+            TaskResult.create_success({"chunks": [Mock(), Mock()]}, {"chunks_created": 2}),  # Chunking
         ]
         mock_processor_factory.create_processor.return_value = mock_processor
         
@@ -275,7 +275,7 @@ class TestPipeline:
         
         # Mock processor failure
         mock_processor = Mock()
-        mock_processor.process.return_value = TaskResult.failure(
+        mock_processor.process.return_value = TaskResult.create_failure(
             "Processing failed",
             {"context": "test"}
         )
@@ -306,7 +306,7 @@ class TestPipeline:
         
         # Mock successful processor
         mock_processor = Mock()
-        mock_processor.process.return_value = TaskResult.success(
+        mock_processor.process.return_value = TaskResult.create_success(
             {"document": Mock()},
             {"content_length": 1000}
         )
