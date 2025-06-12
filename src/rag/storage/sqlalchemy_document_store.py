@@ -929,24 +929,31 @@ class SQLAlchemyDocumentStore:
         """Close the database connection."""
         self.engine.dispose()
 
-    # Methods required by DocumentStoreProtocol but not yet implemented
     def update_metadata(self, metadata: Any) -> None:
         """Update metadata for a file.
 
         Args:
             metadata: Document metadata containing all indexing information
         """
-        # This would map to updating source document metadata
         if hasattr(metadata, "file_path"):
             source_doc = self.get_source_document(str(metadata.file_path))
             if source_doc:
-                # Update the source document with new metadata
                 updated_metadata = source_doc.metadata.copy()
                 updated_metadata.update(
                     metadata.to_dict() if hasattr(metadata, "to_dict") else {}
                 )
-                source_doc.metadata = updated_metadata
-                self.add_source_document(source_doc)
+                updated_source_doc = SourceDocumentMetadata(
+                    source_id=source_doc.source_id,
+                    location=source_doc.location,
+                    content_type=source_doc.content_type,
+                    content_hash=source_doc.content_hash,
+                    size_bytes=source_doc.size_bytes,
+                    last_modified=source_doc.last_modified,
+                    indexed_at=source_doc.indexed_at,
+                    metadata=updated_metadata,
+                    chunk_count=source_doc.chunk_count,
+                )
+                self.add_source_document(updated_source_doc)
 
     def get_metadata(self, file_path: Path) -> dict[str, Any] | None:
         """Get metadata for a file.
@@ -968,7 +975,6 @@ class SQLAlchemyDocumentStore:
         Args:
             file_path: Path to the file
         """
-        # This maps to removing source document
         self.remove_source_document(str(file_path))
 
     def update_chunk_hashes(self, file_path: Path, chunk_hashes: list[str]) -> None:

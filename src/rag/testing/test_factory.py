@@ -448,8 +448,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                     content_type="text/plain",
                 )
 
-        # Don't add to FakeDocumentStore when using fake filesystem to avoid duplication
-        # The document source will handle discovery during indexing
 
     def add_test_metadata(self, file_path: str, metadata: dict[str, Any]) -> None:
         """Add test metadata to the fake document store.
