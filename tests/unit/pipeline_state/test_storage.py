@@ -16,11 +16,19 @@ def storage():
     """Create a PipelineStorage instance with in-memory database."""
     with patch('rag.pipeline_state.storage.create_engine') as mock_create_engine:
         # Create a real in-memory SQLite engine for testing
-        from sqlalchemy import create_engine
+        from sqlalchemy import create_engine, event
         from sqlalchemy.orm import sessionmaker
         from rag.pipeline_state.models import Base
         
         engine = create_engine("sqlite:///:memory:")
+        
+        # Enable foreign key constraints for testing
+        @event.listens_for(engine, "connect")
+        def enable_foreign_keys(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+        
         Base.metadata.create_all(engine)
         mock_create_engine.return_value = engine
         
@@ -116,7 +124,8 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt"
+            source_identifier="test.txt",
+            processing_config={"chunk_size": 1000}
         )
         
         storage.update_document_state(
@@ -139,7 +148,8 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt"
+            source_identifier="test.txt",
+            processing_config={"chunk_size": 1000}
         )
         
         task_id = storage.create_processing_task(
@@ -170,7 +180,8 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt"
+            source_identifier="test.txt",
+            processing_config={"chunk_size": 1000}
         )
         
         # Create parent task
@@ -204,7 +215,8 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt"
+            source_identifier="test.txt",
+            processing_config={"chunk_size": 1000}
         )
         task_id = storage.create_processing_task(
             document_id=document_id,
@@ -231,7 +243,8 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt"
+            source_identifier="test.txt",
+            processing_config={"chunk_size": 1000}
         )
         task_id = storage.create_processing_task(
             document_id=document_id,
@@ -259,7 +272,8 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt"
+            source_identifier="test.txt",
+            processing_config={"chunk_size": 1000}
         )
         
         # Create multiple tasks
@@ -301,11 +315,13 @@ class TestPipelineStorage:
         # Create multiple documents
         doc1_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="doc1.txt"
+            source_identifier="doc1.txt",
+            processing_config={"chunk_size": 1000}
         )
         doc2_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="doc2.txt"
+            source_identifier="doc2.txt",
+            processing_config={"chunk_size": 1000}
         )
         
         # Get documents
@@ -322,7 +338,8 @@ class TestPipelineStorage:
         with pytest.raises(Exception):  # Generic exception as specific error type may vary
             storage.create_document_processing(
                 execution_id="nonexistent",
-                source_identifier="test.txt"
+                source_identifier="test.txt",
+                processing_config={"chunk_size": 1000}
             )
 
     def test_context_manager(self, storage):
@@ -407,7 +424,8 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt"
+            source_identifier="test.txt",
+            processing_config={"chunk_size": 1000}
         )
         task_id = storage.create_processing_task(
             document_id=document_id,
