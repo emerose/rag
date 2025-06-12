@@ -172,6 +172,7 @@ class MarkdownMetadataExtractor(BaseMetadataExtractor):
                     "position": match.start(),
                     "page": 1,  # Default page for markdown
                     "font_size": 12.0,  # Default font size for markdown
+                    "path": "",  # Will be populated by _build_heading_paths
                 }
             )
 
@@ -365,7 +366,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         return font_data
 
     def _analyze_text_element(
-        self, element: LTTextContainer[Any]
+        self, element: LTTextContainer
     ) -> tuple[float, bool]:
         """Analyze a text element to determine font size and if it's bold.
 
@@ -383,10 +384,10 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         if hasattr(element, "get_text"):
             # Process each character in the element
             for char in self._extract_chars_from_element(element):
-                if hasattr(char, "size"):
-                    font_sizes.append(char.size)
+                if "size" in char:
+                    font_sizes.append(char["size"])
                     # Heuristic: Some PDFs mark bold with 'Bold' in font name
-                    if hasattr(char, "fontname") and "Bold" in char.fontname:
+                    if "fontname" in char and "Bold" in char["fontname"]:
                         bold_count += 1
                     char_count += 1
 
@@ -447,7 +448,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         """
         try:
             # Group text elements by font size
-            fonts_by_size: dict[float, list[dict[str, Any]]] = {}
+            fonts_by_size: dict[float, list[FontData]] = {}
             for item in font_data:
                 size = item["font_size"]
                 if size not in fonts_by_size:
@@ -474,11 +475,13 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
                         continue
 
                     # Create heading entry
-                    heading = {
+                    heading: HeadingData = {
                         "level": level,
                         "text": item["text"].strip(),
                         "position": item["position"],
-                        "size": item["font_size"],
+                        "font_size": item["font_size"],
+                        "page": item["page"],
+                        "path": "",  # Will be populated by _build_heading_paths
                     }
                     headings.append(heading)
 
@@ -495,7 +498,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         else:
             return headings
 
-    def _build_heading_paths(self, headings: list[dict[str, Any]]) -> None:
+    def _build_heading_paths(self, headings: list[HeadingData]) -> None:
         """Build hierarchical paths for headings.
 
         Args:
@@ -505,7 +508,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
             return
 
         # Initialize arrays to track current heading at each level
-        current_headings = [None] * 10  # Support up to 10 levels
+        current_headings: list[str | None] = [None] * 10  # Support up to 10 levels
 
         for heading in headings:
             level = heading["level"]
@@ -521,8 +524,9 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
             # Build path from present headings
             path_components: list[str] = []
             for i in range(level):
-                if current_headings[i] is not None:
-                    path_components.append(current_headings[i])
+                heading_text = current_headings[i]
+                if heading_text is not None:
+                    path_components.append(heading_text)
 
             # Store path in heading
             heading["path"] = " > ".join(path_components)
@@ -609,6 +613,7 @@ class HTMLMetadataExtractor(BaseMetadataExtractor):
                         "page": 1,  # Default page for HTML
                         "font_size": 12.0
                         + (6 - level) * 2.0,  # Larger font for higher headings
+                        "path": "",  # Will be populated by _build_heading_paths
                     }
                 )
 
@@ -628,7 +633,7 @@ class HTMLMetadataExtractor(BaseMetadataExtractor):
             List of headings with hierarchical paths
         """
         heading_hierarchy: list[HeadingData] = []
-        current_path = [None] * 6  # For h1-h6
+        current_path: list[str | None] = [None] * 6  # For h1-h6
 
         for heading in headings:
             level = heading["level"]

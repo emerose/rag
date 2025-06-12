@@ -99,7 +99,7 @@ class RAGMCPServer(FastMCP):
         if not vectorstore:
             return []
         docs = vectorstore.similarity_search(query, k=top_k)
-        return [doc.model_dump() for doc in docs]
+        return [{"page_content": doc.page_content, "metadata": doc.metadata} for doc in docs]
 
     async def tool_index(self, path: str, ctx: Context[Any, Any]) -> dict[str, Any]:
         p = Path(path)
@@ -277,47 +277,47 @@ def create_http_app(server: RAGMCPServer, api_key: str | None = None) -> FastAPI
         app.add_middleware(APIKeyAuthMiddleware, api_key=api_key)
 
     @app.post("/query")
-    async def query(req: QueryRequest) -> dict[str, Any]:
+    async def query(req: QueryRequest) -> dict[str, Any]:  # type: ignore[reportUnusedFunction]
         return await handle_query(server, req)
 
     @app.post("/search")
-    async def search(req: SearchRequest) -> list[dict[str, Any]]:
+    async def search(req: SearchRequest) -> list[dict[str, Any]]:  # type: ignore[reportUnusedFunction]
         return await handle_search(server, req)
 
     @app.post("/chat")
-    async def chat(req: ChatRequest) -> dict[str, Any]:
+    async def chat(req: ChatRequest) -> dict[str, Any]:  # type: ignore[reportUnusedFunction]
         return await handle_chat(server, req)
 
     @app.get("/documents")
-    async def documents() -> list[dict[str, Any]]:
+    async def documents() -> list[dict[str, Any]]:  # type: ignore[reportUnusedFunction]
         return await handle_documents(server)
 
     @app.get("/documents/{doc_id}")
-    async def get_document(doc_id: str) -> dict[str, Any] | None:
+    async def get_document(doc_id: str) -> dict[str, Any] | None:  # type: ignore[reportUnusedFunction]
         return await handle_get_document(server, doc_id)
 
     @app.delete("/documents/{doc_id}")
-    async def delete_document(doc_id: str) -> bool:
+    async def delete_document(doc_id: str) -> bool:  # type: ignore[reportUnusedFunction]
         return await handle_delete_document(server, doc_id)
 
     @app.post("/index")
-    async def index(req: IndexRequest) -> dict[str, Any]:
+    async def index(req: IndexRequest) -> dict[str, Any]:  # type: ignore[reportUnusedFunction]
         return await handle_index(server, req)
 
     @app.post("/index/rebuild")
-    async def rebuild() -> dict[str, Any]:
+    async def rebuild() -> dict[str, Any]:  # type: ignore[reportUnusedFunction]
         return await handle_rebuild(server)
 
     @app.get("/index/stats")
-    async def index_stats() -> dict[str, Any]:
+    async def index_stats() -> dict[str, Any]:  # type: ignore[reportUnusedFunction]
         return await handle_index_stats(server)
 
     @app.get("/summaries")
-    async def summaries(k: int = 5) -> list[dict[str, Any]]:
+    async def summaries(k: int = 5) -> list[dict[str, Any]]:  # type: ignore[reportUnusedFunction]
         return await handle_summaries(server, k)
 
     @app.post("/clear")
-    async def clear(req: ClearRequest) -> bool:
+    async def clear(req: ClearRequest) -> bool:  # type: ignore[reportUnusedFunction]
         return await handle_clear(server, req)
 
     return app
