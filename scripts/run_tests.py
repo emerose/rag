@@ -5,6 +5,7 @@ Provides convenient commands for running different test suites according
 to the testing strategy, with rich formatted output and summary views.
 """
 
+import json
 import re
 import subprocess
 import time
@@ -16,11 +17,6 @@ import typer
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
-from rich.progress import (
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-)
 from rich.table import Table
 
 # Global variables for command options
@@ -263,27 +259,11 @@ class DynamicTestRunner:
             return str(table)
 
 
-def run_command_with_progress(
-    cmd: list[str], description: str, capture_output: bool = False
+def run_subprocess_no_progress(
+    cmd: list[str], capture_output: bool = False
 ) -> tuple[int, str, str]:
-    """Run a command with a progress spinner."""
-    progress = Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    )
-
-    with progress:
-        task = progress.add_task(description, total=None)
-
-        if capture_output:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-        else:
-            # For non-captured output, show command being run
-            console.print(f"[blue]Running:[/blue] {' '.join(cmd)}")
-            result = subprocess.run(cmd, check=False)
-
-    # Progress bar is automatically removed when context exits
+    """Run a subprocess without any Rich progress bar/live display."""
+    result = subprocess.run(cmd, capture_output=capture_output, text=True, check=False)
     return (
         result.returncode,
         result.stdout if capture_output else "",
@@ -292,29 +272,54 @@ def run_command_with_progress(
 
 
 def parse_pytest_output(output: str) -> TestResult:
-    """Parse pytest output to extract test results."""
+    """Parse pytest output with JSON report support."""
     result = TestResult()
 
-    # Look for summary line like "5 passed, 2 failed, 1 skipped in 0.23s"
-    summary_pattern = r"(\d+)\s+passed(?:,\s*(\d+)\s+failed)?(?:,\s*(\d+)\s+skipped)?(?:.*in\s*([\d.]+)s)?"
-    match = re.search(summary_pattern, output)
+    # Try to find JSON report in output
+    json_report = None
+    for line in output.splitlines():
+        if line.startswith('{"report":'):
+            try:
+                json_report = json.loads(line)
+                break
+            except json.JSONDecodeError:
+                continue
 
-    if match:
-        result.passed = int(match.group(1))
-        result.failed = int(match.group(2)) if match.group(2) else 0
-        result.skipped = int(match.group(3)) if match.group(3) else 0
-        result.duration = float(match.group(4)) if match.group(4) else None
+    if json_report:
+        report = json_report.get("report", {})
+        result.passed = len(report.get("passed", []))
+        result.failed = len(report.get("failed", []))
+        result.skipped = len(report.get("skipped", []))
         result.total = result.passed + result.failed + result.skipped
 
-    # Extract failed test names
-    if result.failed > 0:
-        result.errors = []
-        # Look for FAILED lines
-        failed_pattern = r"FAILED\s+([^\s]+)\s*-\s*(.+)"
-        for match in re.finditer(failed_pattern, output):
-            test_name = match.group(1)
-            error_msg = match.group(2)
-            result.errors.append(f"{test_name}: {error_msg}")
+        # Collect error messages
+        errors = []
+        for test in report.get("failed", []):
+            if "message" in test:
+                errors.append(test["message"])
+        for test in report.get("error", []):
+            if "message" in test:
+                errors.append(test["message"])
+        result.errors = errors if errors else None
+
+        # Set exit code based on failures
+        result.exit_code = 1 if result.failed > 0 else 0
+    else:
+        # Fallback to regex parsing if no JSON report
+        result.total = len(re.findall(r"collected (\d+) items", output))
+        result.passed = len(re.findall(r"PASSED", output))
+        result.failed = len(re.findall(r"FAILED", output))
+        result.skipped = len(re.findall(r"SKIPPED", output))
+
+        # Extract error messages
+        errors = []
+        for line in output.splitlines():
+            if "FAILED" in line or "ERROR" in line:
+                errors.append(line.strip())
+        result.errors = errors if errors else None
+
+        # Set exit code based on failures
+        result.exit_code = 1 if result.failed > 0 else 0
 
     return result
 
@@ -531,9 +536,8 @@ def run_pyright_with_summary(
     max_errors: int = MAX_TYPE_ERRORS, verbose: bool = False
 ) -> int:
     """Run pyright with summary output."""
-    exit_code, stdout, stderr = run_command_with_progress(
+    exit_code, stdout, stderr = run_subprocess_no_progress(
         ["pyright", "src/rag"],
-        "Running type checking...",
         capture_output=True,
     )
 
@@ -551,10 +555,12 @@ def run_pyright_with_summary(
 
 
 def run_pytest_with_summary(cmd: list[str], title: str, verbose: bool = False) -> int:
-    """Run pytest with summary output."""
-    exit_code, stdout, stderr = run_command_with_progress(
+    """Run pytest with summary output and JSON reporting."""
+    # Add JSON report plugin to command
+    cmd.extend(["--json-report", "--json-report-file=none"])
+
+    exit_code, stdout, stderr = run_subprocess_no_progress(
         cmd,
-        f"Running {title.lower()}...",
         capture_output=True,
     )
 
@@ -575,64 +581,51 @@ def run_ruff_with_summary(verbose: bool = False) -> int:
     """Run ruff formatting and linting with summary."""
     with console.status("[bold green]Running code formatting and linting..."):
         # Format
-        format_result = subprocess.run(
+        format_result = run_subprocess_no_progress(
             ["ruff", "format", "src/", "--line-length", "88"],
             capture_output=True,
-            text=True,
-            check=False,
         )
 
         # Lint
-        lint_result = subprocess.run(
+        lint_result = run_subprocess_no_progress(
             ["ruff", "check", "src/rag", "--fix", "--line-length", "88"],
             capture_output=True,
-            text=True,
-            check=False,
         )
 
         # Re-format
-        reformat_result = subprocess.run(
+        reformat_result = run_subprocess_no_progress(
             ["ruff", "format", "src/", "--line-length", "88"],
             capture_output=True,
-            text=True,
-            check=False,
         )
 
     full_output = (
-        format_result.stdout
-        + format_result.stderr
-        + lint_result.stdout
-        + lint_result.stderr
-        + reformat_result.stdout
-        + reformat_result.stderr
+        format_result[1]
+        + format_result[2]
+        + lint_result[1]
+        + lint_result[2]
+        + reformat_result[1]
+        + reformat_result[2]
     )
 
     # Check if any files were modified or if ruff failed
-    if (
-        format_result.returncode != 0
-        or lint_result.returncode != 0
-        or reformat_result.returncode != 0
-    ):
+    if format_result[0] != 0 or lint_result[0] != 0 or reformat_result[0] != 0:
         console.print("[red]❌ Ruff found issues[/red]")
         console.print(full_output)
-    elif "reformatted" in format_result.stdout or lint_result.stdout.strip():
+    elif "reformatted" in format_result[1] or lint_result[1].strip():
         console.print("[yellow]Code was reformatted/fixed[/yellow]")
-        if verbose and lint_result.stdout.strip():
+        if verbose and lint_result[1].strip():
             console.print("\n[dim]Ruff output:[/dim]")
-            console.print(lint_result.stdout)
+            console.print(lint_result[1])
     else:
         console.print("[green]✅ Code formatting and linting passed[/green]")
 
-    return max(
-        format_result.returncode, lint_result.returncode, reformat_result.returncode
-    )
+    return max(format_result[0], lint_result[0], reformat_result[0])
 
 
 def run_vulture_with_summary(verbose: bool = False) -> int:
     """Run vulture with summary output."""
-    exit_code, stdout, stderr = run_command_with_progress(
+    exit_code, stdout, stderr = run_subprocess_no_progress(
         ["vulture", "--config", "vulture.toml"],
-        "Running dead code detection...",
         capture_output=True,
     )
 
@@ -651,125 +644,59 @@ def run_vulture_with_summary(verbose: bool = False) -> int:
 def run_ruff_quietly() -> tuple[int, str]:
     """Run ruff formatting and linting quietly for dynamic table."""
     # Format
-    format_result = subprocess.run(
+    format_result = run_subprocess_no_progress(
         ["ruff", "format", "src/", "--line-length", "88"],
         capture_output=True,
-        text=True,
-        check=False,
     )
-
     # Lint
-    lint_result = subprocess.run(
+    lint_result = run_subprocess_no_progress(
         ["ruff", "check", "src/rag", "--fix", "--line-length", "88"],
         capture_output=True,
-        text=True,
-        check=False,
     )
-
     # Re-format
-    reformat_result = subprocess.run(
+    reformat_result = run_subprocess_no_progress(
         ["ruff", "format", "src/", "--line-length", "88"],
         capture_output=True,
-        text=True,
-        check=False,
     )
-
-    exit_code = max(
-        format_result.returncode, lint_result.returncode, reformat_result.returncode
-    )
+    exit_code = max(format_result[0], lint_result[0], reformat_result[0])
     output = (
-        format_result.stdout
-        + format_result.stderr
-        + lint_result.stdout
-        + lint_result.stderr
-        + reformat_result.stdout
-        + reformat_result.stderr
+        format_result[1]
+        + format_result[2]
+        + lint_result[1]
+        + lint_result[2]
+        + reformat_result[1]
+        + reformat_result[2]
     )
     return exit_code, output
 
 
 def run_pyright_quietly(max_errors: int) -> tuple[int, str]:
     """Run pyright quietly for dynamic table."""
-    result = subprocess.run(
+    result = run_subprocess_no_progress(
         ["pyright", "src/rag"],
         capture_output=True,
-        text=True,
-        check=False,
     )
-
-    output = result.stdout + result.stderr
+    output = result[1] + result[2]
     parsed = parse_pyright_output(output)
     exit_code = 0 if parsed.total_errors <= max_errors else 1
-
     return exit_code, output
 
 
 def run_vulture_quietly() -> tuple[int, str]:
     """Run vulture quietly for dynamic table."""
-    result = subprocess.run(
+    result = run_subprocess_no_progress(
         ["vulture", "--config", "vulture.toml"],
         capture_output=True,
-        text=True,
-        check=False,
     )
-
-    output = result.stdout + result.stderr
-    return result.returncode, output
+    output = result[1] + result[2]
+    return result[0], output
 
 
 def run_pytest_quietly(cmd: list[str]) -> tuple[int, str]:
     """Run pytest quietly for dynamic table."""
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    output = result.stdout + result.stderr
-    return result.returncode, output
-
-
-def run_pytest_with_progress(
-    cmd: list[str], check_status: "CheckStatus", live_update_callback=None
-) -> tuple[int, str]:
-    """Run pytest with real-time progress updates."""
-    # Add progress output style to pytest command
-    cmd_with_progress = cmd + ["-o", "console_output_style=progress"]
-
-    # Start the process
-    process = subprocess.Popen(
-        cmd_with_progress,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-        universal_newlines=True,
-    )
-
-    output_lines = []
-    percentage = 0
-
-    try:
-        for line in process.stdout:
-            output_lines.append(line)
-
-            # Parse progress percentage from pytest output
-            # Look for patterns like "[ 25%]", "[ 50%]", etc.
-            progress_match = re.search(r"\[\s*(\d+)%\]", line)
-            if progress_match:
-                new_percentage = int(progress_match.group(1))
-                if new_percentage > percentage:
-                    percentage = new_percentage
-                    # Update the check status with current percentage
-                    check_status.percentage = percentage
-                    # Trigger live update if callback provided
-                    if live_update_callback:
-                        live_update_callback()
-
-    except Exception:
-        # If anything goes wrong with progress parsing, continue silently
-        pass
-
-    # Wait for process to complete
-    process.wait()
-
-    full_output = "".join(output_lines)
-    return process.returncode, full_output
+    result = run_subprocess_no_progress(cmd, capture_output=True)
+    output = result[1] + result[2]
+    return result[0], output
 
 
 def run_static_with_summary(
@@ -792,7 +719,6 @@ def run_static_with_summary(
     if ruff_result == 0:
         ruff_check.finish("passed", "No formatting issues")
     else:
-        ruff_check.finish("failed", "Formatting issues found")
         ruff_output_store = ruff_output
         exit_code = ruff_result
         if quick_mode:
@@ -856,98 +782,80 @@ def run_static_with_summary(
         live.update(runner.create_status_table())
 
     # Run unit tests
-    unit_result, unit_output = run_pytest_with_progress(
-        ["python", "-m", "pytest", "tests/unit/", "-v", "--tb=short"],
-        unit_check,
-        lambda: live.update(runner.create_status_table()),
+    unit_check.start()
+    live.update(runner.create_status_table())
+    unit_result, unit_output = run_pytest_quietly(
+        ["python", "-m", "pytest", "tests/unit/", "-v", "--tb=short"]
     )
     parsed_unit = parse_pytest_output(unit_output)
-    unit_output_store = unit_output
     if unit_result == 0:
         unit_check.finish(
             "passed",
-            f"{parsed_unit.passed} tests passed",
+            f"{parsed_unit.passed} passed, {parsed_unit.failed} failed",
             passed_count=parsed_unit.passed,
             failed_count=parsed_unit.failed,
-            skipped_count=parsed_unit.skipped,
         )
     else:
         unit_check.finish(
             "failed",
-            f"{parsed_unit.failed} tests failed",
+            f"{parsed_unit.passed} passed, {parsed_unit.failed} failed",
             passed_count=parsed_unit.passed,
             failed_count=parsed_unit.failed,
-            skipped_count=parsed_unit.skipped,
         )
+        unit_output_store = unit_output
         exit_code = unit_result
         if quick_mode:
             live.update(runner.create_status_table())
             console.print()
             console.print(runner.create_status_table())
             console.print("\n[bold red]Error Details:[/bold red]")
-            console.print("Unit Test Failures:")
-            if parsed_unit.failed <= 5 and parsed_unit.errors:
-                for error in parsed_unit.errors:
-                    console.print(f"  • {error}")
-            else:
-                console.print(
-                    f"{parsed_unit.failed} unit tests failed (use --verbose for details)"
-                )
+            console.print("Unit Test Errors:")
+            display_pytest_results(parsed_unit, "Unit Tests", verbose)
             return exit_code
-        live.update(runner.create_status_table())
+    live.update(runner.create_status_table())
 
     # Run integration tests
     if integration_check:
         integration_check.start()
         live.update(runner.create_status_table())
-        integration_result, integration_output = run_pytest_with_progress(
-            ["python", "-m", "pytest", "-m", "integration", "-v", "--tb=short"],
-            integration_check,
-            lambda: live.update(runner.create_status_table()),
+        integration_result, integration_output = run_pytest_quietly(
+            ["python", "-m", "pytest", "-m", "integration", "-v", "--tb=short"]
         )
         parsed_integration = parse_pytest_output(integration_output)
-        integration_output_store = integration_output
         if integration_result == 0:
             integration_check.finish(
                 "passed",
-                f"{parsed_integration.passed} tests passed",
+                f"{parsed_integration.passed} passed, {parsed_integration.failed} failed",
                 passed_count=parsed_integration.passed,
                 failed_count=parsed_integration.failed,
-                skipped_count=parsed_integration.skipped,
             )
         else:
             integration_check.finish(
                 "failed",
-                f"{parsed_integration.failed} tests failed",
+                f"{parsed_integration.passed} passed, {parsed_integration.failed} failed",
                 passed_count=parsed_integration.passed,
                 failed_count=parsed_integration.failed,
-                skipped_count=parsed_integration.skipped,
             )
+            integration_output_store = integration_output
             exit_code = integration_result
             if quick_mode:
                 live.update(runner.create_status_table())
                 console.print()
                 console.print(runner.create_status_table())
                 console.print("\n[bold red]Error Details:[/bold red]")
-                console.print("Integration Test Failures:")
-                if parsed_integration.failed <= 5 and parsed_integration.errors:
-                    for error in parsed_integration.errors:
-                        console.print(f"  • {error}")
-                else:
-                    console.print(
-                        f"{parsed_integration.failed} integration tests failed (use --verbose for details)"
-                    )
+                console.print("Integration Test Errors:")
+                display_pytest_results(parsed_integration, "Integration Tests", verbose)
                 return exit_code
-            live.update(runner.create_status_table())
+        live.update(runner.create_status_table())
 
     # Run E2E tests
     if e2e_check:
         e2e_check.start()
         live.update(runner.create_status_table())
-        e2e_result, e2e_output = run_pytest_with_progress(
+        e2e_result, e2e_output = run_pytest_with_summary(
             ["python", "-m", "pytest", "-m", "e2e", "-v", "--tb=short"],
-            e2e_check,
-            lambda: live.update(runner.create_status_table()),
+            "E2E Tests",
+            verbose,
         )
         parsed_e2e = parse_pytest_output(e2e_output)
         e2e_output_store = e2e_output
@@ -1068,10 +976,11 @@ def run_check_with_dynamic_table(
     skip_integration: bool = False,
     include_e2e: bool = False,
     verbose: bool = False,
+    quick_mode: bool = False,
 ) -> int:
     """Run complete check workflow with dynamic table display."""
-    # Use global QUICK_MODE
-    quick_mode = QUICK_MODE
+    global QUICK_MODE
+    QUICK_MODE = quick_mode
 
     # Create the dynamic test runner
     runner = DynamicTestRunner()
@@ -1183,43 +1092,33 @@ def run_check_with_dynamic_table(
         # Run unit tests
         unit_check.start()
         live.update(runner.create_status_table())
-        unit_result, unit_output = run_pytest_with_progress(
-            ["python", "-m", "pytest", "tests/unit/", "-v", "--tb=short"],
-            unit_check,
-            lambda: live.update(runner.create_status_table()),
+        unit_result, unit_output = run_pytest_quietly(
+            ["python", "-m", "pytest", "tests/unit/", "-v", "--tb=short"]
         )
         parsed_unit = parse_pytest_output(unit_output)
-        unit_output_store = unit_output
         if unit_result == 0:
             unit_check.finish(
                 "passed",
-                f"{parsed_unit.passed} tests passed",
+                f"{parsed_unit.passed} passed, {parsed_unit.failed} failed",
                 passed_count=parsed_unit.passed,
                 failed_count=parsed_unit.failed,
-                skipped_count=parsed_unit.skipped,
             )
         else:
             unit_check.finish(
                 "failed",
-                f"{parsed_unit.failed} tests failed",
+                f"{parsed_unit.passed} passed, {parsed_unit.failed} failed",
                 passed_count=parsed_unit.passed,
                 failed_count=parsed_unit.failed,
-                skipped_count=parsed_unit.skipped,
             )
+            unit_output_store = unit_output
             exit_code = unit_result
             if quick_mode:
                 live.update(runner.create_status_table())
                 console.print()
                 console.print(runner.create_status_table())
                 console.print("\n[bold red]Error Details:[/bold red]")
-                console.print("Unit Test Failures:")
-                if parsed_unit.failed <= 5 and parsed_unit.errors:
-                    for error in parsed_unit.errors:
-                        console.print(f"  • {error}")
-                else:
-                    console.print(
-                        f"{parsed_unit.failed} unit tests failed (use --verbose for details)"
-                    )
+                console.print("Unit Test Errors:")
+                display_pytest_results(parsed_unit, "Unit Tests", verbose)
                 return exit_code
         live.update(runner.create_status_table())
 
@@ -1227,43 +1126,35 @@ def run_check_with_dynamic_table(
         if integration_check:
             integration_check.start()
             live.update(runner.create_status_table())
-            integration_result, integration_output = run_pytest_with_progress(
-                ["python", "-m", "pytest", "-m", "integration", "-v", "--tb=short"],
-                integration_check,
-                lambda: live.update(runner.create_status_table()),
+            integration_result, integration_output = run_pytest_quietly(
+                ["python", "-m", "pytest", "-m", "integration", "-v", "--tb=short"]
             )
             parsed_integration = parse_pytest_output(integration_output)
-            integration_output_store = integration_output
             if integration_result == 0:
                 integration_check.finish(
                     "passed",
-                    f"{parsed_integration.passed} tests passed",
+                    f"{parsed_integration.passed} passed, {parsed_integration.failed} failed",
                     passed_count=parsed_integration.passed,
                     failed_count=parsed_integration.failed,
-                    skipped_count=parsed_integration.skipped,
                 )
             else:
                 integration_check.finish(
                     "failed",
-                    f"{parsed_integration.failed} tests failed",
+                    f"{parsed_integration.passed} passed, {parsed_integration.failed} failed",
                     passed_count=parsed_integration.passed,
                     failed_count=parsed_integration.failed,
-                    skipped_count=parsed_integration.skipped,
                 )
+                integration_output_store = integration_output
                 exit_code = integration_result
                 if quick_mode:
                     live.update(runner.create_status_table())
                     console.print()
                     console.print(runner.create_status_table())
                     console.print("\n[bold red]Error Details:[/bold red]")
-                    console.print("Integration Test Failures:")
-                    if parsed_integration.failed <= 5 and parsed_integration.errors:
-                        for error in parsed_integration.errors:
-                            console.print(f"  • {error}")
-                    else:
-                        console.print(
-                            f"{parsed_integration.failed} integration tests failed (use --verbose for details)"
-                        )
+                    console.print("Integration Test Errors:")
+                    display_pytest_results(
+                        parsed_integration, "Integration Tests", verbose
+                    )
                     return exit_code
             live.update(runner.create_status_table())
 
@@ -1271,10 +1162,10 @@ def run_check_with_dynamic_table(
         if e2e_check:
             e2e_check.start()
             live.update(runner.create_status_table())
-            e2e_result, e2e_output = run_pytest_with_progress(
+            e2e_result, e2e_output = run_pytest_with_summary(
                 ["python", "-m", "pytest", "-m", "e2e", "-v", "--tb=short"],
-                e2e_check,
-                lambda: live.update(runner.create_status_table()),
+                "E2E Tests",
+                verbose,
             )
             parsed_e2e = parse_pytest_output(e2e_output)
             e2e_output_store = e2e_output
@@ -1498,7 +1389,7 @@ def unit(
         cmd.extend(["-k", pattern])
 
     if full_output:
-        exit_code, _, _ = run_command_with_progress(
+        exit_code, _, _ = run_subprocess_no_progress(
             cmd, "Running unit tests...", capture_output=False
         )
         raise typer.Exit(exit_code)
@@ -1524,7 +1415,7 @@ def integration(
         cmd.extend(["-k", pattern])
 
     if full_output:
-        exit_code, _, _ = run_command_with_progress(
+        exit_code, _, _ = run_subprocess_no_progress(
             cmd, "Running integration tests...", capture_output=False
         )
         raise typer.Exit(exit_code)
@@ -1550,7 +1441,7 @@ def e2e(
         cmd.extend(["-k", pattern])
 
     if full_output:
-        exit_code, _, _ = run_command_with_progress(
+        exit_code, _, _ = run_subprocess_no_progress(
             cmd, "Running E2E tests...", capture_output=False
         )
         raise typer.Exit(exit_code)
@@ -1585,12 +1476,12 @@ def coverage(
         cmd.append(f"--cov-fail-under={min_coverage}")
 
     if full_output:
-        exit_code, _, _ = run_command_with_progress(
+        exit_code, _, _ = run_subprocess_no_progress(
             cmd, "Running tests with coverage...", capture_output=False
         )
         raise typer.Exit(exit_code)
     else:
-        exit_code, stdout, stderr = run_command_with_progress(
+        exit_code, stdout, stderr = run_subprocess_no_progress(
             cmd, "Running tests with coverage...", capture_output=True
         )
         output = stdout + stderr
@@ -1638,7 +1529,7 @@ def typecheck(
 ) -> None:
     """Run type checking only."""
     if full_output:
-        exit_code, _, _ = run_command_with_progress(
+        exit_code, _, _ = run_subprocess_no_progress(
             ["pyright", "src/rag"], "Running type checking...", capture_output=False
         )
         raise typer.Exit(exit_code)
@@ -1657,7 +1548,7 @@ def vulture(
 ) -> None:
     """Run dead code detection (vulture)."""
     if full_output:
-        exit_code, _, _ = run_command_with_progress(
+        exit_code, _, _ = run_subprocess_no_progress(
             ["vulture", "--config", "vulture.toml"],
             "Running dead code detection...",
             capture_output=False,
@@ -1748,11 +1639,16 @@ def check(
     legacy: Annotated[
         bool, typer.Option("--legacy", help="Use legacy sequential output")
     ] = False,
+    quick: Annotated[
+        bool, typer.Option("--quick", help="Stop after first failure")
+    ] = False,
 ) -> None:
     """Run complete check workflow (static → unit → integration)."""
+    global QUICK_MODE
+    QUICK_MODE = quick
     # Always run all phases with the dynamic table, regardless of flags
     exit_code = run_check_with_dynamic_table(
-        max_errors, skip_integration, False, verbose
+        max_errors, skip_integration, False, verbose, quick
     )
     raise typer.Exit(exit_code)
 
@@ -1780,7 +1676,9 @@ def all_tests(
 ) -> None:
     """Run all tests in order: static → unit → integration → e2e."""
     # Always run all phases with the dynamic table, including E2E unless skipped
-    exit_code = run_check_with_dynamic_table(max_errors, False, not skip_e2e, verbose)
+    exit_code = run_check_with_dynamic_table(
+        max_errors, False, not skip_e2e, verbose, False
+    )
     raise typer.Exit(exit_code)
 
 
