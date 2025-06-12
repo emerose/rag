@@ -11,7 +11,7 @@ from fastapi import FastAPI
 from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.server import Context
 from mcp.server.fastmcp.tools.base import Tool
-from mcp.types import EmbeddedResource, ImageContent, TextContent
+from mcp.types import Content
 from pydantic import BaseModel
 
 from rag.auth import APIKeyAuthMiddleware
@@ -82,7 +82,7 @@ class RAGMCPServer(FastMCP):
 
     async def call_tool(
         self, name: str, arguments: dict[str, Any]
-    ) -> Sequence[TextContent | ImageContent | EmbeddedResource]:
+    ) -> Sequence[Content]:
         """Call a tool and log the request."""
 
         logger.info("CallToolRequest", extra={"tool": name, "arguments": arguments})

@@ -312,7 +312,7 @@ class InMemoryVectorStore(VectorStoreProtocol):
         """Add documents to the store."""
         start_idx = len(self.documents)
         self.documents.extend(documents)
-        
+
         # Generate fake embeddings for the documents
         fake_embeddings: list[list[float]] = [[0.1] * self.dimension for _ in documents]
         self.embeddings.extend(fake_embeddings)

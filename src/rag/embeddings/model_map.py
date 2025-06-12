@@ -34,15 +34,15 @@ def load_model_map(path: str | Path) -> dict[str, str]:
     # At this point we know raw_data is a dict
     # Use explicit type casting to break Unknown type propagation
     from typing import cast
-    
+
     result: dict[str, str] = {}
     # Cast to Any first to break Unknown chain, then process safely
     any_dict = cast(dict[Any, Any], raw_data)
-    
+
     # Convert to strings with proper type handling
     for key, value in any_dict.items():
         result[str(key)] = str(value)
-    
+
     return result
 
 
