@@ -344,4 +344,3 @@ class RAGEngine:
         except Exception as e:
             logger.error(f"Error getting document summaries: {e}")
             return []
-

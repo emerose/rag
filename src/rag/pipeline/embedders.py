@@ -54,6 +54,7 @@ class DefaultEmbedder:
                     if isinstance(value, list):
                         # Convert list items to strings, handling Any types from metadata
                         from typing import cast
+
                         value_list = cast(list[Any], value)
                         value = ", ".join(str(v) for v in value_list)
                     metadata_parts.append(f"{key}: {value}")
@@ -259,7 +260,9 @@ class CachedEmbedder:
         if not documents:
             return []
 
-        embeddings: list[list[float]] = [[] for _ in documents]  # Initialize with empty lists
+        embeddings: list[list[float]] = [
+            [] for _ in documents
+        ]  # Initialize with empty lists
         documents_to_embed: list[Document] = []
         indices_to_embed: list[int] = []
 

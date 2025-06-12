@@ -36,7 +36,7 @@ app = typer.Typer(
 console = Console()
 
 # Type checking configuration
-MAX_TYPE_ERRORS = 1    # Updated after achieving ZERO user code errors - only external library issue remains (issue #325)
+MAX_TYPE_ERRORS = 0    # ZERO type errors achieved! Strict type checking fully enforced (issue #325)
 
 
 @dataclass

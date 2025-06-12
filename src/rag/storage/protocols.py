@@ -19,7 +19,12 @@ class VectorStoreProtocol(Protocol):
     facilitates testing with fake implementations.
     """
 
-    def as_retriever(self, *, search_type: str = "similarity", search_kwargs: dict[str, Any] | None = None) -> Any:
+    def as_retriever(
+        self,
+        *,
+        search_type: str = "similarity",
+        search_kwargs: dict[str, Any] | None = None,
+    ) -> Any:
         """Return a retriever instance."""
         ...
 

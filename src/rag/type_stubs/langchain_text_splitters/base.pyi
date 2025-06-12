@@ -7,10 +7,9 @@ from collections.abc import Callable, Collection, Iterable
 from collections.abc import Set as AbstractSet
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, Protocol, TypeVar
 
 from langchain_core.documents import Document
-from typing import Protocol
 
 logger = ...
 TS = TypeVar("TS", bound="TextSplitter")

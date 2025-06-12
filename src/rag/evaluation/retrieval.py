@@ -83,6 +83,7 @@ class RetrievalEvaluator:
         config = RAGConfig(documents_dir=str(docs_dir), data_dir=str(eval_data_dir))
         # Use factory instead of the deprecated create method to avoid import cycles
         from rag.factory import RAGComponentsFactory
+
         factory = RAGComponentsFactory(config, RuntimeOptions())
         engine = factory.create_rag_engine()
         engine.index_directory(docs_dir)

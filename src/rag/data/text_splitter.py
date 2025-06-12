@@ -588,6 +588,7 @@ class TextSplitterFactory:
         if isinstance(splitter, list):
             # Type cast to handle Unknown types in list
             from typing import cast
+
             splitter_list = cast(list[Any], splitter)
             chunked_docs = self._split_markdown_documents(documents, splitter_list)
         else:

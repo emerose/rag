@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Protocol, Self, TYPE_CHECKING, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, Self, runtime_checkable
 
 if TYPE_CHECKING:
     from rag.storage.protocols import VectorStoreProtocol as ExtendedVectorStoreProtocol
@@ -122,7 +122,9 @@ class VectorStoreFactory(ABC):
         ...
 
     @abstractmethod
-    def create_from_documents(self, documents: list[Document]) -> ExtendedVectorStoreProtocol:
+    def create_from_documents(
+        self, documents: list[Document]
+    ) -> ExtendedVectorStoreProtocol:
         """Create a vector store from a list of documents.
 
         Args:
@@ -321,7 +323,9 @@ class FAISSVectorStoreFactory(VectorStoreFactory):
 
         return FAISSVectorStore(faiss_store)
 
-    def create_from_documents(self, documents: list[Document]) -> ExtendedVectorStoreProtocol:
+    def create_from_documents(
+        self, documents: list[Document]
+    ) -> ExtendedVectorStoreProtocol:
         """Create a FAISS vector store from a list of documents.
 
         Args:
@@ -516,7 +520,7 @@ class InMemoryVectorStore:
 
     def save_local(self, folder_path: str, index_name: str) -> None:
         """Persist the vector store to disk (no-op for in-memory store)."""
-        logger.debug(f"InMemoryVectorStore.save_local() called (no-op)")
+        logger.debug("InMemoryVectorStore.save_local() called (no-op)")
 
     @property
     def index(self) -> Any:
@@ -550,7 +554,9 @@ class InMemoryVectorStoreFactory(VectorStoreFactory):
         """
         return InMemoryVectorStore(self.embeddings)
 
-    def create_from_documents(self, documents: list[Document]) -> ExtendedVectorStoreProtocol:
+    def create_from_documents(
+        self, documents: list[Document]
+    ) -> ExtendedVectorStoreProtocol:
         """Create an in-memory vector store from a list of documents.
 
         Args:
