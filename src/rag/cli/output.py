@@ -139,14 +139,16 @@ def _write_json(
     elif isinstance(payload, list):
         print(json.dumps({"tables": payload}))
     elif isinstance(payload, dict):  # type: ignore[misc]
-        if is_table_data(payload):
-            print(json.dumps({"table": payload}))
-        elif "table" in payload:
-            print(json.dumps({"table": payload["table"]}))
-        elif "tables" in payload:
-            print(json.dumps({"tables": payload["tables"]}))
+        # Cast to dict[str, Any] for general dict operations
+        payload_dict = dict(payload)  # This works for both TableData and regular dicts
+        if is_table_data(payload_dict):
+            print(json.dumps({"table": payload_dict}))
+        elif "table" in payload_dict:
+            print(json.dumps({"table": payload_dict["table"]}))
+        elif "tables" in payload_dict:
+            print(json.dumps({"tables": payload_dict["tables"]}))
         else:
-            print(json.dumps(payload))
+            print(json.dumps(payload_dict))
 
 
 def _write_dict_rich(data: dict[str, Any]) -> None:
@@ -191,4 +193,4 @@ def _write_rich(
         for table_data in payload:
             _print_table(table_data)
     elif isinstance(payload, dict):  # type: ignore[misc]
-        _write_dict_rich(payload)
+        _write_dict_rich(dict(payload))

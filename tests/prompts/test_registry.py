@@ -2,7 +2,7 @@
 
 import pytest
 from langchain_core.prompts import PromptTemplate
-from langchain_core.prompts.base import BasePromptTemplate
+from langchain_core.prompts import BasePromptTemplate
 
 from rag.prompts import get_prompt
 from rag.prompts.registry import _PROMPTS
