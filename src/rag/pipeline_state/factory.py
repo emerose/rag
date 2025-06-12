@@ -25,6 +25,7 @@ from rag.pipeline_state.storage import PipelineStorage
 from rag.pipeline_state.transitions import StateTransitionService
 from rag.sources.base import DocumentSourceProtocol
 from rag.sources.filesystem import FilesystemDocumentSource
+from rag.storage.fakes import InMemoryVectorStore
 from rag.storage.protocols import DocumentStoreProtocol, VectorStoreProtocol
 from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
 
@@ -108,8 +109,6 @@ class PipelineFactory:
 
         # Create vector store using the embedding service directly
         # For now, we'll create a simple in-memory vector store
-        from rag.storage.fakes import InMemoryVectorStore
-
         vector_store = InMemoryVectorStore()
 
         # Create text splitter factory for chunking
