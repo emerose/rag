@@ -76,7 +76,7 @@ class CheckStatus:
     failed_count: int = 0
     skipped_count: int = 0
     error_count: int = 0
-    baseline_errors: int = 0
+    allowed_errors: int = 0
     percentage: int = 0  # Current progress percentage for running tests
     
     def start(self):
@@ -94,7 +94,7 @@ class CheckStatus:
         self.failed_count = kwargs.get('failed_count', 0) 
         self.skipped_count = kwargs.get('skipped_count', 0)
         self.error_count = kwargs.get('error_count', 0)
-        self.baseline_errors = kwargs.get('baseline_errors', 0)
+        self.allowed_errors = kwargs.get('allowed_errors', 0)
         # When finished, set percentage to 100% for completed tests
         if status in ["passed", "failed"] and self.name in ["Unit Tests", "Integration Tests", "E2E Tests"]:
             self.percentage = 100
@@ -169,9 +169,9 @@ class DynamicTestRunner:
                     status = "[yellow]⠋ Running[/yellow]"
             elif check.status == "passed":
                 if check.name == "Type Checking":
-                    # Show error count in green if <= baseline (no checkmark for numerical results)
+                    # Show error count in green if within allowed limit (no checkmark for numerical results)
                     if check.error_count > 0:
-                        if check.error_count <= check.baseline_errors:
+                        if check.error_count <= check.allowed_errors:
                             status = f"[green]{check.error_count} errors[/green]"
                         else:
                             status = f"[red]{check.error_count} errors[/red]"
@@ -195,7 +195,7 @@ class DynamicTestRunner:
                     status = "[green]✅[/green]"
             elif check.status == "failed":
                 if check.name == "Type Checking":
-                    if check.error_count > check.baseline_errors:
+                    if check.error_count > check.allowed_errors:
                         status = f"[red]{check.error_count} errors[/red]"
                     else:
                         status = "[red]✗[/red]"
@@ -407,11 +407,11 @@ def display_pyright_results(
     # Summary
     if result.total_errors <= max_errors:
         console.print(
-            f"[green]Type checking passed: {result.total_errors} errors (≤ {max_errors} baseline)[/green]"
+            f"[green]Type checking passed: {result.total_errors} errors (≤ {max_errors} allowed)[/green]"
         )
     else:
         console.print(
-            f"[red]Type checking failed: {result.total_errors} errors (> {max_errors} baseline)[/red]"
+            f"[red]Type checking failed: {result.total_errors} errors (> {max_errors} allowed)[/red]"
         )
 
     # If less than 5 errors, show them all
@@ -563,8 +563,20 @@ def run_ruff_with_summary(verbose: bool = False) -> int:
             text=True,
         )
 
-    # Check if any files were modified
-    if "reformatted" in format_result.stdout or lint_result.stdout.strip():
+    full_output = (
+        format_result.stdout
+        + format_result.stderr
+        + lint_result.stdout
+        + lint_result.stderr
+        + reformat_result.stdout
+        + reformat_result.stderr
+    )
+
+    # Check if any files were modified or if ruff failed
+    if format_result.returncode != 0 or lint_result.returncode != 0 or reformat_result.returncode != 0:
+        console.print("[red]❌ Ruff found issues[/red]")
+        console.print(full_output)
+    elif "reformatted" in format_result.stdout or lint_result.stdout.strip():
         console.print("[yellow]Code was reformatted/fixed[/yellow]")
         if verbose and lint_result.stdout.strip():
             console.print("\n[dim]Ruff output:[/dim]")
@@ -590,14 +602,12 @@ def run_vulture_with_summary(verbose: bool = False) -> int:
         # Count number of issues
         issues = len([line for line in output.strip().split("\n") if line])
         console.print(f"[yellow]Found {issues} potential dead code issues[/yellow]")
-        if verbose:
-            console.print("\n[dim]Vulture output:[/dim]")
-            console.print(output)
+        console.print(output)
 
     return exit_code
 
 
-def run_ruff_quietly() -> int:
+def run_ruff_quietly() -> tuple[int, str]:
     """Run ruff formatting and linting quietly for dynamic table."""
     # Format
     format_result = subprocess.run(
@@ -620,7 +630,16 @@ def run_ruff_quietly() -> int:
         text=True,
     )
 
-    return max(format_result.returncode, lint_result.returncode, reformat_result.returncode)
+    exit_code = max(format_result.returncode, lint_result.returncode, reformat_result.returncode)
+    output = (
+        format_result.stdout
+        + format_result.stderr
+        + lint_result.stdout
+        + lint_result.stderr
+        + reformat_result.stdout
+        + reformat_result.stderr
+    )
+    return exit_code, output
 
 
 def run_pyright_quietly(max_errors: int) -> tuple[int, str]:
@@ -773,12 +792,13 @@ def run_check_with_dynamic_table(
         # Run ruff
         ruff_check.start()
         live.update(runner.create_status_table())
-        ruff_result = run_ruff_quietly()
+        ruff_result, ruff_output = run_ruff_quietly()
         if ruff_result == 0:
             ruff_check.finish("passed", "No formatting issues")
         else:
             ruff_check.finish("failed", "Formatting issues found")
             live.update(runner.create_status_table())
+            console.print(ruff_output)
             return ruff_result
         live.update(runner.create_status_table())
         
@@ -790,16 +810,16 @@ def run_check_with_dynamic_table(
         if pyright_result == 0:
             pyright_check.finish(
                 "passed", 
-                f"{parsed.total_errors} errors (≤ {max_errors} baseline)",
+                f"{parsed.total_errors} errors (≤ {max_errors} allowed)",
                 error_count=parsed.total_errors,
-                baseline_errors=max_errors
+                allowed_errors=max_errors
             )
         else:
             pyright_check.finish(
                 "failed", 
-                f"{parsed.total_errors} errors (> {max_errors} baseline)",
+                f"{parsed.total_errors} errors (> {max_errors} allowed)",
                 error_count=parsed.total_errors,
-                baseline_errors=max_errors
+                allowed_errors=max_errors
             )
             live.update(runner.create_status_table())
             return pyright_result
@@ -815,6 +835,7 @@ def run_check_with_dynamic_table(
             issues = len([line for line in vulture_output.strip().split("\n") if line])
             vulture_check.finish("failed", f"{issues} potential issues found")
             live.update(runner.create_status_table())
+            console.print(vulture_output)
             return vulture_result
         live.update(runner.create_status_table())
         
@@ -1179,9 +1200,6 @@ def lint(
 
 @app.command()
 def typecheck(
-    baseline: Annotated[
-        bool, typer.Option("--baseline", help="Use baseline error limit")
-    ] = True,
     max_errors: Annotated[
         int, typer.Option("--max-errors", help="Maximum allowed errors")
     ] = MAX_TYPE_ERRORS,
@@ -1199,17 +1217,7 @@ def typecheck(
         )
         raise typer.Exit(exit_code)
     else:
-        if baseline:
-            raise typer.Exit(run_pyright_with_summary(max_errors, verbose))
-        else:
-            # Run without baseline
-            exit_code, stdout, stderr = run_command_with_progress(
-                ["pyright", "src/rag"], "Running type checking...", capture_output=True
-            )
-            output = stdout + stderr
-            result = parse_pyright_output(output)
-            display_pyright_results(result, sys.maxsize, verbose)  # No limit
-            raise typer.Exit(exit_code)
+        raise typer.Exit(run_pyright_with_summary(max_errors, verbose))
 
 
 @app.command()
@@ -1261,7 +1269,7 @@ def static(
             console.print(f"\n[green]{desc}:[/green]")
             result = subprocess.run(cmd)
             
-            # Special handling for type checking to respect baseline
+            # Special handling for type checking to respect allowed error count
             if desc == "Type checking":
                 # Parse pyright output to count errors
                 if result.returncode != 0:
@@ -1270,12 +1278,12 @@ def static(
                     output = capture_result.stdout + capture_result.stderr
                     parsed_result = parse_pyright_output(output)
                     
-                    # Only fail if errors exceed baseline
+                    # Only fail if errors exceed the allowed limit
                     if parsed_result.total_errors <= max_errors:
-                        console.print(f"[green]Type checking passed: {parsed_result.total_errors} errors (≤ {max_errors} baseline)[/green]")
-                        # Don't update exit_code for type checking if within baseline
+                        console.print(f"[green]Type checking passed: {parsed_result.total_errors} errors (≤ {max_errors} allowed)[/green]")
+                        # Don't update exit_code for type checking if within limit
                     else:
-                        console.print(f"[red]Type checking failed: {parsed_result.total_errors} errors (> {max_errors} baseline)[/red]")
+                        console.print(f"[red]Type checking failed: {parsed_result.total_errors} errors (> {max_errors} allowed)[/red]")
                         exit_code = max(exit_code, result.returncode)
                 else:
                     # No errors at all
@@ -1432,14 +1440,14 @@ def info() -> None:
     """Show information about the test suite."""
     info_panel = Panel(
         "[bold blue]RAG Test Suite Information[/bold blue]\n\n"
-        f"[cyan]Type error baseline:[/cyan] {MAX_TYPE_ERRORS} errors\n\n"
+        f"[cyan]Default max type errors:[/cyan] {MAX_TYPE_ERRORS}\n\n"
         "[cyan]Test Categories:[/cyan]\n"
         "  • Unit Tests: Fast (<100ms), isolated, no external deps\n"
         "  • Integration Tests: Component interactions (<500ms)\n"
         "  • E2E Tests: Complete workflows (<30s)\n\n"
         "[cyan]Static Analysis Tools:[/cyan]\n"
         "  • ruff: Code formatting and linting\n"
-        "  • pyright: Type checking with baseline\n"
+        "  • pyright: Type checking (fail on >0 errors)\n"
         "  • vulture: Dead code detection\n\n"
         "[cyan]Output Options:[/cyan]\n"
         "  • Default: Summary view with tables and progress\n"
