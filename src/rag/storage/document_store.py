@@ -1258,8 +1258,8 @@ class FakeDocumentStore:
         )
 
 
-# Import the new SQLAlchemy-based implementation as the default
-from .sqlalchemy_document_store import SQLAlchemyDocumentStore
+# Import at the end to avoid circular imports
+from .sqlalchemy_document_store import SQLAlchemyDocumentStore  # noqa: E402
 
 # Create an alias for backward compatibility
 SQLiteDocumentStore = SQLAlchemyDocumentStore
