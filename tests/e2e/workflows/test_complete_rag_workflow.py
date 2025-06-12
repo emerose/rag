@@ -155,6 +155,10 @@ NLP focuses on the interaction between computers and human language.
             docs_dir = temp_path / "docs"
             data_dir = temp_path / "data"
 
+            # Create directories before initializing engine
+            docs_dir.mkdir()
+            data_dir.mkdir(exist_ok=True)
+
             config = RAGConfig(
                 documents_dir=str(docs_dir),
                 data_dir=str(data_dir),
@@ -165,7 +169,6 @@ NLP focuses on the interaction between computers and human language.
             engine = RAGEngine.create(config, runtime)
 
             # Create and index document
-            docs_dir.mkdir()
             doc = docs_dir / "test.txt"
             doc.write_text(
                 "This document contains test content for data clearing testing."
@@ -250,6 +253,10 @@ NLP focuses on the interaction between computers and human language.
             docs_dir = temp_path / "docs"
             data_dir = temp_path / "data"
 
+            # Create directories before initializing engine
+            docs_dir.mkdir()
+            data_dir.mkdir(exist_ok=True)
+
             config = RAGConfig(
                 documents_dir=str(docs_dir),
                 data_dir=str(data_dir),
@@ -271,7 +278,7 @@ NLP focuses on the interaction between computers and human language.
                 openai_api_key="sk-test",
             )
             runtime = RuntimeOptions()
-            engine_empty = RAGEngine(config_empty, runtime)
+            engine_empty = RAGEngine.create(config_empty, runtime)
 
             # Should handle gracefully when directory is empty
             results = engine_empty.ingestion_pipeline.ingest_all()

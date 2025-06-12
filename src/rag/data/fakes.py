@@ -346,3 +346,19 @@ class FakeTextSplitterFactory:
             chunk_size=chunk_size or self.chunk_size,
             chunk_overlap=chunk_overlap or self.chunk_overlap,
         )
+
+    def create_splitter(
+        self, mime_type: str | None = None, **kwargs: Any
+    ) -> FakeTextSplitter:
+        """Create a fake text splitter for a specific MIME type.
+
+        This method provides compatibility with the transformer which calls create_splitter().
+
+        Args:
+            mime_type: MIME type (ignored in fake implementation)
+            **kwargs: Additional arguments passed to create_text_splitter
+
+        Returns:
+            Fake text splitter instance
+        """
+        return self.create_text_splitter(**kwargs)
