@@ -10,4 +10,7 @@ min_confidence = 90
 ignore_names = [
     # Protocol method parameters (not used in protocol definitions with ...)
     "chunk_hashes",
+    # Unused but required parameters in fake implementations
+    "run_manager",  # Required by LangChain base class interface
+    "mime_type",    # Required by text splitter interface but not used in fake implementation
 ]

@@ -302,11 +302,27 @@ class EmbeddingBatcher(EmbeddingServiceProtocol):
 
         return self.embedding_provider.embed_texts(texts)
 
-    def embed_query(self, query: str) -> list[float]:
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings for a list of documents (alias for embed_texts).
+
+        This method provides compatibility with LangChain's Embeddings interface.
+
+        Args:
+            texts: List of texts to embed
+
+        Returns:
+            List of embeddings (lists of floats)
+
+        Raises:
+            ValueError: If embedding generation fails
+        """
+        return self.embed_texts(texts)
+
+    def embed_query(self, text: str) -> list[float]:
         """Generate embedding for a query.
 
         Args:
-            query: Query text to embed
+            text: Query text to embed
 
         Returns:
             Embedding for the query
@@ -314,7 +330,7 @@ class EmbeddingBatcher(EmbeddingServiceProtocol):
         Raises:
             ValueError: If embedding generation fails
         """
-        return self.embedding_provider.embed_query(query)
+        return self.embedding_provider.embed_query(text)
 
     def get_model_info(self) -> dict[str, str]:
         """Get information about the embeddings model.

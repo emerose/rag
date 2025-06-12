@@ -53,11 +53,11 @@ class EmbeddingServiceProtocol(Protocol):
         """
         ...
 
-    def embed_query(self, query: str) -> list[float]:
+    def embed_query(self, text: str) -> list[float]:
         """Generate embedding for a query.
 
         Args:
-            query: Query text to embed
+            text: Query text to embed
 
         Returns:
             Embedding for the query

@@ -123,11 +123,11 @@ class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
         self._log("DEBUG", f"Delegating embedding of {len(texts)} texts to service")
         return self._embedding_service.embed_texts(texts)
 
-    def embed_query(self, query: str) -> list[float]:
+    def embed_query(self, text: str) -> list[float]:
         """Generate embedding for a query.
 
         Args:
-            query: Query text to embed
+            text: Query text to embed
 
         Returns:
             Embedding for the query
@@ -138,7 +138,7 @@ class EmbeddingProvider(EmbeddingServiceProtocol, Embeddings):
 
         """
         self._log("DEBUG", "Delegating query embedding to service")
-        return self._embedding_service.embed_query(query)
+        return self._embedding_service.embed_query(text)
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         """Generate embeddings for a list of documents.

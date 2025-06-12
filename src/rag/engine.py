@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.embeddings.batching import EmbeddingBatcher
-from rag.storage.protocols import DocumentStoreProtocol
-from rag.storage.vector_store import VectorStoreFactory, VectorStoreProtocol
+from rag.storage.protocols import DocumentStoreProtocol, VectorStoreProtocol
+from rag.storage.vector_store import VectorStoreFactory
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +159,7 @@ class RAGEngine:
             # Convert pipeline result to the expected format
             if result.success:
                 # Get list of files that were processed
+                # Import here to avoid circular imports
                 from rag.sources.filesystem import FilesystemDocumentSource
 
                 source = self._document_source
@@ -366,6 +367,7 @@ class RAGEngine:
             return dependencies.create_rag_engine()
         else:
             # Create new factory and use it to create engine
+            # Import here to avoid circular imports
             from rag.factory import RAGComponentsFactory
 
             factory = RAGComponentsFactory(config, runtime)

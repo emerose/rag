@@ -243,7 +243,9 @@ class FakeChatModel(BaseChatModel):
         **kwargs: Any,
     ) -> ChatResult:
         """Async version of _generate."""
-        return self._generate(messages, stop, run_manager, **kwargs)
+        # For the fake implementation, we can safely ignore the async run manager
+        # since we're not doing any real async work
+        return self._generate(messages, stop, None, **kwargs)
 
 
 class FakeTextSplitter:
@@ -271,7 +273,7 @@ class FakeTextSplitter:
         if not text:
             return []
 
-        chunks = []
+        chunks: list[str] = []
         start = 0
 
         while start < len(text):
@@ -295,7 +297,7 @@ class FakeTextSplitter:
         Returns:
             List of document chunks
         """
-        result = []
+        result: list[Document] = []
 
         for doc in documents:
             chunks = self.split_text(doc.page_content)
