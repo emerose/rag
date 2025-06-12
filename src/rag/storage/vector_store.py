@@ -10,7 +10,10 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Protocol, Self, runtime_checkable
+from typing import Any, Protocol, Self, TYPE_CHECKING, runtime_checkable
+
+if TYPE_CHECKING:
+    from rag.storage.protocols import VectorStoreProtocol as ExtendedVectorStoreProtocol
 
 import faiss
 import numpy as np
@@ -131,7 +134,7 @@ class VectorStoreFactory(ABC):
         ...
 
     @abstractmethod
-    def load_from_path(self, path: str) -> VectorStoreProtocol | None:
+    def load_from_path(self, path: str) -> ExtendedVectorStoreProtocol | None:
         """Load a vector store from the given path.
 
         Args:
@@ -189,6 +192,49 @@ class FAISSVectorStore:
         folder_path = str(path_obj.parent)
         index_name = path_obj.name
         self._faiss_store.save_local(folder_path, index_name)
+
+    def save_local(self, folder_path: str, index_name: str) -> None:
+        """Persist the vector store to disk.
+
+        Args:
+            folder_path: Path to the folder to save in
+            index_name: Name of the index file
+        """
+        self._faiss_store.save_local(folder_path, index_name)
+
+    @property
+    def index(self) -> Any:
+        """Get the underlying index (e.g., FAISS index)."""
+        return getattr(self._faiss_store, "index", None)
+
+    @property
+    def docstore(self) -> Any:
+        """Get the document store."""
+        return getattr(self._faiss_store, "docstore", None)
+
+    @property
+    def index_to_docstore_id(self) -> dict[int, str]:
+        """Get mapping from index positions to document store IDs."""
+        return getattr(self._faiss_store, "index_to_docstore_id", {})
+
+    def as_retriever(
+        self,
+        *,
+        search_type: str = "similarity",
+        search_kwargs: dict[str, Any] | None = None,
+    ) -> Any:
+        """Return a retriever instance for this vector store.
+
+        Args:
+            search_type: Type of search to perform (e.g., "similarity")
+            search_kwargs: Additional search parameters
+
+        Returns:
+            Retriever instance that can be used in LangChain chains
+        """
+        return self._faiss_store.as_retriever(
+            search_type=search_type, search_kwargs=search_kwargs or {}
+        )
 
     @classmethod
     def load(cls, path: str, embeddings: Embeddings) -> Self:
@@ -307,7 +353,7 @@ class FAISSVectorStoreFactory(VectorStoreFactory):
         faiss_store = FAISS.from_documents(documents, self.embeddings)
         return FAISSVectorStore(faiss_store)
 
-    def load_from_path(self, path: str) -> FAISSVectorStore | None:
+    def load_from_path(self, path: str) -> ExtendedVectorStoreProtocol | None:
         """Load a FAISS vector store from the given path.
 
         Args:
@@ -518,7 +564,7 @@ class InMemoryVectorStoreFactory(VectorStoreFactory):
         store.add_documents(documents)
         return store
 
-    def load_from_path(self, path: str) -> InMemoryVectorStore | None:
+    def load_from_path(self, path: str) -> ExtendedVectorStoreProtocol | None:
         """Load from path (returns singleton store).
 
         Args:

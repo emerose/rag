@@ -77,11 +77,11 @@ class FakeEmbeddingService(EmbeddingServiceProtocol, Embeddings):
         """
         return self.embed_texts(texts)
 
-    def embed_query(self, query: str) -> list[float]:
+    def embed_query(self, text: str) -> list[float]:
         """Generate embedding for a query.
 
         Args:
-            query: Query text to embed
+            text: Query text to embed
 
         Returns:
             Deterministic embedding based on query content
@@ -89,10 +89,10 @@ class FakeEmbeddingService(EmbeddingServiceProtocol, Embeddings):
         Raises:
             ValueError: If query is invalid
         """
-        if not query.strip():
+        if not text.strip():
             raise ValueError("Query cannot be empty or whitespace-only")
 
-        return self._generate_deterministic_embedding(query)
+        return self._generate_deterministic_embedding(text)
 
     def get_model_info(self) -> dict[str, str]:
         """Get information about the embeddings model.
@@ -205,24 +205,24 @@ class DeterministicEmbeddingService(EmbeddingServiceProtocol, Embeddings):
         """
         return self.embed_texts(texts)
 
-    def embed_query(self, query: str) -> list[float]:
+    def embed_query(self, text: str) -> list[float]:
         """Generate embedding for a query.
 
         Args:
-            query: Query text to embed
+            text: Query text to embed
 
         Returns:
             Deterministic embedding based on query content
         """
-        if not query.strip():
+        if not text.strip():
             raise ValueError("Query cannot be empty or whitespace-only")
 
         # Check for predefined embedding first
-        if query in self._predefined_embeddings:
-            return self._predefined_embeddings[query].copy()
+        if text in self._predefined_embeddings:
+            return self._predefined_embeddings[text].copy()
 
         # Generate deterministic embedding
-        return self._generate_deterministic_embedding(query)
+        return self._generate_deterministic_embedding(text)
 
     def get_model_info(self) -> dict[str, str]:
         """Get information about the embeddings model."""

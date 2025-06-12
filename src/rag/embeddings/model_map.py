@@ -15,16 +15,31 @@ def load_model_map(path: str | Path) -> dict[str, str]:
     path = Path(path)
     try:
         with path.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f) or {}
+            raw_data = yaml.safe_load(f)
     except FileNotFoundError:
         return {}
-    if not isinstance(data, dict):
+
+    # Handle None case
+    if raw_data is None:
+        return {}
+
+    if not isinstance(raw_data, dict):
         raise InvalidConfigurationError(
             config_key="embedding_model_map",
-            value=type(data).__name__,
+            value=type(raw_data).__name__,
             expected="dictionary/mapping",
         )
-    return {str(k): str(v) for k, v in data.items()}
+
+    # At this point we know raw_data is a dict
+    # Convert all keys and values to strings
+    assert isinstance(raw_data, dict)
+    # Use explicit typing to avoid Unknown types
+    result: dict[str, str] = {}
+    items = list(raw_data.items())  # Convert to list to avoid Unknown types
+    for item in items:
+        key, value = item
+        result[str(key)] = str(value)
+    return result
 
 
 def get_model_for_path(

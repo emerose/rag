@@ -150,12 +150,12 @@ class RAGComponentsFactory:
             # For testing, use in-memory vectorstore
             if self.config.vectorstore_backend == "fake":
                 self._vectorstore_factory = InMemoryVectorStoreFactory(
-                    self.embedding_service
+                    self.embedding_service  # type: ignore[arg-type]
                 )
             else:
                 # Default to FAISS for production
                 self._vectorstore_factory = FAISSVectorStoreFactory(
-                    self.embedding_service
+                    self.embedding_service  # type: ignore[arg-type]
                 )
         return self._vectorstore_factory
 
