@@ -117,7 +117,7 @@ class DefaultMetadataExtractor(BaseMetadataExtractor):
         Returns:
             Dictionary of extracted metadata
         """
-        metadata = {}
+        metadata: dict[str, Any] = {}
 
         # Extract title from content if not already in metadata
         doc_metadata: dict[str, Any] = document.metadata
@@ -141,7 +141,7 @@ class MarkdownMetadataExtractor(BaseMetadataExtractor):
         Returns:
             Dictionary of extracted metadata
         """
-        metadata = {}
+        metadata: dict[str, Any] = {}
         content = document.page_content
 
         # Extract title (usually the first heading)
@@ -222,7 +222,7 @@ class PDFMetadataExtractor(BaseMetadataExtractor):
         Returns:
             Dictionary of extracted metadata
         """
-        metadata = {}
+        metadata: dict[str, Any] = {}
 
         # Extract title from existing metadata or content
         doc_metadata: dict[str, Any] = document.metadata
@@ -540,7 +540,7 @@ class HTMLMetadataExtractor(BaseMetadataExtractor):
         Returns:
             Dictionary of extracted metadata
         """
-        metadata = {}
+        metadata: dict[str, Any] = {}
         content = document.page_content
 
         # Extract title from HTML content
