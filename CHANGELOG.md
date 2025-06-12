@@ -118,6 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Log level output is colorized according to severity
 - Refactored `TextSplitterFactory` to use a table-driven approach for better maintainability
 - Enhanced PDF processing with improved font analysis for heading detection
+- Removed `--baseline` flag from `run_tests.py` and fail on >0 type
+  errors by default
 - Separated metadata extraction into dedicated `DocumentMetadataExtractor` classes
 - Improved code structure by breaking down complex methods into smaller, focused helpers
 - Migrated query orchestration to LangChain Expression Language (LCEL):
