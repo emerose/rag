@@ -107,8 +107,6 @@ class LTTextGroup(LTTextContainer):
 class LTTextContainer(LTContainer, LTText):
     """Container that holds text."""
 
-    _objs: list[LTChar | LTAnno | LTTextLine | LTTextBox]
-
     def __init__(self) -> None: ...
     def get_text(self) -> str: ...
 

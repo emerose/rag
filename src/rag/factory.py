@@ -14,8 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from rag.data.text_splitter import TextSplitterFactory
-    from rag.engine import RAGEngine
+    from rag.data.text_splitter import TextSplitterFactory  
     from rag.querying.query_engine import QueryEngine
 
 from langchain_openai import ChatOpenAI
@@ -344,7 +343,7 @@ class RAGComponentsFactory:
             "query_engine": self.create_query_engine(),
         }
 
-    def create_rag_engine(self) -> RAGEngine:
+    def create_rag_engine(self):
         """Create a RAGEngine with all dependencies injected from the factory.
 
         This method creates a RAGEngine instance with pre-built components

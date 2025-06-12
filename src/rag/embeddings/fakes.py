@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 
+from langchain_core.embeddings import Embeddings
+
 from .protocols import EmbeddingServiceProtocol
 
 
-class FakeEmbeddingService(EmbeddingServiceProtocol):
+class FakeEmbeddingService(EmbeddingServiceProtocol, Embeddings):
     """Fake embedding service implementation for testing.
 
     This fake implementation provides deterministic embedding outputs
@@ -140,7 +142,7 @@ class FakeEmbeddingService(EmbeddingServiceProtocol):
         return embedding
 
 
-class DeterministicEmbeddingService(EmbeddingServiceProtocol):
+class DeterministicEmbeddingService(EmbeddingServiceProtocol, Embeddings):
     """Deterministic embedding service with configurable outputs.
 
     This implementation allows you to pre-configure specific embeddings
