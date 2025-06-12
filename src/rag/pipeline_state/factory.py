@@ -92,7 +92,7 @@ class PipelineFactory:
 
         # Create dependencies for processors
         from rag.embeddings import EmbeddingProvider
-        
+
         embedding_service = EmbeddingProvider(
             model=config.embedding_model,
             api_key=config.api_key,

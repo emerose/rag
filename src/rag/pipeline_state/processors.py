@@ -13,11 +13,11 @@ from typing import Any, Protocol
 
 from langchain_core.documents import Document
 
+from rag.data.text_splitter import TextSplitterFactory
 from rag.embeddings.protocols import EmbeddingServiceProtocol
 from rag.pipeline_state.models import ProcessingTask, TaskType
 from rag.sources.base import DocumentSourceProtocol
 from rag.storage.protocols import DocumentStoreProtocol, VectorStoreProtocol
-from rag.data.text_splitter import TextSplitterFactory
 from rag.utils.logging_utils import get_logger
 
 logger = get_logger()
@@ -220,7 +220,7 @@ class ChunkingProcessor(BaseTaskProcessor):
                 )
 
             # Create text splitter
-            if hasattr(self.text_splitter_factory, 'create_text_splitter'):
+            if hasattr(self.text_splitter_factory, "create_text_splitter"):
                 # Use factory method
                 splitter = self.text_splitter_factory(
                     chunk_size=chunking_details.chunk_size,

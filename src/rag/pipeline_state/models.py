@@ -89,7 +89,9 @@ class PipelineExecution(Base):
     error_details: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     # Metadata
-    doc_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    doc_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False, default=dict
+    )
 
     # Relationships
     documents: Mapped[list[DocumentProcessing]] = relationship(
@@ -136,7 +138,9 @@ class DocumentProcessing(Base):
     error_details: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
     # Metadata
-    doc_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    doc_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False, default=dict
+    )
 
     # Relationships
     execution: Mapped[PipelineExecution] = relationship(
