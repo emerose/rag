@@ -89,7 +89,7 @@ class FakeDocumentStore:
             ]
 
         # Apply filters to documents
-        results = []
+        results: list[Document] = []
         for document in self._documents.values():
             metadata = document.metadata or {}
             matches = [metadata.get(k) == v for k, v in filters.items()]
@@ -112,7 +112,7 @@ class FakeDocumentStore:
         Returns:
             Dictionary mapping document IDs to documents (missing IDs are omitted)
         """
-        result = {}
+        result: dict[str, Document] = {}
         for doc_id in doc_ids:
             document = self.get_document(doc_id)
             if document is not None:
@@ -142,7 +142,7 @@ class FakeDocumentStore:
         Returns:
             Dictionary mapping document IDs to deletion success (True/False)
         """
-        result = {}
+        result: dict[str, bool] = {}
         for doc_id in doc_ids:
             result[doc_id] = self.delete_document(doc_id)
         return result
@@ -338,7 +338,7 @@ class FakeDocumentStore:
     @property
     def document_metadata(self) -> dict[str, dict[str, Any]]:
         """Get all document metadata for testing purposes."""
-        result = {}
+        result: dict[str, dict[str, Any]] = {}
         for source_doc in self._source_documents.values():
             result[source_doc.location] = source_doc.metadata
         return result
@@ -534,7 +534,7 @@ class FakeDocumentStore:
         if filters is None:
             return list(self._documents.values())
 
-        results = []
+        results: list[Document] = []
         for document in self._documents.values():
             metadata = document.metadata or {}
             matches = all(metadata.get(k) == v for k, v in filters.items())
@@ -572,7 +572,7 @@ class FakeDocumentStore:
         Returns:
             Dictionary mapping file paths to their metadata
         """
-        result = {}
+        result: dict[str, dict[str, Any]] = {}
         for source_doc in self._source_documents.values():
             if source_doc.source_id == "__global_settings__":
                 continue
@@ -593,7 +593,7 @@ class FakeDocumentStore:
         Returns:
             List of dictionaries containing file information
         """
-        results = []
+        results: list[dict[str, Any]] = []
         for source_doc in self._source_documents.values():
             if source_doc.source_id == "__global_settings__":
                 continue

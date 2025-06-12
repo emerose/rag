@@ -348,3 +348,32 @@ class DocumentStoreProtocol(Protocol):
     def clear_all_file_metadata(self) -> None:
         """Clear all file metadata."""
         ...
+
+    def add_document(self, doc_id: str, document: Document) -> None:
+        """Add a document to the store.
+
+        Args:
+            doc_id: Unique identifier for the document
+            document: Document to store
+        """
+        ...
+
+    def add_source_document(self, source_metadata: Any) -> None:
+        """Add a source document to tracking.
+
+        Args:
+            source_metadata: Source document metadata
+        """
+        ...
+
+    def add_document_to_source(
+        self, document_id: str, source_id: str, chunk_order: int
+    ) -> None:
+        """Link a document chunk to its source document.
+
+        Args:
+            document_id: ID of the document chunk
+            source_id: ID of the source document
+            chunk_order: Order of this chunk within the source
+        """
+        ...

@@ -168,7 +168,8 @@ class FAISSVectorStore:
         Returns:
             List of documents most similar to the query
         """
-        return self._faiss_store.similarity_search(query, k=k)
+        # Type ignore needed due to langchain stubs being incomplete
+        return self._faiss_store.similarity_search(query, k=k)  # type: ignore[reportUnknownMemberType]
 
     def add_documents(self, documents: list[Document]) -> None:
         """Add documents to the vector store.
@@ -249,7 +250,13 @@ class FAISSVectorStore:
     @property
     def embedding_function(self) -> Embeddings:
         """Get the embeddings function."""
-        return self._faiss_store.embedding_function
+        # Handle both Embeddings and callable cases
+        embeddings = self._faiss_store.embedding_function
+        if isinstance(embeddings, Embeddings):
+            return embeddings
+        # If it's a callable, we need to wrap it - this shouldn't happen in practice
+        # but we add this for type safety
+        raise TypeError(f"Expected Embeddings instance, got {type(embeddings)}")
 
 
 class FAISSVectorStoreFactory(VectorStoreFactory):
@@ -333,10 +340,12 @@ class InMemoryVectorStore:
     def __new__(cls, embeddings: Embeddings) -> Self:
         """Create or return existing singleton instance."""
         if cls._instance is None or cls._embeddings != embeddings:
-            cls._instance = super().__new__(cls)
+            instance = super().__new__(cls)
+            cls._instance = instance
             cls._embeddings = embeddings
-            cls._instance._initialized = False
-        return cls._instance
+            instance._initialized = False
+        # Cast to Self since we know _instance is not None at this point
+        return cls._instance  # type: ignore[return-value]
 
     def __init__(self, embeddings: Embeddings):
         """Initialize the in-memory vector store.
@@ -369,7 +378,7 @@ class InMemoryVectorStore:
         query_vector = self.embeddings.embed_query(query)
 
         # Calculate similarities
-        similarities = []
+        similarities: list[tuple[float, int]] = []
         for i, doc_vector in enumerate(self.vectors):
             similarity = self._cosine_similarity(query_vector, doc_vector)
             similarities.append((similarity, i))
