@@ -99,7 +99,9 @@ class RAGMCPServer(FastMCP):
         if not vectorstore:
             return []
         docs = vectorstore.similarity_search(query, k=top_k)
-        return [{"page_content": doc.page_content, "metadata": doc.metadata} for doc in docs]
+        return [
+            {"page_content": doc.page_content, "metadata": doc.metadata} for doc in docs
+        ]
 
     async def tool_index(self, path: str, ctx: Context[Any, Any]) -> dict[str, Any]:
         p = Path(path)
