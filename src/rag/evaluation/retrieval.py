@@ -71,6 +71,7 @@ class RetrievalEvaluator:
         for item in dataset:
             # Cast to dict[str, Any] to fix type checking issues with datasets library
             from typing import cast
+
             item_dict = cast(dict[str, Any], item)
             doc_id = item_dict.get("doc_id") or item_dict.get("_id") or item_dict["id"]
             title = str(item_dict.get("title", ""))
@@ -124,7 +125,10 @@ class RetrievalEvaluator:
         queries = load_dataset(self.dataset, "queries")
         # Cast each query to proper dict type
         from typing import cast
-        query_list: list[dict[str, Any]] = [cast(dict[str, Any], q) for q in queries["queries"]]
+
+        query_list: list[dict[str, Any]] = [
+            cast(dict[str, Any], q) for q in queries["queries"]
+        ]
         # Sort queries by ID numerically for consistent ordering
         query_list.sort(key=lambda x: int(x["_id"]))
         self._logger.debug(f"Loaded {len(query_list)} queries")
@@ -145,6 +149,7 @@ class RetrievalEvaluator:
         for row in qrels:
             # Cast to dict[str, Any] to fix type checking issues with datasets library
             from typing import cast
+
             row_dict = cast(dict[str, Any], row)
             qid = str(row_dict.get("query-id") or row_dict.get("query_id"))
             doc_id = str(row_dict.get("corpus-id") or row_dict.get("doc_id"))
