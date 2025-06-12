@@ -448,9 +448,8 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                     content_type="text/plain",
                 )
 
-        # Also add the file to the FakeDocumentStore if it's being used
-        if hasattr(self.document_store, "add_mock_file"):
-            self.document_store.add_mock_file(resolved_path, content, fixed_mtime)
+        # Don't add to FakeDocumentStore when using fake filesystem to avoid duplication
+        # The document source will handle discovery during indexing
 
     def add_test_metadata(self, file_path: str, metadata: dict[str, Any]) -> None:
         """Add test metadata to the fake document store.
