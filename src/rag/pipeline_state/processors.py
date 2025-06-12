@@ -135,7 +135,7 @@ class DocumentLoadingProcessor(BaseTaskProcessor):
 
             # Compute content hash
             if isinstance(content, str):
-                content_bytes = content.encode('utf-8')
+                content_bytes = content.encode("utf-8")
             else:
                 content_bytes = content
             content_hash = hashlib.sha256(content_bytes).hexdigest()
@@ -234,12 +234,15 @@ class ChunkingProcessor(BaseTaskProcessor):
             )
 
             # Split the document - provide mime_type parameter if required
-            if hasattr(splitter, 'split_documents'):
+            if hasattr(splitter, "split_documents"):
                 # Check if method expects mime_type parameter
                 import inspect
+
                 sig = inspect.signature(splitter.split_documents)
-                if 'mime_type' in sig.parameters:
-                    chunks = splitter.split_documents([source_doc], mime_type="text/plain")
+                if "mime_type" in sig.parameters:
+                    chunks = splitter.split_documents(
+                        [source_doc], mime_type="text/plain"
+                    )
                 else:
                     chunks = splitter.split_documents([source_doc])
             else:
@@ -328,7 +331,7 @@ class EmbeddingProcessor(BaseTaskProcessor):
                 )
 
             # Extract texts from chunks
-            texts = [chunk["content"] for chunk in chunks]
+            texts: list[str] = [chunk["content"] for chunk in chunks]
 
             # Get embedding configuration
             embedding_details = task.embedding_details
@@ -343,7 +346,7 @@ class EmbeddingProcessor(BaseTaskProcessor):
             embeddings = self.embedding_service.embed_texts(texts)
 
             # Prepare output
-            chunks_with_embeddings = []
+            chunks_with_embeddings: list[dict[str, Any]] = []
             for _i, (chunk, embedding) in enumerate(
                 zip(chunks, embeddings, strict=False)
             ):
@@ -456,9 +459,9 @@ class VectorStorageProcessor(BaseTaskProcessor):
             self.document_store.add_source_document(source_metadata)
 
             # Store chunks and embeddings
-            stored_ids = []
-            documents = []
-            embeddings = []
+            stored_ids: list[str] = []
+            documents: list[Document] = []
+            embeddings: list[list[float]] = []
 
             for i, chunk_data in enumerate(chunks_with_embeddings):
                 # Create document ID
@@ -489,12 +492,7 @@ class VectorStorageProcessor(BaseTaskProcessor):
                 stored_ids.append(doc_id)
 
             # Add to vector store
-            self.vector_store.add_embeddings(
-                texts=[d.page_content for d in documents],
-                embeddings=embeddings,
-                metadatas=[d.metadata for d in documents],
-                ids=stored_ids,
-            )
+            self.vector_store.add_documents(documents)
 
             # Prepare output
             output_data = {

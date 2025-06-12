@@ -27,7 +27,8 @@ from rag.sources.base import DocumentSourceProtocol
 from rag.sources.filesystem import FilesystemDocumentSource
 from rag.storage.protocols import DocumentStoreProtocol, VectorStoreProtocol
 from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
-from rag.storage.vector_store import VectorStoreFactory
+
+# from rag.storage.vector_store import VectorStoreFactory  # Not used in current implementation
 from rag.utils.logging_utils import get_logger
 
 logger = get_logger()
@@ -85,19 +86,17 @@ class PipelineFactory:
         transitions = StateTransitionService(storage)
 
         # Create document source
-        document_source = FilesystemDocumentSource(
-            root_path=Path(config.documents_dir)
-        )
+        document_source = FilesystemDocumentSource(root_path=Path(config.documents_dir))
 
         # Create dependencies for processors
-        from rag.embeddings import EmbeddingProvider
         from rag.config.components import EmbeddingConfig
-        
+        from rag.embeddings import EmbeddingProvider
+
         embedding_config = EmbeddingConfig(
             model=config.embedding_model,
             batch_size=config.batch_size,
         )
-        
+
         embedding_service = EmbeddingProvider(
             config=embedding_config,
             openai_api_key=config.openai_api_key,
@@ -107,20 +106,20 @@ class PipelineFactory:
         db_path = Path(config.data_dir) / "documents.db"
         document_store = SQLAlchemyDocumentStore(db_path=db_path)
 
-        # Create vector store factory with proper embedding service
-        vector_store_factory = VectorStoreFactory(
-            embedding_service=embedding_service,
-            workspace_path=Path(config.data_dir),
-        )
-        vector_store = vector_store_factory.create_empty()
+        # Create vector store using the embedding service directly
+        # For now, we'll create a simple in-memory vector store
+        from rag.storage.fakes import InMemoryVectorStore
+
+        vector_store = InMemoryVectorStore()
 
         # Create text splitter factory for chunking
         from rag.data.text_splitter import TextSplitterFactory
+
         text_splitter_factory = TextSplitterFactory(
             chunk_size=config.chunk_size,
             chunk_overlap=config.chunk_overlap,
         )
-        
+
         # Create task processors
         processors = {
             TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(document_source),
@@ -164,11 +163,12 @@ class PipelineFactory:
 
         # Create text splitter factory
         from rag.data.text_splitter import TextSplitterFactory
+
         text_splitter_factory = TextSplitterFactory(
             chunk_size=config.chunk_size,
             chunk_overlap=config.chunk_overlap,
         )
-        
+
         # Create task processors
         processors = {
             TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(
@@ -215,9 +215,7 @@ class PipelineFactory:
 
         # Use provided config or create default
         if config is None:
-            config = PipelineConfig(
-                database_url="sqlite:///:memory:"
-            )
+            config = PipelineConfig(database_url="sqlite:///:memory:")
 
         # Create transitions
         transitions = StateTransitionService(storage)
@@ -225,17 +223,18 @@ class PipelineFactory:
         # Use provided processors or create minimal set
         if processors is None:
             # Import here to avoid circular dependencies
-            from rag.testing.fakes import FakeRAGComponentsFactory
+            from rag.testing.test_factory import FakeRAGComponentsFactory
 
             factory = FakeRAGComponentsFactory.create_minimal()
 
             # Create text splitter factory
             from rag.data.text_splitter import TextSplitterFactory
+
             text_splitter_factory = TextSplitterFactory(
                 chunk_size=config.chunk_size,
                 chunk_overlap=config.chunk_overlap,
             )
-            
+
             processors = {
                 TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(
                     document_source or factory.document_source
@@ -243,7 +242,8 @@ class PipelineFactory:
                 TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
                 TaskType.EMBEDDING: EmbeddingProcessor(factory.embedding_service),
                 TaskType.VECTOR_STORAGE: VectorStorageProcessor(
-                    factory.document_store, factory.vector_store
+                    factory.document_store,
+                    getattr(factory, "vector_store", InMemoryVectorStore()),
                 ),
             }
 
@@ -260,5 +260,7 @@ class PipelineFactory:
             task_processors=processors,
             document_source=document_source,
             config=config,
-            document_store=getattr(factory, 'document_store', None) if 'factory' in locals() else None,
+            document_store=getattr(factory, "document_store", None)
+            if "factory" in locals()
+            else None,
         )

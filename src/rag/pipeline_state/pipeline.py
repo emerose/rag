@@ -6,7 +6,7 @@ processing through the state machine with full recovery support.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any
@@ -67,11 +67,11 @@ class PipelineExecutionResult:
 class Pipeline:
     """Main pipeline orchestrator with state machine support."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         storage: PipelineStorage,
         state_transitions: StateTransitionService,
-        task_processors: dict[TaskType, TaskProcessor],
+        task_processors: Mapping[TaskType, TaskProcessor],
         document_source: DocumentSourceProtocol,
         config: PipelineConfig,
         document_store: Any = None,
@@ -96,7 +96,7 @@ class Pipeline:
         self._executor = ThreadPoolExecutor(max_workers=config.concurrent_tasks)
         self._running = False
         self._paused = False
-        
+
     @property
     def document_store(self) -> Any:
         """Access to document store for backward compatibility."""

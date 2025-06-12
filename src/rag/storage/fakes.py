@@ -274,6 +274,11 @@ class InMemoryVectorStore(VectorStoreProtocol):
         # For testing, this is a no-op
         pass
 
+    def save(self, path: str) -> None:
+        """Save the vector store to disk."""
+        # For testing, this is a no-op
+        pass
+
     @property
     def index(self) -> Any:
         """Get the underlying index (e.g., FAISS index)."""
