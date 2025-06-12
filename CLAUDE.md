@@ -78,7 +78,7 @@ The RAG system is built around **dependency injection** with `RAGEngine` (`src/r
 - **RuntimeOptions**: Mutable runtime flags and callbacks (streaming, progress tracking)
 - **IngestManager**: Coordinates document processing pipeline
 - **VectorStoreManager**: Pluggable vector store backends (FAISS default)
-- **IndexManager**: SQLite-based metadata tracking for incremental indexing
+- **DocumentStore**: SQLite-based metadata tracking and document storage
 
 ### Data Flow
 1. **Document Ingestion**: `DocumentLoader` → `TextSplitter` → `MetadataExtractor`

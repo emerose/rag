@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.engine import RAGEngine
+from rag.factory import RAGComponentsFactory
 
 # Load environment variables from .env file
 load_dotenv()
@@ -110,7 +111,8 @@ NLP focuses on the interaction between computers and human language.
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
             )
             runtime = RuntimeOptions()
-            engine = RAGEngine.create(config, runtime)
+            factory = RAGComponentsFactory(config, runtime)
+            engine = factory.create_rag_engine()
 
             # Step 1: Index all documents
             index_results = engine.ingestion_pipeline.ingest_all()
@@ -166,7 +168,8 @@ NLP focuses on the interaction between computers and human language.
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
             )
             runtime = RuntimeOptions()
-            engine = RAGEngine.create(config, runtime)
+            factory = RAGComponentsFactory(config, runtime)
+            engine = factory.create_rag_engine()
 
             # Create and index document
             doc = docs_dir / "test.txt"
@@ -210,7 +213,8 @@ NLP focuses on the interaction between computers and human language.
                 openai_api_key=os.getenv("OPENAI_API_KEY"),
             )
             runtime = RuntimeOptions()
-            engine = RAGEngine.create(config, runtime)
+            factory = RAGComponentsFactory(config, runtime)
+            engine = factory.create_rag_engine()
 
             # Index all documents
             results = engine.ingestion_pipeline.ingest_all()
@@ -264,7 +268,8 @@ NLP focuses on the interaction between computers and human language.
                 openai_api_key="sk-test",
             )
             runtime = RuntimeOptions()
-            engine = RAGEngine.create(config, runtime)
+            factory = RAGComponentsFactory(config, runtime)
+            engine = factory.create_rag_engine()
 
             # Test indexing empty directory
             empty_dir = temp_path / "empty_dir"
@@ -278,7 +283,8 @@ NLP focuses on the interaction between computers and human language.
                 openai_api_key="sk-test",
             )
             runtime = RuntimeOptions()
-            engine_empty = RAGEngine.create(config_empty, runtime)
+            factory_empty = RAGComponentsFactory(config_empty, runtime)
+            engine_empty = factory_empty.create_rag_engine()
 
             # Should handle gracefully when directory is empty
             results = engine_empty.ingestion_pipeline.ingest_all()
@@ -310,7 +316,8 @@ NLP focuses on the interaction between computers and human language.
             runtime = RuntimeOptions()
 
             # First engine instance - index document
-            engine1 = RAGEngine.create(config, runtime)
+            factory1 = RAGComponentsFactory(config, runtime)
+            engine1 = factory1.create_rag_engine()
             results = engine1.ingestion_pipeline.ingest_all()
             assert results.documents_loaded == 1
             assert results.documents_stored == 1
@@ -322,7 +329,8 @@ NLP focuses on the interaction between computers and human language.
             assert len(source_docs1) == 1
 
             # Create second engine instance (simulating restart)
-            engine2 = RAGEngine.create(config, runtime)
+            factory2 = RAGComponentsFactory(config, runtime)
+            engine2 = factory2.create_rag_engine()
 
             # Should still see the indexed file
             document_store2 = engine2.ingestion_pipeline.document_store

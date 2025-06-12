@@ -159,7 +159,7 @@ def test_factory_creates_rag_engine(temp_dir: Path) -> None:
     assert hasattr(engine, "answer")
 
     # Verify components are accessible through proper interfaces
-    assert engine.index_manager is not None
+    assert engine.document_store is not None
     assert engine.ingestion_pipeline is not None
     assert hasattr(
         engine, "vectorstore"

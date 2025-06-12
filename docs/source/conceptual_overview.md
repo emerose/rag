@@ -45,7 +45,7 @@ The **EmbeddingService** component (implements [EmbeddingServiceProtocol](https:
 ## 4. Cache and Metadata Management
 The **CacheOrchestrator** coordinates cache lifecycle and metadata operations through:
 
-- **IndexManager** (implements [CacheRepositoryProtocol](https://github.com/emerose/rag/blob/main/src/rag/storage/protocols.py)): Records metadata in SQLite database with support for in-memory testing
+- **DocumentStore** (implements [DocumentStoreProtocol](https://github.com/emerose/rag/blob/main/src/rag/storage/protocols.py)): Records documents and metadata in SQLite database with support for in-memory testing
 - **Chunk tracking**: Per-chunk hashes enable incremental indexing, skipping unchanged content
 - **Cache invalidation**: Supports both file-specific and global cache clearing
 - **Metadata enrichment**: Preserves all document metadata plus computed fields like ``token_count``, titles, and heading hierarchies

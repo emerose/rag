@@ -240,27 +240,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         return cls(test_options=test_options)
 
     @classmethod
-    def create_fake_index_manager(
-        cls,
-        data_dir: str = "/fake/data",
-        initial_metadata: dict[str, dict[str, Any]] | None = None,
-    ) -> FakeDocumentStore:
-        """Create a standalone FakeDocumentStore for testing.
-
-        Args:
-            data_dir: Data directory for the manager
-            initial_metadata: Initial metadata to populate
-
-        Returns:
-            Configured FakeDocumentStore instance
-        """
-        manager = FakeDocumentStore()
-        if initial_metadata:
-            for file_path, metadata in initial_metadata.items():
-                manager.set_metadata_dict(file_path, metadata)
-        return manager
-
-    @classmethod
     def create_minimal(cls) -> FakeRAGComponentsFactory:
         """Create a minimal test factory with no initial data.
 

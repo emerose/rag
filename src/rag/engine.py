@@ -86,11 +86,6 @@ class RAGEngine:
         return self._vectorstore_factory
 
     @property
-    def index_manager(self) -> DocumentStoreProtocol:
-        """Get the document store (compatibility property)."""
-        return self._document_store
-
-    @property
     def vectorstore(self) -> VectorStoreProtocol | None:
         """Get the single vectorstore."""
         if self._vectorstore is None:

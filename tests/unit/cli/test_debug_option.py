@@ -22,7 +22,7 @@ class MockEngineFactory:
         if self._engine_mock:
             return self._engine_mock
         engine = MagicMock()
-        engine.index_manager.list_indexed_files.return_value = []
+        engine.document_store.list_indexed_files.return_value = []
         return engine
 
 
