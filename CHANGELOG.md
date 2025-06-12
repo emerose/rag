@@ -9,11 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Enhanced test runner with Rich-formatted summary output and progress bars (Closes #330)
+  - **Dynamic table display**: Real-time updating table showing all test steps with live status
+  - Section separators for static analysis vs test execution
+  - Color-coded status indicators with test counts (✅ Passed (327))
+  - Live duration tracking during execution
   - Parsed output from pytest, pyright, ruff, and vulture with structured summaries
   - Progress bars and spinners for all operations
   - Smart error categorization: <5 type errors shown directly, >5 summarized by category/file
   - Rich tables for test results with pass/fail/skip counts and percentages
   - `--verbose` flag for detailed output and `--full-output` flag for complete tool output
+  - `--legacy` flag to use original sequential output for backward compatibility
 - FastMCP server exposing RAG functionality over HTTP and stdio
 - Unit tests for the new MCP server
 - Integration tests covering CLI workflows and server operations
