@@ -20,7 +20,7 @@ class HybridRetriever:
     rrf_k: int = 60
 
     def _doc_key(self, doc: Document) -> Hashable:
-        return (doc.page_content, tuple(sorted(doc.metadata.items())))  # type: ignore[misc]
+        return (doc.page_content, tuple(sorted(doc.metadata.items())))
 
     def retrieve(self, query: str, k: int = 4) -> list[Document]:
         """Return top-k documents using reciprocal rank fusion."""
