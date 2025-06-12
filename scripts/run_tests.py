@@ -19,7 +19,13 @@ import typer
 from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
-from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeRemainingColumn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeRemainingColumn,
+)
 from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
@@ -36,7 +42,9 @@ app = typer.Typer(
 console = Console()
 
 # Type checking configuration
-MAX_TYPE_ERRORS = 0    # ZERO type errors achieved! Strict type checking fully enforced (issue #325)
+MAX_TYPE_ERRORS = (
+    0  # ZERO type errors achieved! Strict type checking fully enforced (issue #325)
+)
 
 
 @dataclass
@@ -65,7 +73,7 @@ class TypeCheckResult:
 @dataclass
 class CheckStatus:
     """Status of a single check/test step."""
-    
+
     name: str
     status: str = "pending"  # pending, running, passed, failed, skipped
     duration: float | None = None
@@ -78,54 +86,66 @@ class CheckStatus:
     error_count: int = 0
     allowed_errors: int = 0
     percentage: int = 0  # Current progress percentage for running tests
-    
+
     def start(self):
         self.status = "running"
         self.start_time = time.time()
-    
+
     def finish(self, status: str, details: str = "", **kwargs):
         self.status = status
         self.details = details
         if self.start_time:
             self.duration = time.time() - self.start_time
-        
+
         # Store additional details
-        self.passed_count = kwargs.get('passed_count', 0)
-        self.failed_count = kwargs.get('failed_count', 0) 
-        self.skipped_count = kwargs.get('skipped_count', 0)
-        self.error_count = kwargs.get('error_count', 0)
-        self.allowed_errors = kwargs.get('allowed_errors', 0)
+        self.passed_count = kwargs.get("passed_count", 0)
+        self.failed_count = kwargs.get("failed_count", 0)
+        self.skipped_count = kwargs.get("skipped_count", 0)
+        self.error_count = kwargs.get("error_count", 0)
+        self.allowed_errors = kwargs.get("allowed_errors", 0)
         # When finished, set percentage to 100% for completed tests
-        if status in ["passed", "failed"] and self.name in ["Unit Tests", "Integration Tests", "E2E Tests"]:
+        if status in ["passed", "failed"] and self.name in [
+            "Unit Tests",
+            "Integration Tests",
+            "E2E Tests",
+        ]:
             self.percentage = 100
 
 
 class DynamicTestRunner:
     """Manages dynamic test execution with live table updates."""
-    
+
     def __init__(self):
         self.console = Console()
         self.checks: list[CheckStatus] = []
         self.details_output: list[str] = []
-        
+
     def add_check(self, name: str) -> CheckStatus:
         """Add a new check to track."""
         check = CheckStatus(name)
         self.checks.append(check)
         return check
-    
+
     def create_status_table(self) -> Table:
         """Create the dynamic status table."""
-        table = Table(title="Test Execution Status", show_header=True, header_style="bold magenta")
+        table = Table(
+            title="Test Execution Status", show_header=True, header_style="bold magenta"
+        )
         table.add_column("✓", justify="center", width=3)  # Success indicator column
         table.add_column("Check", style="cyan", no_wrap=True, width=25)
-        table.add_column("Status", justify="center", width=38)  # Fixed width for stability
+        table.add_column(
+            "Status", justify="center", width=38
+        )  # Fixed width for stability
         table.add_column("Duration", justify="right", style="dim", width=10)
-        
+
         # Add static analysis section
-        static_checks = ["Code Formatting & Linting", "Type Checking", "Dead Code Detection"]
+        static_checks = [
+            "Code Formatting & Linting",
+            "Type Checking",
+            "Dead Code Detection",
+        ]
         test_checks = ["Unit Tests", "Integration Tests", "E2E Tests"]
-        
+
         # Group checks into sections
         current_section = None
         for check in self.checks:
@@ -138,7 +158,7 @@ class DynamicTestRunner:
                 if current_section is not None:
                     table.add_section()
                 current_section = "tests"
-            
+
             # Success indicator (leftmost column)
             if check.status == "passed":
                 success_indicator = "[green]✓[/green]"
@@ -146,13 +166,16 @@ class DynamicTestRunner:
                 success_indicator = "[red]✗[/red]"
             else:
                 success_indicator = "[dim]•[/dim]"  # Pending/running
-            
+
             # Format status with appropriate colors and icons
             if check.status == "pending":
                 status = "[dim]⏳ Pending[/dim]"
             elif check.status == "running":
                 # Use real percentage for test steps that support it
-                if check.name in ["Unit Tests", "Integration Tests", "E2E Tests"] and check.percentage > 0:
+                if (
+                    check.name in ["Unit Tests", "Integration Tests", "E2E Tests"]
+                    and check.percentage > 0
+                ):
                     status = f"[yellow]⠋ Running ({check.percentage}%)[/yellow]"
                 elif check.start_time:
                     # Fall back to time-based estimate for non-test steps
@@ -162,7 +185,7 @@ class DynamicTestRunner:
                         estimated_total = 4.0  # ~4 seconds for pyright
                     else:
                         estimated_total = 2.0  # Default for quick checks
-                    
+
                     percentage = min(95, int((elapsed / estimated_total) * 100))
                     status = f"[yellow]⠋ Running ({percentage}%)[/yellow]"
                 else:
@@ -186,9 +209,9 @@ class DynamicTestRunner:
                         parts.append(f"[red]{check.failed_count} failed[/red]")
                     if check.skipped_count > 0:
                         parts.append(f"[yellow]{check.skipped_count} skipped[/yellow]")
-                    
+
                     if parts:
-                        status = ' | '.join(parts)
+                        status = " | ".join(parts)
                     else:
                         status = "[green]✅[/green]"
                 else:
@@ -211,7 +234,7 @@ class DynamicTestRunner:
                 status = "[yellow]⏭️ Skipped[/yellow]"
             else:
                 status = check.status
-            
+
             # Format duration
             if check.duration is not None:
                 duration = f"{check.duration:.2f}s"
@@ -220,20 +243,20 @@ class DynamicTestRunner:
                 duration = f"{elapsed:.1f}s"
             else:
                 duration = "-"
-            
+
             table.add_row(success_indicator, check.name, status, duration)
-        
+
         return table
-    
+
     def add_details(self, text: str):
         """Add details to show below the table."""
         self.details_output.append(text)
-    
+
     def create_display(self) -> str:
         """Create the complete display with table and details."""
         # Create table
         table = self.create_status_table()
-        
+
         # Combine table with details
         if self.details_output:
             details = "\n".join(self.details_output)
@@ -251,7 +274,7 @@ def run_command_with_progress(
         TextColumn("[progress.description]{task.description}"),
         console=console,
     )
-    
+
     with progress:
         task = progress.add_task(description, total=None)
 
@@ -261,9 +284,13 @@ def run_command_with_progress(
             # For non-captured output, show command being run
             console.print(f"[blue]Running:[/blue] {' '.join(cmd)}")
             result = subprocess.run(cmd, check=False)
-    
+
     # Progress bar is automatically removed when context exits
-    return result.returncode, result.stdout if capture_output else "", result.stderr if capture_output else ""
+    return (
+        result.returncode,
+        result.stdout if capture_output else "",
+        result.stderr if capture_output else "",
+    )
 
 
 def parse_pytest_output(output: str) -> TestResult:
@@ -301,29 +328,32 @@ def parse_pyright_output(output: str) -> TypeCheckResult:
     result.errors_by_type = defaultdict(int)
 
     # Split output into lines and process each error block
-    lines = output.split('\n')
+    lines = output.split("\n")
     i = 0
     while i < len(lines):
         line = lines[i]
-        
+
         # Look for error line pattern: file:line:col - error: message
-        error_match = re.match(r'(.+?):(\d+):(\d+)\s*-\s*error:\s*(.+)', line)
+        error_match = re.match(r"(.+?):(\d+):(\d+)\s*-\s*error:\s*(.+)", line)
         if error_match:
             file_path = error_match.group(1)
             line_num = error_match.group(2)
             col = error_match.group(3)
             message = error_match.group(4).strip()
-            
+
             # Look for error type in subsequent lines
             error_type = "unknown"
             j = i + 1
             while j < len(lines) and j < i + 5:  # Look ahead max 5 lines
-                type_match = re.search(r'\((report\w+)\)', lines[j])
+                type_match = re.search(r"\((report\w+)\)", lines[j])
                 if type_match:
                     error_type = type_match.group(1)
                     break
                 # Stop if we hit another error or empty line
-                if re.match(r'.+?:\d+:\d+\s*-\s*error:', lines[j]) or lines[j].strip() == '':
+                if (
+                    re.match(r".+?:\d+:\d+\s*-\s*error:", lines[j])
+                    or lines[j].strip() == ""
+                ):
                     break
                 j += 1
 
@@ -331,9 +361,11 @@ def parse_pyright_output(output: str) -> TypeCheckResult:
             if "/rag/" in file_path:
                 file_path = file_path.split("/rag/", 1)[1]
 
-            result.errors_by_file[file_path].append(f"Line {line_num}:{col} - {message}")
+            result.errors_by_file[file_path].append(
+                f"Line {line_num}:{col} - {message}"
+            )
             result.errors_by_type[error_type] += 1
-        
+
         i += 1
 
     # Parse summary line
@@ -424,13 +456,15 @@ def display_pyright_results(
     elif result.errors_by_file:
         # Create side-by-side tables with limited rows
         from rich.columns import Columns
-        
+
         tables = []
-        
+
         # Show summary by error type (top 5)
         if result.errors_by_type:
             error_type_table = Table(
-                title="Type Errors by Category", show_header=True, header_style="bold magenta"
+                title="Type Errors by Category",
+                show_header=True,
+                header_style="bold magenta",
             )
             error_type_table.add_column("Error Type", style="cyan")
             error_type_table.add_column("Count", justify="right")
@@ -439,10 +473,10 @@ def display_pyright_results(
             top_error_types = sorted(
                 result.errors_by_type.items(), key=lambda x: x[1], reverse=True
             )[:5]
-            
+
             for error_type, count in top_error_types:
                 error_type_table.add_row(error_type, str(count))
-            
+
             # Add "..." row if there are more than 5 types
             if len(result.errors_by_type) > 5:
                 error_type_table.add_row("...", "...", style="dim")
@@ -469,7 +503,7 @@ def display_pyright_results(
             file_table.add_row("...", "...", style="dim")
 
         tables.append(file_table)
-        
+
         # Display tables side by side with minimal spacing
         console.print()
         console.print(Columns(tables, equal=False, expand=False, padding=(0, 1)))
@@ -495,7 +529,9 @@ def display_coverage_results(output: str):
         console.print("[green]Coverage report generated[/green]")
 
 
-def run_pyright_with_summary(max_errors: int = MAX_TYPE_ERRORS, verbose: bool = False) -> int:
+def run_pyright_with_summary(
+    max_errors: int = MAX_TYPE_ERRORS, verbose: bool = False
+) -> int:
     """Run pyright with summary output."""
     exit_code, stdout, stderr = run_command_with_progress(
         ["pyright", "src/rag"],
@@ -516,9 +552,7 @@ def run_pyright_with_summary(max_errors: int = MAX_TYPE_ERRORS, verbose: bool = 
     return result.exit_code
 
 
-def run_pytest_with_summary(
-    cmd: list[str], title: str, verbose: bool = False
-) -> int:
+def run_pytest_with_summary(cmd: list[str], title: str, verbose: bool = False) -> int:
     """Run pytest with summary output."""
     exit_code, stdout, stderr = run_command_with_progress(
         cmd,
@@ -573,7 +607,11 @@ def run_ruff_with_summary(verbose: bool = False) -> int:
     )
 
     # Check if any files were modified or if ruff failed
-    if format_result.returncode != 0 or lint_result.returncode != 0 or reformat_result.returncode != 0:
+    if (
+        format_result.returncode != 0
+        or lint_result.returncode != 0
+        or reformat_result.returncode != 0
+    ):
         console.print("[red]❌ Ruff found issues[/red]")
         console.print(full_output)
     elif "reformatted" in format_result.stdout or lint_result.stdout.strip():
@@ -584,7 +622,9 @@ def run_ruff_with_summary(verbose: bool = False) -> int:
     else:
         console.print("[green]✅ Code formatting and linting passed[/green]")
 
-    return max(format_result.returncode, lint_result.returncode, reformat_result.returncode)
+    return max(
+        format_result.returncode, lint_result.returncode, reformat_result.returncode
+    )
 
 
 def run_vulture_with_summary(verbose: bool = False) -> int:
@@ -630,7 +670,9 @@ def run_ruff_quietly() -> tuple[int, str]:
         text=True,
     )
 
-    exit_code = max(format_result.returncode, lint_result.returncode, reformat_result.returncode)
+    exit_code = max(
+        format_result.returncode, lint_result.returncode, reformat_result.returncode
+    )
     output = (
         format_result.stdout
         + format_result.stderr
@@ -650,11 +692,11 @@ def run_pyright_quietly(max_errors: int) -> tuple[int, str]:
         text=True,
         check=False,
     )
-    
+
     output = result.stdout + result.stderr
     parsed = parse_pyright_output(output)
     exit_code = 0 if parsed.total_errors <= max_errors else 1
-    
+
     return exit_code, output
 
 
@@ -666,7 +708,7 @@ def run_vulture_quietly() -> tuple[int, str]:
         text=True,
         check=False,
     )
-    
+
     output = result.stdout + result.stderr
     return result.returncode, output
 
@@ -678,11 +720,13 @@ def run_pytest_quietly(cmd: list[str]) -> tuple[int, str]:
     return result.returncode, output
 
 
-def run_pytest_with_progress(cmd: list[str], check_status: "CheckStatus", live_update_callback=None) -> tuple[int, str]:
+def run_pytest_with_progress(
+    cmd: list[str], check_status: "CheckStatus", live_update_callback=None
+) -> tuple[int, str]:
     """Run pytest with real-time progress updates."""
     # Add progress output style to pytest command
     cmd_with_progress = cmd + ["-o", "console_output_style=progress"]
-    
+
     # Start the process
     process = subprocess.Popen(
         cmd_with_progress,
@@ -690,19 +734,19 @@ def run_pytest_with_progress(cmd: list[str], check_status: "CheckStatus", live_u
         stderr=subprocess.STDOUT,
         text=True,
         bufsize=1,
-        universal_newlines=True
+        universal_newlines=True,
     )
-    
+
     output_lines = []
     percentage = 0
-    
+
     try:
         for line in process.stdout:
             output_lines.append(line)
-            
+
             # Parse progress percentage from pytest output
             # Look for patterns like "[ 25%]", "[ 50%]", etc.
-            progress_match = re.search(r'\[\s*(\d+)%\]', line)
+            progress_match = re.search(r"\[\s*(\d+)%\]", line)
             if progress_match:
                 new_percentage = int(progress_match.group(1))
                 if new_percentage > percentage:
@@ -712,19 +756,21 @@ def run_pytest_with_progress(cmd: list[str], check_status: "CheckStatus", live_u
                     # Trigger live update if callback provided
                     if live_update_callback:
                         live_update_callback()
-                    
+
     except Exception:
         # If anything goes wrong with progress parsing, continue silently
         pass
-    
+
     # Wait for process to complete
     process.wait()
-    
-    full_output = ''.join(output_lines)
+
+    full_output = "".join(output_lines)
     return process.returncode, full_output
 
 
-def run_static_with_summary(max_errors: int = MAX_TYPE_ERRORS, verbose: bool = False) -> int:
+def run_static_with_summary(
+    max_errors: int = MAX_TYPE_ERRORS, verbose: bool = False
+) -> int:
     """Run all static analysis with summary output."""
     console.print(
         Panel(
@@ -772,23 +818,31 @@ def run_check_with_dynamic_table(
 ) -> int:
     """Run complete check workflow with dynamic table display."""
     runner = DynamicTestRunner()
-    
+
     # Set up all checks
     ruff_check = runner.add_check("Code Formatting & Linting")
     pyright_check = runner.add_check("Type Checking")
     vulture_check = runner.add_check("Dead Code Detection")
     unit_check = runner.add_check("Unit Tests")
-    
+
     integration_check = None
     if not skip_integration:
         integration_check = runner.add_check("Integration Tests")
-    
+
     e2e_check = None
     if include_e2e:
         e2e_check = runner.add_check("E2E Tests")
 
-    with Live(runner.create_status_table(), refresh_per_second=4, console=console) as live:
-        
+    ruff_output_store = None
+    pyright_output_store = None
+    pyright_parsed = None
+    vulture_output_store = None
+    exit_code = 0
+
+    with Live(
+        runner.create_status_table(), refresh_per_second=4, console=console
+    ) as live:
+
         # Run ruff
         ruff_check.start()
         live.update(runner.create_status_table())
@@ -797,158 +851,166 @@ def run_check_with_dynamic_table(
             ruff_check.finish("passed", "No formatting issues")
         else:
             ruff_check.finish("failed", "Formatting issues found")
+            ruff_output_store = ruff_output
+            exit_code = ruff_result
+        live.update(runner.create_status_table())
+
+        if exit_code == 0:
+            # Run pyright
+            pyright_check.start()
             live.update(runner.create_status_table())
-            console.print(ruff_output)
-            return ruff_result
-        live.update(runner.create_status_table())
-        
-        # Run pyright
-        pyright_check.start()
-        live.update(runner.create_status_table())
-        pyright_result, pyright_output = run_pyright_quietly(max_errors)
-        parsed = parse_pyright_output(pyright_output)
-        if pyright_result == 0:
-            pyright_check.finish(
-                "passed", 
-                f"{parsed.total_errors} errors (≤ {max_errors} allowed)",
-                error_count=parsed.total_errors,
-                allowed_errors=max_errors
-            )
-        else:
-            pyright_check.finish(
-                "failed",
-                f"{parsed.total_errors} errors (> {max_errors} allowed)",
-                error_count=parsed.total_errors,
-                allowed_errors=max_errors
-            )
+            pyright_result, pyright_output = run_pyright_quietly(max_errors)
+            parsed = parse_pyright_output(pyright_output)
+            if pyright_result == 0:
+                pyright_check.finish(
+                    "passed",
+                    f"{parsed.total_errors} errors (≤ {max_errors} allowed)",
+                    error_count=parsed.total_errors,
+                    allowed_errors=max_errors,
+                )
+            else:
+                pyright_check.finish(
+                    "failed",
+                    f"{parsed.total_errors} errors (> {max_errors} allowed)",
+                    error_count=parsed.total_errors,
+                    allowed_errors=max_errors,
+                )
+                pyright_output_store = pyright_output
+                pyright_parsed = parsed
+                exit_code = pyright_result
             live.update(runner.create_status_table())
-            display_pyright_results(parsed, max_errors, verbose)
-            return pyright_result
-        live.update(runner.create_status_table())
-        
-        # Run vulture
-        vulture_check.start()
-        live.update(runner.create_status_table())
-        vulture_result, vulture_output = run_vulture_quietly()
-        if vulture_result == 0:
-            vulture_check.finish("passed", "No dead code detected")
-        else:
-            issues = len([line for line in vulture_output.strip().split("\n") if line])
-            vulture_check.finish("failed", f"{issues} potential issues found")
+
+        if exit_code == 0:
+            # Run vulture
+            vulture_check.start()
             live.update(runner.create_status_table())
-            console.print(vulture_output)
-            return vulture_result
-        live.update(runner.create_status_table())
-        
-        # Run unit tests
-        unit_check.start()
-        live.update(runner.create_status_table())
-        unit_result, unit_output = run_pytest_with_progress(
-            ["python", "-m", "pytest", "tests/unit/", "-v", "--tb=short"],
-            unit_check,
-            lambda: live.update(runner.create_status_table())
-        )
-        parsed_unit = parse_pytest_output(unit_output)
-        if unit_result == 0:
-            unit_check.finish(
-                "passed", 
-                f"{parsed_unit.passed} tests passed",
-                passed_count=parsed_unit.passed,
-                failed_count=parsed_unit.failed,
-                skipped_count=parsed_unit.skipped
-            )
-        else:
-            unit_check.finish(
-                "failed", 
-                f"{parsed_unit.failed} tests failed",
-                passed_count=parsed_unit.passed,
-                failed_count=parsed_unit.failed,
-                skipped_count=parsed_unit.skipped
-            )
+            vulture_result, vulture_output = run_vulture_quietly()
+            if vulture_result == 0:
+                vulture_check.finish("passed", "No dead code detected")
+            else:
+                issues = len(
+                    [line for line in vulture_output.strip().split("\n") if line]
+                )
+                vulture_check.finish("failed", f"{issues} potential issues found")
+                vulture_output_store = vulture_output
+                exit_code = vulture_result
             live.update(runner.create_status_table())
-            return unit_result
-        live.update(runner.create_status_table())
-        
+
+        if exit_code == 0:
+            # Run unit tests
+            unit_check.start()
+            live.update(runner.create_status_table())
+            unit_result, unit_output = run_pytest_with_progress(
+                ["python", "-m", "pytest", "tests/unit/", "-v", "--tb=short"],
+                unit_check,
+                lambda: live.update(runner.create_status_table()),
+            )
+            parsed_unit = parse_pytest_output(unit_output)
+            if unit_result == 0:
+                unit_check.finish(
+                    "passed",
+                    f"{parsed_unit.passed} tests passed",
+                    passed_count=parsed_unit.passed,
+                    failed_count=parsed_unit.failed,
+                    skipped_count=parsed_unit.skipped,
+                )
+            else:
+                unit_check.finish(
+                    "failed",
+                    f"{parsed_unit.failed} tests failed",
+                    passed_count=parsed_unit.passed,
+                    failed_count=parsed_unit.failed,
+                    skipped_count=parsed_unit.skipped,
+                )
+                exit_code = unit_result
+            live.update(runner.create_status_table())
+
         # Run integration tests
-        if integration_check:
+        if exit_code == 0 and integration_check:
             integration_check.start()
             live.update(runner.create_status_table())
             integration_result, integration_output = run_pytest_with_progress(
                 ["python", "-m", "pytest", "-m", "integration", "-v", "--tb=short"],
                 integration_check,
-                lambda: live.update(runner.create_status_table())
+                lambda: live.update(runner.create_status_table()),
             )
             parsed_integration = parse_pytest_output(integration_output)
             if integration_result == 0:
                 integration_check.finish(
-                    "passed", 
+                    "passed",
                     f"{parsed_integration.passed} tests passed",
                     passed_count=parsed_integration.passed,
                     failed_count=parsed_integration.failed,
-                    skipped_count=parsed_integration.skipped
+                    skipped_count=parsed_integration.skipped,
                 )
             else:
                 integration_check.finish(
-                    "failed", 
+                    "failed",
                     f"{parsed_integration.failed} tests failed",
                     passed_count=parsed_integration.passed,
                     failed_count=parsed_integration.failed,
-                    skipped_count=parsed_integration.skipped
+                    skipped_count=parsed_integration.skipped,
                 )
-                live.update(runner.create_status_table())
-                return integration_result
+                exit_code = integration_result
             live.update(runner.create_status_table())
-        
+
         # Run E2E tests
-        if e2e_check:
+        if exit_code == 0 and e2e_check:
             e2e_check.start()
             live.update(runner.create_status_table())
             e2e_result, e2e_output = run_pytest_with_progress(
                 ["python", "-m", "pytest", "-m", "e2e", "-v", "--tb=short"],
                 e2e_check,
-                lambda: live.update(runner.create_status_table())
+                lambda: live.update(runner.create_status_table()),
             )
             parsed_e2e = parse_pytest_output(e2e_output)
             if e2e_result == 0:
                 e2e_check.finish(
-                    "passed", 
+                    "passed",
                     f"{parsed_e2e.passed} tests passed",
                     passed_count=parsed_e2e.passed,
                     failed_count=parsed_e2e.failed,
-                    skipped_count=parsed_e2e.skipped
+                    skipped_count=parsed_e2e.skipped,
                 )
             else:
                 e2e_check.finish(
-                    "failed", 
+                    "failed",
                     f"{parsed_e2e.failed} tests failed",
                     passed_count=parsed_e2e.passed,
                     failed_count=parsed_e2e.failed,
-                    skipped_count=parsed_e2e.skipped
+                    skipped_count=parsed_e2e.skipped,
                 )
-                live.update(runner.create_status_table())
-                return e2e_result
+                exit_code = e2e_result
             live.update(runner.create_status_table())
+
+    if exit_code != 0:
+        console.print()
+        if ruff_output_store:
+            console.print(ruff_output_store)
+        if pyright_parsed:
+            display_pyright_results(pyright_parsed, max_errors, verbose)
+        if vulture_output_store:
+            console.print(vulture_output_store)
+        return exit_code
 
     # Show detailed results after table
     console.print("\n[bold green]📊 Detailed Results[/bold green]")
-    
+
     # Show pyright details if verbose or errors > 5
-    if pyright_result == 0:
-        parsed = parse_pyright_output(pyright_output)
+    if pyright_output_store is not None:
+        parsed = parse_pyright_output(pyright_output_store)
         if parsed.total_errors > 5:
             display_pyright_results(parsed, max_errors, verbose)
         elif parsed.total_errors > 0 and verbose:
             display_pyright_results(parsed, max_errors, verbose)
-    
+
     # Show test failures if any
-    if unit_result == 0 and parsed_unit.failed == 0:
-        pass  # No failures to show
-    elif parsed_unit.failed > 0 and parsed_unit.failed <= 5:
+    if parsed_unit.failed > 0 and parsed_unit.failed <= 5:
         console.print("\n[red]Unit Test Failures:[/red]")
         if parsed_unit.errors:
             for error in parsed_unit.errors:
                 console.print(f"  • {error}")
-    
+
     console.print()
     console.print(
         Panel(
@@ -998,7 +1060,9 @@ def run_check_with_summary(
 
     # Integration tests
     if not skip_integration:
-        console.print(f"\n[bold green]Step 3/{len(steps)}: Integration Tests[/bold green]")
+        console.print(
+            f"\n[bold green]Step 3/{len(steps)}: Integration Tests[/bold green]"
+        )
         integration_result = run_pytest_with_summary(
             ["python", "-m", "pytest", "-m", "integration", "-v", "--tb=short"],
             "Integration Tests",
@@ -1269,7 +1333,7 @@ def static(
         for cmd, desc in steps:
             console.print(f"\n[green]{desc}:[/green]")
             result = subprocess.run(cmd)
-            
+
             # Special handling for type checking to respect allowed error count
             if desc == "Type checking":
                 # Parse pyright output to count errors
@@ -1278,13 +1342,17 @@ def static(
                     capture_result = subprocess.run(cmd, capture_output=True, text=True)
                     output = capture_result.stdout + capture_result.stderr
                     parsed_result = parse_pyright_output(output)
-                    
+
                     # Only fail if errors exceed the allowed limit
                     if parsed_result.total_errors <= max_errors:
-                        console.print(f"[green]Type checking passed: {parsed_result.total_errors} errors (≤ {max_errors} allowed)[/green]")
+                        console.print(
+                            f"[green]Type checking passed: {parsed_result.total_errors} errors (≤ {max_errors} allowed)[/green]"
+                        )
                         # Don't update exit_code for type checking if within limit
                     else:
-                        console.print(f"[red]Type checking failed: {parsed_result.total_errors} errors (> {max_errors} allowed)[/red]")
+                        console.print(
+                            f"[red]Type checking failed: {parsed_result.total_errors} errors (> {max_errors} allowed)[/red]"
+                        )
                         exit_code = max(exit_code, result.returncode)
                 else:
                     # No errors at all
@@ -1328,7 +1396,10 @@ def check(
         ]
         if not skip_integration:
             steps.append(
-                ("integration", ["python", "scripts/run_tests.py", "integration", "--full-output"])
+                (
+                    "integration",
+                    ["python", "scripts/run_tests.py", "integration", "--full-output"],
+                )
             )
 
         for step_name, cmd in steps:
@@ -1346,7 +1417,9 @@ def check(
         raise typer.Exit(run_check_with_summary(max_errors, skip_integration, verbose))
     else:
         # Use the new dynamic table display
-        raise typer.Exit(run_check_with_dynamic_table(max_errors, skip_integration, False, verbose))
+        raise typer.Exit(
+            run_check_with_dynamic_table(max_errors, skip_integration, False, verbose)
+        )
 
 
 @app.command(name="all")
@@ -1377,7 +1450,10 @@ def all_tests(
         steps = [
             ("static", ["python", "scripts/run_tests.py", "static", "--full-output"]),
             ("unit", ["python", "scripts/run_tests.py", "unit", "--full-output"]),
-            ("integration", ["python", "scripts/run_tests.py", "integration", "--full-output"]),
+            (
+                "integration",
+                ["python", "scripts/run_tests.py", "integration", "--full-output"],
+            ),
         ]
         if not skip_e2e:
             steps.append(
@@ -1421,7 +1497,9 @@ def all_tests(
         raise typer.Exit(0)
     else:
         # Use the new dynamic table display with E2E tests included
-        raise typer.Exit(run_check_with_dynamic_table(max_errors, False, not skip_e2e, verbose))
+        raise typer.Exit(
+            run_check_with_dynamic_table(max_errors, False, not skip_e2e, verbose)
+        )
 
 
 @app.command()

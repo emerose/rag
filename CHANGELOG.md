@@ -122,6 +122,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   errors by default
 - `run_tests.py` now shows detailed type errors when there are five or
   fewer, and always prints Ruff and Vulture output on failure
+- Error details from failed checks are printed below the progress table
 - Separated metadata extraction into dedicated `DocumentMetadataExtractor` classes
 - Improved code structure by breaking down complex methods into smaller, focused helpers
 - Migrated query orchestration to LangChain Expression Language (LCEL):
