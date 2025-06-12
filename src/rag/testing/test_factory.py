@@ -297,11 +297,11 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             from pathlib import Path
 
             from rag.data.document_loader import DocumentLoader
-            from rag.storage.document_store import SQLiteDocumentStore
+            from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
             from rag.storage.filesystem import FilesystemManager
 
             factory._filesystem_manager = FilesystemManager()
-            factory._document_store = SQLiteDocumentStore(
+            factory._document_store = SQLAlchemyDocumentStore(
                 Path(config.data_dir) / "documents.db"
             )
             factory._document_loader = DocumentLoader(

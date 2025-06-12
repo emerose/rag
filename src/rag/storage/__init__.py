@@ -4,10 +4,7 @@ This module contains components for document storage, vectorstore operations,
 and filesystem utilities.
 """
 
-from .document_store import (
-    FakeDocumentStore,
-    SQLiteDocumentStore,
-)
+from .document_store import FakeDocumentStore
 from .fakes import (
     InMemoryFileSystem,
 )
@@ -41,7 +38,6 @@ __all__ = [
     "InMemoryVectorStore",
     "InMemoryVectorStoreFactory",
     "SQLAlchemyDocumentStore",
-    "SQLiteDocumentStore",
     "SourceDocument",
     "SourceDocumentChunk",
     "SourceDocumentMetadata",
