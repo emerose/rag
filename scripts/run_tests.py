@@ -8,6 +8,7 @@ to the testing strategy, with rich formatted output and summary views.
 import re
 import subprocess
 import sys
+import time
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,8 +16,10 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.live import Live
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn, TimeRemainingColumn
+from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 
@@ -56,6 +59,123 @@ class TypeCheckResult:
     errors_by_file: dict[str, list[str]] | None = None
     errors_by_type: dict[str, int] | None = None
     exit_code: int = 0
+
+
+@dataclass
+class CheckStatus:
+    """Status of a single check/test step."""
+    
+    name: str
+    status: str = "pending"  # pending, running, passed, failed, skipped
+    duration: float | None = None
+    details: str = ""
+    start_time: float | None = None
+    
+    def start(self):
+        self.status = "running"
+        self.start_time = time.time()
+    
+    def finish(self, status: str, details: str = ""):
+        self.status = status
+        self.details = details
+        if self.start_time:
+            self.duration = time.time() - self.start_time
+
+
+class DynamicTestRunner:
+    """Manages dynamic test execution with live table updates."""
+    
+    def __init__(self):
+        self.console = Console()
+        self.checks: list[CheckStatus] = []
+        self.details_output: list[str] = []
+        
+    def add_check(self, name: str) -> CheckStatus:
+        """Add a new check to track."""
+        check = CheckStatus(name)
+        self.checks.append(check)
+        return check
+    
+    def create_status_table(self) -> Table:
+        """Create the dynamic status table."""
+        table = Table(title="Test Execution Status", show_header=True, header_style="bold magenta")
+        table.add_column("Check", style="cyan", no_wrap=True)
+        table.add_column("Status", justify="center")
+        table.add_column("Duration", justify="right", style="dim")
+        
+        # Add static analysis section
+        static_checks = ["Code Formatting & Linting", "Type Checking", "Dead Code Detection"]
+        test_checks = ["Unit Tests", "Integration Tests", "E2E Tests"]
+        
+        # Group checks into sections
+        current_section = None
+        for check in self.checks:
+            # Add section separator
+            if check.name in static_checks and current_section != "static":
+                if current_section is not None:
+                    table.add_section()
+                current_section = "static"
+            elif check.name in test_checks and current_section != "tests":
+                if current_section is not None:
+                    table.add_section()
+                current_section = "tests"
+            
+            # Format status with appropriate colors and icons
+            if check.status == "pending":
+                status = "[dim]⏳ Pending[/dim]"
+            elif check.status == "running":
+                status = "[yellow]⠋ Running[/yellow]"
+            elif check.status == "passed":
+                if "tests passed" in check.details:
+                    # Extract number for coloring
+                    count = check.details.split()[0]
+                    status = f"[green]✅ Passed[/green] [green]({count})[/green]"
+                elif "errors" in check.details:
+                    # Show error count
+                    status = f"[green]✅ Passed[/green] [dim]({check.details})[/dim]"
+                else:
+                    status = "[green]✅ Passed[/green]"
+            elif check.status == "failed":
+                if "tests failed" in check.details:
+                    count = check.details.split()[0]
+                    status = f"[red]❌ Failed[/red] [red]({count})[/red]"
+                elif "errors" in check.details:
+                    status = f"[red]❌ Failed[/red] [red]({check.details})[/red]"
+                else:
+                    status = "[red]❌ Failed[/red]"
+            elif check.status == "skipped":
+                status = "[yellow]⏭️ Skipped[/yellow]"
+            else:
+                status = check.status
+            
+            # Format duration
+            if check.duration is not None:
+                duration = f"{check.duration:.2f}s"
+            elif check.status == "running" and check.start_time:
+                elapsed = time.time() - check.start_time
+                duration = f"{elapsed:.1f}s"
+            else:
+                duration = "-"
+            
+            table.add_row(check.name, status, duration)
+        
+        return table
+    
+    def add_details(self, text: str):
+        """Add details to show below the table."""
+        self.details_output.append(text)
+    
+    def create_display(self) -> str:
+        """Create the complete display with table and details."""
+        # Create table
+        table = self.create_status_table()
+        
+        # Combine table with details
+        if self.details_output:
+            details = "\n".join(self.details_output)
+            return f"{table}\n\n{details}"
+        else:
+            return str(table)
 
 
 def run_command_with_progress(
@@ -397,6 +517,68 @@ def run_vulture_with_summary(verbose: bool = False) -> int:
     return exit_code
 
 
+def run_ruff_quietly() -> int:
+    """Run ruff formatting and linting quietly for dynamic table."""
+    # Format
+    format_result = subprocess.run(
+        ["ruff", "format", "src/", "--line-length", "88"],
+        capture_output=True,
+        text=True,
+    )
+
+    # Lint
+    lint_result = subprocess.run(
+        ["ruff", "check", "src/rag", "--fix", "--line-length", "88"],
+        capture_output=True,
+        text=True,
+    )
+
+    # Re-format
+    reformat_result = subprocess.run(
+        ["ruff", "format", "src/", "--line-length", "88"],
+        capture_output=True,
+        text=True,
+    )
+
+    return max(format_result.returncode, lint_result.returncode, reformat_result.returncode)
+
+
+def run_pyright_quietly(max_errors: int) -> tuple[int, str]:
+    """Run pyright quietly for dynamic table."""
+    result = subprocess.run(
+        ["pyright", "src/rag"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    
+    output = result.stdout + result.stderr
+    parsed = parse_pyright_output(output)
+    exit_code = 0 if parsed.total_errors <= max_errors else 1
+    
+    return exit_code, output
+
+
+def run_vulture_quietly() -> tuple[int, str]:
+    """Run vulture quietly for dynamic table."""
+    result = subprocess.run(
+        ["vulture", "--config", "vulture.toml"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    
+    output = result.stdout + result.stderr
+    return result.returncode, output
+
+
+def run_pytest_quietly(cmd: list[str]) -> tuple[int, str]:
+    """Run pytest quietly for dynamic table."""
+    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    output = result.stdout + result.stderr
+    return result.returncode, output
+
+
 def run_static_with_summary(max_errors: int = MAX_TYPE_ERRORS, verbose: bool = False) -> int:
     """Run all static analysis with summary output."""
     console.print(
@@ -435,6 +617,148 @@ def run_static_with_summary(max_errors: int = MAX_TYPE_ERRORS, verbose: bool = F
         )
 
     return vulture_result
+
+
+def run_check_with_dynamic_table(
+    max_errors: int = MAX_TYPE_ERRORS,
+    skip_integration: bool = False,
+    include_e2e: bool = False,
+    verbose: bool = False,
+) -> int:
+    """Run complete check workflow with dynamic table display."""
+    runner = DynamicTestRunner()
+    
+    # Set up all checks
+    ruff_check = runner.add_check("Code Formatting & Linting")
+    pyright_check = runner.add_check("Type Checking")
+    vulture_check = runner.add_check("Dead Code Detection")
+    unit_check = runner.add_check("Unit Tests")
+    
+    integration_check = None
+    if not skip_integration:
+        integration_check = runner.add_check("Integration Tests")
+    
+    e2e_check = None
+    if include_e2e:
+        e2e_check = runner.add_check("E2E Tests")
+
+    with Live(runner.create_status_table(), refresh_per_second=4, console=console) as live:
+        
+        # Run ruff
+        ruff_check.start()
+        live.update(runner.create_status_table())
+        ruff_result = run_ruff_quietly()
+        if ruff_result == 0:
+            ruff_check.finish("passed", "No formatting issues")
+        else:
+            ruff_check.finish("failed", "Formatting issues found")
+            live.update(runner.create_status_table())
+            return ruff_result
+        live.update(runner.create_status_table())
+        
+        # Run pyright
+        pyright_check.start()
+        live.update(runner.create_status_table())
+        pyright_result, pyright_output = run_pyright_quietly(max_errors)
+        if pyright_result == 0:
+            # Parse results for summary
+            parsed = parse_pyright_output(pyright_output)
+            pyright_check.finish("passed", f"{parsed.total_errors} errors (≤ {max_errors} baseline)")
+        else:
+            parsed = parse_pyright_output(pyright_output)
+            pyright_check.finish("failed", f"{parsed.total_errors} errors (> {max_errors} baseline)")
+            live.update(runner.create_status_table())
+            return pyright_result
+        live.update(runner.create_status_table())
+        
+        # Run vulture
+        vulture_check.start()
+        live.update(runner.create_status_table())
+        vulture_result, vulture_output = run_vulture_quietly()
+        if vulture_result == 0:
+            vulture_check.finish("passed", "No dead code detected")
+        else:
+            issues = len([line for line in vulture_output.strip().split("\n") if line])
+            vulture_check.finish("failed", f"{issues} potential issues found")
+            live.update(runner.create_status_table())
+            return vulture_result
+        live.update(runner.create_status_table())
+        
+        # Run unit tests
+        unit_check.start()
+        live.update(runner.create_status_table())
+        unit_result, unit_output = run_pytest_quietly(
+            ["python", "-m", "pytest", "tests/unit/", "-v", "--tb=short"]
+        )
+        parsed_unit = parse_pytest_output(unit_output)
+        if unit_result == 0:
+            unit_check.finish("passed", f"{parsed_unit.passed} tests passed")
+        else:
+            unit_check.finish("failed", f"{parsed_unit.failed} tests failed")
+            live.update(runner.create_status_table())
+            return unit_result
+        live.update(runner.create_status_table())
+        
+        # Run integration tests
+        if integration_check:
+            integration_check.start()
+            live.update(runner.create_status_table())
+            integration_result, integration_output = run_pytest_quietly(
+                ["python", "-m", "pytest", "-m", "integration", "-v", "--tb=short"]
+            )
+            parsed_integration = parse_pytest_output(integration_output)
+            if integration_result == 0:
+                integration_check.finish("passed", f"{parsed_integration.passed} tests passed")
+            else:
+                integration_check.finish("failed", f"{parsed_integration.failed} tests failed")
+                live.update(runner.create_status_table())
+                return integration_result
+            live.update(runner.create_status_table())
+        
+        # Run E2E tests
+        if e2e_check:
+            e2e_check.start()
+            live.update(runner.create_status_table())
+            e2e_result, e2e_output = run_pytest_quietly(
+                ["python", "-m", "pytest", "-m", "e2e", "-v", "--tb=short"]
+            )
+            parsed_e2e = parse_pytest_output(e2e_output)
+            if e2e_result == 0:
+                e2e_check.finish("passed", f"{parsed_e2e.passed} tests passed")
+            else:
+                e2e_check.finish("failed", f"{parsed_e2e.failed} tests failed")
+                live.update(runner.create_status_table())
+                return e2e_result
+            live.update(runner.create_status_table())
+
+    # Show detailed results after table
+    console.print("\n[bold green]📊 Detailed Results[/bold green]")
+    
+    # Show pyright details if verbose or errors > 5
+    if pyright_result == 0:
+        parsed = parse_pyright_output(pyright_output)
+        if parsed.total_errors > 5:
+            display_pyright_results(parsed, max_errors, verbose)
+        elif parsed.total_errors > 0 and verbose:
+            display_pyright_results(parsed, max_errors, verbose)
+    
+    # Show test failures if any
+    if unit_result == 0 and parsed_unit.failed == 0:
+        pass  # No failures to show
+    elif parsed_unit.failed > 0 and parsed_unit.failed <= 5:
+        console.print("\n[red]Unit Test Failures:[/red]")
+        if parsed_unit.errors:
+            for error in parsed_unit.errors:
+                console.print(f"  • {error}")
+    
+    console.print()
+    console.print(
+        Panel(
+            "[bold green]✨ All checks passed successfully! ✨[/bold green]",
+            border_style="green",
+        )
+    )
+    return 0
 
 
 def run_check_with_summary(
@@ -780,6 +1104,12 @@ def check(
     full_output: Annotated[
         bool, typer.Option("--full-output", help="Show full output for all tools")
     ] = False,
+    dynamic: Annotated[
+        bool, typer.Option("--dynamic", help="Use dynamic table display")
+    ] = True,
+    legacy: Annotated[
+        bool, typer.Option("--legacy", help="Use legacy sequential output")
+    ] = False,
 ) -> None:
     """Run complete check workflow (static → unit → integration)."""
     if full_output:
@@ -804,8 +1134,12 @@ def check(
 
         console.print("[green]✨ All checks passed! ✨[/green]")
         raise typer.Exit(0)
-    else:
+    elif legacy or not dynamic:
+        # Use the original sequential output
         raise typer.Exit(run_check_with_summary(max_errors, skip_integration, verbose))
+    else:
+        # Use the new dynamic table display
+        raise typer.Exit(run_check_with_dynamic_table(max_errors, skip_integration, False, verbose))
 
 
 @app.command(name="all")
