@@ -235,5 +235,12 @@ executionEnvironments = [
 dev = [
     "pytest-asyncio>=1.0.0",
     "trio>=0.30.0",
+    "types-aiofiles>=24.1.0.20250606",
+    "types-colorama>=0.4.15.20240311",
+    "types-filelock>=3.2.7",
+    "types-openpyxl>=3.1.5.20250602",
     "types-pyyaml>=6.0.12.20250516",
+    "types-requests>=2.32.4.20250611",
+    "types-setuptools>=80.9.0.20250529",
+    "types-tqdm>=4.67.0.20250516",
 ]
