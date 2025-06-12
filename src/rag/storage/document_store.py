@@ -1159,6 +1159,81 @@ class FakeDocumentStore:
         """Remove a mock file for testing purposes."""
         self.remove_source_document(str(file_path))
 
+    # Methods required by DocumentStoreProtocol
+    def update_metadata(self, metadata: Any) -> None:
+        """Update metadata for a file."""
+        if hasattr(metadata, "file_path"):
+            file_path = str(metadata.file_path)
+            if file_path in self._source_documents:
+                source_doc = self._source_documents[file_path]
+                updated_meta = source_doc.metadata.copy()
+                updated_meta.update(
+                    metadata.to_dict() if hasattr(metadata, "to_dict") else {}
+                )
+                self._source_documents[file_path] = SourceDocumentMetadata(
+                    source_id=source_doc.source_id,
+                    location=source_doc.location,
+                    content_type=source_doc.content_type,
+                    content_hash=source_doc.content_hash,
+                    size_bytes=source_doc.size_bytes,
+                    last_modified=source_doc.last_modified,
+                    indexed_at=source_doc.indexed_at,
+                    metadata=updated_meta,
+                    chunk_count=source_doc.chunk_count,
+                )
+
+    def get_metadata(self, file_path: Path) -> dict[str, Any] | None:
+        """Get metadata for a file."""
+        source_doc = self.get_source_document(str(file_path))
+        return source_doc.metadata if source_doc else None
+
+    def remove_metadata(self, file_path: Path) -> None:
+        """Remove metadata for a file."""
+        self.remove_source_document(str(file_path))
+
+    def update_chunk_hashes(self, file_path: Path, chunk_hashes: list[str]) -> None:
+        """Update chunk hashes for a file."""
+        file_path_str = str(file_path)
+        if file_path_str in self._source_documents:
+            self._source_documents[file_path_str].metadata["chunk_hashes"] = (
+                chunk_hashes
+            )
+
+    def get_chunk_hashes(self, file_path: Path) -> list[str]:
+        """Get chunk hashes for a file."""
+        source_doc = self.get_source_document(str(file_path))
+        return source_doc.metadata.get("chunk_hashes", []) if source_doc else []
+
+    def update_file_metadata(self, metadata: Any) -> None:
+        """Update file metadata."""
+        if hasattr(metadata, "file_path"):
+            self.set_metadata_dict(
+                str(metadata.file_path),
+                metadata.to_dict() if hasattr(metadata, "to_dict") else {},
+            )
+
+    def set_global_setting(self, key: str, value: str) -> None:
+        """Set a global setting."""
+        if "__global_settings__" not in self._source_documents:
+            self._source_documents["__global_settings__"] = SourceDocumentMetadata(
+                source_id="__global_settings__",
+                location="__global_settings__",
+                content_type="application/json",
+                content_hash="",
+                size_bytes=0,
+                last_modified=None,
+                indexed_at=time.time(),
+                metadata={},
+                chunk_count=0,
+            )
+        self._source_documents["__global_settings__"].metadata[key] = value
+
+    def get_global_setting(self, key: str) -> str | None:
+        """Get a global setting."""
+        if "__global_settings__" in self._source_documents:
+            return self._source_documents["__global_settings__"].metadata.get(key)
+        return None
+
     def needs_reindexing(
         self,
         file_path: Path,
@@ -1184,3 +1259,7 @@ class FakeDocumentStore:
 
 
 # Import the new SQLAlchemy-based implementation as the default
+from .sqlalchemy_document_store import SQLAlchemyDocumentStore
+
+# Create an alias for backward compatibility
+SQLiteDocumentStore = SQLAlchemyDocumentStore
