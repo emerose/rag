@@ -65,21 +65,18 @@ def run_command_with_progress(
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        TimeRemainingColumn(),
         console=console,
+        transient=True,  # Remove progress bar when complete
     ) as progress:
         task = progress.add_task(description, total=None)
 
         if capture_output:
             result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-            progress.update(task, completed=True)
             return result.returncode, result.stdout, result.stderr
         else:
             # For non-captured output, show command being run
             console.print(f"[blue]Running:[/blue] {' '.join(cmd)}")
             result = subprocess.run(cmd, check=False)
-            progress.update(task, completed=True)
             return result.returncode, "", ""
 
 
@@ -117,21 +114,41 @@ def parse_pyright_output(output: str) -> TypeCheckResult:
     result.errors_by_file = defaultdict(list)
     result.errors_by_type = defaultdict(int)
 
-    # Parse individual errors
-    error_pattern = r"(/[^:]+):(\d+):(\d+)\s*-\s*error:\s*(.+?)(?:\s*\((\w+)\))?"
-    for match in re.finditer(error_pattern, output):
-        file_path = match.group(1)
-        line = match.group(2)
-        col = match.group(3)
-        message = match.group(4)
-        error_type = match.group(5) or "unknown"
+    # Split output into lines and process each error block
+    lines = output.split('\n')
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        
+        # Look for error line pattern: file:line:col - error: message
+        error_match = re.match(r'(.+?):(\d+):(\d+)\s*-\s*error:\s*(.+)', line)
+        if error_match:
+            file_path = error_match.group(1)
+            line_num = error_match.group(2)
+            col = error_match.group(3)
+            message = error_match.group(4).strip()
+            
+            # Look for error type in subsequent lines
+            error_type = "unknown"
+            j = i + 1
+            while j < len(lines) and j < i + 5:  # Look ahead max 5 lines
+                type_match = re.search(r'\((report\w+)\)', lines[j])
+                if type_match:
+                    error_type = type_match.group(1)
+                    break
+                # Stop if we hit another error or empty line
+                if re.match(r'.+?:\d+:\d+\s*-\s*error:', lines[j]) or lines[j].strip() == '':
+                    break
+                j += 1
 
-        # Simplify file path for display
-        if "/rag/" in file_path:
-            file_path = file_path.split("/rag/", 1)[1]
+            # Simplify file path for display
+            if "/rag/" in file_path:
+                file_path = file_path.split("/rag/", 1)[1]
 
-        result.errors_by_file[file_path].append(f"Line {line}:{col} - {message}")
-        result.errors_by_type[error_type] += 1
+            result.errors_by_file[file_path].append(f"Line {line_num}:{col} - {message}")
+            result.errors_by_type[error_type] += 1
+        
+        i += 1
 
     # Parse summary line
     summary_pattern = r"(\d+)\s+errors?,\s*(\d+)\s+warnings?,\s*(\d+)\s+informations?"
@@ -391,19 +408,19 @@ def run_static_with_summary(max_errors: int = MAX_TYPE_ERRORS, verbose: bool = F
     )
 
     # Run ruff
-    console.print("\n[bold green]Step 1/3: Code Formatting & Linting[/bold green]")
+    console.print("\n[bold green]Code Formatting & Linting[/bold green]")
     ruff_result = run_ruff_with_summary(verbose)
     if ruff_result != 0:
         return ruff_result
 
     # Run pyright
-    console.print("\n[bold green]Step 2/3: Type Checking[/bold green]")
+    console.print("\n[bold green]Type Checking[/bold green]")
     pyright_result = run_pyright_with_summary(max_errors, verbose)
     if pyright_result != 0:
         return pyright_result
 
     # Run vulture
-    console.print("\n[bold green]Step 3/3: Dead Code Detection[/bold green]")
+    console.print("\n[bold green]Dead Code Detection[/bold green]")
     vulture_result = run_vulture_with_summary(verbose)
 
     if vulture_result == 0:
