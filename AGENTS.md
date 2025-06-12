@@ -16,6 +16,8 @@ This repository welcomes contributions from AI-based tools. When acting as an ag
 7. **Update documentation** before completing a task.
 8. **Never commit secrets or generated files.**
 9. **Keep contributor docs aligned** – update `.cursorrules`, `AGENTS.md`, and `CONTRIBUTING.md` together when guidelines change.
+10. **Use `uv run`** to ensure the project's virtual environment is active when
+    running scripts or commands.
 
 ## Code Quality Expectations
 
