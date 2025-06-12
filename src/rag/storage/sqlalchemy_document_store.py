@@ -164,7 +164,7 @@ class SQLAlchemyDocumentStore:
                 existing = session.query(DocumentModel).filter_by(doc_id=doc_id).first()
 
                 # Ensure metadata is properly typed
-                metadata: dict[str, Any] = document.metadata or {}  # type: ignore[assignment]
+                metadata: dict[str, Any] = document.metadata or {}
 
                 if existing:
                     # Update existing document
@@ -203,7 +203,7 @@ class SQLAlchemyDocumentStore:
                     )
 
                     # Ensure metadata is properly typed
-                    metadata: dict[str, Any] = document.metadata or {}  # type: ignore[assignment]
+                    metadata: dict[str, Any] = document.metadata or {}
 
                     if existing:
                         # Update existing document
@@ -234,7 +234,7 @@ class SQLAlchemyDocumentStore:
         doc_dict: dict[str, Document] = {}
         for i, doc in enumerate(documents):
             # Generate a simple ID based on index if no metadata ID exists
-            metadata: dict[str, Any] = doc.metadata or {}  # type: ignore[assignment]
+            metadata: dict[str, Any] = doc.metadata or {}
             doc_id: str = str(metadata.get("doc_id", f"doc_{i}"))
             doc_dict[doc_id] = doc
         self.add_documents(doc_dict)

@@ -95,9 +95,9 @@ def _value_matches_filter(doc_value: Any, filter_value: Any) -> bool:
 
 def _doc_matches_filters(doc: Document, filters: _FilterDict) -> bool:
     for key, expected in filters.items():
-        if key not in doc.metadata:  # type: ignore[misc]
+        if key not in doc.metadata:
             return False
-        if not _value_matches_filter(doc.metadata[key], expected):  # type: ignore[misc]
+        if not _value_matches_filter(doc.metadata[key], expected):
             return False
     return True
 
@@ -112,7 +112,7 @@ def _pack_documents(
 
     for doc in docs:
         token_count = int(
-            doc.metadata.get("token_count", len(_tokenizer.encode(doc.page_content)))  # type: ignore[misc]
+            doc.metadata.get("token_count", len(_tokenizer.encode(doc.page_content)))
         )
         if tokens_used + token_count > max_tokens:
             break
