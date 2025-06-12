@@ -62,22 +62,24 @@ def run_command_with_progress(
     cmd: list[str], description: str, capture_output: bool = False
 ) -> tuple[int, str, str]:
     """Run a command with a progress spinner."""
-    with Progress(
+    progress = Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console,
-        transient=True,  # Remove progress bar when complete
-    ) as progress:
+    )
+    
+    with progress:
         task = progress.add_task(description, total=None)
 
         if capture_output:
             result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-            return result.returncode, result.stdout, result.stderr
         else:
             # For non-captured output, show command being run
             console.print(f"[blue]Running:[/blue] {' '.join(cmd)}")
             result = subprocess.run(cmd, check=False)
-            return result.returncode, "", ""
+    
+    # Progress bar is automatically removed when context exits
+    return result.returncode, result.stdout if capture_output else "", result.stderr if capture_output else ""
 
 
 def parse_pytest_output(output: str) -> TestResult:
