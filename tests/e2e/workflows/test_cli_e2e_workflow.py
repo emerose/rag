@@ -75,22 +75,26 @@ Use the CLI to index documents and ask questions.
             documents = self.create_test_documents(docs_dir)
 
             # Run CLI index command with real FAISS backend
-            result = subprocess.run(
-                [
-                    "python",
-                    "-m",
-                    "rag",
-                    "--vectorstore-backend",
-                    "faiss",
-                    "--data-dir",
-                    str(data_dir),
-                    "index",
-                    str(docs_dir),
-                ],
-                capture_output=True,
-                text=True,
-                cwd="/Users/sq/Development/rag",
-            )
+            try:
+                result = subprocess.run(
+                    [
+                        "python",
+                        "-m",
+                        "rag",
+                        "--vectorstore-backend",
+                        "faiss",
+                        "--data-dir",
+                        str(data_dir),
+                        "index",
+                        str(docs_dir),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    cwd="/Users/sq/Development/rag",
+                    timeout=45,
+                )
+            except subprocess.TimeoutExpired as e:
+                pytest.fail(f"Index command timed out after 45 seconds: {e}")
 
             # Verify command succeeded
             assert result.returncode == 0, f"Index command failed: {result.stderr}"
@@ -113,32 +117,40 @@ Use the CLI to index documents and ask questions.
             documents = self.create_test_documents(docs_dir)
 
             # First index documents
-            index_result = subprocess.run(
-                [
-                    "python",
-                    "-m",
-                    "rag",
-                    "--vectorstore-backend",
-                    "faiss",
-                    "--data-dir",
-                    str(data_dir),
-                    "index",
-                    str(docs_dir),
-                ],
-                capture_output=True,
-                text=True,
-                cwd="/Users/sq/Development/rag",
-            )
+            try:
+                index_result = subprocess.run(
+                    [
+                        "python",
+                        "-m",
+                        "rag",
+                        "--vectorstore-backend",
+                        "faiss",
+                        "--data-dir",
+                        str(data_dir),
+                        "index",
+                        str(docs_dir),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    cwd="/Users/sq/Development/rag",
+                    timeout=45,
+                )
+            except subprocess.TimeoutExpired as e:
+                pytest.fail(f"Index command timed out after 45 seconds: {e}")
 
             assert index_result.returncode == 0, f"Index failed: {index_result.stderr}"
 
             # Then list indexed documents
-            list_result = subprocess.run(
-                ["python", "-m", "rag", "--data-dir", str(data_dir), "list", "--json"],
-                capture_output=True,
-                text=True,
-                cwd="/Users/sq/Development/rag",
-            )
+            try:
+                list_result = subprocess.run(
+                    ["python", "-m", "rag", "--data-dir", str(data_dir), "list", "--json"],
+                    capture_output=True,
+                    text=True,
+                    cwd="/Users/sq/Development/rag",
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired as e:
+                pytest.fail(f"List command timed out after 30 seconds: {e}")
 
             assert list_result.returncode == 0, (
                 f"List command failed: {list_result.stderr}"
@@ -171,7 +183,7 @@ Use the CLI to index documents and ask questions.
                     f"List command output is not valid JSON: {e}\nOutput: {list_result.stdout}"
                 )
 
-    @pytest.mark.timeout(60)  # E2E test with real OpenAI API calls
+    @pytest.mark.timeout(90)  # E2E test with real OpenAI API calls - increased timeout
     def test_cli_answer_command_workflow(self):
         """Test CLI answer command workflow using real APIs."""
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -184,41 +196,49 @@ Use the CLI to index documents and ask questions.
             documents = self.create_test_documents(docs_dir)
 
             # First index documents
-            index_result = subprocess.run(
-                [
-                    "python",
-                    "-m",
-                    "rag",
-                    "--vectorstore-backend",
-                    "faiss",
-                    "--data-dir",
-                    str(data_dir),
-                    "index",
-                    str(docs_dir),
-                ],
-                capture_output=True,
-                text=True,
-                cwd="/Users/sq/Development/rag",
-            )
+            try:
+                index_result = subprocess.run(
+                    [
+                        "python",
+                        "-m",
+                        "rag",
+                        "--vectorstore-backend",
+                        "faiss",
+                        "--data-dir",
+                        str(data_dir),
+                        "index",
+                        str(docs_dir),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    cwd="/Users/sq/Development/rag",
+                    timeout=45,  # Add timeout to prevent indexing from hanging
+                )
+            except subprocess.TimeoutExpired as e:
+                pytest.fail(f"Index command timed out after 45 seconds: {e}")
 
             assert index_result.returncode == 0, f"Index failed: {index_result.stderr}"
 
             # Then ask a question
-            answer_result = subprocess.run(
-                [
-                    "python",
-                    "-m",
-                    "rag",
-                    "--data-dir",
-                    str(data_dir),
-                    "query",
-                    "What is important for software?",
-                    "--json",
-                ],
-                capture_output=True,
-                text=True,
-                cwd="/Users/sq/Development/rag",
-            )
+            try:
+                answer_result = subprocess.run(
+                    [
+                        "python",
+                        "-m",
+                        "rag",
+                        "--data-dir",
+                        str(data_dir),
+                        "query",
+                        "What is important for software?",
+                        "--json",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    cwd="/Users/sq/Development/rag",
+                    timeout=30,  # Add timeout to prevent query from hanging
+                )
+            except subprocess.TimeoutExpired as e:
+                pytest.fail(f"Query command timed out after 30 seconds: {e}")
 
             assert answer_result.returncode == 0, (
                 f"Answer command failed: {answer_result.stderr}"
@@ -253,32 +273,40 @@ Use the CLI to index documents and ask questions.
             documents = self.create_test_documents(docs_dir)
 
             # First index documents
-            index_result = subprocess.run(
-                [
-                    "python",
-                    "-m",
-                    "rag",
-                    "--vectorstore-backend",
-                    "faiss",
-                    "--data-dir",
-                    str(data_dir),
-                    "index",
-                    str(docs_dir),
-                ],
-                capture_output=True,
-                text=True,
-                cwd="/Users/sq/Development/rag",
-            )
+            try:
+                index_result = subprocess.run(
+                    [
+                        "python",
+                        "-m",
+                        "rag",
+                        "--vectorstore-backend",
+                        "faiss",
+                        "--data-dir",
+                        str(data_dir),
+                        "index",
+                        str(docs_dir),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    cwd="/Users/sq/Development/rag",
+                    timeout=45,
+                )
+            except subprocess.TimeoutExpired as e:
+                pytest.fail(f"Index command timed out after 45 seconds: {e}")
 
             assert index_result.returncode == 0, f"Index failed: {index_result.stderr}"
 
             # Verify documents are indexed
-            list_result = subprocess.run(
-                ["python", "-m", "rag", "--data-dir", str(data_dir), "list", "--json"],
-                capture_output=True,
-                text=True,
-                cwd="/Users/sq/Development/rag",
-            )
+            try:
+                list_result = subprocess.run(
+                    ["python", "-m", "rag", "--data-dir", str(data_dir), "list", "--json"],
+                    capture_output=True,
+                    text=True,
+                    cwd="/Users/sq/Development/rag",
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired as e:
+                pytest.fail(f"List command timed out after 30 seconds: {e}")
 
             assert list_result.returncode == 0
             output_data = json.loads(list_result.stdout)
@@ -292,30 +320,38 @@ Use the CLI to index documents and ask questions.
             stored_file_path = table["rows"][0][0]  # First column is File Path
 
             # Clear the stored file
-            clear_result = subprocess.run(
-                [
-                    "python",
-                    "-m",
-                    "rag",
-                    "--data-dir",
-                    str(data_dir),
-                    "clear",
-                    stored_file_path,
-                ],
-                capture_output=True,
-                text=True,
-                cwd="/Users/sq/Development/rag",
-            )
+            try:
+                clear_result = subprocess.run(
+                    [
+                        "python",
+                        "-m",
+                        "rag",
+                        "--data-dir",
+                        str(data_dir),
+                        "clear",
+                        stored_file_path,
+                    ],
+                    capture_output=True,
+                    text=True,
+                    cwd="/Users/sq/Development/rag",
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired as e:
+                pytest.fail(f"Clear command timed out after 30 seconds: {e}")
 
             assert clear_result.returncode == 0, f"Clear failed: {clear_result.stderr}"
 
             # Verify file was removed from index
-            list_result2 = subprocess.run(
-                ["python", "-m", "rag", "--data-dir", str(data_dir), "list", "--json"],
-                capture_output=True,
-                text=True,
-                cwd="/Users/sq/Development/rag",
-            )
+            try:
+                list_result2 = subprocess.run(
+                    ["python", "-m", "rag", "--data-dir", str(data_dir), "list", "--json"],
+                    capture_output=True,
+                    text=True,
+                    cwd="/Users/sq/Development/rag",
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired as e:
+                pytest.fail(f"List command timed out after 30 seconds: {e}")
 
             assert list_result2.returncode == 0
             output_data2 = json.loads(list_result2.stdout)
@@ -338,43 +374,51 @@ Use the CLI to index documents and ask questions.
 
             # Test indexing non-existent directory
             non_existent_dir = temp_path / "missing"
-            result = subprocess.run(
-                [
-                    "python",
-                    "-m",
-                    "rag",
-                    "--vectorstore-backend",
-                    "faiss",
-                    "--data-dir",
-                    str(data_dir),
-                    "index",
-                    str(non_existent_dir),
-                ],
-                capture_output=True,
-                text=True,
-                cwd="/Users/sq/Development/rag",
-            )
+            try:
+                result = subprocess.run(
+                    [
+                        "python",
+                        "-m",
+                        "rag",
+                        "--vectorstore-backend",
+                        "faiss",
+                        "--data-dir",
+                        str(data_dir),
+                        "index",
+                        str(non_existent_dir),
+                    ],
+                    capture_output=True,
+                    text=True,
+                    cwd="/Users/sq/Development/rag",
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired as e:
+                pytest.fail(f"Index command timed out after 30 seconds: {e}")
 
             # Should handle error gracefully (may return 0 with error messages in output)
             # Check that error was logged properly
             assert "ERROR" in result.stderr or "does not exist" in result.stderr
 
             # Test querying with empty data
-            answer_result = subprocess.run(
-                [
-                    "python",
-                    "-m",
-                    "rag",
-                    "--data-dir",
-                    str(data_dir),
-                    "query",
-                    "What is testing?",
-                    "--json",
-                ],
-                capture_output=True,
-                text=True,
-                cwd="/Users/sq/Development/rag",
-            )
+            try:
+                answer_result = subprocess.run(
+                    [
+                        "python",
+                        "-m",
+                        "rag",
+                        "--data-dir",
+                        str(data_dir),
+                        "query",
+                        "What is testing?",
+                        "--json",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    cwd="/Users/sq/Development/rag",
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired as e:
+                pytest.fail(f"Query command timed out after 30 seconds: {e}")
 
             # May succeed but with no sources, or fail gracefully
             # The exact behavior depends on implementation
@@ -387,12 +431,16 @@ Use the CLI to index documents and ask questions.
     def test_cli_help_commands_workflow(self):
         """Test CLI help commands work properly."""
         # Test main help
-        result = subprocess.run(
-            ["python", "-m", "rag", "--help"],
-            capture_output=True,
-            text=True,
-            cwd="/Users/sq/Development/rag",
-        )
+        try:
+            result = subprocess.run(
+                ["python", "-m", "rag", "--help"],
+                capture_output=True,
+                text=True,
+                cwd="/Users/sq/Development/rag",
+                timeout=30,
+            )
+        except subprocess.TimeoutExpired as e:
+            pytest.fail(f"Help command timed out after 30 seconds: {e}")
 
         assert result.returncode == 0
         assert "Commands:" in result.stdout or "Usage:" in result.stdout
@@ -400,12 +448,16 @@ Use the CLI to index documents and ask questions.
         # Test command-specific help
         commands = ["index", "query", "list", "clear"]
         for cmd in commands:
-            result = subprocess.run(
-                ["python", "-m", "rag", cmd, "--help"],
-                capture_output=True,
-                text=True,
-                cwd="/Users/sq/Development/rag",
-            )
+            try:
+                result = subprocess.run(
+                    ["python", "-m", "rag", cmd, "--help"],
+                    capture_output=True,
+                    text=True,
+                    cwd="/Users/sq/Development/rag",
+                    timeout=30,
+                )
+            except subprocess.TimeoutExpired as e:
+                pytest.fail(f"Help command for {cmd} timed out after 30 seconds: {e}")
 
             assert result.returncode == 0, f"Help for {cmd} command failed"
             assert "Usage:" in result.stdout or "Options:" in result.stdout
