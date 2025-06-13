@@ -78,8 +78,6 @@ class PipelineStorage:
                 test_execution = PipelineExecution(
                     id="test-schema-check",
                     state=PipelineState.CREATED,
-                    source_type="test",
-                    source_config={"test": True},
                     created_at=datetime.now(UTC),
                     doc_metadata={"test": True},
                 )
@@ -105,15 +103,11 @@ class PipelineStorage:
 
     def create_pipeline_execution(
         self,
-        source_type: str,
-        source_config: dict[str, Any],
         metadata: dict[str, Any] | None = None,
     ) -> str:
         """Create a new pipeline execution.
 
         Args:
-            source_type: Type of document source (e.g., "filesystem")
-            source_config: Configuration for the source
             metadata: Optional execution metadata
 
         Returns:
@@ -124,8 +118,6 @@ class PipelineStorage:
             execution = PipelineExecution(
                 id=execution_id,
                 state=PipelineState.CREATED,
-                source_type=source_type,
-                source_config=source_config,
                 created_at=datetime.now(UTC),
                 doc_metadata=metadata or {},
             )

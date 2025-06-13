@@ -71,8 +71,6 @@ class PipelineExecution(Base):
     state: Mapped[PipelineState] = mapped_column(
         Enum(PipelineState), default=PipelineState.CREATED, nullable=False
     )
-    source_type: Mapped[str] = mapped_column(String, nullable=False)
-    source_config: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
 
     # Timing information
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)

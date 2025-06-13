@@ -75,9 +75,7 @@ class TestPipeline:
         
         # Create and populate a test execution
         exec_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={"path": "/test/docs"},
-            metadata={"test": True}
+            metadata={"test": True, "source_type": "filesystem", "path": "/test/docs"}
         )
         
         # Create documents for the execution
@@ -163,8 +161,6 @@ class TestPipeline:
         # Check that execution was created in storage
         execution = fake_components["storage"].get_pipeline_execution(execution_id)
         assert execution.state == PipelineState.CREATED
-        assert execution.source_type == "collection"  # Now hardcoded
-        assert execution.source_config == {}  # Now empty
         assert execution.doc_metadata["initiated_by"] == "test"
         assert execution.doc_metadata["source_type"] == "filesystem"
         assert execution.doc_metadata["path"] == "/test/docs"
@@ -235,8 +231,7 @@ class TestPipeline:
         
         # Create a test execution and document
         exec_id = failing_storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={"path": "/test"},
+            metadata={"source_type": "filesystem", "path": "/test"}
         )
         
         doc_id = failing_storage.create_document_processing(
@@ -388,8 +383,7 @@ class TestPipeline:
         
         # Create another execution with RUNNING state
         exec_id_2 = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={"path": "/test2"}
+            metadata={"source_type": "filesystem", "path": "/test2"}
         )
         storage.update_pipeline_state(exec_id_2, PipelineState.RUNNING)
         
@@ -446,8 +440,7 @@ class TestPipeline:
         
         broken_storage = BrokenStorage()
         execution_id = broken_storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={"path": "/test"}
+            metadata={"source_type": "filesystem", "path": "/test"}
         )
         
         # Create a document

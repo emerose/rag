@@ -87,8 +87,6 @@ class PipelineStorageProtocol(Protocol):
 
     def create_pipeline_execution(
         self,
-        source_type: str,
-        source_config: dict[str, Any],
         metadata: dict[str, Any] | None = None,
     ) -> str:
         """Create a new pipeline execution."""

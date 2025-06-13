@@ -111,8 +111,6 @@ class Pipeline:
         """
         # Create execution with simplified interface
         execution_id = self.storage.create_pipeline_execution(
-            source_type="collection",
-            source_config={},
             metadata=metadata,
         )
 

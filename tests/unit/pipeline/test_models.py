@@ -37,10 +37,8 @@ class TestPipelineExecutionModel:
         execution = PipelineExecution(
             id="test-execution-1",
             state=PipelineState.CREATED,
-            source_type="filesystem",
-            source_config={"path": "/test/path"},
             created_at=datetime.utcnow(),
-            doc_metadata={"test": "data"},
+            doc_metadata={"test": "data", "source_type": "filesystem", "path": "/test/path"},
         )
         
         in_memory_db.add(execution)
@@ -50,16 +48,12 @@ class TestPipelineExecutionModel:
         retrieved = in_memory_db.get(PipelineExecution, "test-execution-1")
         assert retrieved is not None
         assert retrieved.state == PipelineState.CREATED
-        assert retrieved.source_type == "filesystem"
-        assert retrieved.source_config == {"path": "/test/path"}
-        assert retrieved.doc_metadata == {"test": "data"}
+        assert retrieved.doc_metadata == {"test": "data", "source_type": "filesystem", "path": "/test/path"}
 
     def test_pipeline_execution_defaults(self, in_memory_db):
         """Test default values for pipeline execution."""
         execution = PipelineExecution(
             id="test-execution-2",
-            source_type="filesystem", 
-            source_config={"path": "/test"},
             created_at=datetime.utcnow(),
         )
         
@@ -78,8 +72,6 @@ class TestPipelineExecutionModel:
         execution = PipelineExecution(
             id="test-execution-3",
             state=PipelineState.RUNNING,
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         
@@ -96,8 +88,6 @@ class TestDocumentProcessingModel:
         # First create a pipeline execution
         execution = PipelineExecution(
             id="test-execution",
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(execution)
@@ -127,8 +117,6 @@ class TestDocumentProcessingModel:
         """Test default values for document processing."""
         execution = PipelineExecution(
             id="test-execution",
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(execution)
@@ -153,8 +141,6 @@ class TestDocumentProcessingModel:
         """Test relationship between execution and document processing."""
         execution = PipelineExecution(
             id="test-execution",
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(execution)
@@ -186,8 +172,6 @@ class TestProcessingTaskModel:
         # Create execution and document
         execution = PipelineExecution(
             id="test-execution",
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(execution)
@@ -226,8 +210,6 @@ class TestProcessingTaskModel:
         # Create execution and document first
         execution = PipelineExecution(
             id="test-execution",
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(execution)
@@ -262,8 +244,6 @@ class TestProcessingTaskModel:
         # Create execution and document
         execution = PipelineExecution(
             id="test-execution",
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(execution)
@@ -316,8 +296,6 @@ class TestTaskDetailModels:
         # Create required parent records
         execution = PipelineExecution(
             id="test-execution",
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(execution)
@@ -364,8 +342,6 @@ class TestTaskDetailModels:
         # Create required parent records
         execution = PipelineExecution(
             id="test-execution",
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(execution)
@@ -414,8 +390,6 @@ class TestTaskDetailModels:
         # Create required parent records
         execution = PipelineExecution(
             id="test-execution",
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(execution)
@@ -468,8 +442,6 @@ class TestTaskDetailModels:
         # Create required parent records
         execution = PipelineExecution(
             id="test-execution",
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(execution)
@@ -524,8 +496,6 @@ class TestModelRelationships:
         # Create full hierarchy
         execution = PipelineExecution(
             id="test-execution",
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(execution)
@@ -570,8 +540,6 @@ class TestModelRelationships:
         # Create full hierarchy
         execution = PipelineExecution(
             id="test-execution",
-            source_type="filesystem",
-            source_config={},
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(execution)

@@ -98,8 +98,6 @@ class FakePipelineStorage:
 
     def create_pipeline_execution(
         self,
-        source_type: str,
-        source_config: dict[str, Any],
         metadata: dict[str, Any] | None = None,
     ) -> str:
         """Create a new pipeline execution."""
@@ -109,8 +107,6 @@ class FakePipelineStorage:
         self.executions[exec_id] = {
             "id": exec_id,
             "state": PipelineState.CREATED,
-            "source_type": source_type,
-            "source_config": source_config,
             "created_at": datetime.now(UTC),
             "started_at": None,
             "completed_at": None,
@@ -213,8 +209,6 @@ class FakePipelineStorage:
         execution = Mock(spec=PipelineExecution)
         execution.id = data["id"]
         execution.state = data["state"]
-        execution.source_type = data["source_type"]
-        execution.source_config = data["source_config"]
         execution.created_at = data["created_at"]
         execution.started_at = data["started_at"]
         execution.completed_at = data["completed_at"]

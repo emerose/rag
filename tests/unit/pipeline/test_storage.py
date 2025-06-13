@@ -45,9 +45,7 @@ class TestPipelineStorage:
     def test_create_pipeline_execution(self, storage):
         """Test creating a pipeline execution."""
         execution_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={"path": "/test/path"},
-            metadata={"test": "data"}
+            metadata={"test": "data", "source_type": "filesystem", "path": "/test/path"}
         )
         
         assert execution_id is not None
@@ -56,9 +54,7 @@ class TestPipelineStorage:
         # Verify it was stored
         execution = storage.get_pipeline_execution(execution_id)
         assert execution is not None
-        assert execution.source_type == "filesystem"
-        assert execution.source_config == {"path": "/test/path"}
-        assert execution.doc_metadata == {"test": "data"}
+        assert execution.doc_metadata == {"test": "data", "source_type": "filesystem", "path": "/test/path"}
         assert execution.state == PipelineState.CREATED
 
     def test_get_pipeline_execution_not_found(self, storage):
@@ -69,8 +65,7 @@ class TestPipelineStorage:
     def test_update_pipeline_state(self, storage):
         """Test updating pipeline state."""
         execution_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={}
+            metadata={"source_type": "filesystem"}
         )
         
         storage.update_pipeline_state(
@@ -89,8 +84,7 @@ class TestPipelineStorage:
     def test_create_document_processing(self, storage):
         """Test creating a document processing record."""
         execution_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={}
+            metadata={"source_type": "filesystem"}
         )
         
         document_id = storage.create_document_processing(
@@ -119,8 +113,7 @@ class TestPipelineStorage:
     def test_update_document_state(self, storage):
         """Test updating document state."""
         execution_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={}
+            metadata={"source_type": "filesystem"}
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
@@ -143,8 +136,7 @@ class TestPipelineStorage:
     def test_create_processing_task(self, storage):
         """Test creating a processing task."""
         execution_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={}
+            metadata={"source_type": "filesystem"}
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
@@ -175,8 +167,7 @@ class TestPipelineStorage:
     def test_create_processing_task_with_dependency(self, storage):
         """Test creating a processing task with dependency."""
         execution_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={}
+            metadata={"source_type": "filesystem"}
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
@@ -210,8 +201,7 @@ class TestPipelineStorage:
     def test_update_task_state(self, storage):
         """Test updating task state."""
         execution_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={}
+            metadata={"source_type": "filesystem"}
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
@@ -238,8 +228,7 @@ class TestPipelineStorage:
     def test_increment_retry_count(self, storage):
         """Test incrementing task retry count."""
         execution_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={}
+            metadata={"source_type": "filesystem"}
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
@@ -267,8 +256,7 @@ class TestPipelineStorage:
     def test_get_pending_tasks_for_document(self, storage):
         """Test getting pending tasks for a document."""
         execution_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={}
+            metadata={"source_type": "filesystem"}
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
@@ -308,8 +296,7 @@ class TestPipelineStorage:
     def test_get_documents_for_execution(self, storage):
         """Test getting documents for an execution."""
         execution_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={}
+            metadata={"source_type": "filesystem"}
         )
         
         # Create multiple documents
@@ -347,8 +334,7 @@ class TestPipelineStorage:
         # Test normal operation
         with storage:
             execution_id = storage.create_pipeline_execution(
-                source_type="filesystem",
-                source_config={}
+                metadata={"source_type": "filesystem"}
             )
             assert execution_id is not None
 
@@ -357,8 +343,7 @@ class TestPipelineStorage:
         with pytest.raises(ValueError):
             with storage:
                 storage.create_pipeline_execution(
-                    source_type="filesystem",
-                    source_config={}
+                    metadata={"source_type": "filesystem"}
                 )
                 # Simulate an error
                 raise ValueError("Test error")
@@ -367,12 +352,10 @@ class TestPipelineStorage:
         """Test listing pipeline executions."""
         # Create multiple executions
         exec1_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={"path": "/path1"}
+            metadata={"source_type": "filesystem", "path": "/path1"}
         )
         exec2_id = storage.create_pipeline_execution(
-            source_type="api",
-            source_config={"url": "http://example.com"}
+            metadata={"source_type": "api", "url": "http://example.com"}
         )
         
         # List executions
@@ -387,12 +370,10 @@ class TestPipelineStorage:
         """Test listing executions with state filter."""
         # Create executions with different states
         exec1_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={}
+            metadata={"source_type": "filesystem"}
         )
         exec2_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={}
+            metadata={"source_type": "filesystem"}
         )
         
         # Update one to running state
@@ -419,8 +400,7 @@ class TestPipelineStorage:
     def test_delete_execution(self, storage):
         """Test deleting a pipeline execution (cascade)."""
         execution_id = storage.create_pipeline_execution(
-            source_type="filesystem",
-            source_config={}
+            metadata={"source_type": "filesystem"}
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
