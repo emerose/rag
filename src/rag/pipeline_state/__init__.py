@@ -15,6 +15,7 @@ from rag.pipeline_state.models import (
     VectorStorageTask,
 )
 from rag.pipeline_state.pipeline import (
+    IngestAllResult,
     Pipeline,
     PipelineConfig,
     PipelineExecutionResult,
@@ -43,6 +44,7 @@ __all__ = [
     "DocumentProcessing",
     "EmbeddingProcessor",
     "EmbeddingTask",
+    "IngestAllResult",
     "Pipeline",
     "PipelineConfig",
     "PipelineDependencies",

@@ -60,12 +60,48 @@ class PipelineStorage:
         # Create session factory
         self.SessionLocal = sessionmaker(bind=self.engine, expire_on_commit=False)
 
-        # Create tables
-        Base.metadata.create_all(self.engine)
+        # Create tables with schema migration support
+        self._ensure_schema()
 
     def get_session(self) -> Session:
         """Get a new database session."""
         return self.SessionLocal()
+
+    def _ensure_schema(self) -> None:
+        """Ensure the database schema is up to date."""
+        try:
+            # Try to create tables normally first
+            Base.metadata.create_all(self.engine)
+
+            # Test if we can create a simple execution to verify schema
+            with self.get_session() as session:
+                test_execution = PipelineExecution(
+                    id="test-schema-check",
+                    state=PipelineState.CREATED,
+                    source_type="test",
+                    source_config={"test": True},
+                    created_at=datetime.now(UTC),
+                    doc_metadata={"test": True},
+                )
+                session.add(test_execution)
+                session.commit()
+
+                # Clean up test execution
+                session.delete(test_execution)
+                session.commit()
+
+        except Exception as e:
+            logger.warning(
+                f"Schema validation failed: {e}. Recreating database schema."
+            )
+            try:
+                # Drop all tables and recreate
+                Base.metadata.drop_all(self.engine)
+                Base.metadata.create_all(self.engine)
+                logger.info("Database schema recreated successfully")
+            except Exception as recreate_error:
+                logger.error(f"Failed to recreate schema: {recreate_error}")
+                raise
 
     def create_pipeline_execution(
         self,

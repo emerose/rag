@@ -78,6 +78,15 @@ class PipelineExecutionResult:
     metadata: dict[str, Any] | None = None
 
 
+@dataclass
+class IngestAllResult:
+    """Result of ingest_all operation for E2E test compatibility."""
+    
+    documents_loaded: int
+    documents_stored: int
+    errors: list[str]
+
+
 class Pipeline:
     """Main pipeline orchestrator with state machine support."""
 
@@ -690,3 +699,61 @@ class Pipeline:
             input_data.update(embedding_output)
 
         return input_data
+
+    def ingest_all(self) -> IngestAllResult:
+        """Ingest all documents from the configured document source.
+
+        This method provides backward compatibility with the E2E test interface
+        by running the full pipeline on all documents in the source.
+
+        Returns:
+            IngestAllResult with documents_loaded, documents_stored, and errors
+        """
+        if not self.document_source:
+            # No document source configured, return empty result
+            return IngestAllResult(documents_loaded=0, documents_stored=0, errors=[])
+
+        try:
+            # Get the documents directory from the document source
+            if (
+                hasattr(self.document_source, "root_path")
+                and self.document_source.root_path
+            ):
+                source_path = str(self.document_source.root_path)
+            else:
+                # Fallback for sources without root_path
+                source_path = "."
+
+            # Start pipeline execution
+            execution_id = self.start(
+                source_path=source_path, metadata={"initiated_by": "ingest_all"}
+            )
+
+            # Run the pipeline
+            result = self.run(execution_id)
+
+            # Convert PipelineExecutionResult to IngestAllResult
+            errors = []
+            if result.error_message:
+                errors.append(result.error_message)
+
+            return IngestAllResult(
+                documents_loaded=result.total_documents,
+                documents_stored=result.processed_documents,
+                errors=errors,
+            )
+
+        except Exception as e:
+            logger.error(f"Error during ingest_all: {e}")
+            return IngestAllResult(
+                documents_loaded=0, documents_stored=0, errors=[str(e)]
+            )
+
+
+@dataclass
+class IngestAllResult:
+    """Result structure for ingest_all method, matching E2E test expectations."""
+
+    documents_loaded: int
+    documents_stored: int
+    errors: list[str]

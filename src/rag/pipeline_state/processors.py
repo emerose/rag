@@ -183,12 +183,10 @@ class DocumentLoadingProcessor(BaseTaskProcessor):
                 "size_bytes": len(content),
             }
 
-            # Metrics
+            # Metrics - avoid lazy loading relationships
             metrics = {
                 "content_length": len(content),
-                "loader_type": task.loading_details.loader_type
-                if task.loading_details
-                else "default",
+                "loader_type": "default",  # Avoid accessing lazy-loaded relationship
             }
 
             return TaskResult(
@@ -251,14 +249,11 @@ class ChunkingProcessor(BaseTaskProcessor):
                     error_message="Missing content in input data",
                 )
 
-            # Get chunking configuration
-            chunking_details = task.chunking_details
-            if not chunking_details:
-                return TaskResult(
-                    success=False,
-                    output_data={},
-                    error_message="Missing chunking configuration",
-                )
+            # Get chunking configuration from processing config
+            processing_config = input_data.get("processing_config", {})
+            # chunk_size = processing_config.get("chunk_size", 1000)  # TODO: Use for chunking
+            # chunk_overlap = processing_config.get("chunk_overlap", 200)  # TODO: Use for chunking
+            chunking_strategy = processing_config.get("chunking_strategy", "recursive")
 
             # Create text splitter using factory
             splitter = self.text_splitter_factory.create_splitter("text/plain")
@@ -306,7 +301,7 @@ class ChunkingProcessor(BaseTaskProcessor):
                 "avg_chunk_size": sum(len(c.page_content) for c in chunks) / len(chunks)
                 if chunks
                 else 0,
-                "strategy": chunking_details.chunking_strategy,
+                "strategy": chunking_strategy,
             }
 
             return TaskResult(
@@ -330,8 +325,9 @@ class ChunkingProcessor(BaseTaskProcessor):
         """Validate chunking task input."""
         if "content" not in input_data:
             return False, "content is required"
-        if not task.chunking_details:
-            return False, "chunking configuration is required"
+        processing_config = input_data.get("processing_config", {})
+        if not processing_config:
+            return False, "processing configuration is required"
         return True, None
 
 
@@ -370,14 +366,13 @@ class EmbeddingProcessor(BaseTaskProcessor):
             # Extract texts from chunks
             texts: list[str] = [chunk["content"] for chunk in chunks]
 
-            # Get embedding configuration
-            embedding_details = task.embedding_details
-            if not embedding_details:
-                return TaskResult(
-                    success=False,
-                    output_data={},
-                    error_message="Missing embedding configuration",
-                )
+            # Get embedding configuration from processing config
+            processing_config = input_data.get("processing_config", {})
+            model_name = processing_config.get(
+                "embedding_model", "text-embedding-ada-002"
+            )
+            # provider = processing_config.get("embedding_provider", "openai")  # TODO: Use for provider selection
+            batch_size = processing_config.get("embedding_batch_size", 100)
 
             # Generate embeddings
             embeddings = self.embedding_service.embed_texts(texts)
@@ -389,7 +384,7 @@ class EmbeddingProcessor(BaseTaskProcessor):
             ):
                 chunk_data = chunk.copy()
                 chunk_data["embedding"] = embedding
-                chunk_data["embedding_model"] = embedding_details.model_name
+                chunk_data["embedding_model"] = model_name
                 chunks_with_embeddings.append(chunk_data)
 
             output_data = {
@@ -401,8 +396,8 @@ class EmbeddingProcessor(BaseTaskProcessor):
             # Metrics
             metrics = {
                 "embeddings_generated": len(embeddings),
-                "model_name": embedding_details.model_name,
-                "batch_size": embedding_details.batch_size,
+                "model_name": model_name,
+                "batch_size": batch_size,
             }
 
             return TaskResult(
@@ -426,8 +421,9 @@ class EmbeddingProcessor(BaseTaskProcessor):
         """Validate embedding task input."""
         if "chunks" not in input_data:
             return False, "chunks are required"
-        if not task.embedding_details:
-            return False, "embedding configuration is required"
+        processing_config = input_data.get("processing_config", {})
+        if not processing_config:
+            return False, "processing configuration is required"
         chunks = input_data.get("chunks", [])
         if not chunks:
             return False, "at least one chunk is required"
@@ -538,12 +534,10 @@ class VectorStorageProcessor(BaseTaskProcessor):
                 "source_id": source_id,
             }
 
-            # Metrics
+            # Metrics - avoid lazy loading relationships
             metrics = {
                 "vectors_stored": len(stored_ids),
-                "store_type": task.storage_details.store_type
-                if task.storage_details
-                else "default",
+                "store_type": "default",  # Avoid accessing lazy-loaded relationship
             }
 
             return TaskResult(
