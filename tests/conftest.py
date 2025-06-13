@@ -29,12 +29,13 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Reorder test collection to run unit tests first, then integration, then e2e.
+    """Reorder test collection to run static analysis first, then unit, integration, e2e.
     
-    This ensures that fast unit tests run first, providing quick feedback,
-    followed by integration tests, and finally the slower e2e tests.
+    This ensures that static analysis runs first for immediate feedback on code quality,
+    followed by fast unit tests, integration tests, and finally slower e2e tests.
     """
-    # Separate tests by type based on file path (same logic as timeout assignment)
+    # Separate tests by type based on file path
+    static_tests = []
     unit_tests = []
     integration_tests = []
     e2e_tests = []
@@ -42,7 +43,9 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     
     for item in items:
         test_path = str(item.path)
-        if "/unit/" in test_path:
+        if "/static/" in test_path:
+            static_tests.append(item)
+        elif "/unit/" in test_path:
             unit_tests.append(item)
         elif "/integration/" in test_path:
             integration_tests.append(item)
@@ -51,8 +54,8 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         else:
             other_tests.append(item)
     
-    # Reorder: unit → integration → e2e → other
-    items[:] = unit_tests + integration_tests + e2e_tests + other_tests
+    # Reorder: static → unit → integration → e2e → other
+    items[:] = static_tests + unit_tests + integration_tests + e2e_tests + other_tests
 
 
 def pytest_runtest_setup(item: pytest.Item) -> None:
@@ -91,7 +94,10 @@ def pytest_runtest_setup(item: pytest.Item) -> None:
 
     # Determine test type by file path and apply timeouts
     test_path = str(item.path)
-    if "/unit/" in test_path:
+    if "/static/" in test_path:
+        timeout = 60 * ci_multiplier  # Static analysis can take longer
+        item.add_marker(pytest.mark.timeout(timeout))
+    elif "/unit/" in test_path:
         timeout = 0.1 * ci_multiplier
         item.add_marker(pytest.mark.timeout(timeout))
     elif "/integration/" in test_path:
