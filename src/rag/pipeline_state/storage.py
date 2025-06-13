@@ -55,13 +55,7 @@ class PipelineStorage:
         if database_url.startswith("sqlite"):
             from sqlalchemy import event
 
-            @event.listens_for(self.engine, "connect")
-            def enable_foreign_keys(
-                dbapi_connection: Any, _connection_record: Any
-            ) -> None:
-                cursor = dbapi_connection.cursor()
-                cursor.execute("PRAGMA foreign_keys=ON")
-                cursor.close()
+            event.listens_for(self.engine, "connect")(self._enable_foreign_keys)
 
         # Create session factory
         self.SessionLocal = sessionmaker(bind=self.engine, expire_on_commit=False)
@@ -239,22 +233,28 @@ class PipelineStorage:
             )
             session.add(details)
 
-    def get_pipeline_execution(self, execution_id: str) -> PipelineExecution | None:
+    def get_pipeline_execution(self, execution_id: str) -> PipelineExecution:
         """Get a pipeline execution by ID."""
         with self.get_session() as session:
             execution = session.get(PipelineExecution, execution_id)
+            if execution is None:
+                raise ValueError(f"Pipeline execution not found: {execution_id}")
             return execution
 
-    def get_document(self, document_id: str) -> DocumentProcessing | None:
+    def get_document(self, document_id: str) -> DocumentProcessing:
         """Get a document processing record by ID."""
         with self.get_session() as session:
             document = session.get(DocumentProcessing, document_id)
+            if document is None:
+                raise ValueError(f"Document processing not found: {document_id}")
             return document
 
-    def get_task(self, task_id: str) -> ProcessingTask | None:
+    def get_task(self, task_id: str) -> ProcessingTask:
         """Get a processing task by ID."""
         with self.get_session() as session:
             task = session.get(ProcessingTask, task_id)
+            if task is None:
+                raise ValueError(f"Processing task not found: {task_id}")
             return task
 
     def update_pipeline_state(
@@ -610,3 +610,14 @@ class PipelineStorage:
     def __exit__(self, _exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:
         """Exit context manager."""
         pass
+
+    def _enable_foreign_keys(
+        self, dbapi_connection: Any, _connection_record: Any
+    ) -> None:
+        """Enable foreign key constraints for SQLite connections.
+
+        This method is used as a SQLAlchemy event listener.
+        """
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()

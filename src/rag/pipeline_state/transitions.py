@@ -15,6 +15,7 @@ from rag.pipeline_state.models import (
     PipelineState,
     ProcessingTask,
     TaskState,
+    TaskType,
 )
 
 
@@ -82,6 +83,92 @@ class PipelineStorageProtocol(Protocol):
 
     def get_pipeline_execution(self, execution_id: str) -> PipelineExecution:
         """Get a pipeline execution by ID."""
+        ...
+
+    def create_pipeline_execution(
+        self,
+        source_type: str,
+        source_config: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """Create a new pipeline execution."""
+        ...
+
+    def create_document_processing(
+        self,
+        execution_id: str,
+        source_identifier: str,
+        processing_config: dict[str, Any],
+        metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """Create a document processing record."""
+        ...
+
+    def create_processing_tasks(
+        self,
+        document_id: str,
+        task_configs: list[dict[str, Any]],
+    ) -> list[str]:
+        """Create processing tasks for a document."""
+        ...
+
+    def get_pipeline_documents(
+        self,
+        execution_id: str,
+        state: TaskState | None = None,
+    ) -> list[DocumentProcessing]:
+        """Get all documents for a pipeline execution."""
+        ...
+
+    def get_document_tasks(
+        self,
+        document_id: str,
+        task_type: TaskType | None = None,
+    ) -> list[ProcessingTask]:
+        """Get all tasks for a document."""
+        ...
+
+    def get_execution_status(self, execution_id: str) -> dict[str, Any]:
+        """Get detailed status of a pipeline execution."""
+        ...
+
+
+class StateTransitionServiceProtocol(Protocol):
+    """Protocol for state transition service operations."""
+
+    def transition_pipeline(
+        self,
+        execution_id: str,
+        new_state: PipelineState,
+        error_message: str | None = None,
+        error_details: dict[str, Any] | None = None,
+    ) -> TransitionResult:
+        """Transition a pipeline execution to a new state."""
+        ...
+
+    def transition_document(
+        self,
+        document_id: str,
+        new_state: TaskState,
+        error_message: str | None = None,
+        error_details: dict[str, Any] | None = None,
+    ) -> TransitionResult:
+        """Transition a document to a new state."""
+        ...
+
+    def transition_task(
+        self,
+        task_id: str,
+        new_state: TaskState,
+        error_message: str | None = None,
+        error_details: dict[str, Any] | None = None,
+        result_summary: dict[str, Any] | None = None,
+    ) -> TransitionResult:
+        """Transition a task to a new state."""
+        ...
+
+    def can_start_task(self, task: ProcessingTask) -> tuple[bool, str | None]:
+        """Check if a task can be started."""
         ...
 
 

@@ -87,7 +87,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         self.test_options = test_options or FakeComponentOptions()
 
         # Create fake component overrides
-        overrides = self._create_fake_overrides()
+        overrides = self._create_fake_overrides(config, runtime_options)
 
         # Initialize parent with fake overrides
         super().__init__(config, runtime_options, overrides)
@@ -132,7 +132,9 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             async_batching=False,  # Simpler synchronous processing
         )
 
-    def _create_fake_overrides(self) -> ComponentOverrides:
+    def _create_fake_overrides(
+        self, config: RAGConfig, runtime_options: RuntimeOptions
+    ) -> ComponentOverrides:
         """Create fake component overrides for testing."""
         # Create the embedding service based on test options
         if self.test_options.use_deterministic_embeddings:
@@ -187,6 +189,41 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             chunk_overlap=50,
         )
 
+        # Create fake pipeline
+        from rag.pipeline_state.fakes import (
+            FakeDocumentSource,
+            FakePipelineStorage,
+            FakeProcessorFactory,
+            FakeStateTransitionService,
+        )
+        from rag.pipeline_state.pipeline import Pipeline
+
+        fake_storage = FakePipelineStorage()
+        fake_transition_service = FakeStateTransitionService(fake_storage)
+        fake_processor_factory = FakeProcessorFactory()
+        fake_document_source = FakeDocumentSource()
+
+        # Convert RAGConfig to PipelineConfig if needed
+        from rag.pipeline_state.pipeline import PipelineConfig
+
+        pipeline_config = PipelineConfig(
+            chunk_size=config.chunk_size,
+            chunk_overlap=config.chunk_overlap,
+            chunking_strategy="recursive",  # Default strategy
+            embedding_model=config.embedding_model,
+            embedding_provider="openai",  # Default provider
+            embedding_batch_size=config.batch_size,
+            vector_store_type=config.vectorstore_backend,
+        )
+
+        fake_pipeline = Pipeline(
+            storage=fake_storage,
+            transition_service=fake_transition_service,
+            processor_factory=fake_processor_factory,
+            document_source=fake_document_source,
+            config=pipeline_config,
+        )
+
         return ComponentOverrides(
             filesystem_manager=filesystem,
             document_store=document_store,
@@ -195,6 +232,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             document_loader=document_loader,
             chat_model=chat_model,
             text_splitter_factory=text_splitter_factory,
+            pipeline=fake_pipeline,
         )
 
     @property
@@ -318,12 +356,92 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 root_path=config.documents_dir,
                 filesystem_manager=factory._filesystem_manager,
             )
+
+            # Create new pipeline with real document store
+            from rag.pipeline_state.fakes import (
+                FakePipelineStorage,
+                FakeProcessorFactory,
+                FakeStateTransitionService,
+            )
+            from rag.pipeline_state.pipeline import Pipeline, PipelineConfig
+
+            fake_storage = FakePipelineStorage()
+            fake_transition_service = FakeStateTransitionService(fake_storage)
+            fake_processor_factory = FakeProcessorFactory()
+
+            # Convert RAGConfig to PipelineConfig
+            pipeline_config = PipelineConfig(
+                chunk_size=config.chunk_size,
+                chunk_overlap=config.chunk_overlap,
+                chunking_strategy="recursive",  # Default strategy
+                embedding_model=config.embedding_model,
+                embedding_provider="openai",  # Default provider
+                embedding_batch_size=config.batch_size,
+                vector_store_type=config.vectorstore_backend,
+            )
+
+            # Create pipeline with real document store
+            real_pipeline = Pipeline(
+                storage=fake_storage,
+                transition_service=fake_transition_service,
+                processor_factory=fake_processor_factory,
+                document_source=factory._document_source,
+                config=pipeline_config,
+                document_store=factory._document_store,  # Pass real document store
+            )
+            factory._pipeline = real_pipeline
         else:
             # For tests that want fake filesystem, use all fake components
             test_options = FakeComponentOptions()
             factory = cls(
                 config=config, runtime_options=runtime, test_options=test_options
             )
+
+            # Even with fake filesystem, we need a real document store for integration tests
+            # Create real document store
+            from pathlib import Path
+
+            from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
+
+            # Ensure data directory exists before creating document store
+            data_dir = Path(config.data_dir)
+            data_dir.mkdir(parents=True, exist_ok=True)
+
+            factory._document_store = SQLAlchemyDocumentStore(data_dir / "documents.db")
+
+            # Create new pipeline with real document store
+            from rag.pipeline_state.fakes import (
+                FakePipelineStorage,
+                FakeProcessorFactory,
+                FakeStateTransitionService,
+            )
+            from rag.pipeline_state.pipeline import Pipeline, PipelineConfig
+
+            fake_storage = FakePipelineStorage()
+            fake_transition_service = FakeStateTransitionService(fake_storage)
+            fake_processor_factory = FakeProcessorFactory()
+
+            # Convert RAGConfig to PipelineConfig
+            pipeline_config = PipelineConfig(
+                chunk_size=config.chunk_size,
+                chunk_overlap=config.chunk_overlap,
+                chunking_strategy="recursive",  # Default strategy
+                embedding_model=config.embedding_model,
+                embedding_provider="openai",  # Default provider
+                embedding_batch_size=config.batch_size,
+                vector_store_type=config.vectorstore_backend,
+            )
+
+            # Create pipeline with real document store
+            real_pipeline = Pipeline(
+                storage=fake_storage,
+                transition_service=fake_transition_service,
+                processor_factory=fake_processor_factory,
+                document_source=factory._document_source,
+                config=pipeline_config,
+                document_store=factory._document_store,  # Pass real document store
+            )
+            factory._pipeline = real_pipeline
 
         return factory
 

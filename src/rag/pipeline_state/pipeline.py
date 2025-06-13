@@ -13,8 +13,13 @@ from typing import Any, TypedDict
 
 from rag.pipeline_state.models import PipelineState, ProcessingTask, TaskState, TaskType
 from rag.pipeline_state.processors import TaskProcessor
-from rag.pipeline_state.storage import PipelineStorage
-from rag.pipeline_state.transitions import StateTransitionService
+
+# PipelineStorage import removed - using PipelineStorageProtocol instead
+from rag.pipeline_state.transitions import (
+    PipelineStorageProtocol,
+    StateTransitionService,
+    StateTransitionServiceProtocol,
+)
 from rag.sources.base import DocumentSourceProtocol
 from rag.utils.logging_utils import get_logger
 
@@ -78,14 +83,14 @@ class Pipeline:
 
     def __init__(  # noqa: PLR0913
         self,
-        storage: PipelineStorage,
-        state_transitions: StateTransitionService | None = None,
+        storage: PipelineStorageProtocol,
+        state_transitions: StateTransitionServiceProtocol | None = None,
         task_processors: Mapping[TaskType, TaskProcessor] | None = None,
         document_source: DocumentSourceProtocol | None = None,
         config: PipelineConfig | None = None,
         document_store: Any = None,
         # Legacy test compatibility parameters
-        transition_service: StateTransitionService | None = None,
+        transition_service: StateTransitionServiceProtocol | None = None,
         processor_factory: Any = None,
         max_workers: int | None = None,
         logger: Any = None,

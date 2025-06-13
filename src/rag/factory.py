@@ -57,6 +57,7 @@ class ComponentOverrides:
     document_loader: Any | None = None
     chat_model: Any | None = None  # Any LangChain chat model interface
     text_splitter_factory: Any | None = None  # TextSplitterFactory or compatible
+    pipeline: Any | None = None  # Pipeline instance for testing
 
 
 class RAGComponentsFactory:
@@ -225,13 +226,17 @@ class RAGComponentsFactory:
     def pipeline(self) -> Any:
         """Get or create state machine pipeline."""
         if self._pipeline is None:
-            from rag.pipeline_state import PipelineFactory
+            # Check for override first
+            if self.overrides.pipeline is not None:
+                self._pipeline = self.overrides.pipeline
+            else:
+                from rag.pipeline_state import PipelineFactory
 
-            # Create pipeline using factory
-            self._pipeline = PipelineFactory.create_default(
-                config=self.config,
-                progress_callback=self.runtime.progress_callback,
-            )
+                # Create pipeline using factory
+                self._pipeline = PipelineFactory.create_default(
+                    config=self.config,
+                    progress_callback=self.runtime.progress_callback,
+                )
         return self._pipeline
 
     @property

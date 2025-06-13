@@ -12,7 +12,7 @@ from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 from unittest.mock import Mock
 
 from langchain_core.documents import Document
@@ -37,9 +37,9 @@ class FakeDocument:
     id: str
     source_identifier: str
     content: str = "Sample document content for testing."
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=lambda: {})
     content_type: str = "text/plain"
-    processing_config: dict[str, Any] = field(default_factory=dict)
+    processing_config: dict[str, Any] = field(default_factory=lambda: {})
     current_state: TaskState = TaskState.PENDING
 
 
@@ -53,7 +53,7 @@ class FakeTask:
     sequence_number: int = 0
     depends_on_task_id: str | None = None
     state: TaskState = TaskState.PENDING
-    task_config: dict[str, Any] = field(default_factory=dict)
+    task_config: dict[str, Any] = field(default_factory=lambda: {})
     retry_count: int = 0
     max_retries: int = 3
 
@@ -252,7 +252,7 @@ class FakePipelineStorage:
         document.size_bytes = data["size_bytes"]
         document.content_type = data["content_type"]
 
-        return document
+        return cast(DocumentProcessing, document)
 
     def get_task(self, task_id: str) -> ProcessingTask:
         """Get a processing task by ID."""
@@ -297,7 +297,7 @@ class FakePipelineStorage:
             task.storage_details = Mock()
             task.storage_details.store_type = "fake_vectorstore"
 
-        return task
+        return cast(ProcessingTask, task)
 
     def update_pipeline_state(
         self,
@@ -409,7 +409,7 @@ class FakePipelineStorage:
         limit: int = 10,
     ) -> list[ProcessingTask]:
         """Get pending tasks ready to be executed."""
-        pending_tasks = []
+        pending_tasks: list[ProcessingTask] = []
 
         for task_data in self.tasks.values():
             if task_data["state"] != TaskState.PENDING:
@@ -449,7 +449,7 @@ class FakePipelineStorage:
         state: TaskState | None = None,
     ) -> list[DocumentProcessing]:
         """Get all documents for a pipeline execution."""
-        documents = []
+        documents: list[DocumentProcessing] = []
 
         for doc_data in self.documents.values():
             if doc_data["execution_id"] != execution_id:
@@ -473,7 +473,7 @@ class FakePipelineStorage:
         task_type: TaskType | None = None,
     ) -> list[ProcessingTask]:
         """Get all tasks for a document."""
-        tasks = []
+        tasks: list[ProcessingTask] = []
 
         for task_data in self.tasks.values():
             if task_data["document_id"] != document_id:
@@ -495,7 +495,7 @@ class FakePipelineStorage:
         state: PipelineState | None = None,
     ) -> list[PipelineExecution]:
         """List pipeline executions."""
-        executions = []
+        executions: list[PipelineExecution] = []
 
         for exec_data in self.executions.values():
             if state and exec_data["state"] != state:
@@ -818,7 +818,7 @@ class FakeDocumentSource:
 
     def get_documents(self, source_ids: list[str]) -> dict[str, SourceDocument]:
         """Get multiple documents."""
-        result = {}
+        result: dict[str, SourceDocument] = {}
         for source_id in source_ids:
             doc = self.get_document(source_id)
             if doc:
@@ -870,7 +870,7 @@ class FakeDocumentStore:
         docs = list(self.documents.values())
         if filters:
             # Apply simple filtering based on metadata
-            filtered_docs = []
+            filtered_docs: list[Document] = []
             for doc in docs:
                 match = True
                 for key, value in filters.items():
@@ -909,7 +909,7 @@ class FakeDocumentStore:
     def list_source_documents(self) -> list[Any]:
         """List all source documents."""
         # Return simple objects with required attributes
-        source_docs = []
+        source_docs: list[Any] = []
         for source_data in self.source_documents.values():
             source_doc = Mock()
             source_doc.source_id = source_data["source_id"]
@@ -955,7 +955,7 @@ class FakeDocumentStore:
         """Get chunk hashes."""
         return []
 
-    def update_file_metadata(self, metadata) -> None:
+    def update_file_metadata(self, metadata: dict[str, Any]) -> None:
         """Update file metadata."""
         pass
 

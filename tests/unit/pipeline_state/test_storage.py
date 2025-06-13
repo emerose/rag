@@ -63,8 +63,8 @@ class TestPipelineStorage:
 
     def test_get_pipeline_execution_not_found(self, storage):
         """Test getting a non-existent pipeline execution."""
-        execution = storage.get_pipeline_execution("nonexistent")
-        assert execution is None
+        with pytest.raises(ValueError, match="Pipeline execution not found: nonexistent"):
+            storage.get_pipeline_execution("nonexistent")
 
     def test_update_pipeline_state(self, storage):
         """Test updating pipeline state."""
@@ -113,8 +113,8 @@ class TestPipelineStorage:
 
     def test_get_document_not_found(self, storage):
         """Test getting a non-existent document."""
-        document = storage.get_document("nonexistent")
-        assert document is None
+        with pytest.raises(ValueError, match="Document processing not found: nonexistent"):
+            storage.get_document("nonexistent")
 
     def test_update_document_state(self, storage):
         """Test updating document state."""
@@ -204,8 +204,8 @@ class TestPipelineStorage:
 
     def test_get_task_not_found(self, storage):
         """Test getting a non-existent task."""
-        task = storage.get_task("nonexistent")
-        assert task is None
+        with pytest.raises(ValueError, match="Processing task not found: nonexistent"):
+            storage.get_task("nonexistent")
 
     def test_update_task_state(self, storage):
         """Test updating task state."""
@@ -441,7 +441,10 @@ class TestPipelineStorage:
         # Delete execution
         storage.delete_execution(execution_id)
         
-        # Verify cascade deletion
-        assert storage.get_pipeline_execution(execution_id) is None
-        assert storage.get_document(document_id) is None
-        assert storage.get_task(task_id) is None
+        # Verify cascade deletion - records should not exist
+        with pytest.raises(ValueError):
+            storage.get_pipeline_execution(execution_id)
+        with pytest.raises(ValueError):
+            storage.get_document(document_id)
+        with pytest.raises(ValueError):
+            storage.get_task(task_id)
