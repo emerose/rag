@@ -219,14 +219,89 @@ def print_execution_plan(tests: List[Dict[str, Any]], pytest_args: List[str]):
             print()
 
 
+def get_known_markers() -> set[str]:
+    """Get the list of known pytest markers dynamically."""
+    markers = set(get_available_markers().keys())
+    markers.add("not")  # Special pytest keyword
+    return markers
+
+
+def separate_marker_args_from_pytest_args(args: List[str]) -> tuple[List[str], List[str]]:
+    """Separate test category arguments from pytest arguments.
+    
+    Returns:
+        (marker_args, pytest_args) where marker_args are for building -m expression
+        and pytest_args are passed directly to pytest
+    """
+    marker_args = []
+    pytest_args = []
+    
+    known_markers = get_known_markers()
+    
+    for arg in args:
+        if arg in known_markers:
+            marker_args.append(arg)
+        elif arg.startswith('-'):
+            # This is a pytest flag
+            pytest_args.append(arg)
+        else:
+            # Assume it's a marker if not a flag
+            marker_args.append(arg)
+    
+    return marker_args, pytest_args
+
+
+def run_pytest_with_execution_plan(marker_args: List[str], pytest_flags: List[str]):
+    """Run pytest after showing execution plan."""
+    # Build pytest marker arguments
+    pytest_marker_args = translate_args_to_pytest_markers(marker_args)
+    
+    # Combine marker args with other pytest flags
+    full_pytest_args = pytest_marker_args + pytest_flags
+    
+    print(f"Check command: {' '.join(marker_args + pytest_flags)}")
+    print(f"Pytest equivalent: pytest {' '.join(full_pytest_args)}")
+    print()
+    
+    # Get execution plan first
+    try:
+        tests = get_pytest_execution_plan(pytest_marker_args)
+        print_execution_plan(tests, full_pytest_args)
+        print()
+        
+        if not tests:
+            print("No tests to run.")
+            return 0
+        
+        # Run pytest with the full arguments
+        print("🚀 Running tests...")
+        print("=" * 60)
+        result = subprocess.run([
+            sys.executable, '-m', 'pytest'
+        ] + full_pytest_args, cwd=Path.cwd())
+        
+        return result.returncode
+        
+    except Exception as e:
+        print(f"Error getting execution plan: {e}")
+        print("Falling back to direct pytest execution...")
+        
+        # Fallback: run pytest directly
+        result = subprocess.run([
+            sys.executable, '-m', 'pytest'
+        ] + full_pytest_args, cwd=Path.cwd())
+        
+        return result.returncode
+
+
 def main():
     """Main entry point for the check wrapper."""
     # Parse arguments (skip script name)
-    check_args = sys.argv[1:]
+    all_args = sys.argv[1:]
     
     # If no args, show usage but also run default
-    if not check_args:
-        print("Usage: python scripts/check.py [test-categories...]")
+    if not all_args:
+        print("Usage: python scripts/check.py [test-categories...] [pytest-flags...]")
         print()
         print("Examples:")
         print("  python scripts/check.py                    # Run check marker (static + unit + integration)")
@@ -234,28 +309,21 @@ def main():
         print("  python scripts/check.py static not vulture # Run static tests except vulture")
         print("  python scripts/check.py unit integration   # Run unit and integration tests")
         print("  python scripts/check.py e2e                # Run end-to-end tests")
+        print("  python scripts/check.py static -x          # Run static tests, stop on first failure")
+        print("  python scripts/check.py unit -v --tb=short # Run unit tests with verbose output")
         print()
         print("Running default 'check' command...")
         print()
-    
-    # Translate to pytest arguments
-    pytest_args = translate_args_to_pytest_markers(check_args)
-    
-    print(f"Check command: {' '.join(check_args)}")
-    print(f"Pytest equivalent: pytest {' '.join(pytest_args)}")
-    print()
-    
-    # Get execution plan
-    try:
-        tests = get_pytest_execution_plan(pytest_args)
-        print_execution_plan(tests, pytest_args)
-    except Exception as e:
-        print(f"Error getting execution plan: {e}")
-        print("Falling back to direct pytest execution...")
         
-        # Fallback: just show what we would run
-        print(f"Would execute: pytest {' '.join(pytest_args)}")
+        # Run default check
+        return run_pytest_with_execution_plan([], [])
+    
+    # Separate marker arguments from pytest flags
+    marker_args, pytest_flags = separate_marker_args_from_pytest_args(all_args)
+    
+    # Run pytest with execution plan
+    return run_pytest_with_execution_plan(marker_args, pytest_flags)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
