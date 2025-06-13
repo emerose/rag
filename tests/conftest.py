@@ -39,6 +39,9 @@ def pytest_configure(config: pytest.Config) -> None:
         "markers", "check: mark test as part of code quality checks (static + unit + integration)"
     )
     config.addinivalue_line(
+        "markers", "all: mark test as part of all tests (static + unit + integration + e2e)"
+    )
+    config.addinivalue_line(
         "markers", "ruff: mark test as ruff static analysis"
     )
     config.addinivalue_line(
@@ -71,6 +74,9 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     
     for item in items:
         test_path = str(item.path)
+        # Add 'all' marker to every test
+        item.add_marker(pytest.mark.all)
+        
         if "/static/" in test_path:
             static_tests.append(item)
             item.add_marker(pytest.mark.static)
