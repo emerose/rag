@@ -63,7 +63,7 @@ def test_golden_set_retrieval_e2e(tmp_path: Path) -> None:
     assert result.documents_loaded > 0, f"No documents loaded during ingestion"
 
     # Verify documents are indexed in DocumentStore
-    document_store = engine.ingestion_pipeline.document_store
+    document_store = engine.document_store
     source_documents = document_store.list_source_documents()
     assert source_documents, "No source documents found after indexing"
 

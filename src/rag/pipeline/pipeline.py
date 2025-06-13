@@ -112,7 +112,9 @@ class Pipeline:
         self.config = config
 
         # Execution control
-        self._executor = ThreadPoolExecutor(max_workers=self.config.concurrent_tasks)
+        self._executor: ThreadPoolExecutor | None = ThreadPoolExecutor(
+            max_workers=self.config.concurrent_tasks
+        )
         self._running = False
         self._paused = False
 
@@ -394,6 +396,10 @@ class Pipeline:
         futures: list[Future[bool]] = []
         for doc in documents:
             if doc.current_state not in (TaskState.COMPLETED, TaskState.CANCELLED):
+                if self._executor is None:
+                    raise RuntimeError(
+                        "Pipeline has been shutdown and cannot process documents"
+                    )
                 future = self._executor.submit(self._process_document, doc.id)
                 futures.append(future)
 
@@ -747,3 +753,26 @@ class Pipeline:
         except Exception as e:
             logger.warning(f"Failed to save vector store: {e}")
             # Don't raise - this is non-critical
+
+    def shutdown(self) -> None:
+        """Shutdown the pipeline and clean up resources."""
+        if hasattr(self, "_executor") and self._executor:
+            self._executor.shutdown(wait=True)
+            self._executor = None
+
+    def __enter__(self) -> Pipeline:
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, _exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:
+        """Context manager exit - clean up resources."""
+        # Parameters are required by context manager protocol but not used
+        self.shutdown()
+
+    def __del__(self) -> None:
+        """Destructor - ensure cleanup on garbage collection."""
+        try:
+            self.shutdown()
+        except Exception:
+            # Ignore exceptions in destructor
+            pass

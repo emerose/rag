@@ -138,7 +138,7 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             assert len(index_results.errors) == 0
 
             # Verify documents are listed as indexed
-            document_store = engine.ingestion_pipeline.document_store
+            document_store = engine.document_store
             source_documents = document_store.list_source_documents()
             # Note: Current pipeline implementation processes files individually
             # So we verify at least one document was processed successfully
@@ -298,7 +298,6 @@ and the DocumentStore system.
             # Test that pipeline components can be created
             pipeline = factory.ingestion_pipeline
             assert pipeline is not None
-            assert hasattr(pipeline, "document_store")
 
             # Test that ingest_manager returns the pipeline
             ingest_manager = factory.ingest_manager
@@ -345,7 +344,7 @@ and the DocumentStore system.
             assert len(results.errors) == 0
 
             # Verify it's indexed
-            document_store1 = engine1.ingestion_pipeline.document_store
+            document_store1 = engine1.document_store
             source_docs1 = document_store1.list_source_documents()
             assert len(source_docs1) == 1
 
@@ -354,7 +353,7 @@ and the DocumentStore system.
             engine2 = factory2.create_rag_engine()
 
             # Should still see the indexed file
-            document_store2 = engine2.ingestion_pipeline.document_store
+            document_store2 = engine2.document_store
             source_docs2 = document_store2.list_source_documents()
             assert len(source_docs2) == 1
             assert source_docs2[0].location == str(test_doc.resolve())

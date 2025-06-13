@@ -114,7 +114,7 @@ class TestPipeline:
     def pipeline(self, fake_components):
         """Create a Pipeline instance with fake dependencies."""
         config = PipelineConfig()
-        return Pipeline(
+        pipeline_instance = Pipeline(
             storage=fake_components["storage"],
             state_transitions=fake_components["transition_service"],
             task_processors={
@@ -123,6 +123,9 @@ class TestPipeline:
             },
             config=config,
         )
+        yield pipeline_instance
+        # Cleanup - ensure ThreadPoolExecutor is shutdown
+        pipeline_instance.shutdown()
 
     def test_start_pipeline(self, pipeline, fake_components):
         """Test starting a new pipeline execution."""
@@ -168,6 +171,7 @@ class TestPipeline:
         assert execution.source_config["recursive"] is True
         assert execution.doc_metadata["initiated_by"] == "test"
 
+    @pytest.mark.timeout(10)  # 10 second timeout for this specific test
     def test_run_successful_pipeline(self, pipeline, fake_components):
         """Test running a pipeline successfully."""
         execution_id = fake_components["execution_id"]
