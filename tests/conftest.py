@@ -38,6 +38,15 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "check: mark test as part of code quality checks (static + unit + integration)"
     )
+    config.addinivalue_line(
+        "markers", "ruff: mark test as ruff static analysis"
+    )
+    config.addinivalue_line(
+        "markers", "pyright: mark test as pyright type checking"
+    )
+    config.addinivalue_line(
+        "markers", "vulture: mark test as vulture dead code detection"
+    )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -66,6 +75,14 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             static_tests.append(item)
             item.add_marker(pytest.mark.static)
             item.add_marker(pytest.mark.check)
+            
+            # Add specific markers for static analysis tools
+            if "ruff" in test_path:
+                item.add_marker(pytest.mark.ruff)
+            elif "pyright" in test_path:
+                item.add_marker(pytest.mark.pyright)
+            elif "vulture" in test_path:
+                item.add_marker(pytest.mark.vulture)
         elif "/unit/" in test_path:
             unit_tests.append(item)
             item.add_marker(pytest.mark.unit)
