@@ -61,6 +61,9 @@ class PipelineConfig:
     # Database configuration
     database_url: str = "sqlite:///pipeline_state.db"
 
+    # Directory configuration
+    data_dir: str | None = None
+
     # Callbacks
     progress_callback: Callable[[dict[str, Any]], None] | None = None
 
@@ -81,7 +84,7 @@ class PipelineExecutionResult:
 @dataclass
 class IngestAllResult:
     """Result of ingest_all operation for E2E test compatibility."""
-    
+
     documents_loaded: int
     documents_stored: int
     errors: list[str]
@@ -312,6 +315,9 @@ class Pipeline:
                 self.transitions.transition_pipeline(
                     execution_id, PipelineState.COMPLETED
                 )
+
+                # Save vector store if the execution completed successfully
+                self._save_vector_store_if_needed()
             elif any(doc.current_state == TaskState.FAILED for doc in documents):
                 # Mark as failed if any documents failed
                 self.transitions.transition_pipeline(
@@ -715,14 +721,11 @@ class Pipeline:
 
         try:
             # Get the documents directory from the document source
-            if (
-                hasattr(self.document_source, "root_path")
-                and self.document_source.root_path
-            ):
-                source_path = str(self.document_source.root_path)
-            else:
-                # Fallback for sources without root_path
-                source_path = "."
+            source_path = "."  # Default fallback
+            if hasattr(self.document_source, "root_path"):
+                root_path = getattr(self.document_source, "root_path", None)
+                if root_path is not None:
+                    source_path = str(root_path)
 
             # Start pipeline execution
             execution_id = self.start(
@@ -733,7 +736,7 @@ class Pipeline:
             result = self.run(execution_id)
 
             # Convert PipelineExecutionResult to IngestAllResult
-            errors = []
+            errors: list[str] = []
             if result.error_message:
                 errors.append(result.error_message)
 
@@ -749,11 +752,42 @@ class Pipeline:
                 documents_loaded=0, documents_stored=0, errors=[str(e)]
             )
 
+    def _save_vector_store_if_needed(self) -> None:
+        """Save the vector store to disk if it has been populated with documents."""
+        try:
+            # Find the VectorStorageProcessor and get its vector store
+            if TaskType.VECTOR_STORAGE in self.processors:
+                vector_processor = self.processors[TaskType.VECTOR_STORAGE]
+                vector_store = getattr(vector_processor, "vector_store", None)
 
-@dataclass
-class IngestAllResult:
-    """Result structure for ingest_all method, matching E2E test expectations."""
+                if vector_store and hasattr(vector_store, "save"):
+                    # Check if we have any documents to save
+                    if hasattr(vector_store, "docstore") and vector_store.docstore:
+                        # Save to the standard location expected by the query engine
+                        from pathlib import Path
 
-    documents_loaded: int
-    documents_stored: int
-    errors: list[str]
+                        # Determine save path - use the pattern from FAISSVectorStoreFactory
+                        if (
+                            hasattr(self, "config")
+                            and hasattr(self.config, "data_dir")
+                            and self.config.data_dir is not None
+                        ):
+                            data_dir = Path(self.config.data_dir)
+                        else:
+                            # Fallback to current directory
+                            data_dir = Path(".")
+
+                        # Create the data directory if it doesn't exist
+                        data_dir.mkdir(parents=True, exist_ok=True)
+
+                        # Save as "workspace" which is the standard name the query engine looks for
+                        vectorstore_path = data_dir / "workspace"
+                        vector_store.save(str(vectorstore_path))
+                        logger.info(f"Saved vector store to {vectorstore_path}")
+                    else:
+                        logger.debug("Vector store is empty, not saving")
+                else:
+                    logger.debug("Vector store does not support saving or is None")
+        except Exception as e:
+            logger.warning(f"Failed to save vector store: {e}")
+            # Don't raise - this is non-critical

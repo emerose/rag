@@ -230,13 +230,8 @@ class RAGComponentsFactory:
             if self.overrides.pipeline is not None:
                 self._pipeline = self.overrides.pipeline
             else:
-                from rag.pipeline_state import PipelineFactory
-
-                # Create pipeline using factory
-                self._pipeline = PipelineFactory.create_default(
-                    config=self.config,
-                    progress_callback=self.runtime.progress_callback,
-                )
+                # Create pipeline with proper vector store integration
+                self._pipeline = self._create_integrated_pipeline()
         return self._pipeline
 
     @property
@@ -370,3 +365,75 @@ class RAGComponentsFactory:
         )
         factory.set_log_callback(self.runtime.log_callback)
         return factory
+
+    def _create_integrated_pipeline(self) -> Any:
+        """Create a pipeline that integrates with the RAG engine's vector store."""
+        from rag.pipeline_state import (
+            Pipeline,
+            PipelineConfig,
+            PipelineStorage,
+            StateTransitionService,
+        )
+        from rag.pipeline_state.models import TaskType
+        from rag.pipeline_state.processors import (
+            ChunkingProcessor,
+            DocumentLoadingProcessor,
+            EmbeddingProcessor,
+            VectorStorageProcessor,
+        )
+
+        # Create pipeline storage with proper database URL
+        pipeline_db_path = Path(self.config.data_dir) / "pipeline_state.db"
+        pipeline_db_url = f"sqlite:///{pipeline_db_path}"
+        storage = PipelineStorage(pipeline_db_url)
+
+        # Create state transition service
+        transitions = StateTransitionService(storage)
+
+        # Create processors that use the factory's components
+        processors = {
+            TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(self.document_source),
+            TaskType.CHUNKING: ChunkingProcessor(self._create_text_splitter_factory()),
+            TaskType.EMBEDDING: EmbeddingProcessor(self.embedding_service),
+            TaskType.VECTOR_STORAGE: VectorStorageProcessor(
+                self.document_store,
+                # Create a vector store that will be saved to the proper location
+                self._create_pipeline_vector_store(),
+            ),
+        }
+
+        # Create pipeline config
+        pipeline_config = PipelineConfig(
+            chunk_size=self.config.chunk_size,
+            chunk_overlap=self.config.chunk_overlap,
+            chunking_strategy="recursive",
+            embedding_model=self.config.embedding_model,
+            embedding_provider="openai",
+            embedding_batch_size=128,
+            vector_store_type=self.config.vectorstore_backend,
+            data_dir=self.config.data_dir,
+            progress_callback=self.runtime.progress_callback,
+        )
+
+        # Create the pipeline
+        return Pipeline(
+            storage=storage,
+            state_transitions=transitions,
+            task_processors=processors,
+            document_source=self.document_source,
+            config=pipeline_config,
+            document_store=self.document_store,
+        )
+
+    def _create_pipeline_vector_store(self) -> Any:
+        """Create a vector store for the pipeline that can be saved and loaded."""
+        # Use the same vector store factory as the query engine
+        vectorstore_factory = self.vectorstore_factory
+
+        # First try to load existing vectorstore
+        existing = vectorstore_factory.load_from_path(str(self.config.data_dir))
+        if existing:
+            return existing
+
+        # Create new empty vectorstore that can be saved
+        return vectorstore_factory.create_empty()
