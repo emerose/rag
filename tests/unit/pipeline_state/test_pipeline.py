@@ -399,7 +399,7 @@ class TestPipeline:
             storage.create_processing_tasks(doc_id, task_configs)
         
         # Create pipeline
-        config = PipelineConfig()
+        config = PipelineConfig(concurrent_tasks=3)
         pipeline = Pipeline(
             storage=storage,
             state_transitions=fake_components["transition_service"],
@@ -410,7 +410,6 @@ class TestPipeline:
             document_source=fake_components["document_source"],
             config=config,
             document_store=None,
-            max_workers=3,
         )
         
         # Test that the pipeline runs and processes multiple documents

@@ -13,14 +13,13 @@ from typing import Any, TypedDict
 
 from rag.pipeline_state.models import PipelineState, ProcessingTask, TaskState, TaskType
 from rag.pipeline_state.processors import TaskProcessor
-
-# PipelineStorage import removed - using PipelineStorageProtocol instead
 from rag.pipeline_state.transitions import (
     PipelineStorageProtocol,
     StateTransitionService,
     StateTransitionServiceProtocol,
 )
 from rag.sources.base import DocumentSourceProtocol
+from rag.storage.protocols import DocumentStoreProtocol
 from rag.utils.logging_utils import get_logger
 
 logger = get_logger()
@@ -100,12 +99,7 @@ class Pipeline:
         task_processors: Mapping[TaskType, TaskProcessor] | None = None,
         document_source: DocumentSourceProtocol | None = None,
         config: PipelineConfig | None = None,
-        document_store: Any = None,
-        # Legacy test compatibility parameters
-        transition_service: StateTransitionServiceProtocol | None = None,
-        processor_factory: Any = None,
-        max_workers: int | None = None,
-        logger: Any = None,
+        document_store: DocumentStoreProtocol | None = None,
     ):
         """Initialize the pipeline.
 
@@ -115,36 +109,22 @@ class Pipeline:
             task_processors: Map of task types to processors
             document_source: Source for loading documents
             config: Pipeline configuration
+            document_store: Document store for metadata persistence
         """
         self.storage = storage
-
-        # Handle both new and legacy parameter styles
-        if state_transitions:
-            self.transitions = state_transitions
-        elif transition_service:
-            self.transitions = transition_service
-        else:
-            self.transitions = StateTransitionService(storage)
-
+        self.transitions = state_transitions or StateTransitionService(storage)
         self.processors = task_processors or {}
         self.document_source = document_source
         self.config = config or PipelineConfig()
         self._document_store = document_store
 
-        # For test compatibility
-        if processor_factory:
-            self.processor_factory = processor_factory
-        if logger:
-            self.logger = logger
-
         # Execution control
-        max_concurrent = max_workers or getattr(self.config, "concurrent_tasks", 10)
-        self._executor = ThreadPoolExecutor(max_workers=max_concurrent)
+        self._executor = ThreadPoolExecutor(max_workers=self.config.concurrent_tasks)
         self._running = False
         self._paused = False
 
     @property
-    def document_store(self) -> Any:
+    def document_store(self) -> DocumentStoreProtocol | None:
         """Access to document store for backward compatibility."""
         return self._document_store
 
@@ -544,15 +524,11 @@ class Pipeline:
             )
 
         try:
-            # Get processor (handle both direct processor map and factory)
-            processor = None
-            if hasattr(self, "processor_factory") and self.processor_factory:
-                processor = self.processor_factory.create_processor(task.task_type)
-            elif task.task_type in self.processors:
-                processor = self.processors[task.task_type]
-
-            if not processor:
+            # Get processor from the processors mapping
+            if task.task_type not in self.processors:
                 raise ValueError(f"No processor for task type {task.task_type}")
+
+            processor = self.processors[task.task_type]
 
             # Prepare input data for the task
             # Always try real input preparation first, fall back if it fails

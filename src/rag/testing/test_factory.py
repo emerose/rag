@@ -196,14 +196,12 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         from rag.pipeline_state.fakes import (
             FakeDocumentSource,
             FakePipelineStorage,
-            FakeProcessorFactory,
             FakeStateTransitionService,
         )
         from rag.pipeline_state.pipeline import Pipeline
 
         fake_storage = FakePipelineStorage()
         fake_transition_service = FakeStateTransitionService(fake_storage)
-        fake_processor_factory = FakeProcessorFactory()
         fake_document_source = FakeDocumentSource()
 
         # Convert RAGConfig to PipelineConfig if needed
@@ -221,8 +219,8 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
         fake_pipeline = Pipeline(
             storage=fake_storage,
-            transition_service=fake_transition_service,
-            processor_factory=fake_processor_factory,
+            state_transitions=fake_transition_service,
+            task_processors={},  # Empty processors for basic fake
             document_source=fake_document_source,
             config=pipeline_config,
         )
