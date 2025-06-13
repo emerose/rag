@@ -445,7 +445,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 storage=fake_storage,
                 state_transitions=fake_transition_service,
                 task_processors=real_processors,  # Use real processors
-                document_source=factory._document_source,
+                document_source=cast(DocumentSourceProtocol, factory._document_source),
                 config=pipeline_config,
                 document_store=factory._document_store,  # Pass real document store
             )
@@ -536,7 +536,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 storage=fake_storage,
                 state_transitions=fake_transition_service,
                 task_processors=real_processors,  # Use real processors
-                document_source=factory._document_source,
+                document_source=cast(DocumentSourceProtocol, factory._document_source),
                 config=pipeline_config,
                 document_store=factory._document_store,  # Pass real document store
             )

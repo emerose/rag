@@ -15,7 +15,6 @@ from rag.pipeline_state.models import PipelineState, ProcessingTask, TaskState, 
 from rag.pipeline_state.processors import TaskProcessor
 from rag.pipeline_state.transitions import (
     PipelineStorageProtocol,
-    StateTransitionService,
     StateTransitionServiceProtocol,
 )
 from rag.sources.base import DocumentSourceProtocol
@@ -95,10 +94,10 @@ class Pipeline:
     def __init__(  # noqa: PLR0913
         self,
         storage: PipelineStorageProtocol,
-        state_transitions: StateTransitionServiceProtocol | None = None,
-        task_processors: Mapping[TaskType, TaskProcessor] | None = None,
-        document_source: DocumentSourceProtocol | None = None,
-        config: PipelineConfig | None = None,
+        state_transitions: StateTransitionServiceProtocol,
+        task_processors: Mapping[TaskType, TaskProcessor],
+        document_source: DocumentSourceProtocol,
+        config: PipelineConfig,
         document_store: DocumentStoreProtocol | None = None,
     ):
         """Initialize the pipeline.
@@ -109,13 +108,13 @@ class Pipeline:
             task_processors: Map of task types to processors
             document_source: Source for loading documents
             config: Pipeline configuration
-            document_store: Document store for metadata persistence
+            document_store: Document store for metadata persistence (optional)
         """
         self.storage = storage
-        self.transitions = state_transitions or StateTransitionService(storage)
-        self.processors = task_processors or {}
+        self.transitions = state_transitions
+        self.processors = task_processors
         self.document_source = document_source
-        self.config = config or PipelineConfig()
+        self.config = config
         self._document_store = document_store
 
         # Execution control
