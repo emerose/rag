@@ -17,5 +17,5 @@ fi
 # Show Python version for debugging
 python --version
 
-# Delegate to the Python check command
-exec python scripts/run_tests.py check 
+# Delegate to the new check command
+exec python scripts/check 

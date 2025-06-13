@@ -46,7 +46,7 @@
    - **New tasks**: Add new tasks without GitHub issue numbers. Use format: `- **Task title** – Task description` or `- [P2] **Task title** – Task description` for priority tasks. The sync system will automatically create GitHub issues and add issue numbers.
    - **Never manually add issue numbers** like `[#123]` to new tasks. Let the sync system handle GitHub integration.
  - **CHANGELOG.md**: Documents all notable changes to the project
- - **check.sh**: Script to run tests, formatting, and linting checks
+ - **scripts/check**: Script to run tests, formatting, and linting checks
 
 ## Task Workflow
 1. Create a new feature branch with appropriate naming: `git checkout -b feature/descriptive-name`
@@ -56,7 +56,7 @@
 5. If approved, begin implementation, checking off individual steps in TODO.md as they're completed
 6. Make small, focused commits with conventional commit messages following the format in the Git Best Practices section
 7. Run tests often and fix errors as they arise
-8. When the task is complete, run check.sh to ensure no errors or linting problems
+8. When the task is complete, run scripts/check to ensure no errors or linting problems
 9. Run integration tests to verify end-to-end functionality
 10. Remove completed tasks from TODO.md and update CHANGELOG.md with the changes
 11. Update documentation to reflect your changes before marking the task complete
@@ -173,7 +173,7 @@ def test_internal_method_calls():
 - **CLI**: The RAG CLI can be run directly when the virtual environment is active.
 - **Dependencies**: Add new dependencies to pyproject.toml, not manually with pip.
 - **Formatting & Linting**: Use ruff for both formatting and linting.
-- **Checks**: Run `./check.sh` before committing changes to ensure code quality.
+- **Checks**: Run `scripts/check` before committing changes to ensure code quality.
 - **Python Version**: Target Python 3.10+ for all new features.
 - **Version Control**: Keep .coverage and other generated files out of git.
 

@@ -450,10 +450,11 @@ python -m pytest -n auto
 ### Project-Specific Test Runners
 
 ```bash
-# Custom test runners for convenience
-python tests/run_tests.py           # Unit tests only
-python tests/run_integration_tests.py  # Integration tests
-./check.sh                          # All quality checks including tests
+# Test execution commands
+scripts/check unit                  # Unit tests only
+scripts/check integration           # Integration tests only
+scripts/check                       # All quality checks including tests (static + unit + integration)
+./check.sh                          # Wrapper script that calls scripts/check
 ```
 
 ### Pytest Configuration

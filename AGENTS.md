@@ -8,7 +8,7 @@ This repository welcomes contributions from AI-based tools. When acting as an ag
    - `.cursorrules` for detailed coding standards and commit conventions
    - `docs/source/testing.md` for testing requirements and patterns
    - `CLAUDE.md` for architecture patterns and development workflow
-2. **Run `./check.sh`** after making changes. This script formats the code, lints it and runs the unit tests.
+2. **Run `scripts/check`** after making changes. This script formats the code, lints it and runs the unit tests.
 3. **Keep commits atomic** and use the conventional commit style described in `.cursorrules`.
 4. **Do not introduce external dependencies** without updating `pyproject.toml`.
 5. **Write tests for your changes** whenever feasible, especially for bug or regression fixes.
@@ -18,7 +18,7 @@ This repository welcomes contributions from AI-based tools. When acting as an ag
 9. **Keep contributor docs aligned** – update `.cursorrules`, `AGENTS.md`, and `CONTRIBUTING.md` together when guidelines change.
 10. **Use `uv run`** to ensure the project's virtual environment is active when
     running scripts or commands.
-11. **Use `--full-output`** with `scripts/run_tests.py` to see detailed logs
+11. **Use `-v --tb=short`** with `scripts/check` to see detailed logs
     when debugging failing checks.
 
 ## Code Quality Expectations

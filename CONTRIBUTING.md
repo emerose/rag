@@ -31,13 +31,13 @@ Run the full quality assurance suite before committing changes:
 ```bash
 ./check.sh
 ```
-This script formats the code, runs the linter, and executes the unit tests via `tests/run_tests.py`.
+This script formats the code, runs the linter, and executes the unit tests via `scripts/check`.
 
 ### Network isolation
 
 Unit tests run with network access disabled using `pytest-socket`. If a test
 needs network access, mark it with `@pytest.mark.integration` and run it via
-`tests/run_integration_tests.py`.
+`scripts/check integration`.
 
 ## Development Guidelines
 

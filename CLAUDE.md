@@ -18,35 +18,30 @@ source .venv/bin/activate
 # Run all quality checks (tests, formatting, linting)
 ./check.sh
 
-# Or use the Python command directly
-python scripts/run_tests.py check
+# Or use the check command directly
+scripts/check
 
-# Run tests only (excluding integration tests)
-python tests/run_tests.py
+# Run specific test groups
+scripts/check static              # Run static analysis only
+scripts/check unit               # Run unit tests only
+scripts/check integration        # Run integration tests only
+scripts/check static not vulture # Run static analysis except vulture
+scripts/check unit integration   # Run unit and integration tests
 
-# Run specific test files
+# Run with pytest flags
+scripts/check static -x          # Stop on first failure
+scripts/check unit -v --tb=short # Verbose output with short traceback
+
+# Direct pytest usage
 pytest tests/unit/test_engine.py -v
+pytest -m "static"               # Run static analysis tests
+pytest -m "unit or integration"  # Run unit and integration tests
 
-# Format code
+# Individual tools (if needed)
 ruff format src/ --line-length 88
-
-# Lint and auto-fix
 ruff check src/rag --fix --line-length 88
-
-# Linting and formatting only (ruff)
-python scripts/run_tests.py lint
-
-# Type checking (no baseline limit) 
-python scripts/run_tests.py typecheck
-
-# Type checking (direct pyright)
 pyright src/rag
-
-# Dead code detection
-python scripts/run_tests.py vulture
-
-# All static analysis (ruff + pyright + vulture)
-python scripts/run_tests.py static
+vulture --config vulture.toml
 ```
 
 ### RAG CLI Usage
@@ -230,7 +225,7 @@ Types: feat, fix, docs, style, refactor, test, chore
 ### Workflow Memory
 - When wrapping up a task, please update TODO.md by removing the tasks you have completed
 
-- Always run check.sh before staging a commit
+- Always run scripts/check before staging a commit
 
 ## Development Best Practices
 
