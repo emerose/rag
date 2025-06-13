@@ -48,15 +48,17 @@ class PipelineStorage:
                 # Enable foreign key constraints for SQLite
                 "isolation_level": None,  # Autocommit mode
             }
-        
+
         self.engine = create_engine(database_url, connect_args=connect_args)
-        
+
         # Enable foreign key constraints for SQLite
         if database_url.startswith("sqlite"):
             from sqlalchemy import event
-            
+
             @event.listens_for(self.engine, "connect")
-            def enable_foreign_keys(dbapi_connection: Any, connection_record: Any) -> None:
+            def enable_foreign_keys(
+                dbapi_connection: Any, connection_record: Any
+            ) -> None:
                 cursor = dbapi_connection.cursor()
                 cursor.execute("PRAGMA foreign_keys=ON")
                 cursor.close()
@@ -562,14 +564,14 @@ class PipelineStorage:
             session.add(task)
 
             # Create task-specific details
-            self._create_task_details(
-                session, task_id, task_type, task_config or {}
-            )
+            self._create_task_details(session, task_id, task_type, task_config or {})
 
             session.commit()
             return task_id
 
-    def get_documents_for_execution(self, execution_id: str) -> list[DocumentProcessing]:
+    def get_documents_for_execution(
+        self, execution_id: str
+    ) -> list[DocumentProcessing]:
         """Alias for get_pipeline_documents (for test compatibility)."""
         return self.get_pipeline_documents(execution_id)
 
