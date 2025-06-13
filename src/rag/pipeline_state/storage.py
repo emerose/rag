@@ -57,7 +57,7 @@ class PipelineStorage:
 
             @event.listens_for(self.engine, "connect")
             def enable_foreign_keys(
-                dbapi_connection: Any, connection_record: Any
+                dbapi_connection: Any, _connection_record: Any
             ) -> None:
                 cursor = dbapi_connection.cursor()
                 cursor.execute("PRAGMA foreign_keys=ON")
@@ -544,7 +544,6 @@ class PipelineStorage:
         sequence_number: int,
         task_config: dict[str, Any] | None = None,
         depends_on_task_id: str | None = None,
-        max_retries: int = 3,
     ) -> str:
         """Create a single processing task (for test compatibility)."""
         with self.get_session() as session:
@@ -559,7 +558,7 @@ class PipelineStorage:
                 depends_on_task_id=depends_on_task_id,
                 created_at=datetime.now(UTC),
                 task_config=task_config or {},
-                max_retries=max_retries,
+                max_retries=3,
             )
             session.add(task)
 
@@ -608,6 +607,6 @@ class PipelineStorage:
         """Enter context manager."""
         return self
 
-    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+    def __exit__(self, _exc_type: Any, _exc_val: Any, _exc_tb: Any) -> None:
         """Exit context manager."""
         pass

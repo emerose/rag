@@ -230,3 +230,8 @@ Types: feat, fix, docs, style, refactor, test, chore
 ## Development Best Practices
 
 - Always use parameterized SQL queries. Don't interpolate values directly
+
+## Workflow Memories
+- whenever you edit a file, run pyright on the file after making your changes. fix any type errors that appear before moving on.
+- in all new code, include full type signatures unless you are certain the type signature is unambiguous
+- avoid the Any type, and avoid returning None where possible

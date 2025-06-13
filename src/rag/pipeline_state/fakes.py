@@ -922,7 +922,7 @@ class FakeDocumentStore:
         return source_docs
 
     # Additional methods for DocumentStoreProtocol compatibility
-    def compute_file_hash(self, file_path) -> str:
+    def compute_file_hash(self, file_path: str) -> str:
         """Compute file hash."""
         content = str(file_path).encode("utf-8")
         return hashlib.sha256(content).hexdigest()
@@ -931,27 +931,27 @@ class FakeDocumentStore:
         """Compute text hash."""
         return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
-    def needs_reindexing(self, *args, **kwargs) -> bool:
+    def needs_reindexing(self, *args: Any, **kwargs: Any) -> bool:
         """Check if reindexing is needed (always False for testing)."""
         return False
 
-    def update_metadata(self, metadata) -> None:
+    def update_metadata(self, metadata: dict[str, Any]) -> None:
         """Update metadata."""
         pass
 
-    def get_metadata(self, file_path) -> dict[str, Any] | None:
+    def get_metadata(self, file_path: str) -> dict[str, Any] | None:
         """Get metadata."""
         return {"fake": "metadata"}
 
-    def remove_metadata(self, file_path) -> None:
+    def remove_metadata(self, file_path: str) -> None:
         """Remove metadata."""
         pass
 
-    def update_chunk_hashes(self, file_path, chunk_hashes: list[str]) -> None:
+    def update_chunk_hashes(self, file_path: str, chunk_hashes: list[str]) -> None:
         """Update chunk hashes."""
         pass
 
-    def get_chunk_hashes(self, file_path) -> list[str]:
+    def get_chunk_hashes(self, file_path: str) -> list[str]:
         """Get chunk hashes."""
         return []
 
@@ -959,7 +959,7 @@ class FakeDocumentStore:
         """Update file metadata."""
         pass
 
-    def get_file_metadata(self, file_path) -> dict[str, Any] | None:
+    def get_file_metadata(self, file_path: str) -> dict[str, Any] | None:
         """Get file metadata."""
         return {"fake": "file_metadata"}
 
