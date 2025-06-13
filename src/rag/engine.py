@@ -170,8 +170,8 @@ class RAGEngine:
             # Start a new pipeline execution with the discovered documents
             execution_id = self.pipeline.start(
                 documents=documents,
-                metadata={"initiated_by": "index_directory"},
-                source_metadata={
+                metadata={
+                    "initiated_by": "index_directory",
                     "source_type": type(self._document_source).__name__,
                     "path": str(directory_path),
                 },
@@ -259,8 +259,6 @@ class RAGEngine:
                 metadata={
                     "initiated_by": "index_file",
                     "target_file": str(file_path),
-                },
-                source_metadata={
                     "source_type": type(self._document_source).__name__,
                     "path": str(file_path),
                 },

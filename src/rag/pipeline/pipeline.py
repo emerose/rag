@@ -98,38 +98,27 @@ class Pipeline:
     def start(
         self,
         documents: list[SourceDocument],
-        document_configs: dict[str, dict[str, Any]] | None = None,
         metadata: dict[str, Any] | None = None,
-        source_metadata: dict[str, Any] | None = None,
     ) -> str:
         """Start a new pipeline execution with a collection of documents.
 
         Args:
             documents: List of SourceDocument objects to process
-            document_configs: Optional per-document processing configurations
             metadata: Optional execution metadata
-            source_metadata: Optional metadata about the document source
 
         Returns:
             Execution ID
         """
-        # Prepare source information from metadata
-        source_type = (source_metadata or {}).get("source_type", "collection")
-        source_config = (source_metadata or {}).copy()
-
-        # Create execution
+        # Create execution with simplified interface
         execution_id = self.storage.create_pipeline_execution(
-            source_type=source_type,
-            source_config=source_config,
+            source_type="collection",
+            source_config={},
             metadata=metadata,
         )
 
         # Create document processing records with pre-loaded content
         for source_doc in documents:
-            # Get document-specific config if provided
-            doc_config = (document_configs or {}).get(source_doc.source_id, {})
-
-            # Build processing config with document content and any processor overrides
+            # Build processing config with document content
             processing_config = {
                 # Pre-loaded document content and metadata
                 "preloaded_content": source_doc.content,
@@ -138,8 +127,6 @@ class Pipeline:
                 "source_metadata": source_doc.metadata,
                 "content_hash": self._compute_content_hash(source_doc.content),
                 "size_bytes": len(source_doc.get_content_as_bytes()),
-                # Store document-specific processor config overrides for future factory use
-                "processor_overrides": doc_config,
             }
 
             # Create document processing record
@@ -378,11 +365,6 @@ class Pipeline:
         content_type = processing_config.get("content_type", "text/plain")
         source_path = processing_config.get("source_path", source_id)
         metadata = processing_config.get("source_metadata", {})
-
-        # Add processor overrides to metadata for potential factory use
-        processor_overrides = processing_config.get("processor_overrides", {})
-        if processor_overrides:
-            metadata = {**metadata, "processor_overrides": processor_overrides}
 
         return SourceDocument(
             source_id=source_id,

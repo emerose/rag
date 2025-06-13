@@ -127,8 +127,10 @@ NLP focuses on the interaction between computers and human language.
             # Index documents using standard pipeline interface
             execution_id = engine.pipeline.start(
                 documents=discovered_documents,
-                metadata={"initiated_by": "test_complete_rag_workflow"},
-                source_metadata={"source_type": "collection"},
+                metadata={
+                    "initiated_by": "test_complete_rag_workflow",
+                    "source_type": "collection",
+                },
             )
             pipeline_result = engine.pipeline.run(execution_id)
 
@@ -204,8 +206,10 @@ NLP focuses on the interaction between computers and human language.
             # Index documents using standard pipeline interface
             execution_id = engine.pipeline.start(
                 documents=discovered_documents,
-                metadata={"initiated_by": "test_incremental_indexing"},
-                source_metadata={"source_type": "collection"},
+                metadata={
+                    "initiated_by": "test_incremental_indexing",
+                    "source_type": "collection",
+                },
             )
             pipeline_result = engine.pipeline.run(execution_id)
             assert pipeline_result.total_documents == 1
@@ -222,8 +226,10 @@ NLP focuses on the interaction between computers and human language.
             # Index documents using standard pipeline interface
             execution_id = engine.pipeline.start(
                 documents=discovered_documents,
-                metadata={"initiated_by": "test_incremental_indexing"},
-                source_metadata={"source_type": "collection"},
+                metadata={
+                    "initiated_by": "test_incremental_indexing",
+                    "source_type": "collection",
+                },
             )
             pipeline_result = engine.pipeline.run(execution_id)
             assert pipeline_result.total_documents == 1  # Same document re-processed
@@ -265,8 +271,10 @@ NLP focuses on the interaction between computers and human language.
             # Index documents using standard pipeline interface
             execution_id = engine.pipeline.start(
                 documents=discovered_documents,
-                metadata={"initiated_by": "test_incremental_indexing"},
-                source_metadata={"source_type": "collection"},
+                metadata={
+                    "initiated_by": "test_incremental_indexing",
+                    "source_type": "collection",
+                },
             )
             pipeline_result = engine.pipeline.run(execution_id)
             assert pipeline_result.total_documents == 3
@@ -350,8 +358,10 @@ NLP focuses on the interaction between computers and human language.
             # Try to index empty document list using standard pipeline interface
             execution_id = engine_empty.pipeline.start(
                 documents=discovered_documents_empty,
-                metadata={"initiated_by": "test_query_with_empty_index"},
-                source_metadata={"source_type": "collection"},
+                metadata={
+                    "initiated_by": "test_query_with_empty_index",
+                    "source_type": "collection",
+                },
             )
             pipeline_result = engine_empty.pipeline.run(execution_id)
 
@@ -397,8 +407,10 @@ NLP focuses on the interaction between computers and human language.
             # Index documents using standard pipeline interface
             execution_id1 = engine1.pipeline.start(
                 documents=discovered_documents1,
-                metadata={"initiated_by": "test_persistence_across_engine_restarts"},
-                source_metadata={"source_type": "collection"},
+                metadata={
+                    "initiated_by": "test_persistence_across_engine_restarts",
+                    "source_type": "collection",
+                },
             )
             pipeline_result1 = engine1.pipeline.run(execution_id1)
             assert pipeline_result1.total_documents == 1

@@ -62,8 +62,10 @@ def test_golden_set_retrieval_e2e(tmp_path: Path) -> None:
     # Index documents using standard pipeline interface
     execution_id = engine.pipeline.start(
         documents=discovered_documents,
-        metadata={"initiated_by": "test_golden_set_retrieval"},
-        source_metadata={"source_type": "collection"},
+        metadata={
+            "initiated_by": "test_golden_set_retrieval",
+            "source_type": "collection",
+        },
     )
     pipeline_result = engine.pipeline.run(execution_id)
     

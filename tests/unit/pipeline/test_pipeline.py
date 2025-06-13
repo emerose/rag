@@ -148,11 +148,11 @@ class TestPipeline:
         
         execution_id = pipeline.start(
             documents=documents,
-            metadata={"initiated_by": "test"},
-            source_metadata={
-                "source_type": "filesystem", 
+            metadata={
+                "initiated_by": "test",
+                "source_type": "filesystem",
                 "path": "/test/docs",
-                "recursive": True
+                "recursive": True,
             }
         )
         
@@ -163,10 +163,11 @@ class TestPipeline:
         # Check that execution was created in storage
         execution = fake_components["storage"].get_pipeline_execution(execution_id)
         assert execution.state == PipelineState.CREATED
-        assert execution.source_type == "filesystem"
-        assert execution.source_config["path"] == "/test/docs"
-        assert execution.source_config["recursive"] is True
+        assert execution.source_type == "collection"  # Now hardcoded
+        assert execution.source_config == {}  # Now empty
         assert execution.doc_metadata["initiated_by"] == "test"
+        assert execution.doc_metadata["source_type"] == "filesystem"
+        assert execution.doc_metadata["path"] == "/test/docs"
 
     @pytest.mark.timeout(10)  # 10 second timeout for this specific test
     def test_run_successful_pipeline(self, pipeline, fake_components):

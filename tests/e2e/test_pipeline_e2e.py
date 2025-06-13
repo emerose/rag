@@ -132,8 +132,10 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             # Process the discovered documents using standard pipeline interface
             execution_id = engine.pipeline.start(
                 documents=discovered_documents,
-                metadata={"initiated_by": "test_complete_workflow"},
-                source_metadata={"source_type": "collection"},
+                metadata={
+                    "initiated_by": "test_complete_workflow",
+                    "source_type": "collection",
+                },
             )
             pipeline_result = engine.pipeline.run(execution_id)
 
@@ -229,8 +231,10 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             # Try to process discovered documents using standard pipeline interface
             execution_id = engine.pipeline.start(
                 documents=discovered_documents,
-                metadata={"initiated_by": "test_pipeline_error_handling"},
-                source_metadata={"source_type": "collection"},
+                metadata={
+                    "initiated_by": "test_pipeline_error_handling",
+                    "source_type": "collection",
+                },
             )
             pipeline_result = engine.pipeline.run(execution_id)
 
@@ -352,8 +356,10 @@ and the DocumentStore system.
             # Index documents using standard pipeline interface
             execution_id1 = engine1.pipeline.start(
                 documents=discovered_documents1,
-                metadata={"initiated_by": "test_pipeline_persistence_across_restarts"},
-                source_metadata={"source_type": "collection"},
+                metadata={
+                    "initiated_by": "test_pipeline_persistence_across_restarts",
+                    "source_type": "collection",
+                },
             )
             pipeline_result1 = engine1.pipeline.run(execution_id1)
             
