@@ -8,6 +8,7 @@ from typing import Any, Protocol, runtime_checkable
 from langchain_core.documents import Document
 
 from .metadata import DocumentMetadata, FileMetadata
+from .source_metadata import SourceDocumentMetadata
 
 
 @runtime_checkable
@@ -388,5 +389,21 @@ class DocumentStoreProtocol(Protocol):
             document_id: ID of the document chunk
             source_id: ID of the source document
             chunk_order: Order of this chunk within the source
+        """
+        ...
+
+    def list_source_documents(self) -> list[SourceDocumentMetadata]:
+        """List all source documents.
+
+        Returns:
+            List of source document metadata
+        """
+        ...
+
+    def remove_source_document(self, source_id: str) -> None:
+        """Remove a source document and all its associated chunks.
+
+        Args:
+            source_id: ID of the source document to remove
         """
         ...

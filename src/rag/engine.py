@@ -320,6 +320,9 @@ class RAGEngine:
         try:
             # Remove from DocumentStore
             document_store = self.ingestion_pipeline.document_store
+            if document_store is None:
+                logger.error("Document store is not available")
+                return
             document_store.remove_source_document(str(file_path))
 
             # No additional cleanup needed - document_store handles everything
@@ -347,6 +350,9 @@ class RAGEngine:
         try:
             # Get source documents from DocumentStore
             document_store = self.ingestion_pipeline.document_store
+            if document_store is None:
+                logger.error("Document store is not available")
+                return []
             source_documents = document_store.list_source_documents()
             if not source_documents:
                 return []
