@@ -1,0 +1,1 @@
+"""Static analysis tests that run before unit tests."""
