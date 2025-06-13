@@ -123,7 +123,6 @@ class TestPipeline:
             },
             document_source=fake_components["document_source"],
             config=config,
-            document_store=None,
         )
 
     def test_start_pipeline(self, pipeline, fake_components):
@@ -239,7 +238,6 @@ class TestPipeline:
             },
             document_source=failing_document_source,
             config=config,
-            document_store=None,
         )
         
         # Get the document and process it
@@ -294,7 +292,6 @@ class TestPipeline:
             task_processors={},  # Empty processors dict will cause key error
             document_source=fake_components["document_source"],
             config=config,
-            document_store=None,
         )
         
         # Get a task to process
@@ -409,7 +406,6 @@ class TestPipeline:
             },
             document_source=fake_components["document_source"],
             config=config,
-            document_store=None,
         )
         
         # Test that the pipeline runs and processes multiple documents
@@ -450,7 +446,6 @@ class TestPipeline:
             },
             document_source=fake_components["document_source"],
             config=config,
-            document_store=None,
         )
         
         result = broken_pipeline.run(execution_id)

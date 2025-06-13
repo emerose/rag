@@ -422,7 +422,6 @@ class RAGComponentsFactory:
             task_processors=processors,
             document_source=self.document_source,
             config=pipeline_config,
-            document_store=self.document_store,
         )
 
     def _create_pipeline_vector_store(self) -> Any:

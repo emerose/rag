@@ -18,7 +18,6 @@ from rag.pipeline.transitions import (
     StateTransitionServiceProtocol,
 )
 from rag.sources.base import DocumentSourceProtocol
-from rag.storage.protocols import DocumentStoreProtocol
 from rag.utils.logging_utils import get_logger
 
 logger = get_logger()
@@ -91,14 +90,13 @@ class IngestAllResult:
 class Pipeline:
     """Main pipeline orchestrator with state machine support."""
 
-    def __init__(  # noqa: PLR0913
+    def __init__(
         self,
         storage: PipelineStorageProtocol,
         state_transitions: StateTransitionServiceProtocol,
         task_processors: Mapping[TaskType, TaskProcessor],
         document_source: DocumentSourceProtocol,
         config: PipelineConfig,
-        document_store: DocumentStoreProtocol | None = None,
     ):
         """Initialize the pipeline.
 
@@ -108,24 +106,17 @@ class Pipeline:
             task_processors: Map of task types to processors
             document_source: Source for loading documents
             config: Pipeline configuration
-            document_store: Document store for metadata persistence (optional)
         """
         self.storage = storage
         self.transitions = state_transitions
         self.processors = task_processors
         self.document_source = document_source
         self.config = config
-        self._document_store = document_store
 
         # Execution control
         self._executor = ThreadPoolExecutor(max_workers=self.config.concurrent_tasks)
         self._running = False
         self._paused = False
-
-    @property
-    def document_store(self) -> DocumentStoreProtocol | None:
-        """Access to document store for backward compatibility."""
-        return self._document_store
 
     def start(
         self,

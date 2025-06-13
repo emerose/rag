@@ -447,7 +447,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 task_processors=real_processors,  # Use real processors
                 document_source=cast(DocumentSourceProtocol, factory._document_source),
                 config=pipeline_config,
-                document_store=factory._document_store,  # Pass real document store
             )
             factory._pipeline = real_pipeline
         else:
@@ -538,7 +537,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 task_processors=real_processors,  # Use real processors
                 document_source=cast(DocumentSourceProtocol, factory._document_source),
                 config=pipeline_config,
-                document_store=factory._document_store,  # Pass real document store
             )
             factory._pipeline = real_pipeline
 

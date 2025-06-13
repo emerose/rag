@@ -319,7 +319,7 @@ class RAGEngine:
         """
         try:
             # Remove from DocumentStore
-            document_store = self.ingestion_pipeline.document_store
+            document_store = self.document_store
             if document_store is None:
                 logger.error("Document store is not available")
                 return
@@ -349,7 +349,7 @@ class RAGEngine:
         """
         try:
             # Get source documents from DocumentStore
-            document_store = self.ingestion_pipeline.document_store
+            document_store = self.document_store
             if document_store is None:
                 logger.error("Document store is not available")
                 return []

@@ -56,7 +56,7 @@ class RAGMCPServer(FastMCP):
     def _get_indexed_files(self) -> list[dict[str, Any]]:
         """Get list of indexed files from the document store."""
         try:
-            document_store = self.engine.ingestion_pipeline.document_store
+            document_store = self.engine.document_store
             if document_store is None:
                 logger.error("Document store is not available")
                 return []

@@ -951,7 +951,7 @@ def list_documents(
         rag_engine = create_rag_engine(config, runtime_options)
 
         # Get source documents from DocumentStore
-        document_store = rag_engine.ingestion_pipeline.document_store
+        document_store = rag_engine.document_store
         if document_store is None:
             logger.error("Document store is not available")
             return
@@ -1074,7 +1074,7 @@ def _initialize_rag_engine(runtime_options: RuntimeOptions | None = None) -> RAG
 
 def _load_vectorstore(rag_engine: RAGEngine) -> None:
     """Load vectorstore into the RAG engine."""
-    document_store = rag_engine.ingestion_pipeline.document_store
+    document_store = rag_engine.document_store
     if document_store is None:
         logger.error("Document store is not available")
         return
