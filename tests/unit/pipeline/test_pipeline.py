@@ -121,17 +121,39 @@ class TestPipeline:
                 task_type: fake_components["processor_factory"].create_processor(task_type)
                 for task_type in TaskType
             },
-            document_source=fake_components["document_source"],
             config=config,
         )
 
     def test_start_pipeline(self, pipeline, fake_components):
         """Test starting a new pipeline execution."""
+        # Create mock SourceDocument objects
+        from rag.sources.base import SourceDocument
+        
+        documents = [
+            SourceDocument(
+                source_id="doc1.txt",
+                content="This is the content of document 1.",
+                content_type="text/plain",
+                source_path="/test/docs/doc1.txt",
+                metadata={"file_type": "text"}
+            ),
+            SourceDocument(
+                source_id="doc2.txt",
+                content="This is the content of document 2.",
+                content_type="text/plain",
+                source_path="/test/docs/doc2.txt",
+                metadata={"file_type": "text"}
+            )
+        ]
+        
         execution_id = pipeline.start(
-            source_path="/test/docs",
-            source_type="filesystem",
-            source_config={"recursive": True},
-            metadata={"initiated_by": "test"}
+            documents=documents,
+            metadata={"initiated_by": "test"},
+            source_metadata={
+                "source_type": "filesystem", 
+                "path": "/test/docs",
+                "recursive": True
+            }
         )
         
         # Should return a valid execution ID
@@ -236,7 +258,6 @@ class TestPipeline:
                 task_type: failing_processor_factory.create_processor(task_type)
                 for task_type in TaskType
             },
-            document_source=failing_document_source,
             config=config,
         )
         
@@ -290,7 +311,6 @@ class TestPipeline:
             storage=fake_components["storage"],
             state_transitions=fake_components["transition_service"],
             task_processors={},  # Empty processors dict will cause key error
-            document_source=fake_components["document_source"],
             config=config,
         )
         
@@ -404,7 +424,6 @@ class TestPipeline:
                 task_type: fake_components["processor_factory"].create_processor(task_type)
                 for task_type in TaskType
             },
-            document_source=fake_components["document_source"],
             config=config,
         )
         
@@ -444,7 +463,6 @@ class TestPipeline:
                 task_type: fake_components["processor_factory"].create_processor(task_type)
                 for task_type in TaskType
             },
-            document_source=fake_components["document_source"],
             config=config,
         )
         

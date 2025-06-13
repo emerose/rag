@@ -115,7 +115,16 @@ NLP focuses on the interaction between computers and human language.
             engine = factory.create_rag_engine()
 
             # Step 1: Index all documents
-            index_results = engine.ingestion_pipeline.ingest_all()
+            # First discover documents from the directory
+            document_source = engine.document_source
+            document_ids = document_source.list_documents()
+            discovered_documents = []
+            for doc_id in document_ids:
+                source_doc = document_source.get_document(doc_id)
+                if source_doc:
+                    discovered_documents.append(source_doc)
+            
+            index_results = engine.ingestion_pipeline.ingest_all(discovered_documents)
 
             # Verify indexing succeeded
             assert index_results.documents_loaded == 3  # 3 documents
@@ -177,7 +186,16 @@ NLP focuses on the interaction between computers and human language.
                 "This document contains test content for data clearing testing."
             )
 
-            results = engine.ingestion_pipeline.ingest_all()
+            # Discover and index documents
+            document_source = engine.document_source
+            document_ids = document_source.list_documents()
+            discovered_documents = []
+            for doc_id in document_ids:
+                source_doc = document_source.get_document(doc_id)
+                if source_doc:
+                    discovered_documents.append(source_doc)
+            
+            results = engine.ingestion_pipeline.ingest_all(discovered_documents)
             assert results.documents_loaded == 1
             assert results.documents_stored == 1
             assert len(results.errors) == 0
@@ -189,7 +207,7 @@ NLP focuses on the interaction between computers and human language.
 
             # NOTE: Data clearing functionality implemented in new architecture
             # For now, just verify that we can re-index successfully
-            results = engine.ingestion_pipeline.ingest_all()
+            results = engine.ingestion_pipeline.ingest_all(discovered_documents)
             assert results.documents_loaded == 1  # Same document re-processed
 
             # Verify document is still indexed
@@ -217,7 +235,16 @@ NLP focuses on the interaction between computers and human language.
             engine = factory.create_rag_engine()
 
             # Index all documents
-            results = engine.ingestion_pipeline.ingest_all()
+            # First discover documents from the directory
+            document_source = engine.document_source
+            document_ids = document_source.list_documents()
+            discovered_documents = []
+            for doc_id in document_ids:
+                source_doc = document_source.get_document(doc_id)
+                if source_doc:
+                    discovered_documents.append(source_doc)
+            
+            results = engine.ingestion_pipeline.ingest_all(discovered_documents)
             assert results.documents_loaded == 3
             assert results.documents_stored >= 1  # At least 1 document processed
             assert len(results.errors) == 0
@@ -287,7 +314,16 @@ NLP focuses on the interaction between computers and human language.
             engine_empty = factory_empty.create_rag_engine()
 
             # Should handle gracefully when directory is empty
-            results = engine_empty.ingestion_pipeline.ingest_all()
+            # Discover documents from empty directory
+            document_source_empty = engine_empty.document_source
+            document_ids_empty = document_source_empty.list_documents()
+            discovered_documents_empty = []
+            for doc_id in document_ids_empty:
+                source_doc = document_source_empty.get_document(doc_id)
+                if source_doc:
+                    discovered_documents_empty.append(source_doc)
+            
+            results = engine_empty.ingestion_pipeline.ingest_all(discovered_documents_empty)
 
             # Should return results indicating no documents processed
             assert results.documents_loaded == 0
@@ -318,7 +354,17 @@ NLP focuses on the interaction between computers and human language.
             # First engine instance - index document
             factory1 = RAGComponentsFactory(config, runtime)
             engine1 = factory1.create_rag_engine()
-            results = engine1.ingestion_pipeline.ingest_all()
+            
+            # Discover and index documents
+            document_source1 = engine1.document_source
+            document_ids1 = document_source1.list_documents()
+            discovered_documents1 = []
+            for doc_id in document_ids1:
+                source_doc = document_source1.get_document(doc_id)
+                if source_doc:
+                    discovered_documents1.append(source_doc)
+            
+            results = engine1.ingestion_pipeline.ingest_all(discovered_documents1)
             assert results.documents_loaded == 1
             assert results.documents_stored == 1
             assert len(results.errors) == 0

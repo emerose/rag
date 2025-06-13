@@ -67,60 +67,70 @@ class TestDocumentLoadingProcessor:
         return source
 
     @pytest.fixture
-    def processor(self, mock_document_source):
-        """Create a DocumentLoadingProcessor with mocked dependencies."""
-        return DocumentLoadingProcessor(
-            document_source=mock_document_source
-        )
+    def processor(self):
+        """Create a DocumentLoadingProcessor."""
+        return DocumentLoadingProcessor()
 
     def test_task_type(self, processor):
         """Test that processor has correct task type."""
         assert processor.task_type == TaskType.DOCUMENT_LOADING
 
-    def test_process_success(self, processor, mock_document_source):
-        """Test successful document loading."""
+    def test_process_success(self, processor):
+        """Test successful document loading with pre-loaded content."""
         task = Mock(spec=ProcessingTask)
-        task.loading_details = Mock()
-        task.loading_details.loader_type = "default"
         
-        input_data = {"source_identifier": "doc.txt"}
+        input_data = {
+            "processing_config": {
+                "preloaded_content": "Test document content",
+                "content_hash": "abc123",
+                "content_type": "text/plain",
+                "source_path": "/test/doc.txt",
+                "source_metadata": {"source": "test.txt"},
+                "size_bytes": 20
+            }
+        }
         
         result = processor.process(task, input_data)
         
         assert result.success is True
         assert "content" in result.output_data
+        assert result.output_data["content"] == "Test document content"
         assert "content_hash" in result.output_data
+        assert result.output_data["content_hash"] == "abc123"
         if result.metrics:
             assert "content_length" in result.metrics
-        mock_document_source.get_document.assert_called_once_with("doc.txt")
 
-    def test_process_missing_source_path(self, processor):
-        """Test processing with missing source identifier."""
+    def test_process_missing_preloaded_content(self, processor):
+        """Test processing with missing preloaded content."""
         task = Mock(spec=ProcessingTask)
-        task.loading_details = Mock()
-        task.loading_details.loader_type = "default"
         
-        input_data = {}  # Missing source_identifier
+        input_data = {
+            "processing_config": {
+                # Missing preloaded_content
+                "content_hash": "abc123"
+            }
+        }
         
         result = processor.process(task, input_data)
         
         assert result.success is False
-        assert "source_identifier" in result.error_message
+        assert "preloaded_content" in result.error_message
 
-    def test_process_loader_error(self, processor, mock_document_source):
-        """Test processing when document source fails."""
+    def test_process_missing_content_hash(self, processor):
+        """Test processing with missing content hash."""
         task = Mock(spec=ProcessingTask)
-        task.loading_details = Mock()
-        task.loading_details.loader_type = "default"
         
-        mock_document_source.get_document.side_effect = Exception("Load failed")
-        
-        input_data = {"source_identifier": "doc.txt"}
+        input_data = {
+            "processing_config": {
+                "preloaded_content": "Test content"
+                # Missing content_hash
+            }
+        }
         
         result = processor.process(task, input_data)
         
         assert result.success is False
-        assert "Load failed" in result.error_message
+        assert "content_hash" in result.error_message
 
 
 class TestChunkingProcessor:

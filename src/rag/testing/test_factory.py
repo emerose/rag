@@ -194,7 +194,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
         # Create fake pipeline
         from rag.pipeline.fakes import (
-            FakeDocumentSource,
             FakePipelineStorage,
             FakeStateTransitionService,
         )
@@ -202,7 +201,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
         fake_storage = FakePipelineStorage()
         fake_transition_service = FakeStateTransitionService(fake_storage)
-        fake_document_source = FakeDocumentSource()
 
         # Convert RAGConfig to PipelineConfig if needed
         from rag.pipeline.pipeline import PipelineConfig
@@ -221,7 +219,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             storage=fake_storage,
             state_transitions=fake_transition_service,
             task_processors={},  # Empty processors for basic fake
-            document_source=fake_document_source,
             config=pipeline_config,
         )
 
@@ -413,14 +410,9 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             factory._vectorstore_factory = SharedVectorStoreFactory(fake_vector_store)
 
             # Create real processors - these will actually call document store methods
-            from typing import cast
-
-            from rag.sources.base import DocumentSourceProtocol
 
             real_processors = {
-                TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(
-                    cast(DocumentSourceProtocol, factory._document_source)
-                ),
+                TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(),
                 TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
                 TaskType.EMBEDDING: EmbeddingProcessor(factory._raw_embedding_service),
                 TaskType.VECTOR_STORAGE: VectorStorageProcessor(
@@ -445,7 +437,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 storage=fake_storage,
                 state_transitions=fake_transition_service,
                 task_processors=real_processors,  # Use real processors
-                document_source=cast(DocumentSourceProtocol, factory._document_source),
                 config=pipeline_config,
             )
             factory._pipeline = real_pipeline
@@ -503,14 +494,9 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             factory._vectorstore_factory = SharedVectorStoreFactory(fake_vector_store)
 
             # Create real processors - these will actually call document store methods
-            from typing import cast
-
-            from rag.sources.base import DocumentSourceProtocol
 
             real_processors = {
-                TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(
-                    cast(DocumentSourceProtocol, factory._document_source)
-                ),
+                TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(),
                 TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
                 TaskType.EMBEDDING: EmbeddingProcessor(factory._raw_embedding_service),
                 TaskType.VECTOR_STORAGE: VectorStorageProcessor(
@@ -535,7 +521,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 storage=fake_storage,
                 state_transitions=fake_transition_service,
                 task_processors=real_processors,  # Use real processors
-                document_source=cast(DocumentSourceProtocol, factory._document_source),
                 config=pipeline_config,
             )
             factory._pipeline = real_pipeline

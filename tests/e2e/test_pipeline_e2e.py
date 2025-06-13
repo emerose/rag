@@ -120,7 +120,17 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             engine = factory.create_rag_engine()
 
             # Step 1: Index all documents using IngestionPipeline
-            index_results = engine.ingestion_pipeline.ingest_all()
+            # First discover documents from the directory
+            document_source = engine.document_source
+            document_ids = document_source.list_documents()
+            discovered_documents = []
+            for doc_id in document_ids:
+                source_doc = document_source.get_document(doc_id)
+                if source_doc:
+                    discovered_documents.append(source_doc)
+            
+            # Process the discovered documents
+            index_results = engine.ingestion_pipeline.ingest_all(discovered_documents)
 
             # Verify indexing succeeded
             assert index_results.documents_loaded == 3  # 3 documents
@@ -202,7 +212,16 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             engine = factory.create_rag_engine()
 
             # Test with empty directory (should handle gracefully)
-            results = engine.ingestion_pipeline.ingest_all()
+            # Discover documents (should be empty)
+            document_source = engine.document_source
+            document_ids = document_source.list_documents()
+            discovered_documents = []
+            for doc_id in document_ids:
+                source_doc = document_source.get_document(doc_id)
+                if source_doc:
+                    discovered_documents.append(source_doc)
+            
+            results = engine.ingestion_pipeline.ingest_all(discovered_documents)
 
             # Should return results indicating no documents processed
             assert results.documents_loaded == 0
@@ -310,7 +329,17 @@ and the DocumentStore system.
             # First engine instance - index document
             factory1 = RAGComponentsFactory(config, runtime)
             engine1 = factory1.create_rag_engine()
-            results = engine1.ingestion_pipeline.ingest_all()
+            
+            # Discover and index documents
+            document_source1 = engine1.document_source
+            document_ids1 = document_source1.list_documents()
+            discovered_documents1 = []
+            for doc_id in document_ids1:
+                source_doc = document_source1.get_document(doc_id)
+                if source_doc:
+                    discovered_documents1.append(source_doc)
+            
+            results = engine1.ingestion_pipeline.ingest_all(discovered_documents1)
             assert results.documents_loaded == 1
             assert results.documents_stored == 1
             assert len(results.errors) == 0

@@ -6,6 +6,7 @@ processing through the state machine with full recovery support.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
@@ -17,7 +18,7 @@ from rag.pipeline.transitions import (
     PipelineStorageProtocol,
     StateTransitionServiceProtocol,
 )
-from rag.sources.base import DocumentSourceProtocol
+from rag.sources.base import SourceDocument
 from rag.utils.logging_utils import get_logger
 
 logger = get_logger()
@@ -95,7 +96,6 @@ class Pipeline:
         storage: PipelineStorageProtocol,
         state_transitions: StateTransitionServiceProtocol,
         task_processors: Mapping[TaskType, TaskProcessor],
-        document_source: DocumentSourceProtocol,
         config: PipelineConfig,
     ):
         """Initialize the pipeline.
@@ -104,13 +104,11 @@ class Pipeline:
             storage: Database storage for state management
             state_transitions: State transition service
             task_processors: Map of task types to processors
-            document_source: Source for loading documents
             config: Pipeline configuration
         """
         self.storage = storage
         self.transitions = state_transitions
         self.processors = task_processors
-        self.document_source = document_source
         self.config = config
 
         # Execution control
@@ -120,53 +118,37 @@ class Pipeline:
 
     def start(
         self,
-        source_path: str,
+        documents: list[SourceDocument],
         document_configs: dict[str, dict[str, Any]] | None = None,
         metadata: dict[str, Any] | None = None,
-        # Test compatibility parameters
-        source_type: str | None = None,
-        source_config: dict[str, Any] | None = None,
+        source_metadata: dict[str, Any] | None = None,
     ) -> str:
-        """Start a new pipeline execution.
+        """Start a new pipeline execution with a collection of documents.
 
         Args:
-            source_path: Path or identifier for document source
+            documents: List of SourceDocument objects to process
             document_configs: Optional per-document processing configurations
             metadata: Optional execution metadata
+            source_metadata: Optional metadata about the document source
 
         Returns:
             Execution ID
         """
-        # Handle test compatibility - merge source_config with path
-        if source_config:
-            final_source_config = source_config.copy()
-            final_source_config["path"] = source_path
-        else:
-            final_source_config = {"path": source_path}
+        # Prepare source information from metadata
+        source_type = (source_metadata or {}).get("source_type", "collection")
+        source_config = (source_metadata or {}).copy()
 
         # Create execution
         execution_id = self.storage.create_pipeline_execution(
-            source_type=source_type
-            or (
-                type(self.document_source).__name__
-                if self.document_source
-                else "unknown"
-            ),
-            source_config=final_source_config,
+            source_type=source_type,
+            source_config=source_config,
             metadata=metadata,
         )
 
-        # List documents from source (if available)
-        if self.document_source:
-            document_ids = self.document_source.list_documents(path=source_path)
-        else:
-            # For testing - assume no documents
-            document_ids = []
-
-        # Create document processing records
-        for doc_id in document_ids:
+        # Create document processing records with pre-loaded content
+        for source_doc in documents:
             # Get document-specific config if provided
-            doc_config = (document_configs or {}).get(doc_id, {})
+            doc_config = (document_configs or {}).get(source_doc.source_id, {})
 
             # Merge with default config
             processing_config = {
@@ -192,12 +174,19 @@ class Pipeline:
                 "vector_store_config": doc_config.get(
                     "vector_store_config", self.config.vector_store_config
                 ),
+                # Pre-loaded document content and metadata
+                "preloaded_content": source_doc.content,
+                "content_type": source_doc.content_type,
+                "source_path": source_doc.source_path,
+                "source_metadata": source_doc.metadata,
+                "content_hash": self._compute_content_hash(source_doc.content),
+                "size_bytes": len(source_doc.get_content_as_bytes()),
             }
 
             # Create document processing record
             doc_processing_id = self.storage.create_document_processing(
                 execution_id=execution_id,
-                source_identifier=doc_id,
+                source_identifier=source_doc.source_id,
                 processing_config=processing_config,
             )
 
@@ -206,8 +195,7 @@ class Pipeline:
                 {
                     "task_type": TaskType.DOCUMENT_LOADING,
                     "task_config": {
-                        "loader_type": "default",
-                        "loader_config": {},
+                        "loader_type": "preloaded",
                     },
                     "max_retries": self.config.max_retries,
                 },
@@ -245,9 +233,17 @@ class Pipeline:
             self.storage.create_processing_tasks(doc_processing_id, task_configs)  # type: ignore[arg-type]
 
         logger.info(
-            f"Created pipeline execution {execution_id} with {len(document_ids)} documents"
+            f"Created pipeline execution {execution_id} with {len(documents)} documents"
         )
         return execution_id
+
+    def _compute_content_hash(self, content: str | bytes) -> str:
+        """Compute SHA-256 hash of document content."""
+        if isinstance(content, str):
+            content_bytes = content.encode("utf-8")
+        else:
+            content_bytes = content
+        return hashlib.sha256(content_bytes).hexdigest()
 
     def run(self, execution_id: str) -> PipelineExecutionResult:
         """Run or resume a pipeline execution.
@@ -672,30 +668,24 @@ class Pipeline:
 
         return input_data
 
-    def ingest_all(self) -> IngestAllResult:
-        """Ingest all documents from the configured document source.
+    def ingest_all(self, documents: list[SourceDocument]) -> IngestAllResult:
+        """Ingest all provided documents through the pipeline.
 
         This method provides backward compatibility with the E2E test interface
-        by running the full pipeline on all documents in the source.
+        by running the full pipeline on the provided documents.
+
+        Args:
+            documents: List of SourceDocument objects to ingest
 
         Returns:
             IngestAllResult with documents_loaded, documents_stored, and errors
         """
-        if not self.document_source:
-            # No document source configured, return empty result
-            return IngestAllResult(documents_loaded=0, documents_stored=0, errors=[])
-
         try:
-            # Get the documents directory from the document source
-            source_path = "."  # Default fallback
-            if hasattr(self.document_source, "root_path"):
-                root_path = getattr(self.document_source, "root_path", None)
-                if root_path is not None:
-                    source_path = str(root_path)
-
             # Start pipeline execution
             execution_id = self.start(
-                source_path=source_path, metadata={"initiated_by": "ingest_all"}
+                documents=documents,
+                metadata={"initiated_by": "ingest_all"},
+                source_metadata={"source_type": "collection"},
             )
 
             # Run the pipeline

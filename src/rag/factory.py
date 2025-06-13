@@ -392,7 +392,7 @@ class RAGComponentsFactory:
 
         # Create processors that use the factory's components
         processors = {
-            TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(self.document_source),
+            TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(),
             TaskType.CHUNKING: ChunkingProcessor(self._create_text_splitter_factory()),
             TaskType.EMBEDDING: EmbeddingProcessor(self.embedding_service),
             TaskType.VECTOR_STORAGE: VectorStorageProcessor(
@@ -420,7 +420,6 @@ class RAGComponentsFactory:
             storage=storage,
             state_transitions=transitions,
             task_processors=processors,
-            document_source=self.document_source,
             config=pipeline_config,
         )
 

@@ -24,7 +24,6 @@ from rag.pipeline.processors import (
 from rag.pipeline.storage import PipelineStorage
 from rag.pipeline.transitions import StateTransitionService
 from rag.sources.base import DocumentSourceProtocol
-from rag.sources.filesystem import FilesystemDocumentSource
 from rag.storage.fakes import InMemoryVectorStore
 from rag.storage.protocols import DocumentStoreProtocol, VectorStoreProtocol
 from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
@@ -86,8 +85,7 @@ class PipelineFactory:
         storage = PipelineStorage(pipeline_config.database_url)
         transitions = StateTransitionService(storage)
 
-        # Create document source
-        document_source = FilesystemDocumentSource(root_path=Path(config.documents_dir))
+        # Note: document_source no longer needed for pipeline creation
 
         # Create dependencies for processors
         from rag.config.components import EmbeddingConfig
@@ -121,7 +119,7 @@ class PipelineFactory:
 
         # Create task processors
         processors = {
-            TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(document_source),
+            TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(),
             TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
             TaskType.EMBEDDING: EmbeddingProcessor(embedding_service),
             TaskType.VECTOR_STORAGE: VectorStorageProcessor(
@@ -134,7 +132,6 @@ class PipelineFactory:
             storage=storage,
             state_transitions=transitions,
             task_processors=processors,
-            document_source=document_source,
             config=pipeline_config,
         )
 
@@ -169,9 +166,7 @@ class PipelineFactory:
 
         # Create task processors
         processors = {
-            TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(
-                dependencies.document_source
-            ),
+            TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(),
             TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
             TaskType.EMBEDDING: EmbeddingProcessor(dependencies.embedding_service),
             TaskType.VECTOR_STORAGE: VectorStorageProcessor(
@@ -184,7 +179,6 @@ class PipelineFactory:
             storage=dependencies.storage,
             state_transitions=transitions,
             task_processors=processors,
-            document_source=dependencies.document_source,
             config=config,
         )
 
@@ -192,7 +186,6 @@ class PipelineFactory:
     def create_for_testing(
         storage: PipelineStorage | None = None,
         processors: dict[TaskType, TaskProcessor] | None = None,
-        document_source: DocumentSourceProtocol | None = None,
         config: PipelineConfig | None = None,
     ) -> Pipeline:
         """Create a pipeline for testing with mock dependencies.
@@ -200,7 +193,6 @@ class PipelineFactory:
         Args:
             storage: Optional storage (uses in-memory SQLite if not provided)
             processors: Optional task processors
-            document_source: Optional document source
             config: Optional configuration
 
         Returns:
@@ -223,10 +215,8 @@ class PipelineFactory:
             from unittest.mock import Mock
 
             from rag.embeddings.fakes import FakeEmbeddingService
-            from rag.sources.fakes import FakeDocumentSource
             from rag.storage.fakes import InMemoryVectorStore
 
-            fake_doc_source = FakeDocumentSource()
             fake_embedding_service = FakeEmbeddingService()
             fake_doc_store = Mock()  # Mock document store for testing
 
@@ -239,9 +229,7 @@ class PipelineFactory:
             )
 
             processors = {
-                TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(
-                    document_source or fake_doc_source
-                ),
+                TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(),
                 TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
                 TaskType.EMBEDDING: EmbeddingProcessor(fake_embedding_service),
                 TaskType.VECTOR_STORAGE: VectorStorageProcessor(
@@ -250,22 +238,9 @@ class PipelineFactory:
                 ),
             }
 
-        # Use provided or create simple document source
-        if document_source is None:
-            # Create a simple filesystem document source for testing
-            import tempfile
-            from pathlib import Path
-
-            from rag.sources.filesystem import FilesystemDocumentSource
-
-            # Use a temporary directory for testing
-            temp_dir = Path(tempfile.mkdtemp())
-            document_source = FilesystemDocumentSource(root_path=temp_dir)
-
         return Pipeline(
             storage=storage,
             state_transitions=transitions,
             task_processors=processors,
-            document_source=document_source,
             config=config,
         )

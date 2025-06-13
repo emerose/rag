@@ -25,8 +25,11 @@ class TestPipelineFactory:
     def test_create_default_pipeline(self, mock_config, tmp_path):
         """Test creating a pipeline with default configuration."""
         # Use tmp_path for safe directory operations
+        docs_dir = tmp_path / "docs"
+        docs_dir.mkdir()  # Create the docs directory
+        
         test_config = RAGConfig(
-            documents_dir=str(tmp_path / "docs"),
+            documents_dir=str(docs_dir),
             data_dir=str(tmp_path / "data"),
             vectorstore_backend="faiss",
             embedding_model="text-embedding-3-small",
@@ -36,7 +39,6 @@ class TestPipelineFactory:
         with patch('rag.pipeline.factory.PipelineStorage') as mock_storage, \
              patch('rag.pipeline.factory.StateTransitionService'), \
              patch('rag.pipeline.factory.Pipeline') as mock_pipeline_class, \
-             patch('rag.pipeline.factory.FilesystemDocumentSource'), \
              patch('rag.embeddings.EmbeddingProvider'), \
              patch('rag.pipeline.factory.SQLAlchemyDocumentStore') as mock_doc_store, \
              patch('rag.pipeline.factory.InMemoryVectorStore') as mock_vector_store, \
@@ -71,13 +73,11 @@ class TestPipelineFactory:
             # Use provided arguments to avoid complex dependencies
             test_storage = Mock()
             test_processors = {}
-            test_document_source = Mock()
             test_config = Mock()
             
             pipeline = PipelineFactory.create_for_testing(
                 storage=test_storage,
                 processors=test_processors,
-                document_source=test_document_source,
                 config=test_config
             )
             

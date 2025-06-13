@@ -6,7 +6,6 @@ documents through the pipeline stages.
 
 from __future__ import annotations
 
-import hashlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -16,7 +15,6 @@ from langchain_core.documents import Document
 from rag.data.text_splitter import TextSplitterFactory
 from rag.embeddings.protocols import EmbeddingServiceProtocol
 from rag.pipeline.models import ProcessingTask, TaskType
-from rag.sources.base import DocumentSourceProtocol
 from rag.storage.protocols import DocumentStoreProtocol, VectorStoreProtocol
 from rag.utils.logging_utils import get_logger
 
@@ -117,76 +115,61 @@ class BaseTaskProcessor(ABC):
 
 
 class DocumentLoadingProcessor(BaseTaskProcessor):
-    """Processor for document loading tasks."""
+    """Processor for validating and formatting pre-loaded document content."""
 
     task_type = TaskType.DOCUMENT_LOADING
 
-    def __init__(self, document_source: DocumentSourceProtocol):
+    def __init__(self):
         """Initialize the document loading processor.
 
-        Args:
-            document_source: Source for loading documents
+        No dependencies needed since content is pre-loaded by Pipeline.
         """
-        self.document_source = document_source
+        pass
 
     def process(self, task: ProcessingTask, input_data: dict[str, Any]) -> TaskResult:
-        """Load a document from the source.
+        """Validate and format pre-loaded document content.
 
         Args:
             task: Loading task with configuration
-            input_data: Should contain 'source_identifier'
+            input_data: Should contain pre-loaded content and metadata
 
         Returns:
-            TaskResult with loaded document content
+            TaskResult with formatted document content
         """
         try:
-            source_id = input_data.get("source_identifier")
-            if not source_id:
+            # Extract pre-loaded content and metadata from processing config
+            processing_config = input_data.get("processing_config", {})
+
+            content = processing_config.get("preloaded_content")
+            if content is None:
                 return TaskResult(
                     success=False,
                     output_data={},
-                    error_message="Missing source_identifier in input data",
+                    error_message="Missing preloaded_content in processing config",
                 )
 
-            # Load the document
-            source_doc = self.document_source.get_document(source_id)
-            if not source_doc:
+            content_hash = processing_config.get("content_hash")
+            if not content_hash:
                 return TaskResult(
                     success=False,
                     output_data={},
-                    error_message=f"Document not found: {source_id}",
+                    error_message="Missing content_hash in processing config",
                 )
 
-            # Extract content
-            content = source_doc.content
-            if not content:
-                return TaskResult(
-                    success=False,
-                    output_data={},
-                    error_message=f"No content extracted from document: {source_id}",
-                )
-
-            # Compute content hash
-            if isinstance(content, str):
-                content_bytes = content.encode("utf-8")
-            else:
-                content_bytes = content
-            content_hash = hashlib.sha256(content_bytes).hexdigest()
-
-            # Prepare output
+            # Prepare output data
             output_data = {
                 "content": content,
                 "content_hash": content_hash,
-                "content_type": source_doc.content_type,
-                "metadata": source_doc.metadata,
-                "source_path": source_doc.source_path,
-                "size_bytes": len(content),
+                "content_type": processing_config.get("content_type"),
+                "metadata": processing_config.get("source_metadata", {}),
+                "source_path": processing_config.get("source_path"),
+                "size_bytes": processing_config.get("size_bytes", len(str(content))),
             }
 
-            # Metrics - avoid lazy loading relationships
+            # Metrics
             metrics = {
-                "content_length": len(content),
-                "loader_type": "default",  # Avoid accessing lazy-loaded relationship
+                "content_length": len(str(content)),
+                "loader_type": "preloaded",
             }
 
             return TaskResult(
@@ -196,7 +179,7 @@ class DocumentLoadingProcessor(BaseTaskProcessor):
             )
 
         except Exception as e:
-            logger.error(f"Error loading document: {e}")
+            logger.error(f"Error processing pre-loaded document: {e}")
             return TaskResult(
                 success=False,
                 output_data={},
@@ -207,9 +190,12 @@ class DocumentLoadingProcessor(BaseTaskProcessor):
     def validate_input(
         self, task: ProcessingTask, input_data: dict[str, Any]
     ) -> tuple[bool, str | None]:
-        """Validate loading task input."""
-        if "source_identifier" not in input_data:
-            return False, "source_identifier is required"
+        """Validate that pre-loaded content is available."""
+        processing_config = input_data.get("processing_config", {})
+        if "preloaded_content" not in processing_config:
+            return False, "preloaded_content is required in processing_config"
+        if "content_hash" not in processing_config:
+            return False, "content_hash is required in processing_config"
         return True, None
 
 

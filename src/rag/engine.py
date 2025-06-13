@@ -155,10 +155,26 @@ class RAGEngine:
 
         # Use the state machine pipeline to process all documents
         try:
-            # Start a new pipeline execution
+            # Discover and load documents from the directory
+            document_ids = self._document_source.list_documents(
+                path=str(directory_path)
+            )
+            from rag.sources.base import SourceDocument
+
+            documents: list[SourceDocument] = []
+            for doc_id in document_ids:
+                source_doc = self._document_source.get_document(doc_id)
+                if source_doc:
+                    documents.append(source_doc)
+
+            # Start a new pipeline execution with the discovered documents
             execution_id = self.pipeline.start(
-                source_path=str(directory_path),
+                documents=documents,
                 metadata={"initiated_by": "index_directory"},
+                source_metadata={
+                    "source_type": type(self._document_source).__name__,
+                    "path": str(directory_path),
+                },
             )
 
             # Run the pipeline
@@ -220,16 +236,33 @@ class RAGEngine:
         file_path = Path(file_path)
 
         try:
-            # For single file indexing, use the parent directory as source path
-            # and filter to just this file
-            parent_dir = file_path.parent
+            # Load the specific file using the document source
+            # Convert absolute path to relative path from document source root
+            relative_path = str(file_path)
+            if hasattr(self._document_source, "root_path"):
+                try:
+                    relative_path = str(
+                        file_path.relative_to(self._document_source.root_path)
+                    )
+                except ValueError:
+                    # File is outside root_path, use absolute path
+                    relative_path = str(file_path)
 
-            # Start a new pipeline execution for the parent directory
+            # Load the single document
+            source_doc = self._document_source.get_document(relative_path)
+            if not source_doc:
+                return False, f"Could not load document: {file_path}"
+
+            # Start a new pipeline execution with the single document
             execution_id = self.pipeline.start(
-                source_path=str(parent_dir),
+                documents=[source_doc],
                 metadata={
                     "initiated_by": "index_file",
                     "target_file": str(file_path),
+                },
+                source_metadata={
+                    "source_type": type(self._document_source).__name__,
+                    "path": str(file_path),
                 },
             )
 
