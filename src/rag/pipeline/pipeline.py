@@ -65,15 +65,6 @@ class PipelineExecutionResult:
     metadata: dict[str, Any] | None = None
 
 
-@dataclass
-class IngestAllResult:
-    """Result of ingest_all operation for E2E test compatibility."""
-
-    documents_loaded: int
-    documents_stored: int
-    errors: list[str]
-
-
 class Pipeline:
     """Main pipeline orchestrator with state machine support."""
 
@@ -672,46 +663,6 @@ class Pipeline:
             input_data.update(embedding_output)
 
         return input_data
-
-    def ingest_all(self, documents: list[SourceDocument]) -> IngestAllResult:
-        """Ingest all provided documents through the pipeline.
-
-        This method provides backward compatibility with the E2E test interface
-        by running the full pipeline on the provided documents.
-
-        Args:
-            documents: List of SourceDocument objects to ingest
-
-        Returns:
-            IngestAllResult with documents_loaded, documents_stored, and errors
-        """
-        try:
-            # Start pipeline execution
-            execution_id = self.start(
-                documents=documents,
-                metadata={"initiated_by": "ingest_all"},
-                source_metadata={"source_type": "collection"},
-            )
-
-            # Run the pipeline
-            result = self.run(execution_id)
-
-            # Convert PipelineExecutionResult to IngestAllResult
-            errors: list[str] = []
-            if result.error_message:
-                errors.append(result.error_message)
-
-            return IngestAllResult(
-                documents_loaded=result.total_documents,
-                documents_stored=result.processed_documents,
-                errors=errors,
-            )
-
-        except Exception as e:
-            logger.error(f"Error during ingest_all: {e}")
-            return IngestAllResult(
-                documents_loaded=0, documents_stored=0, errors=[str(e)]
-            )
 
     def _save_vector_store_if_needed(self) -> None:
         """Save the vector store to disk if it has been populated with documents."""

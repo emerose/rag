@@ -129,13 +129,18 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
                 if source_doc:
                     discovered_documents.append(source_doc)
             
-            # Process the discovered documents
-            index_results = engine.ingestion_pipeline.ingest_all(discovered_documents)
+            # Process the discovered documents using standard pipeline interface
+            execution_id = engine.pipeline.start(
+                documents=discovered_documents,
+                metadata={"initiated_by": "test_complete_workflow"},
+                source_metadata={"source_type": "collection"},
+            )
+            pipeline_result = engine.pipeline.run(execution_id)
 
             # Verify indexing succeeded
-            assert index_results.documents_loaded == 3  # 3 documents
-            assert index_results.documents_stored >= 1  # At least 1 document processed
-            assert len(index_results.errors) == 0
+            assert pipeline_result.total_documents == 3  # 3 documents
+            assert pipeline_result.processed_documents >= 1  # At least 1 document processed
+            assert pipeline_result.error_message is None  # No pipeline-level errors
 
             # Verify documents are listed as indexed
             document_store = engine.document_store
@@ -221,11 +226,17 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
                 if source_doc:
                     discovered_documents.append(source_doc)
             
-            results = engine.ingestion_pipeline.ingest_all(discovered_documents)
+            # Try to process discovered documents using standard pipeline interface
+            execution_id = engine.pipeline.start(
+                documents=discovered_documents,
+                metadata={"initiated_by": "test_pipeline_error_handling"},
+                source_metadata={"source_type": "collection"},
+            )
+            pipeline_result = engine.pipeline.run(execution_id)
 
             # Should return results indicating no documents processed
-            assert results.documents_loaded == 0
-            assert results.documents_stored == 0
+            assert pipeline_result.total_documents == 0
+            assert pipeline_result.processed_documents == 0
 
     def test_pipeline_component_creation(self):
         """Test that pipeline components are created correctly."""
@@ -338,10 +349,17 @@ and the DocumentStore system.
                 if source_doc:
                     discovered_documents1.append(source_doc)
             
-            results = engine1.ingestion_pipeline.ingest_all(discovered_documents1)
-            assert results.documents_loaded == 1
-            assert results.documents_stored == 1
-            assert len(results.errors) == 0
+            # Index documents using standard pipeline interface
+            execution_id1 = engine1.pipeline.start(
+                documents=discovered_documents1,
+                metadata={"initiated_by": "test_pipeline_persistence_across_restarts"},
+                source_metadata={"source_type": "collection"},
+            )
+            pipeline_result1 = engine1.pipeline.run(execution_id1)
+            
+            assert pipeline_result1.total_documents == 1
+            assert pipeline_result1.processed_documents == 1
+            assert pipeline_result1.error_message is None
 
             # Verify it's indexed
             document_store1 = engine1.document_store

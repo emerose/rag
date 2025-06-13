@@ -124,12 +124,18 @@ NLP focuses on the interaction between computers and human language.
                 if source_doc:
                     discovered_documents.append(source_doc)
             
-            index_results = engine.ingestion_pipeline.ingest_all(discovered_documents)
+            # Index documents using standard pipeline interface
+            execution_id = engine.pipeline.start(
+                documents=discovered_documents,
+                metadata={"initiated_by": "test_complete_rag_workflow"},
+                source_metadata={"source_type": "collection"},
+            )
+            pipeline_result = engine.pipeline.run(execution_id)
 
             # Verify indexing succeeded
-            assert index_results.documents_loaded == 3  # 3 documents
-            assert index_results.documents_stored >= 1  # At least 1 document processed
-            assert len(index_results.errors) == 0
+            assert pipeline_result.total_documents == 3  # 3 documents
+            assert pipeline_result.processed_documents >= 1  # At least 1 document processed
+            assert pipeline_result.error_message is None  # No pipeline-level errors
 
             # Verify documents are listed as indexed
             document_store = engine.document_store
@@ -195,10 +201,16 @@ NLP focuses on the interaction between computers and human language.
                 if source_doc:
                     discovered_documents.append(source_doc)
             
-            results = engine.ingestion_pipeline.ingest_all(discovered_documents)
-            assert results.documents_loaded == 1
-            assert results.documents_stored == 1
-            assert len(results.errors) == 0
+            # Index documents using standard pipeline interface
+            execution_id = engine.pipeline.start(
+                documents=discovered_documents,
+                metadata={"initiated_by": "test_incremental_indexing"},
+                source_metadata={"source_type": "collection"},
+            )
+            pipeline_result = engine.pipeline.run(execution_id)
+            assert pipeline_result.total_documents == 1
+            assert pipeline_result.processed_documents == 1
+            assert pipeline_result.error_message is None
 
             # Verify it's indexed
             document_store = engine.document_store
@@ -207,8 +219,14 @@ NLP focuses on the interaction between computers and human language.
 
             # NOTE: Data clearing functionality implemented in new architecture
             # For now, just verify that we can re-index successfully
-            results = engine.ingestion_pipeline.ingest_all(discovered_documents)
-            assert results.documents_loaded == 1  # Same document re-processed
+            # Index documents using standard pipeline interface
+            execution_id = engine.pipeline.start(
+                documents=discovered_documents,
+                metadata={"initiated_by": "test_incremental_indexing"},
+                source_metadata={"source_type": "collection"},
+            )
+            pipeline_result = engine.pipeline.run(execution_id)
+            assert pipeline_result.total_documents == 1  # Same document re-processed
 
             # Verify document is still indexed
             source_documents = document_store.list_source_documents()
@@ -244,10 +262,16 @@ NLP focuses on the interaction between computers and human language.
                 if source_doc:
                     discovered_documents.append(source_doc)
             
-            results = engine.ingestion_pipeline.ingest_all(discovered_documents)
-            assert results.documents_loaded == 3
-            assert results.documents_stored >= 1  # At least 1 document processed
-            assert len(results.errors) == 0
+            # Index documents using standard pipeline interface
+            execution_id = engine.pipeline.start(
+                documents=discovered_documents,
+                metadata={"initiated_by": "test_incremental_indexing"},
+                source_metadata={"source_type": "collection"},
+            )
+            pipeline_result = engine.pipeline.run(execution_id)
+            assert pipeline_result.total_documents == 3
+            assert pipeline_result.processed_documents >= 1  # At least 1 document processed
+            assert pipeline_result.error_message is None
 
             # Query for information that spans multiple documents
             response = engine.answer("What programming languages are mentioned?", k=3)
@@ -323,11 +347,17 @@ NLP focuses on the interaction between computers and human language.
                 if source_doc:
                     discovered_documents_empty.append(source_doc)
             
-            results = engine_empty.ingestion_pipeline.ingest_all(discovered_documents_empty)
+            # Try to index empty document list using standard pipeline interface
+            execution_id = engine_empty.pipeline.start(
+                documents=discovered_documents_empty,
+                metadata={"initiated_by": "test_query_with_empty_index"},
+                source_metadata={"source_type": "collection"},
+            )
+            pipeline_result = engine_empty.pipeline.run(execution_id)
 
             # Should return results indicating no documents processed
-            assert results.documents_loaded == 0
-            assert results.documents_stored == 0
+            assert pipeline_result.total_documents == 0
+            assert pipeline_result.processed_documents == 0
 
     def test_persistence_across_engine_restarts_e2e(self):
         """Test that data persists across engine restarts in e2e scenario using real APIs."""
@@ -364,10 +394,16 @@ NLP focuses on the interaction between computers and human language.
                 if source_doc:
                     discovered_documents1.append(source_doc)
             
-            results = engine1.ingestion_pipeline.ingest_all(discovered_documents1)
-            assert results.documents_loaded == 1
-            assert results.documents_stored == 1
-            assert len(results.errors) == 0
+            # Index documents using standard pipeline interface
+            execution_id1 = engine1.pipeline.start(
+                documents=discovered_documents1,
+                metadata={"initiated_by": "test_persistence_across_engine_restarts"},
+                source_metadata={"source_type": "collection"},
+            )
+            pipeline_result1 = engine1.pipeline.run(execution_id1)
+            assert pipeline_result1.total_documents == 1
+            assert pipeline_result1.processed_documents == 1
+            assert pipeline_result1.error_message is None
 
             # Verify it's indexed
             document_store1 = engine1.document_store
