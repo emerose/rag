@@ -26,15 +26,34 @@ def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
         "markers", "integration: mark test as integration test (not run by default)"
     )
+    config.addinivalue_line(
+        "markers", "static: mark test as static analysis"
+    )
+    config.addinivalue_line(
+        "markers", "unit: mark test as unit test"
+    )
+    config.addinivalue_line(
+        "markers", "e2e: mark test as end-to-end test"
+    )
+    config.addinivalue_line(
+        "markers", "check: mark test as part of code quality checks (static + unit + integration)"
+    )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Reorder test collection to run static analysis first, then unit, integration, e2e.
+    """Reorder test collection and add markers based on test type.
     
     This ensures that static analysis runs first for immediate feedback on code quality,
     followed by fast unit tests, integration tests, and finally slower e2e tests.
+    
+    Also adds markers for easy test grouping:
+    - static: for static analysis tests
+    - unit: for unit tests  
+    - integration: for integration tests
+    - e2e: for end-to-end tests
+    - check: for all tests except e2e (static + unit + integration)
     """
-    # Separate tests by type based on file path
+    # Separate tests by type based on file path and add markers
     static_tests = []
     unit_tests = []
     integration_tests = []
@@ -45,12 +64,19 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         test_path = str(item.path)
         if "/static/" in test_path:
             static_tests.append(item)
+            item.add_marker(pytest.mark.static)
+            item.add_marker(pytest.mark.check)
         elif "/unit/" in test_path:
             unit_tests.append(item)
+            item.add_marker(pytest.mark.unit)
+            item.add_marker(pytest.mark.check)
         elif "/integration/" in test_path:
             integration_tests.append(item)
+            item.add_marker(pytest.mark.integration)
+            item.add_marker(pytest.mark.check)
         elif "/e2e/" in test_path:
             e2e_tests.append(item)
+            item.add_marker(pytest.mark.e2e)
         else:
             other_tests.append(item)
     
