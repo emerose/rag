@@ -153,6 +153,7 @@ def get_available_markers() -> Dict[str, str]:
     """Get available pytest markers and their descriptions."""
     return {
         "check": "static + unit + integration tests",
+        "all": "all tests including e2e (static + unit + integration + e2e)",
         "static": "all static analysis tests", 
         "unit": "unit tests",
         "integration": "integration tests",
@@ -312,7 +313,8 @@ def print_help():
         print(f"    {marker:<12} - {description}")
     print()
     print("EXAMPLES:")
-    print("    scripts/check                          # Run all check tests (static + unit + integration)")
+    print("    scripts/check                          # Run check tests (static + unit + integration)")
+    print("    scripts/check all                      # Run ALL tests including e2e (static + unit + integration + e2e)")
     print("    scripts/check static                   # Run static analysis only")
     print("    scripts/check unit                     # Run unit tests only")
     print("    scripts/check integration              # Run integration tests only")
