@@ -95,23 +95,25 @@ class TestDocumentLoadingProcessor:
         mock_document_source.get_document.assert_called_once_with("doc.txt")
 
     def test_process_missing_source_path(self, processor):
-        """Test processing with missing source path."""
+        """Test processing with missing source identifier."""
         task = Mock(spec=ProcessingTask)
-        task.task_config = {}
+        task.loading_details = Mock()
+        task.loading_details.loader_type = "default"
         
-        input_data = {"source_identifier": "doc.txt"}
+        input_data = {}  # Missing source_identifier
         
         result = processor.process(task, input_data)
         
         assert result.success is False
-        assert "source_path" in result.error_message
+        assert "source_identifier" in result.error_message
 
-    def test_process_loader_error(self, processor, mock_document_loader):
-        """Test processing when document loader fails."""
+    def test_process_loader_error(self, processor, mock_document_source):
+        """Test processing when document source fails."""
         task = Mock(spec=ProcessingTask)
-        task.task_config = {"source_path": "/test/doc.txt"}
+        task.loading_details = Mock()
+        task.loading_details.loader_type = "default"
         
-        mock_document_loader.load_document.side_effect = Exception("Load failed")
+        mock_document_source.get_document.side_effect = Exception("Load failed")
         
         input_data = {"source_identifier": "doc.txt"}
         
@@ -383,7 +385,7 @@ class TestVectorStorageProcessor:
         result = processor.process(task, input_data)
         
         assert result.success is False
-        assert "chunks_with_embeddings" in result.error_message
+        assert "No chunks with embeddings provided" in result.error_message
 
     def test_process_missing_source_identifier(self, processor):
         """Test processing with missing source identifier."""

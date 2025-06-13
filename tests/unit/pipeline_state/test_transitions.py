@@ -260,6 +260,10 @@ class TestStateTransitionService:
 
     def test_transition_with_error_details(self, transition_service, mock_storage):
         """Test transitions with error messages and details."""
+        # First transition to RUNNING (valid from CREATED)
+        transition_service.transition_pipeline("exec-1", PipelineState.RUNNING)
+        
+        # Now transition to FAILED with error details (valid from RUNNING)
         error_details = {"exception": "ValueError", "context": "test"}
         
         result = transition_service.transition_pipeline(
@@ -269,7 +273,8 @@ class TestStateTransitionService:
         )
         
         assert result.success
-        call = mock_storage.update_pipeline_state_calls[0]
+        # Check the second call (index 1) since we made two transitions
+        call = mock_storage.update_pipeline_state_calls[1]
         assert call["error_message"] == "Pipeline failed"
         assert call["error_details"] == error_details
 
