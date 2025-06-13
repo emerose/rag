@@ -28,6 +28,33 @@ def pytest_configure(config: pytest.Config) -> None:
     )
 
 
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Reorder test collection to run unit tests first, then integration, then e2e.
+    
+    This ensures that fast unit tests run first, providing quick feedback,
+    followed by integration tests, and finally the slower e2e tests.
+    """
+    # Separate tests by type based on file path (same logic as timeout assignment)
+    unit_tests = []
+    integration_tests = []
+    e2e_tests = []
+    other_tests = []
+    
+    for item in items:
+        test_path = str(item.path)
+        if "/unit/" in test_path:
+            unit_tests.append(item)
+        elif "/integration/" in test_path:
+            integration_tests.append(item)
+        elif "/e2e/" in test_path:
+            e2e_tests.append(item)
+        else:
+            other_tests.append(item)
+    
+    # Reorder: unit → integration → e2e → other
+    items[:] = unit_tests + integration_tests + e2e_tests + other_tests
+
+
 def pytest_runtest_setup(item: pytest.Item) -> None:
     """Set marker-based timeouts for tests.
 
