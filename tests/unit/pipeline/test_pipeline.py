@@ -117,10 +117,7 @@ class TestPipeline:
         pipeline_instance = Pipeline(
             storage=fake_components["storage"],
             state_transitions=fake_components["transition_service"],
-            task_processors={
-                task_type: fake_components["processor_factory"].create_processor(task_type)
-                for task_type in TaskType
-            },
+            processor_factory=fake_components["processor_factory"],
             config=config,
         )
         yield pipeline_instance
@@ -258,10 +255,7 @@ class TestPipeline:
         failing_pipeline = Pipeline(
             storage=failing_storage,
             state_transitions=failing_transition_service,
-            task_processors={
-                task_type: failing_processor_factory.create_processor(task_type)
-                for task_type in TaskType
-            },
+            processor_factory=failing_processor_factory,
             config=config,
         )
         
@@ -304,9 +298,16 @@ class TestPipeline:
 
     def test_process_task_processor_creation_failure(self, fake_components):
         """Test processing task when processor creation fails."""
+        
         # Create a custom processor factory that fails
         class FailingProcessorFactory:
-            def create_processor(self, task_type):
+            def create_document_loading_processor(self, document):
+                raise Exception("Processor creation failed")
+            def create_chunking_processor(self, document):
+                raise Exception("Processor creation failed")
+            def create_embedding_processor(self, document):
+                raise Exception("Processor creation failed")
+            def create_vector_storage_processor(self, document):
                 raise Exception("Processor creation failed")
         
         # Create pipeline with failing factory
@@ -314,7 +315,7 @@ class TestPipeline:
         failing_pipeline = Pipeline(
             storage=fake_components["storage"],
             state_transitions=fake_components["transition_service"],
-            task_processors={},  # Empty processors dict will cause key error
+            processor_factory=FailingProcessorFactory(),
             config=config,
         )
         
@@ -424,10 +425,7 @@ class TestPipeline:
         pipeline = Pipeline(
             storage=storage,
             state_transitions=fake_components["transition_service"],
-            task_processors={
-                task_type: fake_components["processor_factory"].create_processor(task_type)
-                for task_type in TaskType
-            },
+            processor_factory=fake_components["processor_factory"],
             config=config,
         )
         
@@ -463,10 +461,7 @@ class TestPipeline:
         broken_pipeline = Pipeline(
             storage=broken_storage,
             state_transitions=fake_components["transition_service"],
-            task_processors={
-                task_type: fake_components["processor_factory"].create_processor(task_type)
-                for task_type in TaskType
-            },
+            processor_factory=fake_components["processor_factory"],
             config=config,
         )
         

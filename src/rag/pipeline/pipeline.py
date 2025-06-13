@@ -7,13 +7,13 @@ processing through the state machine with full recovery support.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
 from rag.pipeline.models import PipelineState, ProcessingTask, TaskState, TaskType
-from rag.pipeline.processors import TaskProcessor
+from rag.pipeline.processors import ProcessorFactory
 from rag.pipeline.transitions import (
     PipelineStorageProtocol,
     StateTransitionServiceProtocol,
@@ -35,23 +35,9 @@ class TaskConfigDict(TypedDict, total=False):
 
 @dataclass
 class PipelineConfig:
-    """Configuration for pipeline execution."""
+    """Configuration for pipeline orchestration."""
 
-    # Processing configuration
-    chunk_size: int = 1000
-    chunk_overlap: int = 200
-    chunking_strategy: str = "recursive"
-
-    # Embedding configuration
-    embedding_model: str = "text-embedding-ada-002"
-    embedding_provider: str = "openai"
-    embedding_batch_size: int = 100
-
-    # Storage configuration
-    vector_store_type: str = "faiss"
-    vector_store_config: dict[str, Any] | None = None
-
-    # Execution configuration
+    # Pipeline orchestration settings
     max_retries: int = 3
     concurrent_documents: int = 5
     concurrent_tasks: int = 10
@@ -95,7 +81,7 @@ class Pipeline:
         self,
         storage: PipelineStorageProtocol,
         state_transitions: StateTransitionServiceProtocol,
-        task_processors: Mapping[TaskType, TaskProcessor],
+        processor_factory: ProcessorFactory,
         config: PipelineConfig,
     ):
         """Initialize the pipeline.
@@ -103,12 +89,12 @@ class Pipeline:
         Args:
             storage: Database storage for state management
             state_transitions: State transition service
-            task_processors: Map of task types to processors
+            processor_factory: Factory for creating document-specific processors
             config: Pipeline configuration
         """
         self.storage = storage
         self.transitions = state_transitions
-        self.processors = task_processors
+        self.processor_factory = processor_factory
         self.config = config
 
         # Execution control
@@ -152,30 +138,8 @@ class Pipeline:
             # Get document-specific config if provided
             doc_config = (document_configs or {}).get(source_doc.source_id, {})
 
-            # Merge with default config
+            # Build processing config with document content and any processor overrides
             processing_config = {
-                "chunk_size": doc_config.get("chunk_size", self.config.chunk_size),
-                "chunk_overlap": doc_config.get(
-                    "chunk_overlap", self.config.chunk_overlap
-                ),
-                "chunking_strategy": doc_config.get(
-                    "chunking_strategy", self.config.chunking_strategy
-                ),
-                "embedding_model": doc_config.get(
-                    "embedding_model", self.config.embedding_model
-                ),
-                "embedding_provider": doc_config.get(
-                    "embedding_provider", self.config.embedding_provider
-                ),
-                "embedding_batch_size": doc_config.get(
-                    "embedding_batch_size", self.config.embedding_batch_size
-                ),
-                "vector_store_type": doc_config.get(
-                    "vector_store_type", self.config.vector_store_type
-                ),
-                "vector_store_config": doc_config.get(
-                    "vector_store_config", self.config.vector_store_config
-                ),
                 # Pre-loaded document content and metadata
                 "preloaded_content": source_doc.content,
                 "content_type": source_doc.content_type,
@@ -183,6 +147,8 @@ class Pipeline:
                 "source_metadata": source_doc.metadata,
                 "content_hash": self._compute_content_hash(source_doc.content),
                 "size_bytes": len(source_doc.get_content_as_bytes()),
+                # Store document-specific processor config overrides for future factory use
+                "processor_overrides": doc_config,
             }
 
             # Create document processing record
@@ -193,6 +159,7 @@ class Pipeline:
             )
 
             # Create processing tasks
+            # Note: Processor-specific configs are now handled by ProcessorFactory
             task_configs: list[TaskConfigDict] = [
                 {
                     "task_type": TaskType.DOCUMENT_LOADING,
@@ -203,30 +170,19 @@ class Pipeline:
                 },
                 {
                     "task_type": TaskType.CHUNKING,
-                    "task_config": {
-                        "strategy": processing_config["chunking_strategy"],
-                        "chunk_size": processing_config["chunk_size"],
-                        "chunk_overlap": processing_config["chunk_overlap"],
-                    },
+                    "task_config": {},  # Config handled by ProcessorFactory
                     "depends_on": TaskType.DOCUMENT_LOADING,
                     "max_retries": self.config.max_retries,
                 },
                 {
                     "task_type": TaskType.EMBEDDING,
-                    "task_config": {
-                        "model_name": processing_config["embedding_model"],
-                        "provider": processing_config["embedding_provider"],
-                        "batch_size": processing_config["embedding_batch_size"],
-                    },
+                    "task_config": {},  # Config handled by ProcessorFactory
                     "depends_on": TaskType.CHUNKING,
                     "max_retries": self.config.max_retries,
                 },
                 {
                     "task_type": TaskType.VECTOR_STORAGE,
-                    "task_config": {
-                        "store_type": processing_config["vector_store_type"],
-                        "store_config": processing_config["vector_store_config"] or {},
-                    },
+                    "task_config": {},  # Config handled by ProcessorFactory
                     "depends_on": TaskType.EMBEDDING,
                     "max_retries": self.config.max_retries,
                 },
@@ -414,6 +370,37 @@ class Pipeline:
         for future in futures:
             future.result()
 
+    def _reconstruct_document(self, input_data: dict[str, Any]) -> SourceDocument:
+        """Reconstruct a SourceDocument from task input data.
+
+        Args:
+            input_data: Task input data containing document information
+
+        Returns:
+            SourceDocument reconstructed from the input data
+        """
+        processing_config = input_data.get("processing_config", {})
+
+        # Extract source document information from processing config
+        source_id = input_data.get("source_identifier", "unknown")
+        content = processing_config.get("preloaded_content", "")
+        content_type = processing_config.get("content_type", "text/plain")
+        source_path = processing_config.get("source_path", source_id)
+        metadata = processing_config.get("source_metadata", {})
+
+        # Add processor overrides to metadata for potential factory use
+        processor_overrides = processing_config.get("processor_overrides", {})
+        if processor_overrides:
+            metadata = {**metadata, "processor_overrides": processor_overrides}
+
+        return SourceDocument(
+            source_id=source_id,
+            content=content,
+            content_type=content_type,
+            source_path=source_path,
+            metadata=metadata,
+        )
+
     def _process_document(self, document_id_or_obj: Any) -> bool:
         """Process a single document through all tasks."""
         # Handle both string ID and Mock object for test compatibility
@@ -484,7 +471,7 @@ class Pipeline:
             )
             return False
 
-    def _process_task(  # noqa: PLR0912
+    def _process_task(  # noqa: PLR0912, PLR0915
         self,
         task: ProcessingTask,
         task_outputs: dict[str, Any] | None = None,
@@ -516,13 +503,7 @@ class Pipeline:
             )
 
         try:
-            # Get processor from the processors mapping
-            if task.task_type not in self.processors:
-                raise ValueError(f"No processor for task type {task.task_type}")
-
-            processor = self.processors[task.task_type]
-
-            # Prepare input data for the task
+            # Prepare input data for the task first (needed to reconstruct document)
             # Always try real input preparation first, fall back if it fails
             try:
                 if hasattr(task, "document_id") and task.document_id:
@@ -533,6 +514,24 @@ class Pipeline:
             except (ValueError, AttributeError):
                 # Fallback for test cases where storage/documents don't exist properly
                 input_data = task_outputs.copy() if task_outputs else {}
+
+            # Reconstruct document and get appropriate processor from factory
+            document = self._reconstruct_document(input_data)
+
+            if task.task_type == TaskType.DOCUMENT_LOADING:
+                processor = self.processor_factory.create_document_loading_processor(
+                    document
+                )
+            elif task.task_type == TaskType.CHUNKING:
+                processor = self.processor_factory.create_chunking_processor(document)
+            elif task.task_type == TaskType.EMBEDDING:
+                processor = self.processor_factory.create_embedding_processor(document)
+            elif task.task_type == TaskType.VECTOR_STORAGE:
+                processor = self.processor_factory.create_vector_storage_processor(
+                    document
+                )
+            else:
+                raise ValueError(f"Unsupported task type {task.task_type}")
 
             # Validate input (handle mock for tests)
             try:
@@ -717,39 +716,31 @@ class Pipeline:
     def _save_vector_store_if_needed(self) -> None:
         """Save the vector store to disk if it has been populated with documents."""
         try:
-            # Find the VectorStorageProcessor and get its vector store
-            if TaskType.VECTOR_STORAGE in self.processors:
-                vector_processor = self.processors[TaskType.VECTOR_STORAGE]
-                vector_store = getattr(vector_processor, "vector_store", None)
+            # Get vector store from processor factory
+            vector_store = self.processor_factory.get_vector_store()
+            if vector_store is None:
+                logger.debug("No vector store available from processor factory")
+                return
 
-                if vector_store and hasattr(vector_store, "save"):
-                    # Check if we have any documents to save
-                    if hasattr(vector_store, "docstore") and vector_store.docstore:
-                        # Save to the standard location expected by the query engine
-                        from pathlib import Path
+            # Check if it's a saveable vector store
+            if hasattr(vector_store, "save_local"):
+                # Get the data directory from config
+                data_dir = self.config.data_dir
+                if data_dir:
+                    from pathlib import Path
 
-                        # Determine save path - use the pattern from FAISSVectorStoreFactory
-                        if (
-                            hasattr(self, "config")
-                            and hasattr(self.config, "data_dir")
-                            and self.config.data_dir is not None
-                        ):
-                            data_dir = Path(self.config.data_dir)
-                        else:
-                            # Fallback to current directory
-                            data_dir = Path(".")
+                    data_path = Path(data_dir)
+                    data_path.mkdir(parents=True, exist_ok=True)
 
-                        # Create the data directory if it doesn't exist
-                        data_dir.mkdir(parents=True, exist_ok=True)
-
-                        # Save as "workspace" which is the standard name the query engine looks for
-                        vectorstore_path = data_dir / "workspace"
-                        vector_store.save(str(vectorstore_path))
-                        logger.info(f"Saved vector store to {vectorstore_path}")
-                    else:
-                        logger.debug("Vector store is empty, not saving")
+                    # Save the vector store - use "workspace" as the name for compatibility
+                    vector_store.save_local(str(data_path), "workspace")
+                    logger.info(f"Saved vector store to {data_path}/workspace")
                 else:
-                    logger.debug("Vector store does not support saving or is None")
+                    logger.warning(
+                        "No data directory configured for saving vector store"
+                    )
+            else:
+                logger.debug("Vector store does not support saving")
         except Exception as e:
             logger.warning(f"Failed to save vector store: {e}")
             # Don't raise - this is non-critical

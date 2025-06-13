@@ -15,10 +15,132 @@ from langchain_core.documents import Document
 from rag.data.text_splitter import TextSplitterFactory
 from rag.embeddings.protocols import EmbeddingServiceProtocol
 from rag.pipeline.models import ProcessingTask, TaskType
+from rag.sources.base import SourceDocument
 from rag.storage.protocols import DocumentStoreProtocol, VectorStoreProtocol
 from rag.utils.logging_utils import get_logger
 
 logger = get_logger()
+
+
+# Processor-specific configuration classes
+@dataclass
+class DocumentLoadingConfig:
+    """Configuration for document loading processors."""
+
+    loader_type: str = "preloaded"
+    loader_config: dict[str, Any] | None = None
+
+
+@dataclass
+class ChunkingConfig:
+    """Configuration for document chunking processors."""
+
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+    chunking_strategy: str = "recursive"
+    separator: str | None = None
+
+
+@dataclass
+class EmbeddingConfig:
+    """Configuration for embedding generation processors."""
+
+    model: str = "text-embedding-ada-002"
+    provider: str = "openai"
+    batch_size: int = 100
+
+
+@dataclass
+class VectorStorageConfig:
+    """Configuration for vector storage processors."""
+
+    store_type: str = "faiss"
+    store_config: dict[str, Any] | None = None
+    collection_name: str | None = None
+
+
+class ProcessorFactory(Protocol):
+    """Factory for creating document-specific processors."""
+
+    def create_document_loading_processor(
+        self, document: SourceDocument
+    ) -> DocumentLoadingProcessor:
+        """Create a document loading processor configured for the given document."""
+        ...
+
+    def create_chunking_processor(self, document: SourceDocument) -> ChunkingProcessor:
+        """Create a chunking processor configured for the given document."""
+        ...
+
+    def create_embedding_processor(
+        self, document: SourceDocument
+    ) -> EmbeddingProcessor:
+        """Create an embedding processor configured for the given document."""
+        ...
+
+    def create_vector_storage_processor(
+        self, document: SourceDocument
+    ) -> VectorStorageProcessor:
+        """Create a vector storage processor configured for the given document."""
+        ...
+
+    def get_vector_store(self) -> VectorStoreProtocol | None:
+        """Get the vector store instance if available."""
+        ...
+
+
+class DefaultProcessorFactory:
+    """Simple factory that returns default-configured processors."""
+
+    def __init__(
+        self,
+        embedding_service: EmbeddingServiceProtocol,
+        document_store: DocumentStoreProtocol,
+        vector_store: VectorStoreProtocol,
+        text_splitter_factory: Any | None = None,
+    ):
+        """Initialize the factory with required dependencies.
+
+        Args:
+            embedding_service: Service for generating embeddings
+            document_store: Store for document metadata
+            vector_store: Store for embeddings
+            text_splitter_factory: Factory for creating text splitters
+        """
+        self.embedding_service = embedding_service
+        self.document_store = document_store
+        self.vector_store = vector_store
+        self.text_splitter_factory = text_splitter_factory or TextSplitterFactory()
+
+    def create_document_loading_processor(
+        self, document: SourceDocument
+    ) -> DocumentLoadingProcessor:
+        """Create a document loading processor with default config."""
+        config = DocumentLoadingConfig()  # Uses default values
+        return DocumentLoadingProcessor(config)
+
+    def create_chunking_processor(self, document: SourceDocument) -> ChunkingProcessor:
+        """Create a chunking processor with default config."""
+        config = ChunkingConfig()  # Uses default values
+        return ChunkingProcessor(config, self.text_splitter_factory)
+
+    def create_embedding_processor(
+        self, document: SourceDocument
+    ) -> EmbeddingProcessor:
+        """Create an embedding processor with default config."""
+        config = EmbeddingConfig()  # Uses default values
+        return EmbeddingProcessor(self.embedding_service, config)
+
+    def create_vector_storage_processor(
+        self, document: SourceDocument
+    ) -> VectorStorageProcessor:
+        """Create a vector storage processor with default config."""
+        config = VectorStorageConfig()  # Uses default values
+        return VectorStorageProcessor(self.document_store, self.vector_store, config)
+
+    def get_vector_store(self) -> VectorStoreProtocol | None:
+        """Get the vector store instance if available."""
+        return self.vector_store
 
 
 @dataclass
@@ -119,12 +241,13 @@ class DocumentLoadingProcessor(BaseTaskProcessor):
 
     task_type = TaskType.DOCUMENT_LOADING
 
-    def __init__(self):
+    def __init__(self, config: DocumentLoadingConfig):
         """Initialize the document loading processor.
 
-        No dependencies needed since content is pre-loaded by Pipeline.
+        Args:
+            config: Configuration for document loading
         """
-        pass
+        self.config = config
 
     def process(self, task: ProcessingTask, input_data: dict[str, Any]) -> TaskResult:
         """Validate and format pre-loaded document content.
@@ -204,12 +327,14 @@ class ChunkingProcessor(BaseTaskProcessor):
 
     task_type = TaskType.CHUNKING
 
-    def __init__(self, text_splitter_factory: Any = None):
+    def __init__(self, config: ChunkingConfig, text_splitter_factory: Any = None):
         """Initialize the chunking processor.
 
         Args:
+            config: Configuration for chunking
             text_splitter_factory: Factory for creating text splitters
         """
+        self.config = config
         if text_splitter_factory is None:
             # Create default instance with sensible defaults
             self.text_splitter_factory = TextSplitterFactory()
@@ -235,11 +360,8 @@ class ChunkingProcessor(BaseTaskProcessor):
                     error_message="Missing content in input data",
                 )
 
-            # Get chunking configuration from processing config
-            processing_config = input_data.get("processing_config", {})
-            # chunk_size = processing_config.get("chunk_size", 1000)  # TODO: Use for chunking
-            # chunk_overlap = processing_config.get("chunk_overlap", 200)  # TODO: Use for chunking
-            chunking_strategy = processing_config.get("chunking_strategy", "recursive")
+            # Use configuration from injected config
+            chunking_strategy = self.config.chunking_strategy
 
             # Create text splitter using factory
             splitter = self.text_splitter_factory.create_splitter("text/plain")
@@ -322,13 +444,17 @@ class EmbeddingProcessor(BaseTaskProcessor):
 
     task_type = TaskType.EMBEDDING
 
-    def __init__(self, embedding_service: EmbeddingServiceProtocol):
+    def __init__(
+        self, embedding_service: EmbeddingServiceProtocol, config: EmbeddingConfig
+    ):
         """Initialize the embedding processor.
 
         Args:
             embedding_service: Service for generating embeddings
+            config: Configuration for embedding generation
         """
         self.embedding_service = embedding_service
+        self.config = config
 
     def process(self, task: ProcessingTask, input_data: dict[str, Any]) -> TaskResult:
         """Generate embeddings for document chunks.
@@ -352,13 +478,9 @@ class EmbeddingProcessor(BaseTaskProcessor):
             # Extract texts from chunks
             texts: list[str] = [chunk["content"] for chunk in chunks]
 
-            # Get embedding configuration from processing config
-            processing_config = input_data.get("processing_config", {})
-            model_name = processing_config.get(
-                "embedding_model", "text-embedding-ada-002"
-            )
-            # provider = processing_config.get("embedding_provider", "openai")  # TODO: Use for provider selection
-            batch_size = processing_config.get("embedding_batch_size", 100)
+            # Use configuration from injected config
+            model_name = self.config.model
+            batch_size = self.config.batch_size
 
             # Generate embeddings
             embeddings = self.embedding_service.embed_texts(texts)
@@ -427,15 +549,18 @@ class VectorStorageProcessor(BaseTaskProcessor):
         self,
         document_store: DocumentStoreProtocol,
         vector_store: VectorStoreProtocol,
+        config: VectorStorageConfig,
     ):
         """Initialize the vector storage processor.
 
         Args:
             document_store: Store for document metadata
             vector_store: Store for embeddings
+            config: Configuration for vector storage
         """
         self.document_store = document_store
         self.vector_store = vector_store
+        self.config = config
 
     def process(self, task: ProcessingTask, input_data: dict[str, Any]) -> TaskResult:
         """Store document chunks and embeddings.

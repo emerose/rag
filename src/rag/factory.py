@@ -374,13 +374,7 @@ class RAGComponentsFactory:
             PipelineStorage,
             StateTransitionService,
         )
-        from rag.pipeline.models import TaskType
-        from rag.pipeline.processors import (
-            ChunkingProcessor,
-            DocumentLoadingProcessor,
-            EmbeddingProcessor,
-            VectorStorageProcessor,
-        )
+        from rag.pipeline.processors import DefaultProcessorFactory
 
         # Create pipeline storage with proper database URL
         pipeline_db_path = Path(self.config.data_dir) / "pipeline_state.db"
@@ -390,27 +384,16 @@ class RAGComponentsFactory:
         # Create state transition service
         transitions = StateTransitionService(storage)
 
-        # Create processors that use the factory's components
-        processors = {
-            TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(),
-            TaskType.CHUNKING: ChunkingProcessor(self._create_text_splitter_factory()),
-            TaskType.EMBEDDING: EmbeddingProcessor(self.embedding_service),
-            TaskType.VECTOR_STORAGE: VectorStorageProcessor(
-                self.document_store,
-                # Create a vector store that will be saved to the proper location
-                self._create_pipeline_vector_store(),
-            ),
-        }
+        # Create processor factory that uses the factory's components
+        processor_factory = DefaultProcessorFactory(
+            embedding_service=self.embedding_service,
+            document_store=self.document_store,
+            vector_store=self._create_pipeline_vector_store(),
+            text_splitter_factory=self._create_text_splitter_factory(),
+        )
 
-        # Create pipeline config
+        # Create pipeline config (only pipeline-level settings)
         pipeline_config = PipelineConfig(
-            chunk_size=self.config.chunk_size,
-            chunk_overlap=self.config.chunk_overlap,
-            chunking_strategy="recursive",
-            embedding_model=self.config.embedding_model,
-            embedding_provider="openai",
-            embedding_batch_size=128,
-            vector_store_type=self.config.vectorstore_backend,
             data_dir=self.config.data_dir,
             progress_callback=self.runtime.progress_callback,
         )
@@ -419,7 +402,7 @@ class RAGComponentsFactory:
         return Pipeline(
             storage=storage,
             state_transitions=transitions,
-            task_processors=processors,
+            processor_factory=processor_factory,
             config=pipeline_config,
         )
 

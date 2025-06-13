@@ -1181,6 +1181,34 @@ class FakeProcessorFactory:
         should_fail = task_type in self.failing_task_types
         return FakeTaskProcessor(task_type, should_fail=should_fail)
 
+    def create_document_loading_processor(
+        self, document: SourceDocument
+    ) -> FakeTaskProcessor:
+        """Create a document loading processor configured for the given document."""
+        should_fail = TaskType.DOCUMENT_LOADING in self.failing_task_types
+        return FakeTaskProcessor(TaskType.DOCUMENT_LOADING, should_fail=should_fail)
+
+    def create_chunking_processor(self, document: SourceDocument) -> FakeTaskProcessor:
+        """Create a chunking processor configured for the given document."""
+        should_fail = TaskType.CHUNKING in self.failing_task_types
+        return FakeTaskProcessor(TaskType.CHUNKING, should_fail=should_fail)
+
+    def create_embedding_processor(self, document: SourceDocument) -> FakeTaskProcessor:
+        """Create an embedding processor configured for the given document."""
+        should_fail = TaskType.EMBEDDING in self.failing_task_types
+        return FakeTaskProcessor(TaskType.EMBEDDING, should_fail=should_fail)
+
+    def create_vector_storage_processor(
+        self, document: SourceDocument
+    ) -> FakeTaskProcessor:
+        """Create a vector storage processor configured for the given document."""
+        should_fail = TaskType.VECTOR_STORAGE in self.failing_task_types
+        return FakeTaskProcessor(TaskType.VECTOR_STORAGE, should_fail=should_fail)
+
+    def get_vector_store(self) -> FakeVectorStore | None:
+        """Get the vector store instance if available."""
+        return self.vector_store
+
 
 # Factory function for creating complete fake pipeline setup
 def create_fake_pipeline_components(

@@ -12,14 +12,10 @@ from typing import Any
 
 from rag.config import RAGConfig
 from rag.embeddings.protocols import EmbeddingServiceProtocol
-from rag.pipeline.models import TaskType
 from rag.pipeline.pipeline import Pipeline, PipelineConfig
 from rag.pipeline.processors import (
-    ChunkingProcessor,
-    DocumentLoadingProcessor,
-    EmbeddingProcessor,
-    TaskProcessor,
-    VectorStorageProcessor,
+    DefaultProcessorFactory,
+    ProcessorFactory,
 )
 from rag.pipeline.storage import PipelineStorage
 from rag.pipeline.transitions import StateTransitionService
@@ -68,15 +64,8 @@ class PipelineFactory:
         if config is None:
             config = RAGConfig(documents_dir="./documents")
 
-        # Create pipeline config
+        # Create pipeline config (only pipeline-level settings)
         pipeline_config = PipelineConfig(
-            chunk_size=config.chunk_size,
-            chunk_overlap=config.chunk_overlap,
-            chunking_strategy="recursive",
-            embedding_model=config.embedding_model,
-            embedding_provider="openai",
-            embedding_batch_size=100,
-            vector_store_type="faiss",
             database_url=database_url or "sqlite:///pipeline_state.db",
             progress_callback=progress_callback,
         )
@@ -117,21 +106,19 @@ class PipelineFactory:
             chunk_overlap=config.chunk_overlap,
         )
 
-        # Create task processors
-        processors = {
-            TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(),
-            TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
-            TaskType.EMBEDDING: EmbeddingProcessor(embedding_service),
-            TaskType.VECTOR_STORAGE: VectorStorageProcessor(
-                document_store, vector_store
-            ),
-        }
+        # Create processor factory
+        processor_factory = DefaultProcessorFactory(
+            embedding_service=embedding_service,
+            document_store=document_store,
+            vector_store=vector_store,
+            text_splitter_factory=text_splitter_factory,
+        )
 
         # Create pipeline
         return Pipeline(
             storage=storage,
             state_transitions=transitions,
-            task_processors=processors,
+            processor_factory=processor_factory,
             config=pipeline_config,
         )
 
@@ -159,40 +146,35 @@ class PipelineFactory:
         # Create text splitter factory
         from rag.data.text_splitter import TextSplitterFactory
 
-        text_splitter_factory = TextSplitterFactory(
-            chunk_size=config.chunk_size,
-            chunk_overlap=config.chunk_overlap,
-        )
+        text_splitter_factory = TextSplitterFactory()
 
-        # Create task processors
-        processors = {
-            TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(),
-            TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
-            TaskType.EMBEDDING: EmbeddingProcessor(dependencies.embedding_service),
-            TaskType.VECTOR_STORAGE: VectorStorageProcessor(
-                dependencies.document_store, dependencies.vector_store
-            ),
-        }
+        # Create processor factory
+        processor_factory = DefaultProcessorFactory(
+            embedding_service=dependencies.embedding_service,
+            document_store=dependencies.document_store,
+            vector_store=dependencies.vector_store,
+            text_splitter_factory=text_splitter_factory,
+        )
 
         # Create pipeline
         return Pipeline(
             storage=dependencies.storage,
             state_transitions=transitions,
-            task_processors=processors,
+            processor_factory=processor_factory,
             config=config,
         )
 
     @staticmethod
     def create_for_testing(
         storage: PipelineStorage | None = None,
-        processors: dict[TaskType, TaskProcessor] | None = None,
+        processor_factory: ProcessorFactory | None = None,
         config: PipelineConfig | None = None,
     ) -> Pipeline:
         """Create a pipeline for testing with mock dependencies.
 
         Args:
             storage: Optional storage (uses in-memory SQLite if not provided)
-            processors: Optional task processors
+            processor_factory: Optional processor factory
             config: Optional configuration
 
         Returns:
@@ -209,8 +191,8 @@ class PipelineFactory:
         # Create transitions
         transitions = StateTransitionService(storage)
 
-        # Use provided processors or create minimal set
-        if processors is None:
+        # Use provided processor factory or create minimal set
+        if processor_factory is None:
             # Create minimal fake dependencies for testing
             from unittest.mock import Mock
 
@@ -223,24 +205,18 @@ class PipelineFactory:
             # Create text splitter factory
             from rag.data.text_splitter import TextSplitterFactory
 
-            text_splitter_factory = TextSplitterFactory(
-                chunk_size=config.chunk_size,
-                chunk_overlap=config.chunk_overlap,
-            )
+            text_splitter_factory = TextSplitterFactory()
 
-            processors = {
-                TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(),
-                TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
-                TaskType.EMBEDDING: EmbeddingProcessor(fake_embedding_service),
-                TaskType.VECTOR_STORAGE: VectorStorageProcessor(
-                    fake_doc_store,
-                    InMemoryVectorStore(),
-                ),
-            }
+            processor_factory = DefaultProcessorFactory(
+                embedding_service=fake_embedding_service,
+                document_store=fake_doc_store,
+                vector_store=InMemoryVectorStore(),
+                text_splitter_factory=text_splitter_factory,
+            )
 
         return Pipeline(
             storage=storage,
             state_transitions=transitions,
-            task_processors=processors,
+            processor_factory=processor_factory,
             config=config,
         )

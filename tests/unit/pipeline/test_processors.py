@@ -11,6 +11,10 @@ from rag.pipeline.processors import (
     EmbeddingProcessor,
     VectorStorageProcessor,
     TaskResult,
+    DocumentLoadingConfig,
+    ChunkingConfig,
+    EmbeddingConfig,
+    VectorStorageConfig,
 )
 
 
@@ -69,7 +73,8 @@ class TestDocumentLoadingProcessor:
     @pytest.fixture
     def processor(self):
         """Create a DocumentLoadingProcessor."""
-        return DocumentLoadingProcessor()
+        config = DocumentLoadingConfig()
+        return DocumentLoadingProcessor(config)
 
     def test_task_type(self, processor):
         """Test that processor has correct task type."""
@@ -151,7 +156,9 @@ class TestChunkingProcessor:
     @pytest.fixture
     def processor(self, mock_text_splitter_factory):
         """Create a ChunkingProcessor with mocked dependencies."""
+        config = ChunkingConfig()
         return ChunkingProcessor(
+            config=config,
             text_splitter_factory=mock_text_splitter_factory
         )
 
@@ -231,8 +238,10 @@ class TestEmbeddingProcessor:
     @pytest.fixture
     def processor(self, mock_embedding_service):
         """Create an EmbeddingProcessor with mocked dependencies."""
+        config = EmbeddingConfig()
         return EmbeddingProcessor(
-            embedding_service=mock_embedding_service
+            embedding_service=mock_embedding_service,
+            config=config
         )
 
     def test_task_type(self, processor):
@@ -332,9 +341,11 @@ class TestVectorStorageProcessor:
     @pytest.fixture
     def processor(self, mock_document_store, mock_vector_store):
         """Create a VectorStorageProcessor with mocked dependencies."""
+        config = VectorStorageConfig()
         return VectorStorageProcessor(
             document_store=mock_document_store,
-            vector_store=mock_vector_store
+            vector_store=mock_vector_store,
+            config=config
         )
 
     def test_task_type(self, processor):

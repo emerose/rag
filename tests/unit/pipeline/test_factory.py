@@ -72,12 +72,12 @@ class TestPipelineFactory:
             
             # Use provided arguments to avoid complex dependencies
             test_storage = Mock()
-            test_processors = {}
+            test_processor_factory = Mock()
             test_config = Mock()
             
             pipeline = PipelineFactory.create_for_testing(
                 storage=test_storage,
-                processors=test_processors,
+                processor_factory=test_processor_factory,
                 config=test_config
             )
             
