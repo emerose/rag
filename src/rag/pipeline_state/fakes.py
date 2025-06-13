@@ -7,7 +7,6 @@ to support dependency injection testing without complex mocking.
 from __future__ import annotations
 
 import hashlib
-import time
 from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -858,11 +857,13 @@ class FakeDocumentStore:
         self.source_links: dict[str, list[tuple[str, int]]] = defaultdict(
             list
         )  # source_id -> [(doc_id, order)]
+        self._doc_counter = 0  # Simple counter for unique IDs
 
     def store_documents(self, documents: list[Document]) -> None:
         """Store documents."""
         for i, doc in enumerate(documents):
-            doc_id = f"stored-doc-{i}-{int(time.time())}"
+            doc_id = f"stored-doc-{self._doc_counter}-{i}"
+            self._doc_counter += 1
             self.documents[doc_id] = doc
 
     def get_documents(self, filters: dict[str, Any] | None = None) -> list[Document]:

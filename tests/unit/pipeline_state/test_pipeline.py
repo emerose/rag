@@ -151,8 +151,7 @@ class TestPipeline:
         """Test running a pipeline successfully."""
         execution_id = fake_components["execution_id"]
         
-        with patch('time.time', side_effect=[1000.0, 1002.5]):  # 2.5 second execution
-            result = pipeline.run(execution_id)
+        result = pipeline.run(execution_id)
         
         assert result.state == PipelineState.COMPLETED
         assert result.execution_id == execution_id
@@ -455,8 +454,7 @@ class TestPipeline:
             document_store=None,
         )
         
-        with patch('time.time', side_effect=[1000.0, 1001.0]):
-            result = broken_pipeline.run(execution_id)
+        result = broken_pipeline.run(execution_id)
         
         # With broken storage, the pipeline may not complete successfully
         # We mainly want to test that the pipeline handles errors gracefully
