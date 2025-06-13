@@ -8,7 +8,7 @@ import pytest
 def test_vulture_check():
     """Run vulture dead code detection."""
     result = subprocess.run(
-        ["vulture", "src/rag"],
+        ["vulture", "--config", "vulture.toml"],
         capture_output=True,
         text=True,
     )
