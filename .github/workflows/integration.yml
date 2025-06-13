@@ -32,6 +32,6 @@ jobs:
       - name: Run e2e tests
         run: |
           . .venv/bin/activate
-          python scripts/run_tests.py e2e --full-output
-        # Uses enhanced test runner for consistent output formatting
-        # --full-output provides detailed pytest output for CI debugging
+          python scripts/check e2e -v --tb=short
+        # Uses pytest-based test runner for consistent output formatting
+        # -v --tb=short provides detailed pytest output for CI debugging

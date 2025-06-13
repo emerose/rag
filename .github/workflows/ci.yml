@@ -47,6 +47,6 @@ jobs:
         run: uv pip list
 
       - name: Run all quality checks and tests  
-        run: uv run python scripts/run_tests.py check --full-output
-        # Uses enhanced test runner with static analysis + unit + integration tests
-        # --full-output provides verbose CI logging while respecting error baselines
+        run: uv run python scripts/check -v --tb=short
+        # Uses pytest-based test runner with static analysis + unit + integration tests
+        # -v --tb=short provides verbose CI logging with concise error reporting
