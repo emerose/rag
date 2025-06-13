@@ -294,32 +294,74 @@ def run_pytest_with_execution_plan(marker_args: List[str], pytest_flags: List[st
         return result.returncode
 
 
+def print_help():
+    """Print custom help message with usage and available markers."""
+    markers = get_available_markers()
+    
+    print("Check - pytest test runner with execution planning")
+    print()
+    print("USAGE:")
+    print("    scripts/check [test-categories...] [pytest-flags...]")
+    print()
+    print("DESCRIPTION:")
+    print("    A pytest wrapper that shows execution plans and supports marker-based test selection.")
+    print("    Combines static analysis, unit tests, and integration tests in a unified runner.")
+    print()
+    print("AVAILABLE MARKERS:")
+    for marker, description in markers.items():
+        print(f"    {marker:<12} - {description}")
+    print()
+    print("EXAMPLES:")
+    print("    scripts/check                          # Run all check tests (static + unit + integration)")
+    print("    scripts/check static                   # Run static analysis only")
+    print("    scripts/check unit                     # Run unit tests only")
+    print("    scripts/check integration              # Run integration tests only")
+    print("    scripts/check e2e                      # Run end-to-end tests only")
+    print("    scripts/check static not vulture       # Run static analysis except vulture")
+    print("    scripts/check unit integration         # Run unit and integration tests")
+    print("    scripts/check static -x                # Run static tests, stop on first failure")
+    print("    scripts/check unit -v --tb=short       # Run unit tests with verbose output")
+    print("    scripts/check ruff                     # Run only ruff checks")
+    print("    scripts/check pyright                  # Run only pyright type checking")
+    print("    scripts/check --collect-only           # Show what tests would run without executing")
+    print()
+    print("MARKER EXPRESSIONS:")
+    print("    Use 'not' to exclude markers:         scripts/check static not vulture")
+    print("    Use multiple markers for OR logic:    scripts/check unit integration")
+    print("    Use with 'not' for AND logic:         scripts/check static not ruff not vulture")
+    print()
+    print("PYTEST FLAGS:")
+    print("    Any pytest flags can be passed through:")
+    print("    -x, --exitfirst                       Stop on first failure")
+    print("    -v, --verbose                          Verbose output")
+    print("    --tb=short|long|line|no                Traceback format")
+    print("    --collect-only                         Show tests without running")
+    print("    -k EXPRESSION                          Run tests matching expression")
+    print("    --lf, --last-failed                    Run only previously failed tests")
+    print("    --ff, --failed-first                   Run failed tests first")
+    print()
+    print("For full pytest options, see: https://docs.pytest.org/en/stable/usage.html")
+
+
 def main():
     """Main entry point for the check wrapper."""
     # Parse arguments (skip script name)
     all_args = sys.argv[1:]
     
-    # If no args, show usage but also run default
+    # Check for help flags first
+    if "-h" in all_args or "--help" in all_args:
+        print_help()
+        return 0
+    
+    # If no args, run default check without any usage info
     if not all_args:
-        print("Usage: python scripts/check.py [test-categories...] [pytest-flags...]")
-        print()
-        print("Examples:")
-        print("  python scripts/check.py                    # Run check marker (static + unit + integration)")
-        print("  python scripts/check.py static             # Run static analysis tests")
-        print("  python scripts/check.py static not vulture # Run static tests except vulture")
-        print("  python scripts/check.py unit integration   # Run unit and integration tests")
-        print("  python scripts/check.py e2e                # Run end-to-end tests")
-        print("  python scripts/check.py static -x          # Run static tests, stop on first failure")
-        print("  python scripts/check.py unit -v --tb=short # Run unit tests with verbose output")
-        print()
-        print("Running default 'check' command...")
-        print()
-        
-        # Run default check
         return run_pytest_with_execution_plan([], [])
     
+    # Remove help flags from args before processing (they've been handled above)
+    filtered_args = [arg for arg in all_args if arg not in ["-h", "--help"]]
+    
     # Separate marker arguments from pytest flags
-    marker_args, pytest_flags = separate_marker_args_from_pytest_args(all_args)
+    marker_args, pytest_flags = separate_marker_args_from_pytest_args(filtered_args)
     
     # Run pytest with execution plan
     return run_pytest_with_execution_plan(marker_args, pytest_flags)
