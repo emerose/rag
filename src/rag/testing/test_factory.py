@@ -357,17 +357,52 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 filesystem_manager=factory._filesystem_manager,
             )
 
-            # Create new pipeline with real document store
+            # Create new pipeline with real document store and real processors
             from rag.pipeline_state.fakes import (
                 FakePipelineStorage,
-                FakeProcessorFactory,
                 FakeStateTransitionService,
             )
+            from rag.pipeline_state.models import TaskType
             from rag.pipeline_state.pipeline import Pipeline, PipelineConfig
+            from rag.pipeline_state.processors import (
+                ChunkingProcessor,
+                DocumentLoadingProcessor,
+                EmbeddingProcessor,
+                VectorStorageProcessor,
+            )
 
             fake_storage = FakePipelineStorage()
             fake_transition_service = FakeStateTransitionService(fake_storage)
-            fake_processor_factory = FakeProcessorFactory()
+
+            # Create real processors that will interact with the real document store
+            from rag.data.text_splitter import TextSplitterFactory
+
+            text_splitter_factory = TextSplitterFactory(
+                chunk_size=config.chunk_size,
+                chunk_overlap=config.chunk_overlap,
+            )
+
+            # Create a fake vector store for integration tests
+            from rag.storage.fakes import InMemoryVectorStore
+
+            fake_vector_store = InMemoryVectorStore()
+
+            # Create real processors - these will actually call document store methods
+            from typing import cast
+
+            from rag.sources.base import DocumentSourceProtocol
+
+            real_processors = {
+                TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(
+                    cast(DocumentSourceProtocol, factory._document_source)
+                ),
+                TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
+                TaskType.EMBEDDING: EmbeddingProcessor(factory._raw_embedding_service),
+                TaskType.VECTOR_STORAGE: VectorStorageProcessor(
+                    factory._document_store,  # Real document store
+                    fake_vector_store,
+                ),
+            }
 
             # Convert RAGConfig to PipelineConfig
             pipeline_config = PipelineConfig(
@@ -380,11 +415,11 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 vector_store_type=config.vectorstore_backend,
             )
 
-            # Create pipeline with real document store
+            # Create pipeline with real document store and real processors
             real_pipeline = Pipeline(
                 storage=fake_storage,
-                transition_service=fake_transition_service,
-                processor_factory=fake_processor_factory,
+                state_transitions=fake_transition_service,
+                task_processors=real_processors,  # Use real processors
                 document_source=factory._document_source,
                 config=pipeline_config,
                 document_store=factory._document_store,  # Pass real document store
@@ -409,17 +444,52 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
             factory._document_store = SQLAlchemyDocumentStore(data_dir / "documents.db")
 
-            # Create new pipeline with real document store
+            # Create new pipeline with real document store and real processors
             from rag.pipeline_state.fakes import (
                 FakePipelineStorage,
-                FakeProcessorFactory,
                 FakeStateTransitionService,
             )
+            from rag.pipeline_state.models import TaskType
             from rag.pipeline_state.pipeline import Pipeline, PipelineConfig
+            from rag.pipeline_state.processors import (
+                ChunkingProcessor,
+                DocumentLoadingProcessor,
+                EmbeddingProcessor,
+                VectorStorageProcessor,
+            )
 
             fake_storage = FakePipelineStorage()
             fake_transition_service = FakeStateTransitionService(fake_storage)
-            fake_processor_factory = FakeProcessorFactory()
+
+            # Create real processors that will interact with the real document store
+            from rag.data.text_splitter import TextSplitterFactory
+
+            text_splitter_factory = TextSplitterFactory(
+                chunk_size=config.chunk_size,
+                chunk_overlap=config.chunk_overlap,
+            )
+
+            # Create a fake vector store for integration tests
+            from rag.storage.fakes import InMemoryVectorStore
+
+            fake_vector_store = InMemoryVectorStore()
+
+            # Create real processors - these will actually call document store methods
+            from typing import cast
+
+            from rag.sources.base import DocumentSourceProtocol
+
+            real_processors = {
+                TaskType.DOCUMENT_LOADING: DocumentLoadingProcessor(
+                    cast(DocumentSourceProtocol, factory._document_source)
+                ),
+                TaskType.CHUNKING: ChunkingProcessor(text_splitter_factory),
+                TaskType.EMBEDDING: EmbeddingProcessor(factory._raw_embedding_service),
+                TaskType.VECTOR_STORAGE: VectorStorageProcessor(
+                    factory._document_store,  # Real document store
+                    fake_vector_store,
+                ),
+            }
 
             # Convert RAGConfig to PipelineConfig
             pipeline_config = PipelineConfig(
@@ -432,11 +502,11 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 vector_store_type=config.vectorstore_backend,
             )
 
-            # Create pipeline with real document store
+            # Create pipeline with real document store and real processors
             real_pipeline = Pipeline(
                 storage=fake_storage,
-                transition_service=fake_transition_service,
-                processor_factory=fake_processor_factory,
+                state_transitions=fake_transition_service,
+                task_processors=real_processors,  # Use real processors
                 document_source=factory._document_source,
                 config=pipeline_config,
                 document_store=factory._document_store,  # Pass real document store

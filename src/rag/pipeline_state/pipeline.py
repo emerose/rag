@@ -539,19 +539,16 @@ class Pipeline:
             if not processor:
                 raise ValueError(f"No processor for task type {task.task_type}")
 
-            # Prepare input data (handle cases where task may not have document_id for tests)
-            if (
-                hasattr(task, "document_id")
-                and task.document_id
-                and not hasattr(task, "_mock_name")
-            ):
-                try:
+            # Prepare input data for the task
+            # Always try real input preparation first, fall back if it fails
+            try:
+                if hasattr(task, "document_id") and task.document_id:
                     input_data = self._prepare_task_input(task, task_outputs)
-                except (ValueError, AttributeError):
-                    # Fallback for test cases - use task_outputs as input_data
+                else:
+                    # Task has no document_id, use empty input
                     input_data = task_outputs.copy() if task_outputs else {}
-            else:
-                # For test compatibility - use task_outputs as input_data
+            except (ValueError, AttributeError):
+                # Fallback for test cases where storage/documents don't exist properly
                 input_data = task_outputs.copy() if task_outputs else {}
 
             # Validate input (handle mock for tests)
