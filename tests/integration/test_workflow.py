@@ -116,15 +116,20 @@ class TestRAGWorkflow:
         original_factory = _engine_factory_provider
 
         try:
-            # Set the fake factory as the CLI's engine factory provider
-            set_engine_factory_provider(
-                lambda config,
-                runtime: FakeRAGComponentsFactory.create_for_integration_tests(
+            # Set the fake factory as the CLI's engine factory provider  
+            # Use fake filesystem to avoid hanging in path resolution during CLI tests
+            def create_cli_safe_factory(config, runtime):
+                factory = FakeRAGComponentsFactory.create_for_integration_tests(
                     config=config,
                     runtime=runtime,
-                    use_real_filesystem=True,  # Use real files but fake OpenAI
+                    use_real_filesystem=False,  # Use fake filesystem for CLI tests
                 )
-            )
+                # Add the sample file to the fake document source
+                sample_content = sample_file_path.read_text()
+                factory._document_source.add_document("sample.txt", sample_content)
+                return factory
+            
+            set_engine_factory_provider(create_cli_safe_factory)
 
             # Print some debug information about the test environment
             print(f"\nRunning workflow test with data dir: {test_data_dir}")

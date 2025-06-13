@@ -21,7 +21,10 @@ from rag.config.components import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any
+    pass
+
+from typing import Any
+
 from rag.embeddings.fake_openai import FakeOpenAI
 from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
 from rag.embeddings.protocols import EmbeddingServiceProtocol
@@ -317,6 +320,26 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         if runtime is None:
             runtime = RuntimeOptions()
 
+        # Import shared types at the top
+        from langchain_core.documents import Document
+
+        # Define shared vector store factory class for integration tests
+        class SharedVectorStoreFactory:
+            def __init__(self, vector_store_instance: Any) -> None:
+                self.vector_store_instance = vector_store_instance
+
+            def create_empty(self) -> Any:
+                return self.vector_store_instance
+
+            def create_from_documents(self, documents: list[Document]) -> Any:
+                # Add documents to the existing instance and return it
+                self.vector_store_instance.add_documents(documents)
+                return self.vector_store_instance
+
+            def load_from_path(self, path: str) -> Any:
+                # For integration tests, just return the shared instance
+                return self.vector_store_instance
+
         # For integration tests, we want minimal fake components but real file operations
         if use_real_filesystem:
             # Use minimal fake components - primarily just fake external APIs
@@ -387,6 +410,10 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
             fake_vector_store = InMemoryVectorStore()
 
+            # Override the vectorstore factory to use the shared instance
+            # This ensures the query engine uses the same vector store that the pipeline populates
+            factory._vectorstore_factory = SharedVectorStoreFactory(fake_vector_store)
+
             # Create real processors - these will actually call document store methods
             from typing import cast
 
@@ -400,7 +427,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 TaskType.EMBEDDING: EmbeddingProcessor(factory._raw_embedding_service),
                 TaskType.VECTOR_STORAGE: VectorStorageProcessor(
                     factory._document_store,  # Real document store
-                    fake_vector_store,
+                    fake_vector_store,  # Same instance used by the query engine
                 ),
             }
 
@@ -474,6 +501,10 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
             fake_vector_store = InMemoryVectorStore()
 
+            # Override the vectorstore factory to use the shared instance
+            # This ensures the query engine uses the same vector store that the pipeline populates
+            factory._vectorstore_factory = SharedVectorStoreFactory(fake_vector_store)
+
             # Create real processors - these will actually call document store methods
             from typing import cast
 
@@ -487,7 +518,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 TaskType.EMBEDDING: EmbeddingProcessor(factory._raw_embedding_service),
                 TaskType.VECTOR_STORAGE: VectorStorageProcessor(
                     factory._document_store,  # Real document store
-                    fake_vector_store,
+                    fake_vector_store,  # Same instance used by the query engine
                 ),
             }
 
