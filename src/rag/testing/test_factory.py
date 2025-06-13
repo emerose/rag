@@ -193,19 +193,19 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         )
 
         # Create fake pipeline
-        from rag.pipeline_state.fakes import (
+        from rag.pipeline.fakes import (
             FakeDocumentSource,
             FakePipelineStorage,
             FakeStateTransitionService,
         )
-        from rag.pipeline_state.pipeline import Pipeline
+        from rag.pipeline.pipeline import Pipeline
 
         fake_storage = FakePipelineStorage()
         fake_transition_service = FakeStateTransitionService(fake_storage)
         fake_document_source = FakeDocumentSource()
 
         # Convert RAGConfig to PipelineConfig if needed
-        from rag.pipeline_state.pipeline import PipelineConfig
+        from rag.pipeline.pipeline import PipelineConfig
 
         pipeline_config = PipelineConfig(
             chunk_size=config.chunk_size,
@@ -379,13 +379,13 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             )
 
             # Create new pipeline with real document store and real processors
-            from rag.pipeline_state.fakes import (
+            from rag.pipeline.fakes import (
                 FakePipelineStorage,
                 FakeStateTransitionService,
             )
-            from rag.pipeline_state.models import TaskType
-            from rag.pipeline_state.pipeline import Pipeline, PipelineConfig
-            from rag.pipeline_state.processors import (
+            from rag.pipeline.models import TaskType
+            from rag.pipeline.pipeline import Pipeline, PipelineConfig
+            from rag.pipeline.processors import (
                 ChunkingProcessor,
                 DocumentLoadingProcessor,
                 EmbeddingProcessor,
@@ -470,13 +470,13 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             factory._document_store = SQLAlchemyDocumentStore(data_dir / "documents.db")
 
             # Create new pipeline with real document store and real processors
-            from rag.pipeline_state.fakes import (
+            from rag.pipeline.fakes import (
                 FakePipelineStorage,
                 FakeStateTransitionService,
             )
-            from rag.pipeline_state.models import TaskType
-            from rag.pipeline_state.pipeline import Pipeline, PipelineConfig
-            from rag.pipeline_state.processors import (
+            from rag.pipeline.models import TaskType
+            from rag.pipeline.pipeline import Pipeline, PipelineConfig
+            from rag.pipeline.processors import (
                 ChunkingProcessor,
                 DocumentLoadingProcessor,
                 EmbeddingProcessor,

@@ -368,14 +368,14 @@ class RAGComponentsFactory:
 
     def _create_integrated_pipeline(self) -> Any:
         """Create a pipeline that integrates with the RAG engine's vector store."""
-        from rag.pipeline_state import (
+        from rag.pipeline import (
             Pipeline,
             PipelineConfig,
             PipelineStorage,
             StateTransitionService,
         )
-        from rag.pipeline_state.models import TaskType
-        from rag.pipeline_state.processors import (
+        from rag.pipeline.models import TaskType
+        from rag.pipeline.processors import (
             ChunkingProcessor,
             DocumentLoadingProcessor,
             EmbeddingProcessor,

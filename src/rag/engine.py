@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 from rag.config import RAGConfig, RuntimeOptions
 from rag.embeddings.batching import EmbeddingBatcher
-from rag.pipeline_state import Pipeline, PipelineState
+from rag.pipeline import Pipeline, PipelineState
 from rag.storage.protocols import DocumentStoreProtocol, VectorStoreProtocol
 from rag.storage.vector_store import VectorStoreFactory
 

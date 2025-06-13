@@ -3,8 +3,8 @@
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 
-from rag.pipeline_state.models import ProcessingTask, TaskType, TaskState
-from rag.pipeline_state.processors import (
+from rag.pipeline.models import ProcessingTask, TaskType, TaskState
+from rag.pipeline.processors import (
     BaseTaskProcessor,
     DocumentLoadingProcessor,
     ChunkingProcessor,

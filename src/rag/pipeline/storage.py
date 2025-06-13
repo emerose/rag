@@ -13,7 +13,7 @@ from typing import Any
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
-from rag.pipeline_state.models import (
+from rag.pipeline.models import (
     Base,
     ChunkingTask,
     DocumentLoadingTask,

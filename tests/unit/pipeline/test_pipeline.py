@@ -3,20 +3,20 @@
 import pytest
 from unittest.mock import Mock, patch
 
-from rag.pipeline_state.fakes import (
+from rag.pipeline.fakes import (
     FakeDocumentSource,
     FakePipelineStorage,
     FakeProcessorFactory,
     FakeStateTransitionService,
     create_fake_pipeline_components,
 )
-from rag.pipeline_state.models import PipelineState, TaskState, TaskType
-from rag.pipeline_state.pipeline import (
+from rag.pipeline.models import PipelineState, TaskState, TaskType
+from rag.pipeline.pipeline import (
     Pipeline,
     PipelineExecutionResult,
     PipelineConfig,
 )
-from rag.pipeline_state.processors import TaskResult
+from rag.pipeline.processors import TaskResult
 
 
 class TestPipelineExecutionResult:

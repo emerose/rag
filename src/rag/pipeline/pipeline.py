@@ -11,9 +11,9 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
-from rag.pipeline_state.models import PipelineState, ProcessingTask, TaskState, TaskType
-from rag.pipeline_state.processors import TaskProcessor
-from rag.pipeline_state.transitions import (
+from rag.pipeline.models import PipelineState, ProcessingTask, TaskState, TaskType
+from rag.pipeline.processors import TaskProcessor
+from rag.pipeline.transitions import (
     PipelineStorageProtocol,
     StateTransitionServiceProtocol,
 )
@@ -593,7 +593,7 @@ class Pipeline:
             logger.error(f"Task {task.id} failed: {e}")
 
             # Create failure result for test compatibility
-            from rag.pipeline_state.processors import TaskResult
+            from rag.pipeline.processors import TaskResult
 
             failure_result = TaskResult.create_failure(
                 error_message=str(e), error_details={"exception_type": type(e).__name__}

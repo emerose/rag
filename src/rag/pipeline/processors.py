@@ -15,7 +15,7 @@ from langchain_core.documents import Document
 
 from rag.data.text_splitter import TextSplitterFactory
 from rag.embeddings.protocols import EmbeddingServiceProtocol
-from rag.pipeline_state.models import ProcessingTask, TaskType
+from rag.pipeline.models import ProcessingTask, TaskType
 from rag.sources.base import DocumentSourceProtocol
 from rag.storage.protocols import DocumentStoreProtocol, VectorStoreProtocol
 from rag.utils.logging_utils import get_logger

@@ -16,7 +16,7 @@ from unittest.mock import Mock
 
 from langchain_core.documents import Document
 
-from rag.pipeline_state.models import (
+from rag.pipeline.models import (
     DocumentProcessing,
     PipelineExecution,
     PipelineState,
@@ -24,8 +24,8 @@ from rag.pipeline_state.models import (
     TaskState,
     TaskType,
 )
-from rag.pipeline_state.processors import TaskResult
-from rag.pipeline_state.transitions import TransitionResult
+from rag.pipeline.processors import TaskResult
+from rag.pipeline.transitions import TransitionResult
 from rag.sources.base import SourceDocument
 
 

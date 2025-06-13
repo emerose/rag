@@ -4,21 +4,21 @@ import pytest
 from datetime import datetime
 from unittest.mock import Mock, patch
 
-from rag.pipeline_state.models import (
+from rag.pipeline.models import (
     PipelineExecution, DocumentProcessing, ProcessingTask,
     PipelineState, TaskState, TaskType
 )
-from rag.pipeline_state.storage import PipelineStorage
+from rag.pipeline.storage import PipelineStorage
 
 
 @pytest.fixture
 def storage():
     """Create a PipelineStorage instance with in-memory database."""
-    with patch('rag.pipeline_state.storage.create_engine') as mock_create_engine:
+    with patch('rag.pipeline.storage.create_engine') as mock_create_engine:
         # Create a real in-memory SQLite engine for testing
         from sqlalchemy import create_engine, event
         from sqlalchemy.orm import sessionmaker
-        from rag.pipeline_state.models import Base
+        from rag.pipeline.models import Base
         
         engine = create_engine("sqlite:///:memory:")
         

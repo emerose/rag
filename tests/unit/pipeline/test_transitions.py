@@ -3,8 +3,8 @@
 import pytest
 from unittest.mock import Mock, MagicMock
 
-from rag.pipeline_state.models import PipelineState, ProcessingTask, TaskState, TaskType
-from rag.pipeline_state.transitions import (
+from rag.pipeline.models import PipelineState, ProcessingTask, TaskState, TaskType
+from rag.pipeline.transitions import (
     StateTransitionError,
     StateTransitionService,
     TransitionResult,

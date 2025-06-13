@@ -12,17 +12,17 @@ from typing import Any
 
 from rag.config import RAGConfig
 from rag.embeddings.protocols import EmbeddingServiceProtocol
-from rag.pipeline_state.models import TaskType
-from rag.pipeline_state.pipeline import Pipeline, PipelineConfig
-from rag.pipeline_state.processors import (
+from rag.pipeline.models import TaskType
+from rag.pipeline.pipeline import Pipeline, PipelineConfig
+from rag.pipeline.processors import (
     ChunkingProcessor,
     DocumentLoadingProcessor,
     EmbeddingProcessor,
     TaskProcessor,
     VectorStorageProcessor,
 )
-from rag.pipeline_state.storage import PipelineStorage
-from rag.pipeline_state.transitions import StateTransitionService
+from rag.pipeline.storage import PipelineStorage
+from rag.pipeline.transitions import StateTransitionService
 from rag.sources.base import DocumentSourceProtocol
 from rag.sources.filesystem import FilesystemDocumentSource
 from rag.storage.fakes import InMemoryVectorStore

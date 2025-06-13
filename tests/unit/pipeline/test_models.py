@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from rag.pipeline_state.models import (
+from rag.pipeline.models import (
     Base,
     ChunkingTask,
     DocumentLoadingTask,

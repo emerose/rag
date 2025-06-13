@@ -1,7 +1,7 @@
 """Database-backed state machine for the ingestion pipeline."""
 
-from rag.pipeline_state.factory import PipelineDependencies, PipelineFactory
-from rag.pipeline_state.models import (
+from rag.pipeline.factory import PipelineDependencies, PipelineFactory
+from rag.pipeline.models import (
     Base,
     ChunkingTask,
     DocumentLoadingTask,
@@ -14,13 +14,13 @@ from rag.pipeline_state.models import (
     TaskType,
     VectorStorageTask,
 )
-from rag.pipeline_state.pipeline import (
+from rag.pipeline.pipeline import (
     IngestAllResult,
     Pipeline,
     PipelineConfig,
     PipelineExecutionResult,
 )
-from rag.pipeline_state.processors import (
+from rag.pipeline.processors import (
     ChunkingProcessor,
     DocumentLoadingProcessor,
     EmbeddingProcessor,
@@ -28,8 +28,8 @@ from rag.pipeline_state.processors import (
     TaskResult,
     VectorStorageProcessor,
 )
-from rag.pipeline_state.storage import PipelineStorage
-from rag.pipeline_state.transitions import (
+from rag.pipeline.storage import PipelineStorage
+from rag.pipeline.transitions import (
     StateTransitionError,
     StateTransitionService,
     TransitionResult,

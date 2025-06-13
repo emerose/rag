@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 from pathlib import Path
 
 from rag.config import RAGConfig
-from rag.pipeline_state.factory import PipelineFactory
+from rag.pipeline.factory import PipelineFactory
 
 
 class TestPipelineFactory:
@@ -33,13 +33,13 @@ class TestPipelineFactory:
             chat_model="gpt-3.5-turbo",
         )
         
-        with patch('rag.pipeline_state.factory.PipelineStorage') as mock_storage, \
-             patch('rag.pipeline_state.factory.StateTransitionService'), \
-             patch('rag.pipeline_state.factory.Pipeline') as mock_pipeline_class, \
-             patch('rag.pipeline_state.factory.FilesystemDocumentSource'), \
+        with patch('rag.pipeline.factory.PipelineStorage') as mock_storage, \
+             patch('rag.pipeline.factory.StateTransitionService'), \
+             patch('rag.pipeline.factory.Pipeline') as mock_pipeline_class, \
+             patch('rag.pipeline.factory.FilesystemDocumentSource'), \
              patch('rag.embeddings.EmbeddingProvider'), \
-             patch('rag.pipeline_state.factory.SQLAlchemyDocumentStore') as mock_doc_store, \
-             patch('rag.pipeline_state.factory.InMemoryVectorStore') as mock_vector_store, \
+             patch('rag.pipeline.factory.SQLAlchemyDocumentStore') as mock_doc_store, \
+             patch('rag.pipeline.factory.InMemoryVectorStore') as mock_vector_store, \
              patch('rag.data.text_splitter.TextSplitterFactory'):
             
             mock_pipeline = Mock()
@@ -57,11 +57,11 @@ class TestPipelineFactory:
 
     def test_create_for_testing(self):
         """Test creating a pipeline for testing."""
-        with patch('rag.pipeline_state.factory.PipelineStorage') as mock_storage, \
-             patch('rag.pipeline_state.factory.StateTransitionService') as mock_transitions, \
-             patch('rag.pipeline_state.factory.Pipeline') as mock_pipeline_class, \
+        with patch('rag.pipeline.factory.PipelineStorage') as mock_storage, \
+             patch('rag.pipeline.factory.StateTransitionService') as mock_transitions, \
+             patch('rag.pipeline.factory.Pipeline') as mock_pipeline_class, \
              patch('rag.data.text_splitter.TextSplitterFactory'), \
-             patch('rag.pipeline_state.factory.InMemoryVectorStore'):
+             patch('rag.pipeline.factory.InMemoryVectorStore'):
             
             mock_pipeline = Mock()
             mock_pipeline_class.return_value = mock_pipeline

@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, ClassVar, Protocol
 
-from rag.pipeline_state.models import (
+from rag.pipeline.models import (
     DocumentProcessing,
     PipelineExecution,
     PipelineState,

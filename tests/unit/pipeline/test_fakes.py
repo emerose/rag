@@ -1,7 +1,7 @@
-"""Deprecated: Use the comprehensive fake implementations in rag.pipeline_state.fakes instead.
+"""Deprecated: Use the comprehensive fake implementations in rag.pipeline.fakes instead.
 
 This file has been superseded by the more complete implementations in:
-/src/rag/pipeline_state/fakes.py
+/src/rag/pipeline/fakes.py
 
 The new fake implementations provide:
 - Comprehensive protocol compliance
@@ -11,7 +11,7 @@ The new fake implementations provide:
 """
 
 # Import from the new location for backwards compatibility
-from rag.pipeline_state.fakes import (
+from rag.pipeline.fakes import (
     FakeDocumentSource,
     FakePipelineStorage,
     FakeProcessorFactory,
