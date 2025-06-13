@@ -287,7 +287,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         return cls(test_options=FakeComponentOptions())
 
     @classmethod
-    def create_for_integration_tests(
+    def create_for_integration_tests(  # noqa: PLR0915
         cls,
         config: RAGConfig | None = None,
         runtime: RuntimeOptions | None = None,
