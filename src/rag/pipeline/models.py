@@ -2,12 +2,13 @@
 
 This module defines the database schema for tracking pipeline executions,
 documents, and processing tasks with their states and configurations.
+Uses python-statemachine library for robust state management.
 """
 
 from __future__ import annotations
 
 import enum
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -26,6 +27,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from statemachine import State, StateMachine
 
 
 class Base(DeclarativeBase):
@@ -153,11 +155,63 @@ class SourceDocumentRecord(Base):
         )
 
 
+class PipelineStateMachine(StateMachine):
+    """State machine for pipeline execution state management."""
+
+    # Define states
+    created = State(initial=True)
+    running = State()
+    paused = State()
+    completed = State(final=True)
+    failed = State()  # Not final to allow retry
+    cancelled = State(final=True)
+
+    # Define transitions
+    start = created.to(running)
+    pause = running.to(paused)
+    resume = paused.to(running)
+    complete = running.to(completed)
+    fail = running.to(failed) | paused.to(failed)
+    cancel = created.to(cancelled) | running.to(cancelled) | paused.to(cancelled)
+    retry = failed.to(running)
+
+    # State callbacks for timing and metadata updates
+    def on_enter_running(self) -> None:
+        """Update started_at timestamp when entering running state."""
+        if self.model and hasattr(self.model, "started_at"):
+            self.model.started_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+    def on_enter_completed(self) -> None:
+        """Update completed_at timestamp when entering completed state."""
+        if self.model and hasattr(self.model, "completed_at"):
+            self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+    def on_enter_failed(self) -> None:
+        """Update completed_at timestamp when entering failed state."""
+        if self.model and hasattr(self.model, "completed_at"):
+            self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+    def on_enter_cancelled(self) -> None:
+        """Update completed_at timestamp when entering cancelled state."""
+        if self.model and hasattr(self.model, "completed_at"):
+            self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+    def on_enter_paused(self) -> None:
+        """Update timestamp when pausing."""
+        if self.model and hasattr(self.model, "updated_at"):
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+
 class PipelineExecution(Base):
-    """Top-level pipeline execution tracking."""
+    """Top-level pipeline execution tracking with integrated state machine."""
 
     __tablename__ = "pipeline_executions"
 
+    # SQLAlchemy fields
     id: Mapped[str] = mapped_column(String, primary_key=True)
     state: Mapped[PipelineState] = mapped_column(
         Enum(PipelineState), default=PipelineState.CREATED, nullable=False
@@ -188,15 +242,108 @@ class PipelineExecution(Base):
         "DocumentProcessing", back_populates="execution", cascade="all, delete-orphan"
     )
 
+    def __init__(self, **kwargs: Any):
+        """Initialize the pipeline execution with state machine."""
+        super().__init__(**kwargs)
+        self.state_machine = PipelineStateMachine(model=self, state_field="state")
+
+    # Delegate state machine methods
+    def start(self) -> None:
+        """Start the pipeline."""
+        self.state_machine.start()
+
+    def pause(self) -> None:
+        """Pause the pipeline."""
+        self.state_machine.pause()
+
+    def resume(self) -> None:
+        """Resume the pipeline."""
+        self.state_machine.resume()
+
+    def complete(self) -> None:
+        """Complete the pipeline."""
+        self.state_machine.complete()
+
+    def fail(self) -> None:
+        """Mark the pipeline as failed."""
+        self.state_machine.fail()
+
+    def cancel(self) -> None:
+        """Cancel the pipeline."""
+        self.state_machine.cancel()
+
+    def retry(self) -> None:
+        """Retry the pipeline."""
+        self.state_machine.retry()
+
+    def set_error(
+        self, error_message: str, error_details: dict[str, Any] | None = None
+    ) -> None:
+        """Set error information for the pipeline execution."""
+        self.error_message = error_message
+        self.error_details = error_details
+        self.updated_at = datetime.now(UTC)
+
     def __repr__(self) -> str:
         return f"<PipelineExecution(id='{self.id}', state={self.state.value})>"
 
 
+class DocumentProcessingStateMachine(StateMachine):
+    """State machine for document processing state management."""
+
+    # Define states
+    pending = State(initial=True)
+    in_progress = State()
+    completed = State(final=True)
+    failed = State()  # Not final to allow retry
+    paused = State()
+    cancelled = State(final=True)
+
+    # Define transitions
+    start = pending.to(in_progress)
+    complete = in_progress.to(completed)
+    fail = in_progress.to(failed) | paused.to(failed)
+    pause = in_progress.to(paused)
+    resume = paused.to(in_progress)
+    cancel = pending.to(cancelled) | in_progress.to(cancelled) | paused.to(cancelled)
+    retry = failed.to(pending)
+
+    # State callbacks for timing updates
+    def on_enter_in_progress(self) -> None:
+        """Update timestamp when starting document processing."""
+        if self.model and hasattr(self.model, "updated_at"):
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+    def on_enter_completed(self) -> None:
+        """Update completed_at timestamp when document processing completes."""
+        if self.model and hasattr(self.model, "completed_at"):
+            self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+    def on_enter_failed(self) -> None:
+        """Update completed_at timestamp when document processing fails."""
+        if self.model and hasattr(self.model, "completed_at"):
+            self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+    def on_enter_cancelled(self) -> None:
+        """Update completed_at timestamp when document processing is cancelled."""
+        if self.model and hasattr(self.model, "completed_at"):
+            self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+    def on_enter_paused(self) -> None:
+        """Update timestamp when pausing."""
+        if self.model and hasattr(self.model, "updated_at"):
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+
 class DocumentProcessing(Base):
-    """Tracks individual document processing within a pipeline execution."""
+    """Tracks individual document processing within a pipeline execution with integrated state machine."""
 
     __tablename__ = "document_processing"
 
+    # SQLAlchemy fields
     id: Mapped[str] = mapped_column(String, primary_key=True)
     execution_id: Mapped[str] = mapped_column(
         String, ForeignKey("pipeline_executions.id"), nullable=False
@@ -212,6 +359,7 @@ class DocumentProcessing(Base):
 
     # Timing
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     # State tracking
@@ -240,15 +388,135 @@ class DocumentProcessing(Base):
         "ProcessingTask", back_populates="document", cascade="all, delete-orphan"
     )
 
+    def __init__(self, **kwargs: Any):
+        """Initialize the document processing with state machine."""
+        super().__init__(**kwargs)
+        self.state_machine = DocumentProcessingStateMachine(
+            model=self, state_field="current_state"
+        )
+
+    # Delegate state machine methods
+    def start(self) -> None:
+        """Start document processing."""
+        self.state_machine.start()
+
+    def complete(self) -> None:
+        """Complete document processing."""
+        self.state_machine.complete()
+
+    def fail(self) -> None:
+        """Mark document processing as failed."""
+        self.state_machine.fail()
+
+    def pause(self) -> None:
+        """Pause document processing."""
+        self.state_machine.pause()
+
+    def resume(self) -> None:
+        """Resume document processing."""
+        self.state_machine.resume()
+
+    def cancel(self) -> None:
+        """Cancel document processing."""
+        self.state_machine.cancel()
+
+    def retry(self) -> None:
+        """Retry document processing."""
+        self.state_machine.retry()
+
+    def set_error(
+        self, error_message: str, error_details: dict[str, Any] | None = None
+    ) -> None:
+        """Set error information for the document processing."""
+        self.error_message = error_message
+        self.error_details = error_details
+        self.updated_at = datetime.now(UTC)
+
     def __repr__(self) -> str:
         return f"<DocumentProcessing(id='{self.id}', source_document_id='{self.source_document_id}')>"
 
 
+class ProcessingTaskStateMachine(StateMachine):
+    """State machine for individual processing task state management with retry logic."""
+
+    # Define states
+    pending = State(initial=True)
+    in_progress = State()
+    completed = State(final=True)
+    failed = State()  # Not final to allow retry
+    paused = State()
+    cancelled = State(final=True)
+
+    # Define transitions
+    start = pending.to(in_progress)
+    complete = in_progress.to(completed)
+    fail = in_progress.to(failed) | paused.to(failed)
+    pause = in_progress.to(paused)
+    resume = paused.to(in_progress)
+    cancel = pending.to(cancelled) | in_progress.to(cancelled) | paused.to(cancelled)
+    retry = failed.to(pending)
+
+    # State callbacks for timing and retry logic
+    def on_enter_in_progress(self) -> None:
+        """Update started_at timestamp when starting task."""
+        if self.model and hasattr(self.model, "started_at"):
+            if not self.model.started_at:  # Only set once
+                self.model.started_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+    def on_enter_completed(self) -> None:
+        """Update completed_at timestamp when task completes."""
+        if self.model and hasattr(self.model, "completed_at"):
+            self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+    def on_enter_failed(self) -> None:
+        """Handle failure with retry logic."""
+        if self.model and hasattr(self.model, "completed_at"):
+            self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            self.model.last_retry_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            # Increment retry count
+            self.model.retry_count += 1  # type: ignore[attr-defined]
+
+    def on_enter_cancelled(self) -> None:
+        """Update timestamp when task is cancelled."""
+        if self.model and hasattr(self.model, "completed_at"):
+            self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+    def on_enter_paused(self) -> None:
+        """Update timestamp when task is paused."""
+        if self.model and hasattr(self.model, "updated_at"):
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+
+    def on_enter_pending(self) -> None:
+        """Update timestamp and handle retry logic when task becomes pending."""
+        if self.model and hasattr(self.model, "updated_at"):
+            self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
+            # Reset timing for retry
+            if hasattr(self.model, "retry_count") and self.model.retry_count > 0:  # type: ignore[attr-defined]
+                self.model.started_at = None  # type: ignore[attr-defined]
+                self.model.completed_at = None  # type: ignore[attr-defined]
+
+    def can_retry(self) -> bool:
+        """Check if this task can be retried."""
+        return (
+            self.model
+            and hasattr(self.model, "state")
+            and hasattr(self.model, "retry_count")
+            and hasattr(self.model, "max_retries")
+            and self.model.state == TaskState.FAILED  # type: ignore[attr-defined]
+            and self.model.retry_count < self.model.max_retries  # type: ignore[attr-defined]
+        )
+
+
 class ProcessingTask(Base):
-    """Individual processing tasks for documents."""
+    """Individual processing tasks for documents with integrated state machine."""
 
     __tablename__ = "processing_tasks"
 
+    # SQLAlchemy fields
     id: Mapped[str] = mapped_column(String, primary_key=True)
     document_id: Mapped[str] = mapped_column(
         String, ForeignKey("document_processing.id"), nullable=False
@@ -266,6 +534,7 @@ class ProcessingTask(Base):
 
     # Timing
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime)
     started_at: Mapped[datetime | None] = mapped_column(DateTime)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
 
@@ -310,6 +579,80 @@ class ProcessingTask(Base):
     storage_details: Mapped[VectorStorageTask | None] = relationship(
         "VectorStorageTask", back_populates="task", cascade="all, delete-orphan"
     )
+
+    def __init__(self, **kwargs: Any):
+        """Initialize the processing task with state machine."""
+        super().__init__(**kwargs)
+        self.state_machine = ProcessingTaskStateMachine(
+            model=self, state_field="state"
+        )
+
+    # Delegate state machine methods
+    def start(self) -> None:
+        """Start the task."""
+        self.state_machine.start()
+
+    def complete(self) -> None:
+        """Complete the task."""
+        self.state_machine.complete()
+
+    def fail(self) -> None:
+        """Mark the task as failed."""
+        self.state_machine.fail()
+
+    def pause(self) -> None:
+        """Pause the task."""
+        self.state_machine.pause()
+
+    def resume(self) -> None:
+        """Resume the task."""
+        self.state_machine.resume()
+
+    def cancel(self) -> None:
+        """Cancel the task."""
+        self.state_machine.cancel()
+
+    def retry(self) -> None:
+        """Retry the task."""
+        self.state_machine.retry()
+
+    def can_retry(self) -> bool:
+        """Check if this task can be retried."""
+        return self.state_machine.can_retry()
+
+    def set_error(
+        self, error_message: str, error_details: dict[str, Any] | None = None
+    ) -> None:
+        """Set error information for the task."""
+        self.error_message = error_message
+        self.error_details = error_details
+        self.updated_at = datetime.now(UTC)
+
+    def set_result(self, result_summary: dict[str, Any]) -> None:
+        """Set result summary for the task."""
+        self.result_summary = result_summary
+        self.updated_at = datetime.now(UTC)
+
+    def can_start(self, dependency_checker: Any = None) -> tuple[bool, str | None]:
+        """Check if this task can be started based on its current state and dependencies.
+
+        Args:
+            dependency_checker: Optional function to check dependency states
+
+        Returns:
+            Tuple of (can_start, reason_if_not)
+        """
+        # Check if task is in correct state
+        if self.state != TaskState.PENDING:
+            return False, f"Task is not in PENDING state (current: {self.state.value})"
+
+        # Check dependencies if checker is provided
+        if dependency_checker and self.depends_on_task_id:
+            can_start_dep, reason = dependency_checker(self.depends_on_task_id)
+            if not can_start_dep:
+                return False, reason
+
+        return True, None
 
     def __repr__(self) -> str:
         return f"<ProcessingTask(id='{self.id}', type={self.task_type.value}, state={self.state.value})>"

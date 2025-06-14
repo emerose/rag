@@ -7,7 +7,7 @@ retry handling, and state consistency enforcement.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from rag.sources.base import SourceDocument
@@ -204,37 +204,7 @@ class StateTransitionServiceProtocol(Protocol):
 
 
 class StateTransitionService:
-    """Manages state transitions for pipeline, documents, and tasks."""
-
-    # Valid pipeline state transitions
-    PIPELINE_TRANSITIONS: ClassVar[dict[PipelineState, list[PipelineState]]] = {
-        PipelineState.CREATED: [PipelineState.RUNNING, PipelineState.CANCELLED],
-        PipelineState.RUNNING: [
-            PipelineState.PAUSED,
-            PipelineState.COMPLETED,
-            PipelineState.FAILED,
-            PipelineState.CANCELLED,
-        ],
-        PipelineState.PAUSED: [PipelineState.RUNNING, PipelineState.CANCELLED],
-        PipelineState.COMPLETED: [],  # Terminal state
-        PipelineState.FAILED: [PipelineState.RUNNING],  # Can retry
-        PipelineState.CANCELLED: [],  # Terminal state
-    }
-
-    # Valid task state transitions
-    TASK_TRANSITIONS: ClassVar[dict[TaskState, list[TaskState]]] = {
-        TaskState.PENDING: [TaskState.IN_PROGRESS, TaskState.CANCELLED],
-        TaskState.IN_PROGRESS: [
-            TaskState.COMPLETED,
-            TaskState.FAILED,
-            TaskState.PAUSED,
-            TaskState.CANCELLED,
-        ],
-        TaskState.COMPLETED: [],  # Terminal state
-        TaskState.FAILED: [TaskState.PENDING, TaskState.CANCELLED],  # Can retry
-        TaskState.PAUSED: [TaskState.IN_PROGRESS, TaskState.CANCELLED],
-        TaskState.CANCELLED: [],  # Terminal state
-    }
+    """Manages state transitions for pipeline, documents, and tasks using state machines."""
 
     def __init__(self, storage: PipelineStorageProtocol):
         """Initialize the state transition service.
@@ -251,7 +221,7 @@ class StateTransitionService:
         error_message: str | None = None,
         error_details: dict[str, Any] | None = None,
     ) -> TransitionResult:
-        """Transition a pipeline execution to a new state.
+        """Transition a pipeline execution to a new state using state machine.
 
         Args:
             execution_id: Pipeline execution ID
@@ -261,33 +231,72 @@ class StateTransitionService:
 
         Returns:
             TransitionResult indicating success or failure
-
-        Raises:
-            StateTransitionError: If the transition is invalid
         """
-        execution = self.storage.get_pipeline_execution(execution_id)
-        current_state = execution.state
+        try:
+            execution = self.storage.get_pipeline_execution(execution_id)
+            current_state = execution.state
 
-        # Check if transition is valid
-        if new_state not in self.PIPELINE_TRANSITIONS.get(current_state, []):
-            return TransitionResult(
-                success=False,
-                previous_state=current_state,
-                new_state=new_state,
-                error_message=f"Invalid transition from {current_state.value} to {new_state.value}",
+            # Set error information if provided
+            if error_message:
+                execution.set_error(error_message, error_details)
+
+            # Map target states to state machine transitions
+            transition_map = {
+                PipelineState.RUNNING: "start"
+                if current_state == PipelineState.CREATED
+                else "resume",
+                PipelineState.PAUSED: "pause",
+                PipelineState.COMPLETED: "complete",
+                PipelineState.FAILED: "fail",
+                PipelineState.CANCELLED: "cancel",
+            }
+
+            transition_name = transition_map.get(new_state)
+            if not transition_name:
+                return TransitionResult(
+                    success=False,
+                    previous_state=current_state,
+                    new_state=new_state,
+                    error_message=f"No transition defined for state {new_state.value}",
+                )
+
+            # Get the transition method and execute it
+            transition_method = getattr(execution.state_machine, transition_name, None)
+            if not transition_method:
+                return TransitionResult(
+                    success=False,
+                    previous_state=current_state,
+                    new_state=new_state,
+                    error_message=f"Transition method '{transition_name}' not found",
+                )
+
+            # Execute the transition
+            transition_method()
+
+            # Persist the updated execution state
+            self.storage.update_pipeline_state(
+                execution_id,
+                execution.state,
+                execution.error_message,
+                execution.error_details,
             )
 
-        # Update the state
-        self.storage.update_pipeline_state(
-            execution_id, new_state, error_message, error_details
-        )
+            return TransitionResult(
+                success=True,
+                previous_state=current_state,
+                new_state=execution.state,
+                metadata={"execution_id": execution_id},
+            )
 
-        return TransitionResult(
-            success=True,
-            previous_state=current_state,
-            new_state=new_state,
-            metadata={"execution_id": execution_id},
-        )
+        except Exception as e:
+            return TransitionResult(
+                success=False,
+                previous_state=current_state
+                if "current_state" in locals()
+                else PipelineState.CREATED,
+                new_state=new_state,
+                error_message=f"State transition failed: {e!s}",
+            )
 
     def transition_document(
         self,
@@ -296,7 +305,7 @@ class StateTransitionService:
         error_message: str | None = None,
         error_details: dict[str, Any] | None = None,
     ) -> TransitionResult:
-        """Transition a document to a new state.
+        """Transition a document to a new state using state machine.
 
         Args:
             document_id: Document processing ID
@@ -307,29 +316,74 @@ class StateTransitionService:
         Returns:
             TransitionResult
         """
-        document = self.storage.get_document(document_id)
-        current_state = document.current_state
+        try:
+            document = self.storage.get_document(document_id)
+            current_state = document.current_state
 
-        # Check if transition is valid
-        if new_state not in self.TASK_TRANSITIONS.get(current_state, []):
-            return TransitionResult(
-                success=False,
-                previous_state=current_state,
-                new_state=new_state,
-                error_message=f"Invalid transition from {current_state.value} to {new_state.value}",
+            # Set error information if provided
+            if error_message:
+                document.set_error(error_message, error_details)
+
+            # Map target states to state machine transitions
+            transition_map = {
+                TaskState.IN_PROGRESS: "start",
+                TaskState.COMPLETED: "complete",
+                TaskState.FAILED: "fail",
+                TaskState.PAUSED: "pause",
+                TaskState.CANCELLED: "cancel",
+                TaskState.PENDING: "retry",
+            }
+
+            transition_name = transition_map.get(new_state)
+            if not transition_name:
+                return TransitionResult(
+                    success=False,
+                    previous_state=current_state,
+                    new_state=new_state,
+                    error_message=f"No transition defined for state {new_state.value}",
+                )
+
+            # Handle special case for resume transition
+            if new_state == TaskState.IN_PROGRESS and current_state == TaskState.PAUSED:
+                transition_name = "resume"
+
+            # Get the transition method and execute it
+            transition_method = getattr(document.state_machine, transition_name, None)
+            if not transition_method:
+                return TransitionResult(
+                    success=False,
+                    previous_state=current_state,
+                    new_state=new_state,
+                    error_message=f"Transition method '{transition_name}' not found",
+                )
+
+            # Execute the transition
+            transition_method()
+
+            # Persist the updated document state
+            self.storage.update_document_state(
+                document_id,
+                document.current_state,
+                document.error_message,
+                document.error_details,
             )
 
-        # Update the state
-        self.storage.update_document_state(
-            document_id, new_state, error_message, error_details
-        )
+            return TransitionResult(
+                success=True,
+                previous_state=current_state,
+                new_state=document.current_state,
+                metadata={"document_id": document_id},
+            )
 
-        return TransitionResult(
-            success=True,
-            previous_state=current_state,
-            new_state=new_state,
-            metadata={"document_id": document_id},
-        )
+        except Exception as e:
+            return TransitionResult(
+                success=False,
+                previous_state=current_state
+                if "current_state" in locals()
+                else TaskState.PENDING,
+                new_state=new_state,
+                error_message=f"State transition failed: {e!s}",
+            )
 
     def transition_task(
         self,
@@ -339,7 +393,7 @@ class StateTransitionService:
         error_details: dict[str, Any] | None = None,
         result_summary: dict[str, Any] | None = None,
     ) -> TransitionResult:
-        """Transition a task to a new state with retry logic.
+        """Transition a task to a new state with retry logic using state machine.
 
         Args:
             task_id: Processing task ID
@@ -351,44 +405,94 @@ class StateTransitionService:
         Returns:
             TransitionResult
         """
-        task = self.storage.get_task(task_id)
-        current_state = task.state
+        try:
+            task = self.storage.get_task(task_id)
+            current_state = task.state
 
-        # Check if transition is valid
-        if new_state not in self.TASK_TRANSITIONS.get(current_state, []):
-            return TransitionResult(
-                success=False,
-                previous_state=current_state,
-                new_state=new_state,
-                error_message=f"Invalid transition from {current_state.value} to {new_state.value}",
-            )
+            # Set error information if provided
+            if error_message:
+                task.set_error(error_message, error_details)
 
-        # Handle retry logic for failed tasks
-        if new_state == TaskState.FAILED:
-            retry_count = self.storage.increment_retry_count(task_id)
+            # Set result summary if provided
+            if result_summary:
+                task.set_result(result_summary)
 
-            # Check if we should retry
-            if retry_count < task.max_retries:
-                # Transition to PENDING for retry instead of FAILED
-                new_state = TaskState.PENDING
-                error_details = error_details or {}
-                error_details["retry_count"] = retry_count
+            # Map target states to state machine transitions
+            transition_map = {
+                TaskState.IN_PROGRESS: "start",
+                TaskState.COMPLETED: "complete",
+                TaskState.FAILED: "fail",
+                TaskState.PAUSED: "pause",
+                TaskState.CANCELLED: "cancel",
+                TaskState.PENDING: "retry",
+            }
+
+            transition_name = transition_map.get(new_state)
+            if not transition_name:
+                return TransitionResult(
+                    success=False,
+                    previous_state=current_state,
+                    new_state=new_state,
+                    error_message=f"No transition defined for state {new_state.value}",
+                )
+
+            # Handle special case for resume transition
+            if new_state == TaskState.IN_PROGRESS and current_state == TaskState.PAUSED:
+                transition_name = "resume"
+
+            # Get the transition method and execute it
+            transition_method = getattr(task.state_machine, transition_name, None)
+            if not transition_method:
+                return TransitionResult(
+                    success=False,
+                    previous_state=current_state,
+                    new_state=new_state,
+                    error_message=f"Transition method '{transition_name}' not found",
+                )
+
+            # Execute the transition
+            transition_method()
+
+            # Handle automatic retry logic for failed tasks
+            final_state = task.state
+            if new_state == TaskState.FAILED and task.state_machine.can_retry():
+                # Automatically transition to pending for retry
+                task.state_machine.retry()
+                final_state = task.state
+
+                # Update error details to indicate retry
+                if not error_details:
+                    error_details = {}
+                error_details["retry_count"] = task.retry_count
                 error_details["max_retries"] = task.max_retries
                 error_details["will_retry"] = True
+                task.set_error(error_message, error_details)
 
-        # Update the state
-        self.storage.update_task_state(task_id, new_state, error_message, error_details)
+            # Persist the updated task state
+            self.storage.update_task_state(
+                task_id, task.state, task.error_message, task.error_details
+            )
 
-        return TransitionResult(
-            success=True,
-            previous_state=current_state,
-            new_state=new_state,
-            metadata={
-                "task_id": task_id,
-                "task_type": task.task_type.value,
-                "result_summary": result_summary,
-            },
-        )
+            return TransitionResult(
+                success=True,
+                previous_state=current_state,
+                new_state=final_state,
+                metadata={
+                    "task_id": task_id,
+                    "task_type": task.task_type.value,
+                    "result_summary": result_summary,
+                },
+            )
+
+        except Exception as e:
+            return TransitionResult(
+                success=False,
+                previous_state=current_state
+                if "current_state" in locals()
+                else TaskState.PENDING,
+                new_state=new_state,
+                error_message=f"State transition failed: {e!s}",
+            )
 
     def can_start_task(self, task: ProcessingTask) -> tuple[bool, str | None]:
         """Check if a task can be started based on dependencies.
@@ -399,20 +503,21 @@ class StateTransitionService:
         Returns:
             Tuple of (can_start, reason_if_not)
         """
-        # Check if task is in correct state
-        if task.state != TaskState.PENDING:
-            return False, f"Task is not in PENDING state (current: {task.state.value})"
 
-        # Check dependencies
-        if task.depends_on_task_id:
-            dependency = self.storage.get_task(task.depends_on_task_id)
-            if dependency.state != TaskState.COMPLETED:
-                return (
-                    False,
-                    f"Dependency task {dependency.id} is not completed (state: {dependency.state.value})",
-                )
+        # Use the task's built-in dependency checker
+        def dependency_checker(depends_on_task_id: str) -> tuple[bool, str | None]:
+            try:
+                dependency = self.storage.get_task(depends_on_task_id)
+                if dependency.state != TaskState.COMPLETED:
+                    return (
+                        False,
+                        f"Dependency task {dependency.id} is not completed (state: {dependency.state.value})",
+                    )
+                return True, None
+            except Exception as e:
+                return False, f"Dependency task {depends_on_task_id} not found: {e!s}"
 
-        return True, None
+        return task.can_start(dependency_checker)
 
     def should_retry_task(self, task: ProcessingTask) -> bool:
         """Check if a failed task should be retried.
@@ -423,7 +528,7 @@ class StateTransitionService:
         Returns:
             True if the task should be retried
         """
-        return task.state == TaskState.FAILED and task.retry_count < task.max_retries
+        return task.state_machine.can_retry()
 
     def get_next_pending_tasks(
         self, document_id: str, limit: int = 10
