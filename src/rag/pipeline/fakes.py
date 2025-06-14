@@ -848,9 +848,6 @@ class FakePipelineStorage:
         return len(old_execution_ids)
 
 
-# Note: StateTransitionService removed - state machines handle transitions directly
-
-
 class FakeDocumentSource:
     """Fake document source for testing."""
 
