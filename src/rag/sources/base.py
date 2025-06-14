@@ -30,6 +30,9 @@ class SourceDocument:
     # Source path or URI
     source_path: str | None = None
 
+    # Content hash for change detection
+    content_hash: str | None = None
+
     @property
     def is_binary(self) -> bool:
         """Check if the document contains binary content."""

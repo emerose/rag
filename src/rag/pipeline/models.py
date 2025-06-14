@@ -164,7 +164,7 @@ class SourceDocumentRecord(Base):
             source_id=source_doc.source_id,
             storage_uri=storage_uri,
             content_type=source_doc.content_type,
-            content_hash=content_hash,
+            content_hash=content_hash or source_doc.content_hash,
             size_bytes=len(source_doc.get_content_as_bytes()),
             source_path=source_doc.source_path,
             source_metadata=source_doc.metadata,

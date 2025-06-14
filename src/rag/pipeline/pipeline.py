@@ -366,29 +366,25 @@ class Pipeline:
             input_data: Task input data containing source_document_id
 
         Returns:
-            SourceDocument loaded from storage or reconstructed for tests
+            SourceDocument loaded from storage
+
+        Raises:
+            ValueError: If source_document_id is missing or document cannot be loaded
         """
         source_document_id = input_data.get("source_document_id")
+        if not source_document_id:
+            raise ValueError("source_document_id is required in input_data")
 
-        if source_document_id and source_document_id != "test":
-            try:
-                # Load the actual source document from storage
-                stored_source_doc = self.storage.get_source_document(source_document_id)
-
-                # Convert to SourceDocument using conversion method
-                return stored_source_doc.to_source_document()
-            except (ValueError, AttributeError):
-                # Fallback if storage fails
-                pass
-
-        # Fallback for tests or when source_document_id is not available
-        return SourceDocument(
-            source_id=source_document_id or "test",
-            content="test content",
-            content_type="text/plain",
-            source_path="test/path",
-            metadata={},
-        )
+        try:
+            # Load the actual source document from storage
+            stored_source_doc = self.storage.get_source_document(source_document_id)
+            # Convert to SourceDocument using conversion method
+            return stored_source_doc.to_source_document()
+        except Exception as e:
+            logger.error(f"Failed to reconstruct document {source_document_id}: {e}")
+            raise ValueError(
+                f"Could not load source document {source_document_id}: {e}"
+            ) from e
 
     def _process_document(self, document_id_or_obj: Any) -> bool:
         """Process a single document through all tasks."""
