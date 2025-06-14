@@ -34,7 +34,7 @@ class FakeDocument:
     """A simple document representation for testing."""
 
     id: str
-    source_identifier: str
+    source_document_id: str
     content: str = "Sample document content for testing."
     metadata: dict[str, Any] = field(default_factory=lambda: {})
     content_type: str = "text/plain"
@@ -119,10 +119,65 @@ class FakePipelineStorage:
         }
         return exec_id
 
+    def create_source_document(  # noqa: PLR0913
+        self,
+        source_id: str,
+        content: str,
+        content_type: str | None = None,
+        content_hash: str | None = None,
+        size_bytes: int | None = None,
+        source_path: str | None = None,
+        source_metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """Create a source document record."""
+        doc_id = f"source-doc-{self._next_id}"
+        self._next_id += 1
+
+        # Store source documents separately
+        if not hasattr(self, "source_documents"):
+            self.source_documents: dict[str, dict[str, Any]] = {}
+
+        self.source_documents[doc_id] = {
+            "id": doc_id,
+            "source_id": source_id,
+            "content": content,
+            "content_type": content_type,
+            "content_hash": content_hash,
+            "size_bytes": size_bytes or len(content.encode("utf-8")),
+            "source_path": source_path,
+            "source_metadata": source_metadata or {},
+            "created_at": datetime.now(UTC),
+        }
+        return doc_id
+
+    def get_source_document(self, document_id: str):
+        """Get a source document by ID."""
+        if not hasattr(self, "source_documents"):
+            self.source_documents: dict[str, dict[str, Any]] = {}
+
+        if document_id not in self.source_documents:
+            raise ValueError(f"Source document not found: {document_id}")
+
+        data = self.source_documents[document_id]
+
+        # Create mock source document object
+        source_doc = Mock()
+        source_doc.id = data["id"]
+        source_doc.source_id = data["source_id"]
+        source_doc.content = data["content"]
+        source_doc.content_type = data["content_type"]
+        source_doc.content_hash = data["content_hash"]
+        source_doc.size_bytes = data["size_bytes"]
+        source_doc.source_path = data["source_path"]
+        source_doc.source_metadata = data["source_metadata"]
+        source_doc.created_at = data["created_at"]
+
+        return source_doc
+
     def create_document_processing(
         self,
         execution_id: str,
-        source_identifier: str,
+        source_document_id: str,
         processing_config: dict[str, Any],
         metadata: dict[str, Any] | None = None,
     ) -> str:
@@ -133,7 +188,7 @@ class FakePipelineStorage:
         self.documents[doc_id] = {
             "id": doc_id,
             "execution_id": execution_id,
-            "source_identifier": source_identifier,
+            "source_document_id": source_document_id,
             "processing_config": processing_config,
             "created_at": datetime.now(UTC),
             "completed_at": None,
@@ -142,9 +197,6 @@ class FakePipelineStorage:
             "error_message": None,
             "error_details": None,
             "doc_metadata": metadata or {},
-            "content_hash": None,
-            "size_bytes": None,
-            "content_type": None,
         }
 
         # Update execution document count
@@ -232,7 +284,7 @@ class FakePipelineStorage:
         document = Mock(spec=DocumentProcessing)
         document.id = data["id"]
         document.execution_id = data["execution_id"]
-        document.source_identifier = data["source_identifier"]
+        document.source_document_id = data["source_document_id"]
         document.processing_config = data["processing_config"]
         document.created_at = data["created_at"]
         document.completed_at = data["completed_at"]
@@ -241,9 +293,6 @@ class FakePipelineStorage:
         document.error_message = data["error_message"]
         document.error_details = data["error_details"]
         document.doc_metadata = data["doc_metadata"]
-        document.content_hash = data["content_hash"]
-        document.size_bytes = data["size_bytes"]
-        document.content_type = data["content_type"]
 
         return cast(DocumentProcessing, document)
 
@@ -1129,7 +1178,7 @@ class FakeTaskProcessor:
                 output_data={
                     "stored_document_ids": ["doc1#chunk0", "doc1#chunk1"],
                     "document_count": 2,
-                    "source_id": input_data.get("source_identifier", "fake_source"),
+                    "source_id": input_data.get("source_document_id", "fake_source"),
                 },
                 metrics={"vectors_stored": 2, "store_type": "fake_vectorstore"},
             )

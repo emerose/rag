@@ -111,6 +111,7 @@ class PipelineFactory:
             embedding_service=embedding_service,
             document_store=document_store,
             vector_store=vector_store,
+            storage=storage,
             text_splitter_factory=text_splitter_factory,
         )
 
@@ -153,6 +154,7 @@ class PipelineFactory:
             embedding_service=dependencies.embedding_service,
             document_store=dependencies.document_store,
             vector_store=dependencies.vector_store,
+            storage=dependencies.storage,
             text_splitter_factory=text_splitter_factory,
         )
 
@@ -211,6 +213,7 @@ class PipelineFactory:
                 embedding_service=fake_embedding_service,
                 document_store=fake_doc_store,
                 vector_store=InMemoryVectorStore(),
+                storage=storage,
                 text_splitter_factory=text_splitter_factory,
             )
 

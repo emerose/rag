@@ -389,6 +389,7 @@ class RAGComponentsFactory:
             embedding_service=self.embedding_service,
             document_store=self.document_store,
             vector_store=self._create_pipeline_vector_store(),
+            storage=storage,
             text_splitter_factory=self._create_text_splitter_factory(),
         )
 

@@ -209,6 +209,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             embedding_service=embedding_service,
             document_store=document_store,
             vector_store=vectorstore_factory.create_empty(),
+            storage=fake_storage,
             text_splitter_factory=text_splitter_factory,
         )
 
@@ -413,6 +414,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 embedding_service=factory._raw_embedding_service,
                 document_store=factory._document_store,
                 vector_store=fake_vector_store,
+                storage=fake_storage,
                 text_splitter_factory=text_splitter_factory,
             )
 
@@ -482,6 +484,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 embedding_service=factory._raw_embedding_service,
                 document_store=factory._document_store,
                 vector_store=fake_vector_store,
+                storage=fake_storage,
                 text_splitter_factory=text_splitter_factory,
             )
 

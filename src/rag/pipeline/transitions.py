@@ -14,6 +14,7 @@ from rag.pipeline.models import (
     PipelineExecution,
     PipelineState,
     ProcessingTask,
+    SourceDocument,
     TaskState,
     TaskType,
 )
@@ -92,10 +93,27 @@ class PipelineStorageProtocol(Protocol):
         """Create a new pipeline execution."""
         ...
 
+    def create_source_document(  # noqa: PLR0913
+        self,
+        source_id: str,
+        content: str,
+        content_type: str | None = None,
+        content_hash: str | None = None,
+        size_bytes: int | None = None,
+        source_path: str | None = None,
+        source_metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """Create a source document record."""
+        ...
+
+    def get_source_document(self, document_id: str) -> SourceDocument:
+        """Get a source document by ID."""
+        ...
+
     def create_document_processing(
         self,
         execution_id: str,
-        source_identifier: str,
+        source_document_id: str,
         processing_config: dict[str, Any],
         metadata: dict[str, Any] | None = None,
     ) -> str:

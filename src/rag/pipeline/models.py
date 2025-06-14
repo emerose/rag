@@ -62,6 +62,46 @@ class PipelineState(enum.Enum):
     CANCELLED = "cancelled"
 
 
+class SourceDocument(Base):
+    """Source documents that can be processed by pipelines.
+
+    This table stores the actual document content and metadata,
+    separate from the processing configuration.
+    """
+
+    __tablename__ = "source_documents"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    source_id: Mapped[str] = mapped_column(String, nullable=False)
+
+    # Document content and metadata
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    content_type: Mapped[str | None] = mapped_column(String)
+    content_hash: Mapped[str | None] = mapped_column(String)
+    size_bytes: Mapped[int | None] = mapped_column(Integer)
+    source_path: Mapped[str | None] = mapped_column(String)
+    source_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSON, nullable=False, default=dict
+    )
+
+    # Timing
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    # Relationships
+    document_processings: Mapped[list[DocumentProcessing]] = relationship(
+        "DocumentProcessing", back_populates="source_document"
+    )
+
+    # Index for efficient lookups
+    __table_args__ = (
+        Index("idx_source_documents_source_id", "source_id"),
+        Index("idx_source_documents_content_hash", "content_hash"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<SourceDocument(id='{self.id}', source_id='{self.source_id}')>"
+
+
 class PipelineExecution(Base):
     """Top-level pipeline execution tracking."""
 
@@ -110,14 +150,11 @@ class DocumentProcessing(Base):
     execution_id: Mapped[str] = mapped_column(
         String, ForeignKey("pipeline_executions.id"), nullable=False
     )
-    source_identifier: Mapped[str] = mapped_column(String, nullable=False)
+    source_document_id: Mapped[str] = mapped_column(
+        String, ForeignKey("source_documents.id"), nullable=False
+    )
 
-    # Document metadata
-    content_hash: Mapped[str | None] = mapped_column(String)
-    size_bytes: Mapped[int | None] = mapped_column(Integer)
-    content_type: Mapped[str | None] = mapped_column(String)
-
-    # Processing configuration (allows different configs per document)
+    # Processing configuration (only actual processing parameters, no content)
     processing_config: Mapped[dict[str, Any]] = mapped_column(
         JSON, nullable=False, default=dict
     )
@@ -145,14 +182,15 @@ class DocumentProcessing(Base):
     execution: Mapped[PipelineExecution] = relationship(
         "PipelineExecution", back_populates="documents"
     )
+    source_document: Mapped[SourceDocument] = relationship(
+        "SourceDocument", back_populates="document_processings"
+    )
     tasks: Mapped[list[ProcessingTask]] = relationship(
         "ProcessingTask", back_populates="document", cascade="all, delete-orphan"
     )
 
     def __repr__(self) -> str:
-        return (
-            f"<DocumentProcessing(id='{self.id}', source='{self.source_identifier}')>"
-        )
+        return f"<DocumentProcessing(id='{self.id}', source_document_id='{self.source_document_id}')>"
 
 
 class ProcessingTask(Base):
@@ -336,7 +374,7 @@ class VectorStorageTask(Base):
 Index("idx_pipeline_state", PipelineExecution.state)
 Index("idx_pipeline_created", PipelineExecution.created_at)
 Index("idx_document_execution", DocumentProcessing.execution_id)
-Index("idx_document_source", DocumentProcessing.source_identifier)
+Index("idx_document_source_document", DocumentProcessing.source_document_id)
 Index("idx_document_state", DocumentProcessing.current_state)
 Index("idx_task_document", ProcessingTask.document_id)
 Index("idx_task_type", ProcessingTask.task_type)
@@ -346,7 +384,7 @@ Index("idx_task_sequence", ProcessingTask.document_id, ProcessingTask.sequence_n
 # Unique constraint to prevent duplicate processing of same document with same config
 UniqueConstraint(
     DocumentProcessing.execution_id,
-    DocumentProcessing.source_identifier,
+    DocumentProcessing.source_document_id,
     DocumentProcessing.processing_config,
     name="uq_document_processing",
 )

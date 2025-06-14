@@ -74,25 +74,29 @@ class TestDocumentLoadingProcessor:
     def processor(self):
         """Create a DocumentLoadingProcessor."""
         config = DocumentLoadingConfig()
-        return DocumentLoadingProcessor(config)
+        # Create mock storage
+        mock_storage = Mock()
+        mock_source_doc = Mock()
+        mock_source_doc.content = "Test document content"
+        mock_source_doc.content_hash = "test_hash"
+        mock_source_doc.content_type = "text/plain"
+        mock_source_doc.source_metadata = {"test": "metadata"}
+        mock_source_doc.source_path = "/test/path"
+        mock_source_doc.size_bytes = 100
+        mock_storage.get_source_document.return_value = mock_source_doc
+        return DocumentLoadingProcessor(config, mock_storage)
 
     def test_task_type(self, processor):
         """Test that processor has correct task type."""
         assert processor.task_type == TaskType.DOCUMENT_LOADING
 
     def test_process_success(self, processor):
-        """Test successful document loading with pre-loaded content."""
+        """Test successful document loading from SourceDocument."""
         task = Mock(spec=ProcessingTask)
         
         input_data = {
-            "processing_config": {
-                "preloaded_content": "Test document content",
-                "content_hash": "abc123",
-                "content_type": "text/plain",
-                "source_path": "/test/doc.txt",
-                "source_metadata": {"source": "test.txt"},
-                "size_bytes": 20
-            }
+            "source_document_id": "test-source-doc-id",
+            "processing_config": {}
         }
         
         result = processor.process(task, input_data)
@@ -101,41 +105,44 @@ class TestDocumentLoadingProcessor:
         assert "content" in result.output_data
         assert result.output_data["content"] == "Test document content"
         assert "content_hash" in result.output_data
-        assert result.output_data["content_hash"] == "abc123"
+        assert result.output_data["content_hash"] == "test_hash"
+        assert "content_type" in result.output_data
+        assert result.output_data["content_type"] == "text/plain"
+        assert "metadata" in result.output_data
+        assert result.output_data["metadata"] == {"test": "metadata"}
         if result.metrics:
             assert "content_length" in result.metrics
 
-    def test_process_missing_preloaded_content(self, processor):
-        """Test processing with missing preloaded content."""
+    def test_process_missing_source_document_id(self, processor):
+        """Test processing with missing source_document_id."""
         task = Mock(spec=ProcessingTask)
         
         input_data = {
-            "processing_config": {
-                # Missing preloaded_content
-                "content_hash": "abc123"
-            }
+            "processing_config": {}
+            # Missing source_document_id
         }
         
         result = processor.process(task, input_data)
         
         assert result.success is False
-        assert "preloaded_content" in result.error_message
+        assert "source_document_id" in result.error_message
 
-    def test_process_missing_content_hash(self, processor):
-        """Test processing with missing content hash."""
+    def test_process_source_document_not_found(self, processor):
+        """Test processing when source document is not found."""
         task = Mock(spec=ProcessingTask)
         
+        # Configure storage to raise an error
+        processor.storage.get_source_document.side_effect = ValueError("Source document not found")
+        
         input_data = {
-            "processing_config": {
-                "preloaded_content": "Test content"
-                # Missing content_hash
-            }
+            "source_document_id": "nonexistent-id",
+            "processing_config": {}
         }
         
         result = processor.process(task, input_data)
         
         assert result.success is False
-        assert "content_hash" in result.error_message
+        assert "Failed to load source document" in result.error_message
 
 
 class TestChunkingProcessor:

@@ -36,6 +36,31 @@ def storage():
         storage = PipelineStorage("sqlite:///:memory:")
         storage.SessionLocal = SessionLocal
         
+        # Create common source documents for tests
+        # Store the IDs to use in tests
+        storage._test_source_doc_ids = {}
+        storage._test_source_doc_ids["source-doc-test"] = storage.create_source_document(
+            source_id="test.txt",
+            content="Test document content",
+            content_type="text/plain",
+            source_path="/test/test.txt",
+            source_metadata={}
+        )
+        storage._test_source_doc_ids["source-doc-1"] = storage.create_source_document(
+            source_id="doc1.txt", 
+            content="Document 1 content",
+            content_type="text/plain",
+            source_path="/test/doc1.txt",
+            source_metadata={}
+        )
+        storage._test_source_doc_ids["source-doc-2"] = storage.create_source_document(
+            source_id="doc2.txt",
+            content="Document 2 content", 
+            content_type="text/plain",
+            source_path="/test/doc2.txt",
+            source_metadata={}
+        )
+        
         return storage
 
 
@@ -87,9 +112,18 @@ class TestPipelineStorage:
             metadata={"source_type": "filesystem"}
         )
         
+        # Create source document first
+        source_doc_id = storage.create_source_document(
+            source_id="test.txt",
+            content="Test document content",
+            content_type="text/plain",
+            source_path="/test/test.txt",
+            source_metadata={"size": 100}
+        )
+        
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt",
+            source_document_id=source_doc_id,
             processing_config={"chunk_size": 1000},
             metadata={"size": 100}
         )
@@ -100,7 +134,7 @@ class TestPipelineStorage:
         document = storage.get_document(document_id)
         assert document is not None
         assert document.execution_id == execution_id
-        assert document.source_identifier == "test.txt"
+        assert document.source_document_id == source_doc_id
         assert document.processing_config == {"chunk_size": 1000}
         assert document.doc_metadata == {"size": 100}
         assert document.current_state == TaskState.PENDING
@@ -115,9 +149,19 @@ class TestPipelineStorage:
         execution_id = storage.create_pipeline_execution(
             metadata={"source_type": "filesystem"}
         )
+        
+        # Create source document first
+        source_doc_id = storage.create_source_document(
+            source_id="test.txt",
+            content="Test document content",
+            content_type="text/plain",
+            source_path="/test/test.txt",
+            source_metadata={}
+        )
+        
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt",
+            source_document_id=source_doc_id,
             processing_config={"chunk_size": 1000}
         )
         
@@ -140,7 +184,7 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt",
+            source_document_id=storage._test_source_doc_ids["source-doc-test"],
             processing_config={"chunk_size": 1000}
         )
         
@@ -171,7 +215,7 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt",
+            source_document_id=storage._test_source_doc_ids["source-doc-test"],
             processing_config={"chunk_size": 1000}
         )
         
@@ -205,7 +249,7 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt",
+            source_document_id=storage._test_source_doc_ids["source-doc-test"],
             processing_config={"chunk_size": 1000}
         )
         task_id = storage.create_processing_task(
@@ -232,7 +276,7 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt",
+            source_document_id=storage._test_source_doc_ids["source-doc-test"],
             processing_config={"chunk_size": 1000}
         )
         task_id = storage.create_processing_task(
@@ -260,7 +304,7 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt",
+            source_document_id=storage._test_source_doc_ids["source-doc-test"],
             processing_config={"chunk_size": 1000}
         )
         
@@ -302,12 +346,12 @@ class TestPipelineStorage:
         # Create multiple documents
         doc1_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="doc1.txt",
+            source_document_id=storage._test_source_doc_ids["source-doc-1"],
             processing_config={"chunk_size": 1000}
         )
         doc2_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="doc2.txt",
+            source_document_id=storage._test_source_doc_ids["source-doc-2"],
             processing_config={"chunk_size": 1000}
         )
         
@@ -325,7 +369,7 @@ class TestPipelineStorage:
         with pytest.raises(Exception):  # Generic exception as specific error type may vary
             storage.create_document_processing(
                 execution_id="nonexistent",
-                source_identifier="test.txt",
+                source_document_id=storage._test_source_doc_ids["source-doc-test"],
                 processing_config={"chunk_size": 1000}
             )
 
@@ -404,7 +448,7 @@ class TestPipelineStorage:
         )
         document_id = storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="test.txt",
+            source_document_id=storage._test_source_doc_ids["source-doc-test"],
             processing_config={"chunk_size": 1000}
         )
         task_id = storage.create_processing_task(

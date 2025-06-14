@@ -78,17 +78,27 @@ class TestPipeline:
             metadata={"test": True, "source_type": "filesystem", "path": "/test/docs"}
         )
         
-        # Create documents for the execution
-        doc_configs = [
-            {"source_identifier": "doc1.txt", "processing_config": {"chunk_size": 1000}},
-            {"source_identifier": "doc2.txt", "processing_config": {"chunk_size": 1000}},
+        # Create source documents first
+        source_docs = [
+            {"source_id": "doc1.txt", "content": "This is the content of document 1."},
+            {"source_id": "doc2.txt", "content": "This is the content of document 2."},
         ]
         
-        for doc_config in doc_configs:
+        for doc_data in source_docs:
+            # Create source document
+            source_doc_id = storage.create_source_document(
+                source_id=doc_data["source_id"],
+                content=doc_data["content"],
+                content_type="text/plain",
+                source_path=f"/test/docs/{doc_data['source_id']}",
+                source_metadata={"fake": "metadata"}
+            )
+            
+            # Create document processing record
             doc_id = storage.create_document_processing(
                 execution_id=exec_id,
-                source_identifier=doc_config["source_identifier"],
-                processing_config=doc_config["processing_config"]
+                source_document_id=source_doc_id,
+                processing_config={"chunk_size": 1000}
             )
             
             # Create tasks for each document
@@ -234,9 +244,17 @@ class TestPipeline:
             metadata={"source_type": "filesystem", "path": "/test"}
         )
         
+        # Create source document first
+        source_doc_id = failing_storage.create_source_document(
+            source_id="test.txt",
+            content="test content",
+            content_type="text/plain",
+            source_metadata={}
+        )
+        
         doc_id = failing_storage.create_document_processing(
             execution_id=exec_id,
-            source_identifier="test.txt",
+            source_document_id=source_doc_id,
             processing_config={}
         )
         
@@ -275,7 +293,7 @@ class TestPipeline:
         tasks = storage.get_document_tasks(documents[0].id)
         task = tasks[0]  # Get first task
         
-        input_data = {"source_identifier": documents[0].source_identifier}
+        input_data = {"source_document_id": documents[0].source_document_id}
         
         result = pipeline._process_task(task, input_data)
         
@@ -404,9 +422,17 @@ class TestPipeline:
         execution_id = fake_components["execution_id"]
         
         for i in range(2, 5):  # Add 3 more documents (we already have 2)
+            # Create source document first
+            source_doc_id = storage.create_source_document(
+                source_id=f"doc{i}.txt",
+                content=f"This is the content of document {i}.",
+                content_type="text/plain",
+                source_metadata={}
+            )
+            
             doc_id = storage.create_document_processing(
                 execution_id=execution_id,
-                source_identifier=f"doc{i}.txt",
+                source_document_id=source_doc_id,
                 processing_config={"chunk_size": 1000}
             )
             # Create minimal tasks
@@ -443,10 +469,18 @@ class TestPipeline:
             metadata={"source_type": "filesystem", "path": "/test"}
         )
         
+        # Create source document first
+        source_doc_id = broken_storage.create_source_document(
+            source_id="bad.txt",
+            content="bad content",
+            content_type="text/plain",
+            source_metadata={}
+        )
+        
         # Create a document
         doc_id = broken_storage.create_document_processing(
             execution_id=execution_id,
-            source_identifier="bad.txt",
+            source_document_id=source_doc_id,
             processing_config={}
         )
         

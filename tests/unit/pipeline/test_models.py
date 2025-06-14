@@ -14,6 +14,7 @@ from rag.pipeline.models import (
     PipelineExecution,
     PipelineState,
     ProcessingTask,
+    SourceDocument,
     TaskState,
     TaskType,
     VectorStorageTask,
@@ -26,7 +27,22 @@ def in_memory_db():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     SessionLocal = sessionmaker(bind=engine)
-    return SessionLocal()
+    session = SessionLocal()
+    
+    # Create a generic source document that can be referenced by tests
+    generic_source_doc = SourceDocument(
+        id="source-doc-generic",
+        source_id="test.txt",
+        content="This is generic test content",
+        content_type="text/plain",
+        source_path="/test/test.txt",
+        source_metadata={},
+        created_at=datetime.utcnow(),
+    )
+    session.add(generic_source_doc)
+    session.commit()
+    
+    return session
 
 
 class TestPipelineExecutionModel:
@@ -92,11 +108,23 @@ class TestDocumentProcessingModel:
         )
         in_memory_db.add(execution)
         
+        # Create source document
+        source_doc = SourceDocument(
+            id="source-doc-1",
+            source_id="test.txt",
+            content="This is test content",
+            content_type="text/plain",
+            source_path="/test/test.txt",
+            source_metadata={"size": 100},
+            created_at=datetime.utcnow(),
+        )
+        in_memory_db.add(source_doc)
+        
         # Create document processing
         document = DocumentProcessing(
             id="test-doc-1",
             execution_id="test-execution",
-            source_identifier="test.txt",
+            source_document_id="source-doc-1",
             processing_config={"chunk_size": 1000},
             created_at=datetime.utcnow(),
             doc_metadata={"size": 100},
@@ -109,7 +137,7 @@ class TestDocumentProcessingModel:
         retrieved = in_memory_db.get(DocumentProcessing, "test-doc-1")
         assert retrieved is not None
         assert retrieved.execution_id == "test-execution"
-        assert retrieved.source_identifier == "test.txt"
+        assert retrieved.source_document_id == "source-doc-1"
         assert retrieved.processing_config == {"chunk_size": 1000}
         assert retrieved.doc_metadata == {"size": 100}
 
@@ -121,10 +149,22 @@ class TestDocumentProcessingModel:
         )
         in_memory_db.add(execution)
         
+        # Create source document
+        source_doc = SourceDocument(
+            id="source-doc-2",
+            source_id="test2.txt",
+            content="This is test content 2",
+            content_type="text/plain",
+            source_path="/test/test2.txt",
+            source_metadata={},
+            created_at=datetime.utcnow(),
+        )
+        in_memory_db.add(source_doc)
+        
         document = DocumentProcessing(
             id="test-doc-2",
             execution_id="test-execution", 
-            source_identifier="test2.txt",
+            source_document_id="source-doc-2",
             created_at=datetime.utcnow(),
         )
         
@@ -145,10 +185,22 @@ class TestDocumentProcessingModel:
         )
         in_memory_db.add(execution)
         
+        # Create source document
+        source_doc = SourceDocument(
+            id="source-doc-3",
+            source_id="test3.txt",
+            content="This is test content 3",
+            content_type="text/plain",
+            source_path="/test/test3.txt",
+            source_metadata={},
+            created_at=datetime.utcnow(),
+        )
+        in_memory_db.add(source_doc)
+        
         document = DocumentProcessing(
             id="test-doc-3",
             execution_id="test-execution",
-            source_identifier="test3.txt",
+            source_document_id="source-doc-3",
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(document)
@@ -176,10 +228,22 @@ class TestProcessingTaskModel:
         )
         in_memory_db.add(execution)
         
+        # Create source document
+        source_doc = SourceDocument(
+            id="source-doc-test4",
+            source_id="test.txt",
+            content="This is test content",
+            content_type="text/plain",
+            source_path="/test/test.txt",
+            source_metadata={},
+            created_at=datetime.utcnow(),
+        )
+        in_memory_db.add(source_doc)
+        
         document = DocumentProcessing(
             id="test-doc",
             execution_id="test-execution",
-            source_identifier="test.txt",
+            source_document_id="source-doc-test4",
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(document)
@@ -214,10 +278,22 @@ class TestProcessingTaskModel:
         )
         in_memory_db.add(execution)
         
+        # Create source document
+        source_doc = SourceDocument(
+            id="source-doc-test5",
+            source_id="test.txt",
+            content="This is test content",
+            content_type="text/plain",
+            source_path="/test/test.txt",
+            source_metadata={},
+            created_at=datetime.utcnow(),
+        )
+        in_memory_db.add(source_doc)
+        
         document = DocumentProcessing(
             id="test-doc",
             execution_id="test-execution",
-            source_identifier="test.txt",
+            source_document_id="source-doc-test5",
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(document)
@@ -251,7 +327,7 @@ class TestProcessingTaskModel:
         document = DocumentProcessing(
             id="test-doc",
             execution_id="test-execution",
-            source_identifier="test.txt",
+            source_document_id="source-doc-generic",
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(document)
@@ -303,7 +379,7 @@ class TestTaskDetailModels:
         document = DocumentProcessing(
             id="test-doc",
             execution_id="test-execution",
-            source_identifier="test.txt",
+            source_document_id="source-doc-generic",
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(document)
@@ -349,7 +425,7 @@ class TestTaskDetailModels:
         document = DocumentProcessing(
             id="test-doc",
             execution_id="test-execution",
-            source_identifier="test.txt",
+            source_document_id="source-doc-generic",
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(document)
@@ -397,7 +473,7 @@ class TestTaskDetailModels:
         document = DocumentProcessing(
             id="test-doc",
             execution_id="test-execution",
-            source_identifier="test.txt",
+            source_document_id="source-doc-generic",
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(document)
@@ -449,7 +525,7 @@ class TestTaskDetailModels:
         document = DocumentProcessing(
             id="test-doc",
             execution_id="test-execution",
-            source_identifier="test.txt",
+            source_document_id="source-doc-generic",
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(document)
@@ -503,7 +579,7 @@ class TestModelRelationships:
         document = DocumentProcessing(
             id="test-doc",
             execution_id="test-execution",
-            source_identifier="test.txt",
+            source_document_id="source-doc-generic",
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(document)
@@ -547,7 +623,7 @@ class TestModelRelationships:
         document = DocumentProcessing(
             id="test-doc",
             execution_id="test-execution",
-            source_identifier="test.txt",
+            source_document_id="source-doc-generic",
             created_at=datetime.utcnow(),
         )
         in_memory_db.add(document)

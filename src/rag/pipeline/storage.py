@@ -22,6 +22,7 @@ from rag.pipeline.models import (
     PipelineExecution,
     PipelineState,
     ProcessingTask,
+    SourceDocument,
     TaskState,
     TaskType,
     VectorStorageTask,
@@ -125,10 +126,71 @@ class PipelineStorage:
             session.commit()
             return execution_id
 
+    def create_source_document(  # noqa: PLR0913
+        self,
+        source_id: str,
+        content: str,
+        content_type: str | None = None,
+        content_hash: str | None = None,
+        size_bytes: int | None = None,
+        source_path: str | None = None,
+        source_metadata: dict[str, Any] | None = None,
+    ) -> str:
+        """Create a source document record.
+
+        Args:
+            source_id: Identifier from the source system
+            content: The document content
+            content_type: MIME type of the content
+            content_hash: Hash of the content for deduplication
+            size_bytes: Size of the content in bytes
+            source_path: Path or URL to the source
+            source_metadata: Additional metadata from the source
+
+        Returns:
+            Source document ID
+        """
+        with self.get_session() as session:
+            doc_id = str(uuid.uuid4())
+            source_doc = SourceDocument(
+                id=doc_id,
+                source_id=source_id,
+                content=content,
+                content_type=content_type,
+                content_hash=content_hash,
+                size_bytes=size_bytes or len(content.encode("utf-8")),
+                source_path=source_path,
+                source_metadata=source_metadata or {},
+                created_at=datetime.now(UTC),
+            )
+            session.add(source_doc)
+            session.commit()
+            return doc_id
+
+    def get_source_document(self, document_id: str) -> SourceDocument:
+        """Get a source document by ID.
+
+        Args:
+            document_id: Source document ID
+
+        Returns:
+            Source document record
+
+        Raises:
+            ValueError: If source document is not found
+        """
+        with self.get_session() as session:
+            result = session.get(SourceDocument, document_id)
+            if result is None:
+                raise ValueError(f"Source document not found: {document_id}")
+            # Refresh to ensure all attributes are loaded
+            session.refresh(result)
+            return result
+
     def create_document_processing(
         self,
         execution_id: str,
-        source_identifier: str,
+        source_document_id: str,
         processing_config: dict[str, Any],
         metadata: dict[str, Any] | None = None,
     ) -> str:
@@ -136,7 +198,7 @@ class PipelineStorage:
 
         Args:
             execution_id: Parent pipeline execution ID
-            source_identifier: Document source identifier
+            source_document_id: ID of the source document to process
             processing_config: Configuration for processing this document
             metadata: Optional document metadata
 
@@ -148,7 +210,7 @@ class PipelineStorage:
             document = DocumentProcessing(
                 id=doc_id,
                 execution_id=execution_id,
-                source_identifier=source_identifier,
+                source_document_id=source_document_id,
                 processing_config=processing_config,
                 created_at=datetime.now(UTC),
                 doc_metadata=metadata or {},
