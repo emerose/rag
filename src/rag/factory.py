@@ -372,7 +372,6 @@ class RAGComponentsFactory:
             Pipeline,
             PipelineConfig,
             PipelineStorage,
-            StateTransitionService,
         )
         from rag.pipeline.processors import DefaultProcessorFactory
 
@@ -381,8 +380,7 @@ class RAGComponentsFactory:
         pipeline_db_url = f"sqlite:///{pipeline_db_path}"
         storage = PipelineStorage(pipeline_db_url)
 
-        # Create state transition service
-        transitions = StateTransitionService(storage)
+        # No state transition service needed - state machines handle transitions
 
         # Create processor factory that uses the factory's components
         processor_factory = DefaultProcessorFactory(
@@ -402,7 +400,6 @@ class RAGComponentsFactory:
         # Create the pipeline
         return Pipeline(
             storage=storage,
-            state_transitions=transitions,
             processor_factory=processor_factory,
             config=pipeline_config,
         )

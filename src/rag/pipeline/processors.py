@@ -15,7 +15,6 @@ from langchain_core.documents import Document
 from rag.data.text_splitter import TextSplitterFactory
 from rag.embeddings.protocols import EmbeddingServiceProtocol
 from rag.pipeline.models import ProcessingTask, TaskType
-from rag.pipeline.transitions import PipelineStorageProtocol
 from rag.sources.base import SourceDocument
 from rag.storage.protocols import DocumentStoreProtocol, VectorStoreProtocol
 from rag.utils.logging_utils import get_logger
@@ -245,7 +244,7 @@ class DocumentLoadingProcessor(BaseTaskProcessor):
 
     task_type = TaskType.DOCUMENT_LOADING
 
-    def __init__(self, config: DocumentLoadingConfig, storage: PipelineStorageProtocol):
+    def __init__(self, config: DocumentLoadingConfig, storage: Any):
         """Initialize the document loading processor.
 
         Args:

@@ -37,7 +37,6 @@ class TestPipelineFactory:
         )
         
         with patch('rag.pipeline.factory.PipelineStorage') as mock_storage, \
-             patch('rag.pipeline.factory.StateTransitionService'), \
              patch('rag.pipeline.factory.Pipeline') as mock_pipeline_class, \
              patch('rag.embeddings.EmbeddingProvider'), \
              patch('rag.pipeline.factory.SQLAlchemyDocumentStore') as mock_doc_store, \
@@ -60,7 +59,6 @@ class TestPipelineFactory:
     def test_create_for_testing(self):
         """Test creating a pipeline for testing."""
         with patch('rag.pipeline.factory.PipelineStorage') as mock_storage, \
-             patch('rag.pipeline.factory.StateTransitionService') as mock_transitions, \
              patch('rag.pipeline.factory.Pipeline') as mock_pipeline_class, \
              patch('rag.data.text_splitter.TextSplitterFactory'), \
              patch('rag.pipeline.factory.InMemoryVectorStore'):
@@ -68,7 +66,6 @@ class TestPipelineFactory:
             mock_pipeline = Mock()
             mock_pipeline_class.return_value = mock_pipeline
             mock_storage.return_value = Mock()
-            mock_transitions.return_value = Mock()
             
             # Use provided arguments to avoid complex dependencies
             test_storage = Mock()

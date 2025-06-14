@@ -179,30 +179,35 @@ class PipelineStateMachine(StateMachine):
     def on_enter_running(self) -> None:
         """Update started_at timestamp when entering running state."""
         if self.model and hasattr(self.model, "started_at"):
+            self.model.state = PipelineState.RUNNING  # type: ignore[attr-defined]
             self.model.started_at = datetime.now(UTC)  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
     def on_enter_completed(self) -> None:
         """Update completed_at timestamp when entering completed state."""
         if self.model and hasattr(self.model, "completed_at"):
+            self.model.state = PipelineState.COMPLETED  # type: ignore[attr-defined]
             self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
     def on_enter_failed(self) -> None:
         """Update completed_at timestamp when entering failed state."""
         if self.model and hasattr(self.model, "completed_at"):
+            self.model.state = PipelineState.FAILED  # type: ignore[attr-defined]
             self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
     def on_enter_cancelled(self) -> None:
         """Update completed_at timestamp when entering cancelled state."""
         if self.model and hasattr(self.model, "completed_at"):
+            self.model.state = PipelineState.CANCELLED  # type: ignore[attr-defined]
             self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
     def on_enter_paused(self) -> None:
         """Update timestamp when pausing."""
         if self.model and hasattr(self.model, "updated_at"):
+            self.model.state = PipelineState.PAUSED  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
 
@@ -243,38 +248,80 @@ class PipelineExecution(Base):
     )
 
     def __init__(self, **kwargs: Any):
-        """Initialize the pipeline execution with state machine."""
+        """Initialize the pipeline execution."""
         super().__init__(**kwargs)
-        self.state_machine = PipelineStateMachine(model=self, state_field="state")
+        # State machine can be created on-demand if needed for validation
+        self._state_machine: PipelineStateMachine | None = None
 
-    # Delegate state machine methods
+    # State transition methods
     def start(self) -> None:
         """Start the pipeline."""
-        self.state_machine.start()
+        if self.state == PipelineState.CREATED:
+            self.state = PipelineState.RUNNING
+            self.started_at = datetime.now(UTC)
+            self.updated_at = datetime.now(UTC)
+        elif self.state == PipelineState.PAUSED:
+            # Resume from paused state
+            self.state = PipelineState.RUNNING
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot start from state {self.state}")
 
     def pause(self) -> None:
         """Pause the pipeline."""
-        self.state_machine.pause()
+        if self.state == PipelineState.RUNNING:
+            self.state = PipelineState.PAUSED
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot pause from state {self.state}")
 
     def resume(self) -> None:
         """Resume the pipeline."""
-        self.state_machine.resume()
+        if self.state == PipelineState.PAUSED:
+            self.state = PipelineState.RUNNING
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot resume from state {self.state}")
 
     def complete(self) -> None:
         """Complete the pipeline."""
-        self.state_machine.complete()
+        if self.state == PipelineState.RUNNING:
+            self.state = PipelineState.COMPLETED
+            self.completed_at = datetime.now(UTC)
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot complete from state {self.state}")
 
     def fail(self) -> None:
         """Mark the pipeline as failed."""
-        self.state_machine.fail()
+        if self.state in (PipelineState.RUNNING, PipelineState.PAUSED):
+            self.state = PipelineState.FAILED
+            self.completed_at = datetime.now(UTC)
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot fail from state {self.state}")
 
     def cancel(self) -> None:
         """Cancel the pipeline."""
-        self.state_machine.cancel()
+        if self.state in (
+            PipelineState.CREATED,
+            PipelineState.RUNNING,
+            PipelineState.PAUSED,
+        ):
+            self.state = PipelineState.CANCELLED
+            self.completed_at = datetime.now(UTC)
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot cancel from state {self.state}")
 
     def retry(self) -> None:
         """Retry the pipeline."""
-        self.state_machine.retry()
+        if self.state == PipelineState.FAILED:
+            self.state = PipelineState.RUNNING
+            self.completed_at = None
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot retry from state {self.state}")
 
     def set_error(
         self, error_message: str, error_details: dict[str, Any] | None = None
@@ -312,29 +359,34 @@ class DocumentProcessingStateMachine(StateMachine):
     def on_enter_in_progress(self) -> None:
         """Update timestamp when starting document processing."""
         if self.model and hasattr(self.model, "updated_at"):
+            self.model.current_state = TaskState.IN_PROGRESS  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
     def on_enter_completed(self) -> None:
         """Update completed_at timestamp when document processing completes."""
         if self.model and hasattr(self.model, "completed_at"):
+            self.model.current_state = TaskState.COMPLETED  # type: ignore[attr-defined]
             self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
     def on_enter_failed(self) -> None:
         """Update completed_at timestamp when document processing fails."""
         if self.model and hasattr(self.model, "completed_at"):
+            self.model.current_state = TaskState.FAILED  # type: ignore[attr-defined]
             self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
     def on_enter_cancelled(self) -> None:
         """Update completed_at timestamp when document processing is cancelled."""
         if self.model and hasattr(self.model, "completed_at"):
+            self.model.current_state = TaskState.CANCELLED  # type: ignore[attr-defined]
             self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
     def on_enter_paused(self) -> None:
         """Update timestamp when pausing."""
         if self.model and hasattr(self.model, "updated_at"):
+            self.model.current_state = TaskState.PAUSED  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
 
@@ -389,40 +441,75 @@ class DocumentProcessing(Base):
     )
 
     def __init__(self, **kwargs: Any):
-        """Initialize the document processing with state machine."""
+        """Initialize the document processing."""
         super().__init__(**kwargs)
-        self.state_machine = DocumentProcessingStateMachine(
-            model=self, state_field="current_state"
-        )
+        # State machine can be created on-demand if needed for validation
+        self._state_machine: DocumentProcessingStateMachine | None = None
 
-    # Delegate state machine methods
+    # State transition methods
     def start(self) -> None:
         """Start document processing."""
-        self.state_machine.start()
+        if self.current_state == TaskState.PENDING:
+            self.current_state = TaskState.IN_PROGRESS
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot start from state {self.current_state}")
 
     def complete(self) -> None:
         """Complete document processing."""
-        self.state_machine.complete()
+        if self.current_state == TaskState.IN_PROGRESS:
+            self.current_state = TaskState.COMPLETED
+            self.completed_at = datetime.now(UTC)
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot complete from state {self.current_state}")
 
     def fail(self) -> None:
         """Mark document processing as failed."""
-        self.state_machine.fail()
+        if self.current_state in (TaskState.IN_PROGRESS, TaskState.PAUSED):
+            self.current_state = TaskState.FAILED
+            self.completed_at = datetime.now(UTC)
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot fail from state {self.current_state}")
 
     def pause(self) -> None:
         """Pause document processing."""
-        self.state_machine.pause()
+        if self.current_state == TaskState.IN_PROGRESS:
+            self.current_state = TaskState.PAUSED
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot pause from state {self.current_state}")
 
     def resume(self) -> None:
         """Resume document processing."""
-        self.state_machine.resume()
+        if self.current_state == TaskState.PAUSED:
+            self.current_state = TaskState.IN_PROGRESS
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot resume from state {self.current_state}")
 
     def cancel(self) -> None:
         """Cancel document processing."""
-        self.state_machine.cancel()
+        if self.current_state in (
+            TaskState.PENDING,
+            TaskState.IN_PROGRESS,
+            TaskState.PAUSED,
+        ):
+            self.current_state = TaskState.CANCELLED
+            self.completed_at = datetime.now(UTC)
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot cancel from state {self.current_state}")
 
     def retry(self) -> None:
         """Retry document processing."""
-        self.state_machine.retry()
+        if self.current_state == TaskState.FAILED:
+            self.current_state = TaskState.PENDING
+            self.completed_at = None
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot retry from state {self.current_state}")
 
     def set_error(
         self, error_message: str, error_details: dict[str, Any] | None = None
@@ -460,19 +547,22 @@ class ProcessingTaskStateMachine(StateMachine):
     def on_enter_in_progress(self) -> None:
         """Update started_at timestamp when starting task."""
         if self.model and hasattr(self.model, "started_at"):
-            if not self.model.started_at:  # Only set once
+            self.model.state = TaskState.IN_PROGRESS  # type: ignore[attr-defined]
+            if not self.model.started_at:  # Only set once  # type: ignore[attr-defined]
                 self.model.started_at = datetime.now(UTC)  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
     def on_enter_completed(self) -> None:
         """Update completed_at timestamp when task completes."""
         if self.model and hasattr(self.model, "completed_at"):
+            self.model.state = TaskState.COMPLETED  # type: ignore[attr-defined]
             self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
     def on_enter_failed(self) -> None:
         """Handle failure with retry logic."""
         if self.model and hasattr(self.model, "completed_at"):
+            self.model.state = TaskState.FAILED  # type: ignore[attr-defined]
             self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
             self.model.last_retry_at = datetime.now(UTC)  # type: ignore[attr-defined]
@@ -482,17 +572,20 @@ class ProcessingTaskStateMachine(StateMachine):
     def on_enter_cancelled(self) -> None:
         """Update timestamp when task is cancelled."""
         if self.model and hasattr(self.model, "completed_at"):
+            self.model.state = TaskState.CANCELLED  # type: ignore[attr-defined]
             self.model.completed_at = datetime.now(UTC)  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
     def on_enter_paused(self) -> None:
         """Update timestamp when task is paused."""
         if self.model and hasattr(self.model, "updated_at"):
+            self.model.state = TaskState.PAUSED  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
 
     def on_enter_pending(self) -> None:
         """Update timestamp and handle retry logic when task becomes pending."""
         if self.model and hasattr(self.model, "updated_at"):
+            self.model.state = TaskState.PENDING  # type: ignore[attr-defined]
             self.model.updated_at = datetime.now(UTC)  # type: ignore[attr-defined]
             # Reset timing for retry
             if hasattr(self.model, "retry_count") and self.model.retry_count > 0:  # type: ignore[attr-defined]
@@ -581,44 +674,88 @@ class ProcessingTask(Base):
     )
 
     def __init__(self, **kwargs: Any):
-        """Initialize the processing task with state machine."""
+        """Initialize the processing task."""
         super().__init__(**kwargs)
-        self.state_machine = ProcessingTaskStateMachine(
-            model=self, state_field="state"
-        )
+        # State machine can be created on-demand if needed for validation
+        self._state_machine: ProcessingTaskStateMachine | None = None
 
-    # Delegate state machine methods
+    # State transition methods
     def start(self) -> None:
         """Start the task."""
-        self.state_machine.start()
+        if self.state == TaskState.PENDING:
+            self.state = TaskState.IN_PROGRESS
+            if not self.started_at:  # Only set once
+                self.started_at = datetime.now(UTC)
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot start from state {self.state}")
 
     def complete(self) -> None:
         """Complete the task."""
-        self.state_machine.complete()
+        if self.state == TaskState.IN_PROGRESS:
+            self.state = TaskState.COMPLETED
+            self.completed_at = datetime.now(UTC)
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot complete from state {self.state}")
 
     def fail(self) -> None:
         """Mark the task as failed."""
-        self.state_machine.fail()
+        if self.state in (TaskState.IN_PROGRESS, TaskState.PAUSED):
+            # Handle retry logic
+            if self.retry_count < self.max_retries:
+                self.retry_count += 1
+                self.state = TaskState.PENDING  # Auto-retry
+                self.last_retry_at = datetime.now(UTC)
+                self.updated_at = datetime.now(UTC)
+                # Reset timing for retry
+                self.started_at = None
+                self.completed_at = None
+            else:
+                self.state = TaskState.FAILED
+                self.completed_at = datetime.now(UTC)
+                self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot fail from state {self.state}")
 
     def pause(self) -> None:
         """Pause the task."""
-        self.state_machine.pause()
+        if self.state == TaskState.IN_PROGRESS:
+            self.state = TaskState.PAUSED
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot pause from state {self.state}")
 
     def resume(self) -> None:
         """Resume the task."""
-        self.state_machine.resume()
+        if self.state == TaskState.PAUSED:
+            self.state = TaskState.IN_PROGRESS
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot resume from state {self.state}")
 
     def cancel(self) -> None:
         """Cancel the task."""
-        self.state_machine.cancel()
+        if self.state in (TaskState.PENDING, TaskState.IN_PROGRESS, TaskState.PAUSED):
+            self.state = TaskState.CANCELLED
+            self.completed_at = datetime.now(UTC)
+            self.updated_at = datetime.now(UTC)
+        else:
+            raise ValueError(f"Cannot cancel from state {self.state}")
 
     def retry(self) -> None:
         """Retry the task."""
-        self.state_machine.retry()
+        if self.state == TaskState.FAILED:
+            self.state = TaskState.PENDING
+            self.completed_at = None
+            self.updated_at = datetime.now(UTC)
+            # Don't reset retry_count here - it tracks total attempts
+        else:
+            raise ValueError(f"Cannot retry from state {self.state}")
 
     def can_retry(self) -> bool:
         """Check if this task can be retried."""
-        return self.state_machine.can_retry()
+        return self.state == TaskState.FAILED and self.retry_count < self.max_retries
 
     def set_error(
         self, error_message: str, error_details: dict[str, Any] | None = None

@@ -7,7 +7,6 @@ from rag.pipeline.fakes import (
     FakeDocumentSource,
     FakePipelineStorage,
     FakeProcessorFactory,
-    FakeStateTransitionService,
     create_fake_pipeline_components,
 )
 from rag.pipeline.models import PipelineState, TaskState, TaskType
@@ -69,7 +68,7 @@ class TestPipeline:
             "doc1.txt": "This is the content of document 1.",
             "doc2.txt": "This is the content of document 2.",
         }
-        storage, transition_service, processor_factory, document_source = create_fake_pipeline_components(
+        storage, processor_factory, document_source = create_fake_pipeline_components(
             documents=documents
         )
         
@@ -112,7 +111,6 @@ class TestPipeline:
         
         return {
             "storage": storage,
-            "transition_service": transition_service,
             "processor_factory": processor_factory,
             "document_source": document_source,
             "execution_id": exec_id,
@@ -124,7 +122,6 @@ class TestPipeline:
         config = PipelineConfig()
         pipeline_instance = Pipeline(
             storage=fake_components["storage"],
-            state_transitions=fake_components["transition_service"],
             processor_factory=fake_components["processor_factory"],
             config=config,
         )
@@ -235,7 +232,7 @@ class TestPipeline:
     def test_process_document_task_failure(self, fake_components):
         """Test processing document when a task fails."""
         # Create components with failing processors
-        failing_storage, failing_transition_service, failing_processor_factory, failing_document_source = create_fake_pipeline_components(
+        failing_storage, failing_processor_factory, failing_document_source = create_fake_pipeline_components(
             failing_task_types={TaskType.DOCUMENT_LOADING}
         )
         
@@ -268,7 +265,6 @@ class TestPipeline:
         config = PipelineConfig()
         failing_pipeline = Pipeline(
             storage=failing_storage,
-            state_transitions=failing_transition_service,
             processor_factory=failing_processor_factory,
             config=config,
         )
@@ -328,7 +324,6 @@ class TestPipeline:
         config = PipelineConfig()
         failing_pipeline = Pipeline(
             storage=fake_components["storage"],
-            state_transitions=fake_components["transition_service"],
             processor_factory=FailingProcessorFactory(),
             config=config,
         )
@@ -445,7 +440,6 @@ class TestPipeline:
         config = PipelineConfig(concurrent_tasks=3)
         pipeline = Pipeline(
             storage=storage,
-            state_transitions=fake_components["transition_service"],
             processor_factory=fake_components["processor_factory"],
             config=config,
         )
@@ -488,7 +482,6 @@ class TestPipeline:
         config = PipelineConfig()
         broken_pipeline = Pipeline(
             storage=broken_storage,
-            state_transitions=fake_components["transition_service"],
             processor_factory=fake_components["processor_factory"],
             config=config,
         )

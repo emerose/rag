@@ -14,10 +14,6 @@ from typing import Any, TypedDict
 
 from rag.pipeline.models import PipelineState, ProcessingTask, TaskState, TaskType
 from rag.pipeline.processors import ProcessorFactory
-from rag.pipeline.transitions import (
-    PipelineStorageProtocol,
-    StateTransitionServiceProtocol,
-)
 from rag.sources.base import SourceDocument
 from rag.utils.logging_utils import get_logger
 
@@ -70,8 +66,7 @@ class Pipeline:
 
     def __init__(
         self,
-        storage: PipelineStorageProtocol,
-        state_transitions: StateTransitionServiceProtocol,
+        storage: Any,
         processor_factory: ProcessorFactory,
         config: PipelineConfig,
     ):
@@ -79,12 +74,10 @@ class Pipeline:
 
         Args:
             storage: Database storage for state management
-            state_transitions: State transition service
             processor_factory: Factory for creating document-specific processors
             config: Pipeline configuration
         """
         self.storage = storage
-        self.transitions = state_transitions
         self.processor_factory = processor_factory
         self.config = config
 
@@ -165,7 +158,7 @@ class Pipeline:
                 },
             ]
 
-            self.storage.create_processing_tasks(doc_processing_id, task_configs)  # type: ignore[arg-type]
+            self.storage.create_processing_tasks(doc_processing_id, task_configs)
 
         logger.info(
             f"Created pipeline execution {execution_id} with {len(documents)} documents"
@@ -189,12 +182,12 @@ class Pipeline:
         Returns:
             Execution result
         """
-        # Transition to running state
-        result = self.transitions.transition_pipeline(
-            execution_id, PipelineState.RUNNING
-        )
-        if not result.success:
-            raise ValueError(f"Cannot start execution: {result.error_message}")
+        # Get execution and transition to running state
+        execution = self.storage.get_pipeline_execution(execution_id)
+        try:
+            execution.start()
+        except Exception as e:
+            raise ValueError(f"Cannot start execution: {e}") from e
 
         self._running = True
         self._paused = False
@@ -213,18 +206,17 @@ class Pipeline:
 
             if all_completed:
                 # Mark execution as completed
-                self.transitions.transition_pipeline(
-                    execution_id, PipelineState.COMPLETED
-                )
+                execution.complete()
+                self.storage.update_pipeline_state(execution_id, execution.state)
 
                 # Save vector store if the execution completed successfully
                 self._save_vector_store_if_needed()
             elif any(doc.current_state == TaskState.FAILED for doc in documents):
                 # Mark as failed if any documents failed
-                self.transitions.transition_pipeline(
-                    execution_id,
-                    PipelineState.FAILED,
-                    error_message="One or more documents failed processing",
+                execution.set_error("One or more documents failed processing")
+                execution.fail()
+                self.storage.update_pipeline_state(
+                    execution_id, execution.state, execution.error_message
                 )
 
             # Get final execution state
@@ -242,11 +234,14 @@ class Pipeline:
 
         except Exception as e:
             logger.error(f"Pipeline execution failed: {e}")
-            self.transitions.transition_pipeline(
+            execution = self.storage.get_pipeline_execution(execution_id)
+            execution.set_error(str(e), {"exception_type": type(e).__name__})
+            execution.fail()
+            self.storage.update_pipeline_state(
                 execution_id,
-                PipelineState.FAILED,
-                error_message=str(e),
-                error_details={"exception_type": type(e).__name__},
+                execution.state,
+                execution.error_message,
+                execution.error_details,
             )
             raise
         finally:
@@ -261,12 +256,14 @@ class Pipeline:
         Returns:
             True if paused successfully
         """
-        result = self.transitions.transition_pipeline(
-            execution_id, PipelineState.PAUSED
-        )
-        if result.success:
+        try:
+            execution = self.storage.get_pipeline_execution(execution_id)
+            execution.pause()
+            self.storage.update_pipeline_state(execution_id, execution.state)
             self._paused = True
-        return result.success
+            return True
+        except Exception:
+            return False
 
     def resume(self, execution_id: str) -> PipelineExecutionResult:
         """Resume a paused or failed pipeline execution.
@@ -299,10 +296,13 @@ class Pipeline:
         Returns:
             True if cancelled successfully
         """
-        result = self.transitions.transition_pipeline(
-            execution_id, PipelineState.CANCELLED
-        )
-        return result.success
+        try:
+            execution = self.storage.get_pipeline_execution(execution_id)
+            execution.cancel()
+            self.storage.update_pipeline_state(execution_id, execution.state)
+            return True
+        except Exception:
+            return False
 
     def list_executions(
         self, state: PipelineState | None = None
@@ -327,13 +327,13 @@ class Pipeline:
 
         # Process documents concurrently
         futures: list[Future[bool]] = []
-        for doc in documents:
-            if doc.current_state not in (TaskState.COMPLETED, TaskState.CANCELLED):
+        for doc in documents:  # type: ignore[assignment]
+            if doc.current_state not in (TaskState.COMPLETED, TaskState.CANCELLED):  # type: ignore[attr-defined]
                 if self._executor is None:
                     raise RuntimeError(
                         "Pipeline has been shutdown and cannot process documents"
                     )
-                future = self._executor.submit(self._process_document, doc.id)
+                future = self._executor.submit(self._process_document, doc.id)  # type: ignore[attr-defined]
                 futures.append(future)
 
                 # Limit concurrent documents
@@ -389,7 +389,9 @@ class Pipeline:
         logger.info(f"Processing document {document_id}")
 
         # Transition document to in progress
-        self.transitions.transition_document(document_id, TaskState.IN_PROGRESS)
+        document = self.storage.get_document(document_id)
+        document.start()
+        self.storage.update_document_state(document_id, document.current_state)
 
         try:
             # Get all tasks for the document (handle mock for tests)
@@ -399,26 +401,43 @@ class Pipeline:
 
             # Process tasks in order
             task_outputs: dict[str, Any] = {}
-            for task in sorted(tasks, key=lambda t: t.sequence_number):
+            for task in sorted(tasks, key=lambda t: t.sequence_number):  # type: ignore[arg-type, return-value, misc]
                 if self._paused:
                     logger.info("Pipeline paused, stopping document processing")
                     break
 
                 # Check if task needs processing
-                if task.state in (TaskState.COMPLETED, TaskState.CANCELLED):
+                if task.state in (TaskState.COMPLETED, TaskState.CANCELLED):  # type: ignore[attr-defined]
                     continue
 
-                # Check dependencies
-                can_start, reason = self.transitions.can_start_task(task)
+                # Check dependencies using task's built-in method
+                def dependency_checker(
+                    depends_on_task_id: str,
+                ) -> tuple[bool, str | None]:
+                    try:
+                        dependency = self.storage.get_task(depends_on_task_id)
+                        if dependency.state != TaskState.COMPLETED:
+                            return (
+                                False,
+                                f"Dependency task {dependency.id} is not completed (state: {dependency.state.value})",
+                            )
+                        return True, None
+                    except Exception as e:
+                        return (
+                            False,
+                            f"Dependency task {depends_on_task_id} not found: {e!s}",
+                        )
+
+                can_start, reason = task.can_start(dependency_checker)  # type: ignore[attr-defined]
                 if not can_start:
-                    logger.warning(f"Cannot start task {task.id}: {reason}")
+                    logger.warning(f"Cannot start task {task.id}: {reason}")  # type: ignore[attr-defined]
                     continue
 
                 # Process the task
-                success = self._process_task(task, task_outputs)
+                success = self._process_task(task, task_outputs)  # type: ignore[arg-type]
                 if not success:
                     # Task failed after retries
-                    logger.error(f"Task {task.id} failed permanently")
+                    logger.error(f"Task {task.id} failed permanently")  # type: ignore[attr-defined]
                     break
 
             # Check if all tasks completed
@@ -427,24 +446,30 @@ class Pipeline:
 
             if all_completed:
                 # Mark document as completed
-                self.transitions.transition_document(document_id, TaskState.COMPLETED)
+                document = self.storage.get_document(document_id)
+                document.complete()
+                self.storage.update_document_state(document_id, document.current_state)
                 return True
             else:
                 # Mark as failed
-                self.transitions.transition_document(
-                    document_id,
-                    TaskState.FAILED,
-                    error_message="One or more tasks failed",
+                document = self.storage.get_document(document_id)
+                document.set_error("One or more tasks failed")
+                document.fail()
+                self.storage.update_document_state(
+                    document_id, document.current_state, document.error_message
                 )
                 return False
 
         except Exception as e:
             logger.error(f"Error processing document {document_id}: {e}")
-            self.transitions.transition_document(
+            document = self.storage.get_document(document_id)
+            document.set_error(str(e), {"exception_type": type(e).__name__})
+            document.fail()
+            self.storage.update_document_state(
                 document_id,
-                TaskState.FAILED,
-                error_message=str(e),
-                error_details={"exception_type": type(e).__name__},
+                document.current_state,
+                document.error_message,
+                document.error_details,
             )
             return False
 
@@ -466,7 +491,8 @@ class Pipeline:
         if task_outputs is None:
             task_outputs = {}
         # Transition to in progress
-        self.transitions.transition_task(task.id, TaskState.IN_PROGRESS)
+        task.start()
+        self.storage.update_task_state(task.id, task.state)
 
         # Report progress
         if self.config.progress_callback:
@@ -529,11 +555,10 @@ class Pipeline:
 
             if result.success:
                 # Task succeeded
-                self.transitions.transition_task(
-                    task.id,
-                    TaskState.COMPLETED,
-                    result_summary=result.metrics,
-                )
+                if result.metrics:
+                    task.set_result(result.metrics)
+                task.complete()
+                self.storage.update_task_state(task.id, task.state)
 
                 # Store output for next tasks
                 if task.task_type and hasattr(task.task_type, "value"):
@@ -568,19 +593,15 @@ class Pipeline:
                 error_message=str(e), error_details={"exception_type": type(e).__name__}
             )
 
-            # Transition to failed (may retry)
-            transition_result = self.transitions.transition_task(
-                task.id,
-                TaskState.FAILED,
-                error_message=str(e),
-                error_details={"exception_type": type(e).__name__},
+            # Set error and attempt to fail (may auto-retry)
+            task.set_error(str(e), {"exception_type": type(e).__name__})
+            task.fail()
+            self.storage.update_task_state(
+                task.id, task.state, task.error_message, task.error_details
             )
 
-            # Check if task will be retried
-            if (
-                hasattr(transition_result, "new_state")
-                and transition_result.new_state == TaskState.PENDING
-            ):
+            # Check if task will be retried (state machine handles auto-retry)
+            if task.state == TaskState.PENDING:
                 logger.info(f"Task {task.id} will be retried")
                 # Recursively retry the task
                 return self._process_task(task, task_outputs)

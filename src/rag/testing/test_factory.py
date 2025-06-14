@@ -195,12 +195,10 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         # Create fake pipeline
         from rag.pipeline.fakes import (
             FakePipelineStorage,
-            FakeStateTransitionService,
         )
         from rag.pipeline.pipeline import Pipeline
 
         fake_storage = FakePipelineStorage()
-        fake_transition_service = FakeStateTransitionService(fake_storage)
 
         # Create processor factory for the fake pipeline
         from rag.pipeline.processors import DefaultProcessorFactory
@@ -222,7 +220,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
         fake_pipeline = Pipeline(
             storage=fake_storage,
-            state_transitions=fake_transition_service,
             processor_factory=processor_factory,
             config=pipeline_config,
         )
@@ -383,12 +380,10 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             # Create new pipeline with real document store and real processors
             from rag.pipeline.fakes import (
                 FakePipelineStorage,
-                FakeStateTransitionService,
             )
             from rag.pipeline.pipeline import Pipeline, PipelineConfig
 
             fake_storage = FakePipelineStorage()
-            fake_transition_service = FakeStateTransitionService(fake_storage)
 
             # Create real processors that will interact with the real document store
             from rag.data.text_splitter import TextSplitterFactory
@@ -426,7 +421,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             # Create pipeline with real document store and processor factory
             real_pipeline = Pipeline(
                 storage=fake_storage,
-                state_transitions=fake_transition_service,
                 processor_factory=processor_factory,
                 config=pipeline_config,
             )
@@ -453,12 +447,10 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             # Create new pipeline with real document store and real processors
             from rag.pipeline.fakes import (
                 FakePipelineStorage,
-                FakeStateTransitionService,
             )
             from rag.pipeline.pipeline import Pipeline, PipelineConfig
 
             fake_storage = FakePipelineStorage()
-            fake_transition_service = FakeStateTransitionService(fake_storage)
 
             # Create real processors that will interact with the real document store
             from rag.data.text_splitter import TextSplitterFactory
@@ -496,7 +488,6 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             # Create pipeline with real document store and processor factory
             real_pipeline = Pipeline(
                 storage=fake_storage,
-                state_transitions=fake_transition_service,
                 processor_factory=processor_factory,
                 config=pipeline_config,
             )

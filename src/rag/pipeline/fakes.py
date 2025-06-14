@@ -11,7 +11,7 @@ from collections import defaultdict
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, ClassVar, cast
+from typing import Any, cast
 from unittest.mock import Mock
 
 from langchain_core.documents import Document
@@ -26,7 +26,6 @@ from rag.pipeline.models import (
     TaskType,
 )
 from rag.pipeline.processors import TaskResult
-from rag.pipeline.transitions import TransitionResult
 from rag.sources.base import SourceDocument
 
 
@@ -315,14 +314,14 @@ class FakePipelineStorage:
 
         return task_ids
 
-    def get_pipeline_execution(self, execution_id: str) -> PipelineExecution:
+    def get_pipeline_execution(self, execution_id: str) -> PipelineExecution:  # noqa: PLR0915
         """Get a pipeline execution by ID."""
         if execution_id not in self.executions:
             raise ValueError(f"Pipeline execution not found: {execution_id}")
 
         data = self.executions[execution_id]
 
-        # Create mock execution object
+        # Create mock execution object with state machine methods
         execution = Mock(spec=PipelineExecution)
         execution.id = data["id"]
         execution.state = data["state"]
@@ -336,6 +335,71 @@ class FakePipelineStorage:
         execution.error_details = data["error_details"]
         execution.doc_metadata = data["doc_metadata"]
 
+        # Add state machine methods that update the stored state
+        def start():
+            if data["state"] == PipelineState.CREATED:
+                data["state"] = PipelineState.RUNNING
+                execution.state = PipelineState.RUNNING
+                data["started_at"] = datetime.now(UTC)
+                execution.started_at = data["started_at"]
+            elif data["state"] == PipelineState.PAUSED:
+                # Resume from paused state
+                data["state"] = PipelineState.RUNNING
+                execution.state = PipelineState.RUNNING
+            else:
+                raise ValueError(f"Cannot start from state {data['state']}")
+
+        def complete():
+            if data["state"] == PipelineState.RUNNING:
+                data["state"] = PipelineState.COMPLETED
+                execution.state = PipelineState.COMPLETED
+                data["completed_at"] = datetime.now(UTC)
+                execution.completed_at = data["completed_at"]
+            else:
+                raise ValueError(f"Cannot complete from state {data['state']}")
+
+        def fail():
+            if data["state"] in (PipelineState.RUNNING, PipelineState.PAUSED):
+                data["state"] = PipelineState.FAILED
+                execution.state = PipelineState.FAILED
+                data["completed_at"] = datetime.now(UTC)
+                execution.completed_at = data["completed_at"]
+            else:
+                raise ValueError(f"Cannot fail from state {data['state']}")
+
+        def pause():
+            if data["state"] == PipelineState.RUNNING:
+                data["state"] = PipelineState.PAUSED
+                execution.state = PipelineState.PAUSED
+            else:
+                raise ValueError(f"Cannot pause from state {data['state']}")
+
+        def cancel():
+            if data["state"] in (
+                PipelineState.CREATED,
+                PipelineState.RUNNING,
+                PipelineState.PAUSED,
+            ):
+                data["state"] = PipelineState.CANCELLED
+                execution.state = PipelineState.CANCELLED
+                data["completed_at"] = datetime.now(UTC)
+                execution.completed_at = data["completed_at"]
+            else:
+                raise ValueError(f"Cannot cancel from state {data['state']}")
+
+        def set_error(error_message: str, error_details: dict[str, Any] | None = None):
+            data["error_message"] = error_message
+            data["error_details"] = error_details
+            execution.error_message = error_message
+            execution.error_details = error_details
+
+        execution.start = start
+        execution.complete = complete
+        execution.fail = fail
+        execution.pause = pause
+        execution.cancel = cancel
+        execution.set_error = set_error
+
         return execution
 
     def get_document(self, document_id: str) -> DocumentProcessing:
@@ -345,7 +409,7 @@ class FakePipelineStorage:
 
         data = self.documents[document_id]
 
-        # Create mock document object
+        # Create mock document object with state machine methods
         document = Mock(spec=DocumentProcessing)
         document.id = data["id"]
         document.execution_id = data["execution_id"]
@@ -359,9 +423,40 @@ class FakePipelineStorage:
         document.error_details = data["error_details"]
         document.doc_metadata = data["doc_metadata"]
 
+        # Add state machine methods
+        def start():
+            if data["current_state"] == TaskState.PENDING:
+                data["current_state"] = TaskState.IN_PROGRESS
+                document.current_state = TaskState.IN_PROGRESS
+
+        def complete():
+            if data["current_state"] == TaskState.IN_PROGRESS:
+                data["current_state"] = TaskState.COMPLETED
+                document.current_state = TaskState.COMPLETED
+                data["completed_at"] = datetime.now(UTC)
+                document.completed_at = data["completed_at"]
+
+        def fail():
+            if data["current_state"] in (TaskState.IN_PROGRESS, TaskState.PAUSED):
+                data["current_state"] = TaskState.FAILED
+                document.current_state = TaskState.FAILED
+                data["completed_at"] = datetime.now(UTC)
+                document.completed_at = data["completed_at"]
+
+        def set_error(error_message: str, error_details: dict[str, Any] | None = None):
+            data["error_message"] = error_message
+            data["error_details"] = error_details
+            document.error_message = error_message
+            document.error_details = error_details
+
+        document.start = start
+        document.complete = complete
+        document.fail = fail
+        document.set_error = set_error
+
         return cast(DocumentProcessing, document)
 
-    def get_task(self, task_id: str) -> ProcessingTask:
+    def get_task(self, task_id: str) -> ProcessingTask:  # noqa: PLR0915
         """Get a processing task by ID."""
         if task_id not in self.tasks:
             raise ValueError(f"Processing task not found: {task_id}")
@@ -403,6 +498,66 @@ class FakePipelineStorage:
         elif data["task_type"] == TaskType.VECTOR_STORAGE:
             task.storage_details = Mock()
             task.storage_details.store_type = "fake_vectorstore"
+
+        # Add state machine methods
+        def start():
+            if data["state"] == TaskState.PENDING:
+                data["state"] = TaskState.IN_PROGRESS
+                task.state = TaskState.IN_PROGRESS
+                data["started_at"] = datetime.now(UTC)
+                task.started_at = data["started_at"]
+
+        def complete():
+            if data["state"] == TaskState.IN_PROGRESS:
+                data["state"] = TaskState.COMPLETED
+                task.state = TaskState.COMPLETED
+                data["completed_at"] = datetime.now(UTC)
+                task.completed_at = data["completed_at"]
+
+        def fail():
+            if data["state"] in (TaskState.IN_PROGRESS, TaskState.PAUSED):
+                # Handle retry logic
+                if data["retry_count"] < data["max_retries"]:
+                    data["retry_count"] += 1
+                    data["state"] = TaskState.PENDING  # Auto-retry
+                    task.state = TaskState.PENDING
+                    task.retry_count = data["retry_count"]
+                    data["last_retry_at"] = datetime.now(UTC)
+                    task.last_retry_at = data["last_retry_at"]
+                else:
+                    data["state"] = TaskState.FAILED
+                    task.state = TaskState.FAILED
+                    data["completed_at"] = datetime.now(UTC)
+                    task.completed_at = data["completed_at"]
+
+        def set_error(error_message: str, error_details: dict[str, Any] | None = None):
+            data["error_message"] = error_message
+            data["error_details"] = error_details
+            task.error_message = error_message
+            task.error_details = error_details
+
+        def set_result(result_summary: dict[str, Any]):
+            data["result_summary"] = result_summary
+            task.result_summary = result_summary
+
+        def can_start(dependency_checker: Any = None) -> tuple[bool, str | None]:
+            if data["state"] != TaskState.PENDING:
+                return (
+                    False,
+                    f"Task is not in PENDING state (current: {data['state'].value})",
+                )
+
+            if dependency_checker and data["depends_on_task_id"]:
+                return dependency_checker(data["depends_on_task_id"])
+
+            return True, None
+
+        task.start = start
+        task.complete = complete
+        task.fail = fail
+        task.set_error = set_error
+        task.set_result = set_result
+        task.can_start = can_start
 
         return cast(ProcessingTask, task)
 
@@ -693,203 +848,7 @@ class FakePipelineStorage:
         return len(old_execution_ids)
 
 
-class FakeStateTransitionService:
-    """Fake state transition service for testing."""
-
-    # Define valid transitions (same as real service)
-    PIPELINE_TRANSITIONS: ClassVar[dict[PipelineState, list[PipelineState]]] = {
-        PipelineState.CREATED: [PipelineState.RUNNING, PipelineState.CANCELLED],
-        PipelineState.RUNNING: [
-            PipelineState.PAUSED,
-            PipelineState.COMPLETED,
-            PipelineState.FAILED,
-            PipelineState.CANCELLED,
-        ],
-        PipelineState.PAUSED: [PipelineState.RUNNING, PipelineState.CANCELLED],
-        PipelineState.COMPLETED: [],  # Terminal state
-        PipelineState.FAILED: [],  # Can retry - but let's not allow it for testing
-        PipelineState.CANCELLED: [],  # Terminal state
-    }
-
-    TASK_TRANSITIONS: ClassVar[dict[TaskState, list[TaskState]]] = {
-        TaskState.PENDING: [TaskState.IN_PROGRESS, TaskState.CANCELLED],
-        TaskState.IN_PROGRESS: [
-            TaskState.COMPLETED,
-            TaskState.FAILED,
-            TaskState.PAUSED,
-            TaskState.CANCELLED,
-        ],
-        TaskState.COMPLETED: [],  # Terminal state
-        TaskState.FAILED: [TaskState.PENDING, TaskState.CANCELLED],  # Can retry
-        TaskState.PAUSED: [TaskState.IN_PROGRESS, TaskState.CANCELLED],
-        TaskState.CANCELLED: [],  # Terminal state
-    }
-
-    def __init__(self, storage: FakePipelineStorage):
-        """Initialize with fake storage."""
-        self.storage = storage
-
-    def transition_pipeline(
-        self,
-        execution_id: str,
-        new_state: PipelineState,
-        error_message: str | None = None,
-        error_details: dict[str, Any] | None = None,
-    ) -> TransitionResult:
-        """Transition a pipeline execution to a new state."""
-        try:
-            execution = self.storage.get_pipeline_execution(execution_id)
-            current_state = execution.state
-
-            # Check if transition is valid
-            if new_state not in self.PIPELINE_TRANSITIONS.get(current_state, []):
-                return TransitionResult(
-                    success=False,
-                    previous_state=current_state,
-                    new_state=new_state,
-                    error_message=f"Invalid transition from {current_state.value} to {new_state.value}",
-                )
-
-            # Update the state
-            self.storage.update_pipeline_state(
-                execution_id, new_state, error_message, error_details
-            )
-
-            return TransitionResult(
-                success=True,
-                previous_state=current_state,
-                new_state=new_state,
-                metadata={"execution_id": execution_id},
-            )
-        except Exception as e:
-            return TransitionResult(
-                success=False,
-                previous_state=PipelineState.CREATED,
-                new_state=new_state,
-                error_message=str(e),
-            )
-
-    def transition_document(
-        self,
-        document_id: str,
-        new_state: TaskState,
-        error_message: str | None = None,
-        error_details: dict[str, Any] | None = None,
-    ) -> TransitionResult:
-        """Transition a document to a new state."""
-        try:
-            document = self.storage.get_document(document_id)
-            current_state = document.current_state
-
-            # Check if transition is valid
-            if new_state not in self.TASK_TRANSITIONS.get(current_state, []):
-                return TransitionResult(
-                    success=False,
-                    previous_state=current_state,
-                    new_state=new_state,
-                    error_message=f"Invalid transition from {current_state.value} to {new_state.value}",
-                )
-
-            # Update the state
-            self.storage.update_document_state(
-                document_id, new_state, error_message, error_details
-            )
-
-            return TransitionResult(
-                success=True,
-                previous_state=current_state,
-                new_state=new_state,
-                metadata={"document_id": document_id},
-            )
-        except Exception as e:
-            return TransitionResult(
-                success=False,
-                previous_state=TaskState.PENDING,
-                new_state=new_state,
-                error_message=str(e),
-            )
-
-    def transition_task(
-        self,
-        task_id: str,
-        new_state: TaskState,
-        error_message: str | None = None,
-        error_details: dict[str, Any] | None = None,
-        result_summary: dict[str, Any] | None = None,
-    ) -> TransitionResult:
-        """Transition a task to a new state with retry logic."""
-        try:
-            task = self.storage.get_task(task_id)
-            current_state = task.state
-
-            # Check if transition is valid
-            if new_state not in self.TASK_TRANSITIONS.get(current_state, []):
-                return TransitionResult(
-                    success=False,
-                    previous_state=current_state,
-                    new_state=new_state,
-                    error_message=f"Invalid transition from {current_state.value} to {new_state.value}",
-                )
-
-            # Handle retry logic for failed tasks
-            if new_state == TaskState.FAILED:
-                retry_count = self.storage.increment_retry_count(task_id)
-
-                # Check if we should retry
-                if retry_count < task.max_retries:
-                    # Transition to PENDING for retry instead of FAILED
-                    new_state = TaskState.PENDING
-                    error_details = error_details or {}
-                    error_details["retry_count"] = retry_count
-                    error_details["max_retries"] = task.max_retries
-                    error_details["will_retry"] = True
-
-            # Update the state
-            self.storage.update_task_state(
-                task_id, new_state, error_message, error_details
-            )
-
-            return TransitionResult(
-                success=True,
-                previous_state=current_state,
-                new_state=new_state,
-                metadata={
-                    "task_id": task_id,
-                    "task_type": task.task_type.value,
-                    "result_summary": result_summary,
-                },
-            )
-        except Exception as e:
-            return TransitionResult(
-                success=False,
-                previous_state=TaskState.PENDING,
-                new_state=new_state,
-                error_message=str(e),
-            )
-
-    def can_start_task(self, task: ProcessingTask) -> tuple[bool, str | None]:
-        """Check if a task can be started based on dependencies."""
-        # Check if task is in correct state
-        if task.state != TaskState.PENDING:
-            return False, f"Task is not in PENDING state (current: {task.state.value})"
-
-        # Check dependencies
-        if task.depends_on_task_id:
-            try:
-                dependency = self.storage.get_task(task.depends_on_task_id)
-                if dependency.state != TaskState.COMPLETED:
-                    return (
-                        False,
-                        f"Dependency task {dependency.id} is not completed (state: {dependency.state.value})",
-                    )
-            except ValueError:
-                return False, f"Dependency task {task.depends_on_task_id} not found"
-
-        return True, None
-
-    def should_retry_task(self, task: ProcessingTask) -> bool:
-        """Check if a failed task should be retried."""
-        return task.state == TaskState.FAILED and task.retry_count < task.max_retries
+# Note: StateTransitionService removed - state machines handle transitions directly
 
 
 class FakeDocumentSource:
@@ -1324,7 +1283,6 @@ def create_fake_pipeline_components(
     failing_task_types: set[TaskType] | None = None,
 ) -> tuple[
     FakePipelineStorage,
-    FakeStateTransitionService,
     FakeProcessorFactory,
     FakeDocumentSource,
 ]:
@@ -1335,10 +1293,9 @@ def create_fake_pipeline_components(
         failing_task_types: Optional set of task types that should fail
 
     Returns:
-        Tuple of (storage, transition_service, processor_factory, document_source)
+        Tuple of (storage, processor_factory, document_source)
     """
     storage = FakePipelineStorage()
-    transition_service = FakeStateTransitionService(storage)
     document_source = FakeDocumentSource(documents)
     document_store = FakeDocumentStore()
     vector_store = FakeVectorStore()
@@ -1350,4 +1307,4 @@ def create_fake_pipeline_components(
         vector_store=vector_store,
     )
 
-    return storage, transition_service, processor_factory, document_source
+    return storage, processor_factory, document_source

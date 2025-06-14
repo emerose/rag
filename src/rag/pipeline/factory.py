@@ -18,7 +18,6 @@ from rag.pipeline.processors import (
     ProcessorFactory,
 )
 from rag.pipeline.storage import PipelineStorage
-from rag.pipeline.transitions import StateTransitionService
 from rag.sources.base import DocumentSourceProtocol
 from rag.storage.fakes import InMemoryVectorStore
 from rag.storage.protocols import DocumentStoreProtocol, VectorStoreProtocol
@@ -70,9 +69,8 @@ class PipelineFactory:
             progress_callback=progress_callback,
         )
 
-        # Create storage and transitions
+        # Create storage
         storage = PipelineStorage(pipeline_config.database_url)
-        transitions = StateTransitionService(storage)
 
         # Note: document_source no longer needed for pipeline creation
 
@@ -118,7 +116,6 @@ class PipelineFactory:
         # Create pipeline
         return Pipeline(
             storage=storage,
-            state_transitions=transitions,
             processor_factory=processor_factory,
             config=pipeline_config,
         )
@@ -141,8 +138,7 @@ class PipelineFactory:
         if config is None:
             config = PipelineConfig()
 
-        # Create state transitions
-        transitions = StateTransitionService(dependencies.storage)
+        # Dependencies already contain storage - no transitions service needed
 
         # Create text splitter factory
         from rag.data.text_splitter import TextSplitterFactory
@@ -161,7 +157,6 @@ class PipelineFactory:
         # Create pipeline
         return Pipeline(
             storage=dependencies.storage,
-            state_transitions=transitions,
             processor_factory=processor_factory,
             config=config,
         )
@@ -190,8 +185,7 @@ class PipelineFactory:
         if config is None:
             config = PipelineConfig(database_url="sqlite:///:memory:")
 
-        # Create transitions
-        transitions = StateTransitionService(storage)
+        # No transitions service needed - state machines handle this
 
         # Use provided processor factory or create minimal set
         if processor_factory is None:
@@ -219,7 +213,6 @@ class PipelineFactory:
 
         return Pipeline(
             storage=storage,
-            state_transitions=transitions,
             processor_factory=processor_factory,
             config=config,
         )
