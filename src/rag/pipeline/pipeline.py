@@ -647,6 +647,8 @@ class Pipeline:
             )
             input_data.update(loading_output)
             input_data.update(embedding_output)
+            # Add source_identifier for vector storage
+            input_data["source_identifier"] = input_data.get("source_document_id", "unknown")
 
         return input_data
 

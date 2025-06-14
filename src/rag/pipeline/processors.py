@@ -436,9 +436,7 @@ class ChunkingProcessor(BaseTaskProcessor):
         """Validate chunking task input."""
         if "content" not in input_data:
             return False, "content is required"
-        processing_config = input_data.get("processing_config", {})
-        if not processing_config:
-            return False, "processing configuration is required"
+        # processing_config is optional - will use defaults if empty
         return True, None
 
 
@@ -532,9 +530,7 @@ class EmbeddingProcessor(BaseTaskProcessor):
         """Validate embedding task input."""
         if "chunks" not in input_data:
             return False, "chunks are required"
-        processing_config = input_data.get("processing_config", {})
-        if not processing_config:
-            return False, "processing configuration is required"
+        # processing_config is optional - will use defaults if empty
         chunks = input_data.get("chunks", [])
         if not chunks:
             return False, "at least one chunk is required"
