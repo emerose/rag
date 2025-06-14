@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterable, Awaitable, Callable, Iterable
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterable, AsyncIterator, Awaitable, Callable, Iterable
+from typing import Any
 
 
 async def iterate(iterable: Iterable[Any]) -> AsyncIterator[Any]:

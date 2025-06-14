@@ -170,18 +170,51 @@ class PipelineStorage:
             session.commit()
             return doc_id
 
+    def get_source_document_by_hash_and_path(
+        self, content_hash: str, source_path: str
+    ) -> SourceDocumentRecord | None:
+        """Get a source document by content hash and source path.
+
+        Args:
+            content_hash: Content hash of the document
+            source_path: Source path of the document
+
+        Returns:
+            Source document record if found, None otherwise
+        """
+        with self.get_session() as session:
+            stmt = select(SourceDocumentRecord).where(
+                SourceDocumentRecord.content_hash == content_hash,
+                SourceDocumentRecord.source_path == source_path,
+            )
+            result = session.execute(stmt).scalar_one_or_none()
+            if result:
+                # Refresh to ensure all attributes are loaded
+                session.refresh(result)
+            return result
+
     def create_source_document_from_domain(
         self, source_doc: SourceDocument, content_hash: str | None = None
     ) -> str:
         """Create a source document record from a domain SourceDocument.
+
+        This method implements deduplication - if a document with the same
+        content hash and source path already exists, it returns the existing ID.
 
         Args:
             source_doc: The domain SourceDocument to store
             content_hash: Optional content hash for deduplication
 
         Returns:
-            Source document ID
+            Source document ID (existing or newly created)
         """
+        # Check for existing document with same content hash and path
+        if content_hash and source_doc.source_path:
+            existing = self.get_source_document_by_hash_and_path(
+                content_hash, source_doc.source_path
+            )
+            if existing:
+                return existing.id
 
         with self.get_session() as session:
             doc_id = str(uuid.uuid4())

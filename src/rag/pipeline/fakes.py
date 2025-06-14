@@ -21,6 +21,7 @@ from rag.pipeline.models import (
     PipelineExecution,
     PipelineState,
     ProcessingTask,
+    SourceDocumentRecord,
     TaskState,
     TaskType,
 )
@@ -209,6 +210,34 @@ class FakePipelineStorage:
         source_doc.to_source_document = to_source_document
 
         return source_doc
+
+    def get_source_document_by_hash_and_path(
+        self, content_hash: str, source_path: str
+    ) -> SourceDocumentRecord | None:
+        """Get a source document by content hash and source path."""
+        if not hasattr(self, "source_documents"):
+            self.source_documents: dict[str, dict[str, Any]] = {}
+
+        # Search through existing source documents
+        for data in self.source_documents.values():
+            if (
+                data.get("content_hash") == content_hash
+                and data.get("source_path") == source_path
+            ):
+                # Create mock source document record object
+                source_doc = Mock()
+                source_doc.id = data["id"]
+                source_doc.source_id = data["source_id"]
+                source_doc.content = data["content"]
+                source_doc.content_type = data["content_type"]
+                source_doc.content_hash = data["content_hash"]
+                source_doc.size_bytes = data["size_bytes"]
+                source_doc.source_path = data["source_path"]
+                source_doc.source_metadata = data["source_metadata"]
+                source_doc.created_at = data["created_at"]
+                return source_doc
+
+        return None
 
     def create_document_processing(
         self,

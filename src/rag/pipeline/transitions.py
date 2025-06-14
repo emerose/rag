@@ -113,6 +113,12 @@ class PipelineStorageProtocol(Protocol):
         """Get a source document by ID."""
         ...
 
+    def get_source_document_by_hash_and_path(
+        self, content_hash: str, source_path: str
+    ) -> SourceDocumentRecord | None:
+        """Get a source document by content hash and source path."""
+        ...
+
     def create_source_document_from_domain(
         self, source_doc: SourceDocument, content_hash: str | None = None
     ) -> str:
