@@ -1,75 +1,55 @@
-"""SQLAlchemy models for the RAG system storage layer.
+"""SQLAlchemy models for document storage.
 
-This module defines the database schema using SQLAlchemy ORM models
-for storing documents, source documents, and their relationships.
+This module defines the SQLAlchemy ORM models used for storing documents
+and their metadata in the database.
 """
 
 from __future__ import annotations
 
-import json
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, ForeignKey, Index, Integer, String, Text
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-
-class Base(DeclarativeBase):
-    pass
+from rag.sources.base import SourceDocument as SourceDocumentDomain
+from rag.storage.base import Base
 
 
 class Document(Base):
-    """Document model for storing text chunks and their metadata.
+    """Model for storing document chunks.
 
-    This model represents the core documents table that stores
-    individual text chunks with their associated metadata.
+    This model represents individual document chunks that have been
+    processed and are ready for vector storage.
     """
 
     __tablename__ = "documents"
 
-    doc_id: Mapped[str] = mapped_column(String, primary_key=True)
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    doc_metadata: Mapped[dict[str, Any]] = mapped_column(
-        JSON, nullable=False, default=dict
-    )
-
-    # Relationship to source document chunks
-    source_chunks: Mapped[list[SourceDocumentChunk]] = relationship(
-        "SourceDocumentChunk", back_populates="document", cascade="all, delete-orphan"
-    )
-
-    def __repr__(self) -> str:
-        return f"<Document(doc_id='{self.doc_id}', content_length={len(self.content)})>"
+    doc_id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    content: Mapped[str] = mapped_column(Text)
+    doc_metadata: Mapped[dict[str, Any]] = mapped_column(JSON)
 
 
 class SourceDocument(Base):
-    """Source document model for tracking original files and their metadata.
+    """Model for tracking source documents.
 
-    This model represents the source_documents table that tracks
-    the original files from which document chunks are derived.
+    This model represents the original source documents before they are
+    split into chunks for processing.
     """
 
     __tablename__ = "source_documents"
 
-    id: Mapped[str] = mapped_column(String, primary_key=True)
-    location: Mapped[str] = mapped_column(String, nullable=False)
-    content_type: Mapped[str | None] = mapped_column(String)
-    content_hash: Mapped[str | None] = mapped_column(String)
-    size_bytes: Mapped[int | None] = mapped_column(Integer)
-    last_modified: Mapped[str | None] = mapped_column(
-        String
-    )  # Float as string for compatibility
-    indexed_at: Mapped[str] = mapped_column(
-        String, nullable=False
-    )  # Float as string for compatibility
-    metadata_json: Mapped[str | None] = mapped_column(
-        Text
-    )  # JSON stored as text for compatibility
-    created_at: Mapped[str] = mapped_column(
-        String, nullable=False
-    )  # Float as string for compatibility
-    updated_at: Mapped[str] = mapped_column(
-        String, nullable=False
-    )  # Float as string for compatibility
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)
+    location: Mapped[str] = mapped_column(String(1024))
+    content_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_modified: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    indexed_at: Mapped[str] = mapped_column(String(50))
+    doc_metadata: Mapped[dict[str, Any]] = mapped_column(JSON)
+    created_at: Mapped[str] = mapped_column(String(50))
+    updated_at: Mapped[str] = mapped_column(String(50))
 
     # Relationship to chunks
     chunks: Mapped[list[SourceDocumentChunk]] = relationship(
@@ -78,58 +58,137 @@ class SourceDocument(Base):
         cascade="all, delete-orphan",
     )
 
-    @property
-    def doc_metadata(self) -> dict[str, Any]:
-        """Get metadata as a dictionary."""
-        if self.metadata_json:
-            return json.loads(self.metadata_json)
-        return {}
-
-    @doc_metadata.setter
-    def doc_metadata(self, value: dict[str, Any]) -> None:
-        """Set metadata from a dictionary."""
-        self.metadata_json = json.dumps(value)
-
-    def __repr__(self) -> str:
-        return f"<SourceDocument(id='{self.id}', location='{self.location}')>"
-
 
 class SourceDocumentChunk(Base):
-    """Join table for linking source documents to their chunks.
+    """Model for linking document chunks to their source documents.
 
-    This model represents the source_document_chunks table that
-    maintains the relationship between source documents and their
-    individual text chunks, including ordering information.
+    This is a join table that tracks which chunks belong to which source
+    documents and their order within the document.
     """
 
     __tablename__ = "source_document_chunks"
 
     source_document_id: Mapped[str] = mapped_column(
-        String, ForeignKey("source_documents.id"), primary_key=True
+        String(255), ForeignKey("source_documents.id"), primary_key=True
     )
     document_id: Mapped[str] = mapped_column(
-        String, ForeignKey("documents.doc_id"), primary_key=True
+        String(255), ForeignKey("documents.doc_id"), primary_key=True
     )
-    chunk_order: Mapped[int] = mapped_column(Integer, nullable=False)
-    created_at: Mapped[str] = mapped_column(
-        String, nullable=False
-    )  # Float as string for compatibility
+    chunk_order: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[str] = mapped_column(String(50))
 
     # Relationships
     source_document: Mapped[SourceDocument] = relationship(
         "SourceDocument", back_populates="chunks"
     )
-    document: Mapped[Document] = relationship(
-        "Document", back_populates="source_chunks"
+    document: Mapped[Document] = relationship("Document")
+
+
+class StoredDocument(Base):
+    """Model for storing document metadata and content.
+
+    This model represents a document that has been stored in the system,
+    including its metadata and a reference to its content.
+    """
+
+    __tablename__ = "stored_documents"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    source_id: Mapped[str] = mapped_column(String(36), unique=True, index=True)
+    storage_uri: Mapped[str] = mapped_column(String(1024))
+    content_type: Mapped[str] = mapped_column(String(128))
+    content_hash: Mapped[str] = mapped_column(String(64))
+    size_bytes: Mapped[int] = mapped_column()
+    source_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    source_metadata: Mapped[dict[str, Any]] = mapped_column(JSON)
+    processed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    # Relationship to document content
+    chunk: Mapped[Chunk | None] = relationship(
+        "Chunk", back_populates="stored_document", uselist=False
     )
 
-    def __repr__(self) -> str:
-        return f"<SourceDocumentChunk(source_id='{self.source_document_id}', doc_id='{self.document_id}', order={self.chunk_order})>"
+    def to_source_document(self) -> SourceDocumentDomain:
+        """Convert to a SourceDocument.
+
+        Returns:
+            SourceDocument: The converted source document
+
+        Raises:
+            ValueError: If document content is not available
+        """
+        if not self.chunk:
+            raise ValueError("Document content not available")
+
+        return SourceDocumentDomain(
+            source_id=self.source_id,
+            content=self.chunk.content,
+            source_metadata=self.source_metadata,
+            content_type=self.content_type,
+            source_path=self.source_path,
+        )
+
+    @classmethod
+    def from_source_document(
+        cls, doc: SourceDocumentDomain, storage_uri: str
+    ) -> StoredDocument:
+        """Create a StoredDocument from a SourceDocument.
+
+        Args:
+            doc: The source document to convert
+            storage_uri: URI where the document content is stored
+
+        Returns:
+            StoredDocument: The created stored document
+        """
+        # Create stored document record
+        stored_doc = cls(
+            id=str(uuid.uuid4()),
+            source_id=doc.source_id,
+            storage_uri=storage_uri,
+            content_type=doc.content_type,
+            content_hash=doc.content_hash,
+            size_bytes=len(doc.get_content_as_bytes()),
+            source_path=doc.source_path,
+            source_metadata=doc.source_metadata,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+
+        # Create document record
+        chunk = Chunk(
+            id=str(uuid.uuid4()),
+            content=doc.get_content_as_string(),
+            chunk_metadata=doc.source_metadata,
+        )
+
+        # Link them together
+        stored_doc.chunk = chunk
+
+        return stored_doc
 
 
-# Create an index for efficient chunk ordering queries
-Index(
-    "idx_source_chunks_order",
-    SourceDocumentChunk.source_document_id,
-    SourceDocumentChunk.chunk_order,
-)
+class Chunk(Base):
+    """Model for storing document content.
+
+    This model represents the actual content of a document, stored as text.
+    It is linked to a StoredDocument record that contains the metadata.
+    """
+
+    __tablename__ = "chunks"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    stored_document_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("stored_documents.id")
+    )
+    content: Mapped[str] = mapped_column(Text)
+    chunk_metadata: Mapped[dict[str, Any]] = mapped_column(JSON)
+
+    # Relationship to stored document
+    stored_document: Mapped[StoredDocument] = relationship(
+        "StoredDocument", back_populates="chunk"
+    )

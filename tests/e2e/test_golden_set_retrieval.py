@@ -50,11 +50,30 @@ def test_golden_set_retrieval_e2e(tmp_path: Path) -> None:
     engine = factory.create_rag_engine()
 
     # Index the documents
-    result = engine.ingestion_pipeline.ingest_all()
-    assert result.documents_loaded > 0, f"No documents loaded during ingestion"
+    # First discover documents from the directory
+    document_source = engine.document_source
+    document_ids = document_source.list_documents()
+    discovered_documents = []
+    for doc_id in document_ids:
+        source_doc = document_source.get_document(doc_id)
+        if source_doc:
+            discovered_documents.append(source_doc)
+    
+    # Index documents using standard pipeline interface
+    execution_id = engine.pipeline.start(
+        documents=discovered_documents,
+        metadata={
+            "initiated_by": "test_golden_set_retrieval",
+            "source_type": "collection",
+        },
+    )
+    pipeline_result = engine.pipeline.run(execution_id)
+    
+    assert pipeline_result.total_documents > 0, f"No documents loaded during ingestion"
+    assert pipeline_result.processed_documents > 0, f"No documents processed successfully"
 
     # Verify documents are indexed in DocumentStore
-    document_store = engine.ingestion_pipeline.document_store
+    document_store = engine.document_store
     source_documents = document_store.list_source_documents()
     assert source_documents, "No source documents found after indexing"
 

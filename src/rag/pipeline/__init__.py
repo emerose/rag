@@ -1,25 +1,56 @@
-"""Document ingestion pipeline module.
+"""Database-backed state machine for the ingestion pipeline."""
 
-This module provides the pipeline architecture for ingesting documents
-from sources, transforming them, and storing them in document and vector stores.
-"""
-
-from .base import (
-    DocumentTransformer,
-    Embedder,
-    IngestionPipeline,
-    PipelineResult,
-    PipelineStage,
+from rag.pipeline.factory import PipelineDependencies, PipelineFactory
+from rag.pipeline.models import (
+    Base,
+    ChunkingTask,
+    DocumentLoadingTask,
+    DocumentProcessing,
+    EmbeddingTask,
+    PipelineExecution,
+    PipelineState,
+    ProcessingTask,
+    TaskState,
+    TaskType,
+    VectorStorageTask,
 )
-from .embedders import DefaultEmbedder
-from .transformers import DefaultDocumentTransformer
+from rag.pipeline.pipeline import (
+    Pipeline,
+    PipelineConfig,
+    PipelineExecutionResult,
+)
+from rag.pipeline.processors import (
+    ChunkingProcessor,
+    DocumentLoadingProcessor,
+    EmbeddingProcessor,
+    TaskProcessor,
+    TaskResult,
+    VectorStorageProcessor,
+)
+from rag.pipeline.storage import PipelineStorage
 
 __all__ = [
-    "DefaultDocumentTransformer",
-    "DefaultEmbedder",
-    "DocumentTransformer",
-    "Embedder",
-    "IngestionPipeline",
-    "PipelineResult",
-    "PipelineStage",
+    "Base",
+    "ChunkingProcessor",
+    "ChunkingTask",
+    "DocumentLoadingProcessor",
+    "DocumentLoadingTask",
+    "DocumentProcessing",
+    "EmbeddingProcessor",
+    "EmbeddingTask",
+    "Pipeline",
+    "PipelineConfig",
+    "PipelineDependencies",
+    "PipelineExecution",
+    "PipelineExecutionResult",
+    "PipelineFactory",
+    "PipelineState",
+    "PipelineStorage",
+    "ProcessingTask",
+    "TaskProcessor",
+    "TaskResult",
+    "TaskState",
+    "TaskType",
+    "VectorStorageProcessor",
+    "VectorStorageTask",
 ]

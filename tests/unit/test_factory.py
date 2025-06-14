@@ -16,29 +16,37 @@ from langchain_core.language_models import FakeListChatModel
 
 
 def test_factory_creates_real_components(temp_dir: Path) -> None:
-    """Test that factory creates real components with injected fake embeddings."""
+    """Test that factory creates components with fake implementations."""
+    from unittest.mock import Mock
+    
     config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")
     runtime = RuntimeOptions()
 
-    # Use ComponentOverrides to inject fake embedding service
-    # and mock the chat model to avoid OpenAI connection
-    overrides = ComponentOverrides(embedding_service=FakeEmbeddingService())
+    # Create a mock pipeline to avoid real initialization
+    mock_pipeline = Mock()
+    mock_pipeline.start.return_value = "execution-123"
+    mock_pipeline.run.return_value = Mock(state="completed")
+
+    # Use ComponentOverrides to inject all fake components
+    overrides = ComponentOverrides(
+        embedding_service=FakeEmbeddingService(),
+        pipeline=mock_pipeline,
+        chat_model=FakeListChatModel(responses=["Fake response"]),
+        filesystem_manager=InMemoryFileSystem(),
+        document_store=FakeDocumentStore()
+    )
     factory = RAGComponentsFactory(config, runtime, overrides)
 
-    # Override the chat model property to return a fake
-    fake_chat_model = FakeListChatModel(responses=["Fake response"])
-    factory._chat_model = fake_chat_model
-
-    # Test that properties create real implementations (except embeddings)
+    # Test that properties return the overridden implementations
     assert factory.filesystem_manager is not None
     assert factory.document_store is not None
     assert factory.vectorstore_factory is not None
     assert isinstance(factory.embedding_service, FakeEmbeddingService)
     assert factory.chat_model is not None
     assert factory.document_loader is not None
-    assert factory.ingestion_pipeline is not None
+    assert factory.pipeline is mock_pipeline
 
-    # Test component creation
+    # Test component creation doesn't fail
     query_engine = factory.create_query_engine()
     assert query_engine is not None
 
@@ -75,17 +83,21 @@ def test_factory_uses_injected_dependencies(temp_dir: Path) -> None:
 
 def test_factory_singleton_behavior(temp_dir: Path) -> None:
     """Test that factory returns the same instance for multiple calls."""
+    from unittest.mock import Mock
+    
     config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")
     runtime = RuntimeOptions()
 
-    # Use ComponentOverrides to inject fake embedding service
-    # and mock the chat model to avoid OpenAI connection
-    overrides = ComponentOverrides(embedding_service=FakeEmbeddingService())
-    factory = RAGComponentsFactory(config, runtime, overrides)
+    # Create a mock pipeline
+    mock_pipeline = Mock()
 
-    # Override the chat model property to return a fake
-    fake_chat_model = FakeListChatModel(responses=["Fake response"])
-    factory._chat_model = fake_chat_model
+    # Use ComponentOverrides to inject fake components
+    overrides = ComponentOverrides(
+        embedding_service=FakeEmbeddingService(),
+        pipeline=mock_pipeline,
+        chat_model=FakeListChatModel(responses=["Fake response"])
+    )
+    factory = RAGComponentsFactory(config, runtime, overrides)
 
     # Test singleton behavior for components
     query1 = factory.create_query_engine()
@@ -99,17 +111,22 @@ def test_factory_singleton_behavior(temp_dir: Path) -> None:
 
 def test_factory_create_all_components(temp_dir: Path) -> None:
     """Test creating all components at once."""
+    from unittest.mock import Mock
+    
     config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")
     runtime = RuntimeOptions()
 
-    # Use ComponentOverrides to inject fake embedding service
-    # and mock the chat model to avoid OpenAI connection
-    overrides = ComponentOverrides(embedding_service=FakeEmbeddingService())
-    factory = RAGComponentsFactory(config, runtime, overrides)
+    # Create a mock pipeline
+    mock_pipeline = Mock()
 
-    # Override the chat model property to return a fake
-    fake_chat_model = FakeListChatModel(responses=["Fake response"])
-    factory._chat_model = fake_chat_model
+    # Use ComponentOverrides to inject fake components
+    overrides = ComponentOverrides(
+        embedding_service=FakeEmbeddingService(),
+        pipeline=mock_pipeline,
+        chat_model=FakeListChatModel(responses=["Fake response"])
+    )
+    factory = RAGComponentsFactory(config, runtime, overrides)
+    
     components = factory.create_all_components()
 
     # Check that all expected components are present
@@ -133,17 +150,21 @@ def test_factory_create_all_components(temp_dir: Path) -> None:
 
 def test_factory_creates_rag_engine(temp_dir: Path) -> None:
     """Test that factory can create a complete RAGEngine instance."""
+    from unittest.mock import Mock
+    
     config = RAGConfig(documents_dir=str(temp_dir), openai_api_key="test-key")
     runtime = RuntimeOptions()
 
-    # Use ComponentOverrides to inject fake embedding service
-    # and mock the chat model to avoid OpenAI connection
-    overrides = ComponentOverrides(embedding_service=FakeEmbeddingService())
-    factory = RAGComponentsFactory(config, runtime, overrides)
+    # Create a mock pipeline
+    mock_pipeline = Mock()
 
-    # Override the chat model property to return a fake
-    fake_chat_model = FakeListChatModel(responses=["Fake response"])
-    factory._chat_model = fake_chat_model
+    # Use ComponentOverrides to inject fake components
+    overrides = ComponentOverrides(
+        embedding_service=FakeEmbeddingService(),
+        pipeline=mock_pipeline,
+        chat_model=FakeListChatModel(responses=["Fake response"])
+    )
+    factory = RAGComponentsFactory(config, runtime, overrides)
 
     # Create RAGEngine via factory
     engine = factory.create_rag_engine()

@@ -120,15 +120,32 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             engine = factory.create_rag_engine()
 
             # Step 1: Index all documents using IngestionPipeline
-            index_results = engine.ingestion_pipeline.ingest_all()
+            # First discover documents from the directory
+            document_source = engine.document_source
+            document_ids = document_source.list_documents()
+            discovered_documents = []
+            for doc_id in document_ids:
+                source_doc = document_source.get_document(doc_id)
+                if source_doc:
+                    discovered_documents.append(source_doc)
+            
+            # Process the discovered documents using standard pipeline interface
+            execution_id = engine.pipeline.start(
+                documents=discovered_documents,
+                metadata={
+                    "initiated_by": "test_complete_workflow",
+                    "source_type": "collection",
+                },
+            )
+            pipeline_result = engine.pipeline.run(execution_id)
 
             # Verify indexing succeeded
-            assert index_results.documents_loaded == 3  # 3 documents
-            assert index_results.documents_stored >= 1  # At least 1 document processed
-            assert len(index_results.errors) == 0
+            assert pipeline_result.total_documents == 3  # 3 documents
+            assert pipeline_result.processed_documents >= 1  # At least 1 document processed
+            assert pipeline_result.error_message is None  # No pipeline-level errors
 
             # Verify documents are listed as indexed
-            document_store = engine.ingestion_pipeline.document_store
+            document_store = engine.document_store
             source_documents = document_store.list_source_documents()
             # Note: Current pipeline implementation processes files individually
             # So we verify at least one document was processed successfully
@@ -202,11 +219,28 @@ Tools like Docker, Kubernetes, and CI/CD pipelines are essential.
             engine = factory.create_rag_engine()
 
             # Test with empty directory (should handle gracefully)
-            results = engine.ingestion_pipeline.ingest_all()
+            # Discover documents (should be empty)
+            document_source = engine.document_source
+            document_ids = document_source.list_documents()
+            discovered_documents = []
+            for doc_id in document_ids:
+                source_doc = document_source.get_document(doc_id)
+                if source_doc:
+                    discovered_documents.append(source_doc)
+            
+            # Try to process discovered documents using standard pipeline interface
+            execution_id = engine.pipeline.start(
+                documents=discovered_documents,
+                metadata={
+                    "initiated_by": "test_pipeline_error_handling",
+                    "source_type": "collection",
+                },
+            )
+            pipeline_result = engine.pipeline.run(execution_id)
 
             # Should return results indicating no documents processed
-            assert results.documents_loaded == 0
-            assert results.documents_stored == 0
+            assert pipeline_result.total_documents == 0
+            assert pipeline_result.processed_documents == 0
 
     def test_pipeline_component_creation(self):
         """Test that pipeline components are created correctly."""
@@ -279,7 +313,6 @@ and the DocumentStore system.
             # Test that pipeline components can be created
             pipeline = factory.ingestion_pipeline
             assert pipeline is not None
-            assert hasattr(pipeline, "document_store")
 
             # Test that ingest_manager returns the pipeline
             ingest_manager = factory.ingest_manager
@@ -310,13 +343,32 @@ and the DocumentStore system.
             # First engine instance - index document
             factory1 = RAGComponentsFactory(config, runtime)
             engine1 = factory1.create_rag_engine()
-            results = engine1.ingestion_pipeline.ingest_all()
-            assert results.documents_loaded == 1
-            assert results.documents_stored == 1
-            assert len(results.errors) == 0
+            
+            # Discover and index documents
+            document_source1 = engine1.document_source
+            document_ids1 = document_source1.list_documents()
+            discovered_documents1 = []
+            for doc_id in document_ids1:
+                source_doc = document_source1.get_document(doc_id)
+                if source_doc:
+                    discovered_documents1.append(source_doc)
+            
+            # Index documents using standard pipeline interface
+            execution_id1 = engine1.pipeline.start(
+                documents=discovered_documents1,
+                metadata={
+                    "initiated_by": "test_pipeline_persistence_across_restarts",
+                    "source_type": "collection",
+                },
+            )
+            pipeline_result1 = engine1.pipeline.run(execution_id1)
+            
+            assert pipeline_result1.total_documents == 1
+            assert pipeline_result1.processed_documents == 1
+            assert pipeline_result1.error_message is None
 
             # Verify it's indexed
-            document_store1 = engine1.ingestion_pipeline.document_store
+            document_store1 = engine1.document_store
             source_docs1 = document_store1.list_source_documents()
             assert len(source_docs1) == 1
 
@@ -325,7 +377,7 @@ and the DocumentStore system.
             engine2 = factory2.create_rag_engine()
 
             # Should still see the indexed file
-            document_store2 = engine2.ingestion_pipeline.document_store
+            document_store2 = engine2.document_store
             source_docs2 = document_store2.list_source_documents()
             assert len(source_docs2) == 1
             assert source_docs2[0].location == str(test_doc.resolve())

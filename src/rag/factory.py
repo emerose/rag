@@ -57,6 +57,7 @@ class ComponentOverrides:
     document_loader: Any | None = None
     chat_model: Any | None = None  # Any LangChain chat model interface
     text_splitter_factory: Any | None = None  # TextSplitterFactory or compatible
+    pipeline: Any | None = None  # Pipeline instance for testing
 
 
 class RAGComponentsFactory:
@@ -98,6 +99,7 @@ class RAGComponentsFactory:
         self._reranker: BaseReranker | None = None
 
         # Pipeline components
+        self._pipeline: Any | None = None
         self._ingestion_pipeline: Any | None = None
         self._document_source: Any | None = None
 
@@ -221,45 +223,21 @@ class RAGComponentsFactory:
         return self._document_source
 
     @property
+    def pipeline(self) -> Any:
+        """Get or create state machine pipeline."""
+        if self._pipeline is None:
+            # Check for override first
+            if self.overrides.pipeline is not None:
+                self._pipeline = self.overrides.pipeline
+            else:
+                # Create pipeline with proper vector store integration
+                self._pipeline = self._create_integrated_pipeline()
+        return self._pipeline
+
+    @property
     def ingestion_pipeline(self) -> Any:
-        """Get or create ingestion pipeline."""
-        if self._ingestion_pipeline is None:
-            from rag.pipeline import IngestionPipeline
-
-            # Use the same document store logic as the property
-            document_store = self.document_store
-
-            # Create transformer and embedder
-            from rag.pipeline import DefaultDocumentTransformer, DefaultEmbedder
-
-            # Use text splitter factory override if provided
-            text_splitter_factory = self._text_splitter_factory
-            if text_splitter_factory is None:
-                text_splitter_factory = self._create_text_splitter_factory()
-
-            transformer = DefaultDocumentTransformer(
-                chunk_size=self.config.chunk_size,
-                chunk_overlap=self.config.chunk_overlap,
-                text_splitter_factory=text_splitter_factory,
-            )
-
-            embedder = DefaultEmbedder(
-                embedding_service=self.embedding_service,
-            )
-
-            # Create the ingestion pipeline
-            workspace_path = str(Path(self.config.data_dir) / "workspace")
-            self._ingestion_pipeline = IngestionPipeline(
-                source=self.document_source,
-                transformer=transformer,
-                document_store=document_store,
-                embedder=embedder,
-                vector_store=self.vectorstore_factory,  # Use new factory instead of old repository
-                progress_callback=self.runtime.progress_callback,
-                workspace_path=workspace_path,
-            )
-
-        return self._ingestion_pipeline
+        """Get or create ingestion pipeline (compatibility property)."""
+        return self.pipeline
 
     @property
     def reranker(self) -> BaseReranker | None:
@@ -363,7 +341,7 @@ class RAGComponentsFactory:
             query_engine=self.create_query_engine(),
             document_store=self.document_store,
             vectorstore_factory=self.vectorstore_factory,
-            ingestion_pipeline=self.ingestion_pipeline,
+            pipeline=self.pipeline,
             document_source=self.document_source,
             embedding_batcher=self.embedding_batcher,
         )
@@ -387,3 +365,54 @@ class RAGComponentsFactory:
         )
         factory.set_log_callback(self.runtime.log_callback)
         return factory
+
+    def _create_integrated_pipeline(self) -> Any:
+        """Create a pipeline that integrates with the RAG engine's vector store."""
+        from rag.pipeline import (
+            Pipeline,
+            PipelineConfig,
+            PipelineStorage,
+        )
+        from rag.pipeline.processors import DefaultProcessorFactory
+
+        # Create pipeline storage with proper database URL
+        pipeline_db_path = Path(self.config.data_dir) / "pipeline_state.db"
+        pipeline_db_url = f"sqlite:///{pipeline_db_path}"
+        storage = PipelineStorage(pipeline_db_url)
+
+        # No state transition service needed - state machines handle transitions
+
+        # Create processor factory that uses the factory's components
+        processor_factory = DefaultProcessorFactory(
+            embedding_service=self.embedding_service,
+            document_store=self.document_store,
+            vector_store=self._create_pipeline_vector_store(),
+            storage=storage,
+            text_splitter_factory=self._create_text_splitter_factory(),
+        )
+
+        # Create pipeline config (only pipeline-level settings)
+        pipeline_config = PipelineConfig(
+            data_dir=self.config.data_dir,
+            progress_callback=self.runtime.progress_callback,
+        )
+
+        # Create the pipeline
+        return Pipeline(
+            storage=storage,
+            processor_factory=processor_factory,
+            config=pipeline_config,
+        )
+
+    def _create_pipeline_vector_store(self) -> Any:
+        """Create a vector store for the pipeline that can be saved and loaded."""
+        # Use the same vector store factory as the query engine
+        vectorstore_factory = self.vectorstore_factory
+
+        # First try to load existing vectorstore
+        existing = vectorstore_factory.load_from_path(str(self.config.data_dir))
+        if existing:
+            return existing
+
+        # Create new empty vectorstore that can be saved
+        return vectorstore_factory.create_empty()

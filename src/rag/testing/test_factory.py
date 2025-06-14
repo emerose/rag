@@ -21,7 +21,10 @@ from rag.config.components import (
 )
 
 if TYPE_CHECKING:
-    from typing import Any
+    pass
+
+from typing import Any
+
 from rag.embeddings.fake_openai import FakeOpenAI
 from rag.embeddings.fakes import DeterministicEmbeddingService, FakeEmbeddingService
 from rag.embeddings.protocols import EmbeddingServiceProtocol
@@ -87,7 +90,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         self.test_options = test_options or FakeComponentOptions()
 
         # Create fake component overrides
-        overrides = self._create_fake_overrides()
+        overrides = self._create_fake_overrides(config, runtime_options)
 
         # Initialize parent with fake overrides
         super().__init__(config, runtime_options, overrides)
@@ -132,7 +135,9 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             async_batching=False,  # Simpler synchronous processing
         )
 
-    def _create_fake_overrides(self) -> ComponentOverrides:
+    def _create_fake_overrides(
+        self, config: RAGConfig, runtime_options: RuntimeOptions
+    ) -> ComponentOverrides:
         """Create fake component overrides for testing."""
         # Create the embedding service based on test options
         if self.test_options.use_deterministic_embeddings:
@@ -187,6 +192,38 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             chunk_overlap=50,
         )
 
+        # Create fake pipeline
+        from rag.pipeline.fakes import (
+            FakePipelineStorage,
+        )
+        from rag.pipeline.pipeline import Pipeline
+
+        fake_storage = FakePipelineStorage()
+
+        # Create processor factory for the fake pipeline
+        from rag.pipeline.processors import DefaultProcessorFactory
+
+        processor_factory = DefaultProcessorFactory(
+            embedding_service=embedding_service,
+            document_store=document_store,
+            vector_store=vectorstore_factory.create_empty(),
+            storage=fake_storage,
+            text_splitter_factory=text_splitter_factory,
+        )
+
+        # Create pipeline config (only pipeline-level settings)
+        from rag.pipeline.pipeline import PipelineConfig
+
+        pipeline_config = PipelineConfig(
+            data_dir=config.data_dir,
+        )
+
+        fake_pipeline = Pipeline(
+            storage=fake_storage,
+            processor_factory=processor_factory,
+            config=pipeline_config,
+        )
+
         return ComponentOverrides(
             filesystem_manager=filesystem,
             document_store=document_store,
@@ -195,6 +232,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
             document_loader=document_loader,
             chat_model=chat_model,
             text_splitter_factory=text_splitter_factory,
+            pipeline=fake_pipeline,
         )
 
     @property
@@ -249,7 +287,7 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
         return cls(test_options=FakeComponentOptions())
 
     @classmethod
-    def create_for_integration_tests(
+    def create_for_integration_tests(  # noqa: PLR0915
         cls,
         config: RAGConfig | None = None,
         runtime: RuntimeOptions | None = None,
@@ -278,6 +316,26 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
 
         if runtime is None:
             runtime = RuntimeOptions()
+
+        # Import shared types at the top
+        from langchain_core.documents import Document
+
+        # Define shared vector store factory class for integration tests
+        class SharedVectorStoreFactory:
+            def __init__(self, vector_store_instance: Any) -> None:
+                self.vector_store_instance = vector_store_instance
+
+            def create_empty(self) -> Any:
+                return self.vector_store_instance
+
+            def create_from_documents(self, documents: list[Document]) -> Any:
+                # Add documents to the existing instance and return it
+                self.vector_store_instance.add_documents(documents)
+                return self.vector_store_instance
+
+            def load_from_path(self, path: str) -> Any:
+                # For integration tests, just return the shared instance
+                return self.vector_store_instance
 
         # For integration tests, we want minimal fake components but real file operations
         if use_real_filesystem:
@@ -318,12 +376,122 @@ class FakeRAGComponentsFactory(RAGComponentsFactory):
                 root_path=config.documents_dir,
                 filesystem_manager=factory._filesystem_manager,
             )
+
+            # Create new pipeline with real document store and real processors
+            from rag.pipeline.fakes import (
+                FakePipelineStorage,
+            )
+            from rag.pipeline.pipeline import Pipeline, PipelineConfig
+
+            fake_storage = FakePipelineStorage()
+
+            # Create real processors that will interact with the real document store
+            from rag.data.text_splitter import TextSplitterFactory
+
+            text_splitter_factory = TextSplitterFactory(
+                chunk_size=config.chunk_size,
+                chunk_overlap=config.chunk_overlap,
+            )
+
+            # Create a fake vector store for integration tests
+            from rag.storage.fakes import InMemoryVectorStore
+
+            fake_vector_store = InMemoryVectorStore()
+
+            # Override the vectorstore factory to use the shared instance
+            # This ensures the query engine uses the same vector store that the pipeline populates
+            factory._vectorstore_factory = SharedVectorStoreFactory(fake_vector_store)
+
+            # Create processor factory with real components
+            from rag.pipeline.processors import DefaultProcessorFactory
+
+            processor_factory = DefaultProcessorFactory(
+                embedding_service=factory._raw_embedding_service,
+                document_store=factory._document_store,
+                vector_store=fake_vector_store,
+                storage=fake_storage,
+                text_splitter_factory=text_splitter_factory,
+            )
+
+            # Create pipeline config (only pipeline-level settings)
+            pipeline_config = PipelineConfig(
+                data_dir=config.data_dir,
+            )
+
+            # Create pipeline with real document store and processor factory
+            real_pipeline = Pipeline(
+                storage=fake_storage,
+                processor_factory=processor_factory,
+                config=pipeline_config,
+            )
+            factory._pipeline = real_pipeline
         else:
             # For tests that want fake filesystem, use all fake components
             test_options = FakeComponentOptions()
             factory = cls(
                 config=config, runtime_options=runtime, test_options=test_options
             )
+
+            # Even with fake filesystem, we need a real document store for integration tests
+            # Create real document store
+            from pathlib import Path
+
+            from rag.storage.sqlalchemy_document_store import SQLAlchemyDocumentStore
+
+            # Ensure data directory exists before creating document store
+            data_dir = Path(config.data_dir)
+            data_dir.mkdir(parents=True, exist_ok=True)
+
+            factory._document_store = SQLAlchemyDocumentStore(data_dir / "documents.db")
+
+            # Create new pipeline with real document store and real processors
+            from rag.pipeline.fakes import (
+                FakePipelineStorage,
+            )
+            from rag.pipeline.pipeline import Pipeline, PipelineConfig
+
+            fake_storage = FakePipelineStorage()
+
+            # Create real processors that will interact with the real document store
+            from rag.data.text_splitter import TextSplitterFactory
+
+            text_splitter_factory = TextSplitterFactory(
+                chunk_size=config.chunk_size,
+                chunk_overlap=config.chunk_overlap,
+            )
+
+            # Create a fake vector store for integration tests
+            from rag.storage.fakes import InMemoryVectorStore
+
+            fake_vector_store = InMemoryVectorStore()
+
+            # Override the vectorstore factory to use the shared instance
+            # This ensures the query engine uses the same vector store that the pipeline populates
+            factory._vectorstore_factory = SharedVectorStoreFactory(fake_vector_store)
+
+            # Create processor factory with real components
+            from rag.pipeline.processors import DefaultProcessorFactory
+
+            processor_factory = DefaultProcessorFactory(
+                embedding_service=factory._raw_embedding_service,
+                document_store=factory._document_store,
+                vector_store=fake_vector_store,
+                storage=fake_storage,
+                text_splitter_factory=text_splitter_factory,
+            )
+
+            # Create pipeline config (only pipeline-level settings)
+            pipeline_config = PipelineConfig(
+                data_dir=config.data_dir,
+            )
+
+            # Create pipeline with real document store and processor factory
+            real_pipeline = Pipeline(
+                storage=fake_storage,
+                processor_factory=processor_factory,
+                config=pipeline_config,
+            )
+            factory._pipeline = real_pipeline
 
         return factory
 

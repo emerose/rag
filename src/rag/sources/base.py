@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import AsyncIterator, Iterator
-from dataclasses import dataclass
 from typing import Any, Protocol, runtime_checkable
 
 
-@dataclass
 class SourceDocument:
     """Represents a document from a source before processing.
 
@@ -15,20 +14,37 @@ class SourceDocument:
     parsing, splitting, or transformation.
     """
 
-    # Unique identifier within the source
-    source_id: str
+    def __init__(  # noqa: PLR0913
+        self,
+        source_id: str,
+        content: bytes | str,
+        source_metadata: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+        content_type: str | None = "text/plain",
+        source_path: str | None = None,
+    ):
+        """Initialize a SourceDocument.
 
-    # Raw content (bytes for binary files, string for text)
-    content: bytes | str
-
-    # Source-specific metadata
-    metadata: dict[str, Any]
-
-    # Content type (MIME type)
-    content_type: str | None = None
-
-    # Source path or URI
-    source_path: str | None = None
+        Args:
+            source_id: Unique identifier within the source
+            content: Raw content (bytes for binary files, string for text)
+            source_metadata: Source-specific metadata (preferred parameter name)
+            metadata: Source-specific metadata (deprecated, use source_metadata)
+            content_type: Content type (MIME type)
+            source_path: Source path or URI
+        """
+        self.source_id = source_id
+        self.content = content
+        # Handle both metadata and source_metadata parameters
+        if source_metadata is not None:
+            self.source_metadata = source_metadata
+        elif metadata is not None:
+            self.source_metadata = metadata
+        else:
+            self.source_metadata = {}
+        self.content_type = content_type or "text/plain"
+        self.source_path = source_path
+        self.content_hash = self.compute_content_hash()
 
     @property
     def is_binary(self) -> bool:
@@ -51,6 +67,20 @@ class SourceDocument:
         if isinstance(self.content, str):
             return self.content
         return self.content.decode(encoding)
+
+    def compute_content_hash(self) -> str:
+        """Compute SHA-256 hash of document content.
+
+        Returns:
+            Hex digest of the content hash
+        """
+        content_bytes = self.get_content_as_bytes()
+        return hashlib.sha256(content_bytes).hexdigest()
+
+    @property
+    def metadata(self) -> dict[str, Any]:
+        """Alias for source_metadata for backward compatibility."""
+        return self.source_metadata
 
 
 @runtime_checkable

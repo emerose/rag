@@ -67,7 +67,7 @@ class TestIndexingWorkflow:
         assert len(data_files) > 0
 
         # Verify document appears in index via DocumentStore
-        document_store = engine.ingestion_pipeline.document_store
+        document_store = engine.document_store
         source_documents = document_store.list_source_documents()
         assert len(source_documents) == 1
 
@@ -101,7 +101,7 @@ class TestIndexingWorkflow:
         assert results["pipeline"]["documents_processed"] == 3
 
         # Verify all documents appear in index
-        document_store = engine.ingestion_pipeline.document_store
+        document_store = engine.document_store
         source_documents = document_store.list_source_documents()
         indexed_files = source_documents  # For compatibility with existing assertions
         assert len(indexed_files) == 3
@@ -164,7 +164,7 @@ class TestIndexingWorkflow:
         assert "Successfully indexed" in message
 
         # Verify document is properly indexed
-        document_store = engine.ingestion_pipeline.document_store
+        document_store = engine.document_store
         source_documents = document_store.list_source_documents()
         indexed_files = source_documents  # For compatibility with existing assertions
         assert len(indexed_files) == 1
@@ -189,7 +189,7 @@ class TestIndexingWorkflow:
         assert success is True
 
         # Verify file is indexed
-        document_store = engine.ingestion_pipeline.document_store
+        document_store = engine.document_store
         source_documents = document_store.list_source_documents()
         indexed_files = source_documents  # For compatibility with existing assertions
         assert len(indexed_files) == 1
@@ -198,7 +198,7 @@ class TestIndexingWorkflow:
         engine.clear_data(str(doc_path))
 
         # Verify file is no longer in index
-        document_store = engine.ingestion_pipeline.document_store
+        document_store = engine.document_store
         source_documents = document_store.list_source_documents()
         indexed_files = source_documents  # For compatibility with existing assertions
         assert len(indexed_files) == 0
@@ -207,7 +207,7 @@ class TestIndexingWorkflow:
         success, message = engine.index_file(doc_path)
         assert success is True
 
-        document_store = engine.ingestion_pipeline.document_store
+        document_store = engine.document_store
         source_documents = document_store.list_source_documents()
         indexed_files = source_documents  # For compatibility with existing assertions
         assert len(indexed_files) == 1
@@ -238,7 +238,7 @@ class TestIndexingWorkflow:
         assert results["pipeline"]["documents_processed"] == 2
 
         # Verify files are recognized
-        document_store = engine.ingestion_pipeline.document_store
+        document_store = engine.document_store
         source_documents = document_store.list_source_documents()
         indexed_files = source_documents  # For compatibility with existing assertions
         assert len(indexed_files) == 2

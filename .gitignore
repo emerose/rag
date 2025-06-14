@@ -36,3 +36,8 @@ Ingest
 htmlcov/
 docs/build/
 commit_msg.txt
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3

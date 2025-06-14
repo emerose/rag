@@ -8,6 +8,7 @@ from typing import Any, Protocol, runtime_checkable
 from langchain_core.documents import Document
 
 from .metadata import DocumentMetadata, FileMetadata
+from .source_metadata import SourceDocumentMetadata
 
 
 @runtime_checkable
@@ -388,5 +389,47 @@ class DocumentStoreProtocol(Protocol):
             document_id: ID of the document chunk
             source_id: ID of the source document
             chunk_order: Order of this chunk within the source
+        """
+        ...
+
+    def list_source_documents(self) -> list[SourceDocumentMetadata]:
+        """List all source documents.
+
+        Returns:
+            List of source document metadata
+        """
+        ...
+
+    def remove_source_document(self, source_id: str) -> None:
+        """Remove a source document and all its associated chunks.
+
+        Args:
+            source_id: ID of the source document to remove
+        """
+        ...
+
+    def store_content(self, content: str, content_type: str = "text/plain") -> str:
+        """Store document content and return a storage URI.
+
+        Args:
+            content: The document content to store
+            content_type: MIME type of the content
+
+        Returns:
+            Storage URI that can be used to retrieve the content
+        """
+        ...
+
+    def get_content(self, storage_uri: str) -> str:
+        """Retrieve document content using a storage URI.
+
+        Args:
+            storage_uri: Storage URI returned by store_content
+
+        Returns:
+            The document content
+
+        Raises:
+            ValueError: If the storage URI is invalid or content not found
         """
         ...

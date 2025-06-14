@@ -42,7 +42,7 @@ class TestIntegrationWorkflows:
 
         Returns list of dicts with file_path, file_type, num_chunks, file_size
         """
-        document_store = engine.ingestion_pipeline.document_store
+        document_store = engine.document_store
         source_documents = document_store.list_source_documents()
 
         indexed_files = []
@@ -210,7 +210,7 @@ class TestIntegrationWorkflows:
 
         # Should fail gracefully
         assert success is False
-        assert "Error" in message or "Failed" in message
+        assert "Error" in message or "Failed" in message or "Could not load" in message
 
     def test_directory_workflow_with_mixed_files(self, tmp_path):
         """Test directory indexing with different file types."""

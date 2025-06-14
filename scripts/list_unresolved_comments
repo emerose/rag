@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Usage: ./list_unresolved_comments.sh <pr_number>
+# Example: ./list_unresolved_comments.sh 348
+
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+  echo "Usage: $0 <pr_number>"
+  exit 1
+fi
+
+PR_NUMBER="$1"
+OWNER="emerose"
+REPO="rag"
+
+gh api graphql -f query=$'
+query($owner: String!, $name: String!, $number: Int!) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          isResolved
+          comments(first: 1) {
+            nodes {
+              body
+              path
+              originalLine
+            }
+          }
+        }
+      }
+    }
+  }
+}
+' -f owner="$OWNER" -f name="$REPO" -F number="$PR_NUMBER" \
+| jq -r '.data.repository.pullRequest.reviewThreads.nodes[] 
+  | select(.isResolved == false) 
+  | .comments.nodes[0] 
+  | "\(.path):\(.originalLine // "unknown line") → \(.body | gsub("\n"; " "))"'
