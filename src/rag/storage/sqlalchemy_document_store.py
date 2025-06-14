@@ -1065,3 +1065,65 @@ class SQLAlchemyDocumentStore:
         if settings_doc:
             return settings_doc.metadata.get(key)
         return None
+
+    def store_content(self, content: str, content_type: str = "text/plain") -> str:
+        """Store document content and return a storage URI.
+
+        Args:
+            content: The document content to store
+            content_type: MIME type of the content
+
+        Returns:
+            Storage URI that can be used to retrieve the content
+        """
+        import hashlib
+        import uuid
+
+        # Generate a unique content ID
+        content_id = str(uuid.uuid4())
+        content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+        # Store content as a special document record
+        content_metadata = SourceDocumentMetadata(
+            source_id=f"__content__{content_id}",
+            location=f"content://{content_id}",
+            content_type=content_type,
+            content_hash=content_hash,
+            size_bytes=len(content.encode("utf-8")),
+            last_modified=None,
+            indexed_at=time.time(),
+            metadata={"content": content, "storage_type": "content"},
+            chunk_count=0,
+        )
+
+        self.add_source_document(content_metadata)
+        return f"sqlalchemy://{content_id}"
+
+    def get_content(self, storage_uri: str) -> str:
+        """Retrieve document content using a storage URI.
+
+        Args:
+            storage_uri: Storage URI returned by store_content
+
+        Returns:
+            The document content
+
+        Raises:
+            ValueError: If the storage URI is invalid or content not found
+        """
+        if not storage_uri.startswith("sqlalchemy://"):
+            raise ValueError(f"Invalid storage URI format: {storage_uri}")
+
+        content_id = storage_uri[13:]  # Remove "sqlalchemy://" prefix
+        source_id = f"__content__{content_id}"
+
+        content_doc = self.get_source_document(source_id)
+        if not content_doc:
+            raise ValueError(f"Content not found for URI: {storage_uri}")
+
+        # Extract content from metadata
+        content = content_doc.metadata.get("content")
+        if content is None:
+            raise ValueError(f"Content data missing for URI: {storage_uri}")
+
+        return content

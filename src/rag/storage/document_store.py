@@ -27,6 +27,8 @@ class FakeDocumentStore:
         self._documents: dict[str, Document] = {}
         self._source_documents: dict[str, SourceDocumentMetadata] = {}
         self._source_document_chunks: dict[str, list[tuple[str, int]]] = {}
+        self._content_storage: dict[str, str] = {}
+        self._next_content_id = 1
 
     def add_document(self, doc_id: str, document: Document) -> None:
         """Add a document to the store.
@@ -618,3 +620,39 @@ class FakeDocumentStore:
         self._source_document_chunks.clear()
         if global_settings:
             self._source_documents["__global_settings__"] = global_settings
+
+    def store_content(self, content: str, content_type: str = "text/plain") -> str:
+        """Store document content and return a storage URI.
+
+        Args:
+            content: The document content to store
+            content_type: MIME type of the content
+
+        Returns:
+            Storage URI that can be used to retrieve the content
+        """
+        content_id = f"fake-content-{self._next_content_id}"
+        self._next_content_id += 1
+        self._content_storage[content_id] = content
+        return f"fake://{content_id}"
+
+    def get_content(self, storage_uri: str) -> str:
+        """Retrieve document content using a storage URI.
+
+        Args:
+            storage_uri: Storage URI returned by store_content
+
+        Returns:
+            The document content
+
+        Raises:
+            ValueError: If the storage URI is invalid or content not found
+        """
+        if not storage_uri.startswith("fake://"):
+            raise ValueError(f"Invalid storage URI format: {storage_uri}")
+
+        content_id = storage_uri[7:]  # Remove "fake://" prefix
+        if content_id not in self._content_storage:
+            raise ValueError(f"Content not found for URI: {storage_uri}")
+
+        return self._content_storage[content_id]

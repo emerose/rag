@@ -407,3 +407,29 @@ class DocumentStoreProtocol(Protocol):
             source_id: ID of the source document to remove
         """
         ...
+
+    def store_content(self, content: str, content_type: str = "text/plain") -> str:
+        """Store document content and return a storage URI.
+
+        Args:
+            content: The document content to store
+            content_type: MIME type of the content
+
+        Returns:
+            Storage URI that can be used to retrieve the content
+        """
+        ...
+
+    def get_content(self, storage_uri: str) -> str:
+        """Retrieve document content using a storage URI.
+
+        Args:
+            storage_uri: Storage URI returned by store_content
+
+        Returns:
+            The document content
+
+        Raises:
+            ValueError: If the storage URI is invalid or content not found
+        """
+        ...

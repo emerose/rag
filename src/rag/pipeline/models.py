@@ -70,8 +70,8 @@ class PipelineState(enum.Enum):
 class SourceDocumentRecord(Base):
     """Database record for source documents that can be processed by pipelines.
 
-    This table stores the actual document content and metadata,
-    separate from the processing configuration.
+    This table stores document metadata and references to content stored
+    separately in DocumentStore, enabling separation of concerns.
     """
 
     __tablename__ = "source_documents"
@@ -79,8 +79,8 @@ class SourceDocumentRecord(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)
     source_id: Mapped[str] = mapped_column(String, nullable=False)
 
-    # Document content and metadata
-    content: Mapped[str] = mapped_column(Text, nullable=False)
+    # Content reference and metadata
+    storage_uri: Mapped[str] = mapped_column(String, nullable=False)
     content_type: Mapped[str | None] = mapped_column(String)
     content_hash: Mapped[str | None] = mapped_column(String)
     size_bytes: Mapped[int | None] = mapped_column(Integer)
@@ -106,17 +106,32 @@ class SourceDocumentRecord(Base):
     def __repr__(self) -> str:
         return f"<SourceDocumentRecord(id='{self.id}', source_id='{self.source_id}')>"
 
-    def to_source_document(self) -> SourceDocument:
+    def to_source_document(self, document_store: Any = None) -> SourceDocument:
         """Convert this database record to a domain SourceDocument.
+
+        Args:
+            document_store: DocumentStore to retrieve content from. If None,
+                           storage_uri will be used as content (for backwards compatibility)
 
         Returns:
             SourceDocument from the sources module
         """
         from rag.sources.base import SourceDocument
 
+        # Retrieve content from storage if document_store is provided
+        if document_store is not None:
+            try:
+                content = document_store.get_content(self.storage_uri)
+            except Exception:
+                # Fallback: use storage_uri as content if retrieval fails
+                content = self.storage_uri
+        else:
+            # Backwards compatibility: treat storage_uri as content
+            content = self.storage_uri
+
         return SourceDocument(
             source_id=self.source_id,
-            content=self.content,
+            content=content,
             metadata=self.source_metadata,
             content_type=self.content_type,
             source_path=self.source_path,
@@ -126,6 +141,7 @@ class SourceDocumentRecord(Base):
     def from_source_document(
         cls,
         source_doc: SourceDocument,
+        storage_uri: str,
         document_id: str | None = None,
         content_hash: str | None = None,
     ) -> SourceDocumentRecord:
@@ -133,6 +149,7 @@ class SourceDocumentRecord(Base):
 
         Args:
             source_doc: The domain SourceDocument to convert
+            storage_uri: URI where the content is stored
             document_id: Optional ID for the record (will be generated if not provided)
             content_hash: Optional content hash (will be calculated if not provided)
 
@@ -145,7 +162,7 @@ class SourceDocumentRecord(Base):
         return cls(
             id=document_id or str(uuid.uuid4()),
             source_id=source_doc.source_id,
-            content=source_doc.get_content_as_string(),
+            storage_uri=storage_uri,
             content_type=source_doc.content_type,
             content_hash=content_hash,
             size_bytes=len(source_doc.get_content_as_bytes()),

@@ -30,6 +30,7 @@ from rag.pipeline.models import (
     TaskType,
     VectorStorageTask,
 )
+from rag.storage.protocols import DocumentStoreProtocol
 from rag.utils.logging_utils import get_logger
 
 logger = get_logger()
@@ -38,12 +39,18 @@ logger = get_logger()
 class PipelineStorage:
     """Database storage for pipeline state management."""
 
-    def __init__(self, database_url: str = "sqlite:///pipeline_state.db"):
+    def __init__(
+        self,
+        database_url: str = "sqlite:///pipeline_state.db",
+        document_store: DocumentStoreProtocol | None = None,
+    ):
         """Initialize the pipeline storage.
 
         Args:
             database_url: SQLAlchemy database URL
+            document_store: Optional DocumentStore for content storage
         """
+        self.document_store = document_store
         # Create engine
         connect_args = {}
         if database_url.startswith("sqlite"):
@@ -153,12 +160,25 @@ class PipelineStorage:
         Returns:
             Source document ID
         """
+        # Store content and get storage URI
+        if self.document_store is not None:
+            try:
+                storage_uri = self.document_store.store_content(
+                    content, content_type or "text/plain"
+                )
+            except Exception:
+                # Fallback: use content directly as storage_uri for compatibility
+                storage_uri = content
+        else:
+            # No document store available, use content directly
+            storage_uri = content
+
         with self.get_session() as session:
             doc_id = str(uuid.uuid4())
             source_doc = SourceDocumentRecord(
                 id=doc_id,
                 source_id=source_id,
-                content=content,
+                storage_uri=storage_uri,
                 content_type=content_type,
                 content_hash=content_hash,
                 size_bytes=size_bytes or len(content.encode("utf-8")),
@@ -216,10 +236,27 @@ class PipelineStorage:
             if existing:
                 return existing.id
 
+        # Store content and get storage URI
+        if self.document_store is not None:
+            try:
+                storage_uri = self.document_store.store_content(
+                    source_doc.get_content_as_string(),
+                    source_doc.content_type or "text/plain",
+                )
+            except Exception:
+                # Fallback: use content directly as storage_uri for compatibility
+                storage_uri = source_doc.get_content_as_string()
+        else:
+            # No document store available, use content directly
+            storage_uri = source_doc.get_content_as_string()
+
         with self.get_session() as session:
             doc_id = str(uuid.uuid4())
             record = SourceDocumentRecord.from_source_document(
-                source_doc, document_id=doc_id, content_hash=content_hash
+                source_doc,
+                storage_uri=storage_uri,
+                document_id=doc_id,
+                content_hash=content_hash,
             )
             session.add(record)
             session.commit()

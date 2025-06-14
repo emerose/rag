@@ -77,12 +77,23 @@ class TestDocumentLoadingProcessor:
         # Create mock storage
         mock_storage = Mock()
         mock_source_doc = Mock()
-        mock_source_doc.content = "Test document content"
         mock_source_doc.content_hash = "test_hash"
         mock_source_doc.content_type = "text/plain"
         mock_source_doc.source_metadata = {"test": "metadata"}
         mock_source_doc.source_path = "/test/path"
         mock_source_doc.size_bytes = 100
+        
+        # Mock the to_source_document method to return a proper SourceDocument
+        from rag.sources.base import SourceDocument
+        mock_source_document = SourceDocument(
+            source_id="test-source-doc-id",
+            content="Test document content",
+            content_type="text/plain",
+            metadata={"test": "metadata"},
+            source_path="/test/path"
+        )
+        mock_source_doc.to_source_document.return_value = mock_source_document
+        
         mock_storage.get_source_document.return_value = mock_source_doc
         return DocumentLoadingProcessor(config, mock_storage)
 

@@ -69,12 +69,7 @@ class PipelineFactory:
             progress_callback=progress_callback,
         )
 
-        # Create storage
-        storage = PipelineStorage(pipeline_config.database_url)
-
-        # Note: document_source no longer needed for pipeline creation
-
-        # Create dependencies for processors
+        # Create dependencies for processors first
         from rag.config.components import EmbeddingConfig
         from rag.embeddings import EmbeddingProvider
 
@@ -91,6 +86,9 @@ class PipelineFactory:
         # Create document store with proper database URL
         db_path = Path(config.data_dir) / "documents.db"
         document_store = SQLAlchemyDocumentStore(db_path=db_path)
+
+        # Create storage with document store for content management
+        storage = PipelineStorage(pipeline_config.database_url, document_store)
 
         # Create vector store using the embedding service directly
         # For now, we'll create a simple in-memory vector store
@@ -179,7 +177,11 @@ class PipelineFactory:
         """
         # Use in-memory database for testing
         if storage is None:
-            storage = PipelineStorage("sqlite:///:memory:")
+            # Create fake document store for testing
+            from rag.storage.document_store import FakeDocumentStore
+
+            fake_document_store = FakeDocumentStore()
+            storage = PipelineStorage("sqlite:///:memory:", fake_document_store)
 
         # Use provided config or create default
         if config is None:

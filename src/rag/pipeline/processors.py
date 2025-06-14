@@ -120,7 +120,7 @@ class DefaultProcessorFactory:
     ) -> DocumentLoadingProcessor:
         """Create a document loading processor with default config."""
         config = DocumentLoadingConfig()  # Uses default values
-        return DocumentLoadingProcessor(config, self.storage)
+        return DocumentLoadingProcessor(config, self.storage, self.document_store)
 
     def create_chunking_processor(self, document: SourceDocument) -> ChunkingProcessor:
         """Create a chunking processor with default config."""
@@ -244,15 +244,19 @@ class DocumentLoadingProcessor(BaseTaskProcessor):
 
     task_type = TaskType.DOCUMENT_LOADING
 
-    def __init__(self, config: DocumentLoadingConfig, storage: Any):
+    def __init__(
+        self, config: DocumentLoadingConfig, storage: Any, document_store: Any = None
+    ):
         """Initialize the document loading processor.
 
         Args:
             config: Configuration for document loading
             storage: Storage instance for loading source documents
+            document_store: Optional document store for content retrieval
         """
         self.config = config
         self.storage = storage
+        self.document_store = document_store
 
     def process(self, task: ProcessingTask, input_data: dict[str, Any]) -> TaskResult:
         """Load document content from SourceDocument record.
@@ -276,7 +280,7 @@ class DocumentLoadingProcessor(BaseTaskProcessor):
 
             # Load source document from storage
             try:
-                source_doc = self.storage.get_source_document(source_document_id)
+                source_doc_record = self.storage.get_source_document(source_document_id)
             except ValueError as e:
                 return TaskResult(
                     success=False,
@@ -284,14 +288,17 @@ class DocumentLoadingProcessor(BaseTaskProcessor):
                     error_message=f"Failed to load source document: {e}",
                 )
 
+            # Convert SourceDocumentRecord to SourceDocument with content
+            source_doc = source_doc_record.to_source_document(self.document_store)
+
             # Prepare output data
             output_data = {
                 "content": source_doc.content,
-                "content_hash": source_doc.content_hash,
+                "content_hash": source_doc_record.content_hash,
                 "content_type": source_doc.content_type,
-                "metadata": source_doc.source_metadata,
+                "metadata": source_doc.metadata,
                 "source_path": source_doc.source_path,
-                "size_bytes": source_doc.size_bytes,
+                "size_bytes": source_doc_record.size_bytes,
             }
 
             # Metrics

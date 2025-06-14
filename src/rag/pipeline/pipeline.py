@@ -12,7 +12,13 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, TypedDict, cast
 
-from rag.pipeline.models import PipelineState, ProcessingTask, TaskState, TaskType
+from rag.pipeline.models import (
+    DocumentProcessing,
+    PipelineState,
+    ProcessingTask,
+    TaskState,
+    TaskType,
+)
 from rag.pipeline.processors import ProcessorFactory
 from rag.sources.base import SourceDocument
 from rag.utils.logging_utils import get_logger
@@ -191,6 +197,9 @@ class Pipeline:
         except Exception as e:
             raise ValueError(f"Cannot start execution: {e}") from e
 
+        # Save the state change to storage
+        self.storage.update_pipeline_state(execution_id, execution.state)
+
         self._running = True
         self._paused = False
 
@@ -329,7 +338,8 @@ class Pipeline:
 
         # Process documents concurrently
         futures: list[Future[bool]] = []
-        for doc in documents:
+        doc_list: list[DocumentProcessing] = cast(list[DocumentProcessing], documents)
+        for doc in doc_list:
             if doc.current_state not in (TaskState.COMPLETED, TaskState.CANCELLED):
                 if self._executor is None:
                     raise RuntimeError(
@@ -403,7 +413,8 @@ class Pipeline:
 
             # Process tasks in order
             task_outputs: dict[str, Any] = {}
-            for task in sorted(tasks, key=lambda t: t.sequence_number):
+            task_list: list[ProcessingTask] = cast(list[ProcessingTask], tasks)
+            for task in sorted(task_list, key=lambda t: t.sequence_number):
                 if self._paused:
                     logger.info("Pipeline paused, stopping document processing")
                     break

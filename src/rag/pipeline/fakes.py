@@ -84,9 +84,14 @@ class FakeTask:
 class FakePipelineStorage:
     """Comprehensive fake pipeline storage for testing."""
 
-    def __init__(self, database_url: str = "sqlite:///:memory:"):
+    def __init__(
+        self,
+        database_url: str = "sqlite:///:memory:",
+        document_store: Any | None = None,
+    ):
         """Initialize fake storage."""
         self.database_url = database_url
+        self.document_store = document_store
         self.executions: dict[str, dict[str, Any]] = {}
         self.documents: dict[str, dict[str, Any]] = {}
         self.tasks: dict[str, dict[str, Any]] = {}
@@ -137,10 +142,23 @@ class FakePipelineStorage:
         if not hasattr(self, "source_documents"):
             self.source_documents: dict[str, dict[str, Any]] = {}
 
+        # Store content and get storage URI
+        if self.document_store is not None:
+            try:
+                storage_uri = self.document_store.store_content(
+                    content, content_type or "text/plain"
+                )
+            except Exception:
+                # Fallback: use content directly as storage_uri for compatibility
+                storage_uri = content
+        else:
+            # No document store available, use content directly
+            storage_uri = content
+
         self.source_documents[doc_id] = {
             "id": doc_id,
             "source_id": source_id,
-            "content": content,
+            "storage_uri": storage_uri,
             "content_type": content_type,
             "content_hash": content_hash,
             "size_bytes": size_bytes or len(content.encode("utf-8")),
@@ -161,10 +179,13 @@ class FakePipelineStorage:
         if not hasattr(self, "source_documents"):
             self.source_documents: dict[str, dict[str, Any]] = {}
 
+        # For fake storage, just use content as storage_uri for simplicity
+        storage_uri = source_doc.get_content_as_string()
+
         self.source_documents[doc_id] = {
             "id": doc_id,
             "source_id": source_doc.source_id,
-            "content": source_doc.get_content_as_string(),
+            "storage_uri": storage_uri,
             "content_type": source_doc.content_type,
             "content_hash": content_hash,
             "size_bytes": len(source_doc.get_content_as_bytes()),
@@ -188,7 +209,7 @@ class FakePipelineStorage:
         source_doc = Mock()
         source_doc.id = data["id"]
         source_doc.source_id = data["source_id"]
-        source_doc.content = data["content"]
+        source_doc.storage_uri = data["storage_uri"]
         source_doc.content_type = data["content_type"]
         source_doc.content_hash = data["content_hash"]
         source_doc.size_bytes = data["size_bytes"]
@@ -197,10 +218,12 @@ class FakePipelineStorage:
         source_doc.created_at = data["created_at"]
 
         # Add conversion method that returns a domain SourceDocument
-        def to_source_document():
+        def to_source_document(document_store: Any = None):
+            # For fake storage, storage_uri contains the content directly
+            content = data["storage_uri"]
             return SourceDocument(
                 source_id=data["source_id"],
-                content=data["content"],
+                content=content,
                 metadata=data["source_metadata"],
                 content_type=data["content_type"],
                 source_path=data["source_path"],
@@ -227,7 +250,7 @@ class FakePipelineStorage:
                 source_doc = Mock()
                 source_doc.id = data["id"]
                 source_doc.source_id = data["source_id"]
-                source_doc.content = data["content"]
+                source_doc.storage_uri = data["storage_uri"]
                 source_doc.content_type = data["content_type"]
                 source_doc.content_hash = data["content_hash"]
                 source_doc.size_bytes = data["size_bytes"]
@@ -1292,10 +1315,12 @@ def create_fake_pipeline_components(
     Returns:
         Tuple of (storage, processor_factory, document_source)
     """
-    storage = FakePipelineStorage()
     document_source = FakeDocumentSource(documents)
     document_store = FakeDocumentStore()
     vector_store = FakeVectorStore()
+
+    # Pass document_store to storage for content management
+    storage = FakePipelineStorage(document_store=document_store)
 
     processor_factory = FakeProcessorFactory(
         failing_task_types=failing_task_types,

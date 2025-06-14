@@ -33,7 +33,7 @@ def in_memory_db():
     generic_source_doc = SourceDocumentRecord(
         id="source-doc-generic",
         source_id="test.txt",
-        content="This is generic test content",
+        storage_uri="test://generic-content",
         content_type="text/plain",
         source_path="/test/test.txt",
         source_metadata={},
@@ -112,7 +112,7 @@ class TestDocumentProcessingModel:
         source_doc = SourceDocumentRecord(
             id="source-doc-1",
             source_id="test.txt",
-            content="This is test content",
+            storage_uri="test://content-1",
             content_type="text/plain",
             source_path="/test/test.txt",
             source_metadata={"size": 100},
@@ -153,7 +153,7 @@ class TestDocumentProcessingModel:
         source_doc = SourceDocumentRecord(
             id="source-doc-2",
             source_id="test2.txt",
-            content="This is test content 2",
+            storage_uri="test://content-2",
             content_type="text/plain",
             source_path="/test/test2.txt",
             source_metadata={},
@@ -189,7 +189,7 @@ class TestDocumentProcessingModel:
         source_doc = SourceDocumentRecord(
             id="source-doc-3",
             source_id="test3.txt",
-            content="This is test content 3",
+            storage_uri="test://content-3",
             content_type="text/plain",
             source_path="/test/test3.txt",
             source_metadata={},
@@ -232,7 +232,7 @@ class TestProcessingTaskModel:
         source_doc = SourceDocumentRecord(
             id="source-doc-test4",
             source_id="test.txt",
-            content="This is test content",
+            storage_uri="test://content-4",
             content_type="text/plain",
             source_path="/test/test.txt",
             source_metadata={},
@@ -282,7 +282,7 @@ class TestProcessingTaskModel:
         source_doc = SourceDocumentRecord(
             id="source-doc-test5",
             source_id="test.txt",
-            content="This is test content",
+            storage_uri="test://content-5",
             content_type="text/plain",
             source_path="/test/test.txt",
             source_metadata={},
