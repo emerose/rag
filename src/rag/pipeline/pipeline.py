@@ -10,7 +10,7 @@ import hashlib
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 from rag.pipeline.models import PipelineState, ProcessingTask, TaskState, TaskType
 from rag.pipeline.processors import ProcessorFactory
@@ -158,7 +158,9 @@ class Pipeline:
                 },
             ]
 
-            self.storage.create_processing_tasks(doc_processing_id, task_configs)
+            self.storage.create_processing_tasks(
+                doc_processing_id, cast(list[dict[str, Any]], task_configs)
+            )
 
         logger.info(
             f"Created pipeline execution {execution_id} with {len(documents)} documents"
@@ -327,13 +329,13 @@ class Pipeline:
 
         # Process documents concurrently
         futures: list[Future[bool]] = []
-        for doc in documents:  # type: ignore[assignment]
-            if doc.current_state not in (TaskState.COMPLETED, TaskState.CANCELLED):  # type: ignore[attr-defined]
+        for doc in documents:
+            if doc.current_state not in (TaskState.COMPLETED, TaskState.CANCELLED):
                 if self._executor is None:
                     raise RuntimeError(
                         "Pipeline has been shutdown and cannot process documents"
                     )
-                future = self._executor.submit(self._process_document, doc.id)  # type: ignore[attr-defined]
+                future = self._executor.submit(self._process_document, doc.id)
                 futures.append(future)
 
                 # Limit concurrent documents
@@ -401,13 +403,13 @@ class Pipeline:
 
             # Process tasks in order
             task_outputs: dict[str, Any] = {}
-            for task in sorted(tasks, key=lambda t: t.sequence_number):  # type: ignore[arg-type, return-value, misc]
+            for task in sorted(tasks, key=lambda t: t.sequence_number):
                 if self._paused:
                     logger.info("Pipeline paused, stopping document processing")
                     break
 
                 # Check if task needs processing
-                if task.state in (TaskState.COMPLETED, TaskState.CANCELLED):  # type: ignore[attr-defined]
+                if task.state in (TaskState.COMPLETED, TaskState.CANCELLED):
                     continue
 
                 # Check dependencies using task's built-in method
@@ -428,16 +430,16 @@ class Pipeline:
                             f"Dependency task {depends_on_task_id} not found: {e!s}",
                         )
 
-                can_start, reason = task.can_start(dependency_checker)  # type: ignore[attr-defined]
+                can_start, reason = task.can_start(dependency_checker)
                 if not can_start:
-                    logger.warning(f"Cannot start task {task.id}: {reason}")  # type: ignore[attr-defined]
+                    logger.warning(f"Cannot start task {task.id}: {reason}")
                     continue
 
                 # Process the task
-                success = self._process_task(task, task_outputs)  # type: ignore[arg-type]
+                success = self._process_task(task, task_outputs)
                 if not success:
                     # Task failed after retries
-                    logger.error(f"Task {task.id} failed permanently")  # type: ignore[attr-defined]
+                    logger.error(f"Task {task.id} failed permanently")
                     break
 
             # Check if all tasks completed
