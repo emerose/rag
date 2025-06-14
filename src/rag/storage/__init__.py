@@ -9,7 +9,14 @@ from .fakes import (
     InMemoryFileSystem,
 )
 from .filesystem import FilesystemManager
-from .models import Base, Document, SourceDocument, SourceDocumentChunk
+from .models import (
+    Base,
+    Chunk,
+    Document,
+    SourceDocument,
+    SourceDocumentChunk,
+    StoredDocument,
+)
 from .protocols import (
     DocumentStoreProtocol,
     FileSystemProtocol,
@@ -27,6 +34,7 @@ from .vector_store import (
 
 __all__ = [
     "Base",
+    "Chunk",
     "Document",
     "DocumentStoreProtocol",
     "FAISSVectorStore",
@@ -41,6 +49,7 @@ __all__ = [
     "SourceDocument",
     "SourceDocumentChunk",
     "SourceDocumentMetadata",
+    "StoredDocument",
     "VectorStoreFactory",
     "VectorStoreProtocol",
 ]

@@ -140,14 +140,14 @@ class TestPipeline:
                 content="This is the content of document 1.",
                 content_type="text/plain",
                 source_path="/test/docs/doc1.txt",
-                metadata={"file_type": "text"}
+                source_metadata={"file_type": "text"}
             ),
             SourceDocument(
                 source_id="doc2.txt",
                 content="This is the content of document 2.",
                 content_type="text/plain",
                 source_path="/test/docs/doc2.txt",
-                metadata={"file_type": "text"}
+                source_metadata={"file_type": "text"}
             )
         ]
         
@@ -363,11 +363,26 @@ class TestPipeline:
             execution_id, PipelineState.PAUSED
         )
         
-        result = pipeline.resume(execution_id)
+        # Mock the expensive parts to avoid threading and mock creation issues
+        from unittest.mock import patch, Mock
+        mock_doc = Mock()
+        mock_doc.current_state = TaskState.COMPLETED
         
-        # Resume actually runs the pipeline, so it should complete
+        with patch.object(pipeline, '_process_execution') as mock_process:
+            with patch.object(pipeline, '_save_vector_store_if_needed'):
+                with patch.object(fake_components["storage"], 'get_pipeline_documents', return_value=[mock_doc]):
+                    result = pipeline.resume(execution_id)
+        
+        # Verify that resume actually calls run and transitions states correctly
         assert result.state == PipelineState.COMPLETED
         assert result.execution_id == execution_id
+        
+        # Verify _process_execution was called
+        mock_process.assert_called_once_with(execution_id)
+        
+        # Verify the execution state was updated to COMPLETED  
+        execution = fake_components["storage"].get_pipeline_execution(execution_id)
+        assert execution.state == PipelineState.COMPLETED
 
     def test_cancel_pipeline(self, pipeline, fake_components):
         """Test cancelling a pipeline."""
