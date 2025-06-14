@@ -256,7 +256,6 @@ class PipelineStorage:
                 source_doc,
                 storage_uri=storage_uri,
                 document_id=doc_id,
-                content_hash=content_hash,
             )
             session.add(record)
             session.commit()

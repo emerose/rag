@@ -99,10 +99,10 @@ class Pipeline:
         documents: list[SourceDocument],
         metadata: dict[str, Any] | None = None,
     ) -> str:
-        """Start a new pipeline execution with a collection of documents.
+        """Start a new pipeline execution.
 
         Args:
-            documents: List of SourceDocument objects to process
+            documents: List of source documents to process
             metadata: Optional execution metadata
 
         Returns:
@@ -116,9 +116,8 @@ class Pipeline:
         # Create source documents and processing records
         for source_doc in documents:
             # Create source document record in storage using conversion method
-            content_hash = self._compute_content_hash(source_doc.content)
             source_document_id = self.storage.create_source_document_from_domain(
-                source_doc, content_hash=content_hash
+                source_doc, content_hash=source_doc.content_hash
             )
 
             # Build processing config (only processing-specific settings, no content)

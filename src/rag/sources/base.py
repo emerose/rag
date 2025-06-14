@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import AsyncIterator, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol, runtime_checkable
 
 
@@ -25,13 +26,17 @@ class SourceDocument:
     metadata: dict[str, Any]
 
     # Content type (MIME type)
-    content_type: str | None = None
+    content_type: str = field(default="text/plain")
 
     # Source path or URI
-    source_path: str | None = None
+    source_path: str | None = field(default=None)
 
     # Content hash for change detection
-    content_hash: str | None = None
+    content_hash: str = field(default=None, init=False)
+
+    def __post_init__(self) -> None:
+        """Initialize content hash after content is set."""
+        self.content_hash = self.compute_content_hash()
 
     @property
     def is_binary(self) -> bool:
@@ -54,6 +59,15 @@ class SourceDocument:
         if isinstance(self.content, str):
             return self.content
         return self.content.decode(encoding)
+
+    def compute_content_hash(self) -> str:
+        """Compute SHA-256 hash of document content.
+
+        Returns:
+            Hex digest of the content hash
+        """
+        content_bytes = self.get_content_as_bytes()
+        return hashlib.sha256(content_bytes).hexdigest()
 
 
 @runtime_checkable

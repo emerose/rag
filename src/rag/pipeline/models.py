@@ -143,7 +143,6 @@ class SourceDocumentRecord(Base):
         source_doc: SourceDocument,
         storage_uri: str,
         document_id: str | None = None,
-        content_hash: str | None = None,
     ) -> SourceDocumentRecord:
         """Create a database record from a domain SourceDocument.
 
@@ -151,7 +150,6 @@ class SourceDocumentRecord(Base):
             source_doc: The domain SourceDocument to convert
             storage_uri: URI where the content is stored
             document_id: Optional ID for the record (will be generated if not provided)
-            content_hash: Optional content hash (will be calculated if not provided)
 
         Returns:
             New SourceDocumentRecord instance (not yet saved to database)
@@ -164,7 +162,7 @@ class SourceDocumentRecord(Base):
             source_id=source_doc.source_id,
             storage_uri=storage_uri,
             content_type=source_doc.content_type,
-            content_hash=content_hash or source_doc.content_hash,
+            content_hash=source_doc.content_hash,
             size_bytes=len(source_doc.get_content_as_bytes()),
             source_path=source_doc.source_path,
             source_metadata=source_doc.metadata,
