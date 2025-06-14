@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from rag.sources.base import SourceDocument
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
@@ -22,7 +25,7 @@ from rag.pipeline.models import (
     PipelineExecution,
     PipelineState,
     ProcessingTask,
-    SourceDocument,
+    SourceDocumentRecord,
     TaskState,
     TaskType,
     VectorStorageTask,
@@ -152,7 +155,7 @@ class PipelineStorage:
         """
         with self.get_session() as session:
             doc_id = str(uuid.uuid4())
-            source_doc = SourceDocument(
+            source_doc = SourceDocumentRecord(
                 id=doc_id,
                 source_id=source_id,
                 content=content,
@@ -167,7 +170,29 @@ class PipelineStorage:
             session.commit()
             return doc_id
 
-    def get_source_document(self, document_id: str) -> SourceDocument:
+    def create_source_document_from_domain(
+        self, source_doc: SourceDocument, content_hash: str | None = None
+    ) -> str:
+        """Create a source document record from a domain SourceDocument.
+
+        Args:
+            source_doc: The domain SourceDocument to store
+            content_hash: Optional content hash for deduplication
+
+        Returns:
+            Source document ID
+        """
+
+        with self.get_session() as session:
+            doc_id = str(uuid.uuid4())
+            record = SourceDocumentRecord.from_source_document(
+                source_doc, document_id=doc_id, content_hash=content_hash
+            )
+            session.add(record)
+            session.commit()
+            return doc_id
+
+    def get_source_document(self, document_id: str) -> SourceDocumentRecord:
         """Get a source document by ID.
 
         Args:
@@ -180,7 +205,7 @@ class PipelineStorage:
             ValueError: If source document is not found
         """
         with self.get_session() as session:
-            result = session.get(SourceDocument, document_id)
+            result = session.get(SourceDocumentRecord, document_id)
             if result is None:
                 raise ValueError(f"Source document not found: {document_id}")
             # Refresh to ensure all attributes are loaded

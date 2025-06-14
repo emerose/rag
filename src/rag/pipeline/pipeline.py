@@ -116,15 +116,10 @@ class Pipeline:
 
         # Create source documents and processing records
         for source_doc in documents:
-            # Create source document record in storage
-            source_document_id = self.storage.create_source_document(
-                source_id=source_doc.source_id,
-                content=source_doc.get_content_as_string(),
-                content_type=source_doc.content_type,
-                content_hash=self._compute_content_hash(source_doc.content),
-                size_bytes=len(source_doc.get_content_as_bytes()),
-                source_path=source_doc.source_path,
-                source_metadata=source_doc.metadata,
+            # Create source document record in storage using conversion method
+            content_hash = self._compute_content_hash(source_doc.content)
+            source_document_id = self.storage.create_source_document_from_domain(
+                source_doc, content_hash=content_hash
             )
 
             # Build processing config (only processing-specific settings, no content)
@@ -368,14 +363,8 @@ class Pipeline:
                 # Load the actual source document from storage
                 stored_source_doc = self.storage.get_source_document(source_document_id)
 
-                # Convert to SourceDocument from sources.base
-                return SourceDocument(
-                    source_id=stored_source_doc.source_id,
-                    content=stored_source_doc.content,
-                    content_type=stored_source_doc.content_type,
-                    source_path=stored_source_doc.source_path,
-                    metadata=stored_source_doc.source_metadata,
-                )
+                # Convert to SourceDocument using conversion method
+                return stored_source_doc.to_source_document()
             except (ValueError, AttributeError):
                 # Fallback if storage fails
                 pass

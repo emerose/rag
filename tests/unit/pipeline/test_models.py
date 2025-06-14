@@ -14,7 +14,7 @@ from rag.pipeline.models import (
     PipelineExecution,
     PipelineState,
     ProcessingTask,
-    SourceDocument,
+    SourceDocumentRecord,
     TaskState,
     TaskType,
     VectorStorageTask,
@@ -30,7 +30,7 @@ def in_memory_db():
     session = SessionLocal()
     
     # Create a generic source document that can be referenced by tests
-    generic_source_doc = SourceDocument(
+    generic_source_doc = SourceDocumentRecord(
         id="source-doc-generic",
         source_id="test.txt",
         content="This is generic test content",
@@ -109,7 +109,7 @@ class TestDocumentProcessingModel:
         in_memory_db.add(execution)
         
         # Create source document
-        source_doc = SourceDocument(
+        source_doc = SourceDocumentRecord(
             id="source-doc-1",
             source_id="test.txt",
             content="This is test content",
@@ -150,7 +150,7 @@ class TestDocumentProcessingModel:
         in_memory_db.add(execution)
         
         # Create source document
-        source_doc = SourceDocument(
+        source_doc = SourceDocumentRecord(
             id="source-doc-2",
             source_id="test2.txt",
             content="This is test content 2",
@@ -186,7 +186,7 @@ class TestDocumentProcessingModel:
         in_memory_db.add(execution)
         
         # Create source document
-        source_doc = SourceDocument(
+        source_doc = SourceDocumentRecord(
             id="source-doc-3",
             source_id="test3.txt",
             content="This is test content 3",
@@ -229,7 +229,7 @@ class TestProcessingTaskModel:
         in_memory_db.add(execution)
         
         # Create source document
-        source_doc = SourceDocument(
+        source_doc = SourceDocumentRecord(
             id="source-doc-test4",
             source_id="test.txt",
             content="This is test content",
@@ -279,7 +279,7 @@ class TestProcessingTaskModel:
         in_memory_db.add(execution)
         
         # Create source document
-        source_doc = SourceDocument(
+        source_doc = SourceDocumentRecord(
             id="source-doc-test5",
             source_id="test.txt",
             content="This is test content",

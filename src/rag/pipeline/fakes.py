@@ -150,6 +150,30 @@ class FakePipelineStorage:
         }
         return doc_id
 
+    def create_source_document_from_domain(
+        self, source_doc: SourceDocument, content_hash: str | None = None
+    ) -> str:
+        """Create a source document record from a domain SourceDocument."""
+        doc_id = f"source-doc-{self._next_id}"
+        self._next_id += 1
+
+        # Store source documents separately
+        if not hasattr(self, "source_documents"):
+            self.source_documents: dict[str, dict[str, Any]] = {}
+
+        self.source_documents[doc_id] = {
+            "id": doc_id,
+            "source_id": source_doc.source_id,
+            "content": source_doc.get_content_as_string(),
+            "content_type": source_doc.content_type,
+            "content_hash": content_hash,
+            "size_bytes": len(source_doc.get_content_as_bytes()),
+            "source_path": source_doc.source_path,
+            "source_metadata": source_doc.metadata,
+            "created_at": datetime.now(UTC),
+        }
+        return doc_id
+
     def get_source_document(self, document_id: str):
         """Get a source document by ID."""
         if not hasattr(self, "source_documents"):
@@ -160,7 +184,7 @@ class FakePipelineStorage:
 
         data = self.source_documents[document_id]
 
-        # Create mock source document object
+        # Create mock source document record object with conversion method
         source_doc = Mock()
         source_doc.id = data["id"]
         source_doc.source_id = data["source_id"]
@@ -171,6 +195,18 @@ class FakePipelineStorage:
         source_doc.source_path = data["source_path"]
         source_doc.source_metadata = data["source_metadata"]
         source_doc.created_at = data["created_at"]
+
+        # Add conversion method that returns a domain SourceDocument
+        def to_source_document():
+            return SourceDocument(
+                source_id=data["source_id"],
+                content=data["content"],
+                metadata=data["source_metadata"],
+                content_type=data["content_type"],
+                source_path=data["source_path"],
+            )
+
+        source_doc.to_source_document = to_source_document
 
         return source_doc
 

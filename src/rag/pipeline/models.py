@@ -8,7 +8,10 @@ from __future__ import annotations
 
 import enum
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from rag.sources.base import SourceDocument
 
 from sqlalchemy import (
     JSON,
@@ -62,8 +65,8 @@ class PipelineState(enum.Enum):
     CANCELLED = "cancelled"
 
 
-class SourceDocument(Base):
-    """Source documents that can be processed by pipelines.
+class SourceDocumentRecord(Base):
+    """Database record for source documents that can be processed by pipelines.
 
     This table stores the actual document content and metadata,
     separate from the processing configuration.
@@ -99,7 +102,55 @@ class SourceDocument(Base):
     )
 
     def __repr__(self) -> str:
-        return f"<SourceDocument(id='{self.id}', source_id='{self.source_id}')>"
+        return f"<SourceDocumentRecord(id='{self.id}', source_id='{self.source_id}')>"
+
+    def to_source_document(self) -> SourceDocument:
+        """Convert this database record to a domain SourceDocument.
+
+        Returns:
+            SourceDocument from the sources module
+        """
+        from rag.sources.base import SourceDocument
+
+        return SourceDocument(
+            source_id=self.source_id,
+            content=self.content,
+            metadata=self.source_metadata,
+            content_type=self.content_type,
+            source_path=self.source_path,
+        )
+
+    @classmethod
+    def from_source_document(
+        cls,
+        source_doc: SourceDocument,
+        document_id: str | None = None,
+        content_hash: str | None = None,
+    ) -> SourceDocumentRecord:
+        """Create a database record from a domain SourceDocument.
+
+        Args:
+            source_doc: The domain SourceDocument to convert
+            document_id: Optional ID for the record (will be generated if not provided)
+            content_hash: Optional content hash (will be calculated if not provided)
+
+        Returns:
+            New SourceDocumentRecord instance (not yet saved to database)
+        """
+        import uuid
+        from datetime import UTC, datetime
+
+        return cls(
+            id=document_id or str(uuid.uuid4()),
+            source_id=source_doc.source_id,
+            content=source_doc.get_content_as_string(),
+            content_type=source_doc.content_type,
+            content_hash=content_hash,
+            size_bytes=len(source_doc.get_content_as_bytes()),
+            source_path=source_doc.source_path,
+            source_metadata=source_doc.metadata,
+            created_at=datetime.now(UTC),
+        )
 
 
 class PipelineExecution(Base):
@@ -182,8 +233,8 @@ class DocumentProcessing(Base):
     execution: Mapped[PipelineExecution] = relationship(
         "PipelineExecution", back_populates="documents"
     )
-    source_document: Mapped[SourceDocument] = relationship(
-        "SourceDocument", back_populates="document_processings"
+    source_document: Mapped[SourceDocumentRecord] = relationship(
+        "SourceDocumentRecord", back_populates="document_processings"
     )
     tasks: Mapped[list[ProcessingTask]] = relationship(
         "ProcessingTask", back_populates="document", cascade="all, delete-orphan"

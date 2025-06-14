@@ -7,14 +7,17 @@ retry handling, and state consistency enforcement.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, Protocol
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol
+
+if TYPE_CHECKING:
+    from rag.sources.base import SourceDocument
 
 from rag.pipeline.models import (
     DocumentProcessing,
     PipelineExecution,
     PipelineState,
     ProcessingTask,
-    SourceDocument,
+    SourceDocumentRecord,
     TaskState,
     TaskType,
 )
@@ -106,8 +109,14 @@ class PipelineStorageProtocol(Protocol):
         """Create a source document record."""
         ...
 
-    def get_source_document(self, document_id: str) -> SourceDocument:
+    def get_source_document(self, document_id: str) -> SourceDocumentRecord:
         """Get a source document by ID."""
+        ...
+
+    def create_source_document_from_domain(
+        self, source_doc: SourceDocument, content_hash: str | None = None
+    ) -> str:
+        """Create a source document record from a domain SourceDocument."""
         ...
 
     def create_document_processing(
